@@ -19,7 +19,13 @@ export type Action =
   | "mot.create"
   | "attention.create"
   | "custody.confirm"
-  | "inventory.operate";
+  | "inventory.operate"
+  | "quote.create"
+  | "quote.price"
+  | "quote.follow"
+  | "sale.receive"
+  | "agenda.use"
+  | "goals.manage";
 
 export function can(role: Role, action: Action, companyCode?: string | null): boolean {
   const admin = role === "ADMINISTRADOR";
@@ -82,6 +88,25 @@ export function can(role: Role, action: Action, companyCode?: string | null): bo
       if (companyCode === "SYSTRON") return admin || ceo || gerenteSy || role === "ALMACEN";
       if (companyCode === "SERVOMOTORES") return admin || ceo || gerenteSm;
       return false;
+    case "quote.create":
+      if (admin || ceo || coord) return true;
+      if (companyCode === "SYSTRON") return sales;
+      if (companyCode === "SERVOMOTORES") return gerenteSm;
+      return false;
+    case "quote.price":
+      if (admin || ceo) return true;
+      return companyCode === "SERVOMOTORES" && gerenteSm;
+    case "quote.follow":
+      if (admin || ceo || coord) return true;
+      if (companyCode === "SYSTRON") return sales;
+      if (companyCode === "SERVOMOTORES") return gerenteSm;
+      return false;
+    case "sale.receive":
+      return companyCode === "SYSTRON" && (admin || ceo || gerenteSy || role === "ALMACEN");
+    case "agenda.use":
+      return admin || ceo || sales || gerenteSm;
+    case "goals.manage":
+      return (admin || ceo) && companyCode === "SYSTRON";
     default:
       return false;
   }

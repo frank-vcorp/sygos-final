@@ -39,6 +39,12 @@ model Company {
   custodyMovements CustodyMovement[]
   parts            Part[]
   stockMovements   StockMovement[]
+  quotes           Quote[]
+  sales            Sale[]
+  agendaCategories AgendaCategory[]
+  agendaActivities AgendaActivity[]
+  goalTypes        GoalType[]
+  salesGoals       SalesGoal[]
 }
 
 model User {
@@ -100,6 +106,8 @@ model Client {
   prospects  Prospect[]
   equipments Equipment[]
   attentions Attention[]
+  quotes     Quote[]
+  sales      Sale[]
 
   @@index([companyId, name])
 }
@@ -238,6 +246,7 @@ model Equipment {
   attentions     Attention[]
   movements      CustodyMovement[]
   technicalCases TechnicalCase[]
+  quotes         Quote[]
 
   @@index([originCompanyId, kind])
   @@index([custody])
@@ -425,6 +434,130 @@ model StockMovement {
   createdAt    DateTime @default(now())
 
   @@index([partId, createdAt])
+}
+
+model Quote {
+  id                 String   @id @default(cuid())
+  folio              String   @unique
+  companyId          String
+  company            Company  @relation(fields: [companyId], references: [id])
+  clientId           String
+  client             Client   @relation(fields: [clientId], references: [id])
+  quoteType          String
+  status             String
+  equipmentId        String?
+  equipment          Equipment? @relation(fields: [equipmentId], references: [id])
+  technicalCaseId    String?
+  linkedQuoteId      String?
+  preliminaryType    String?
+  preliminaryBrand   String?
+  preliminaryModel   String?
+  preliminarySerial  String?
+  reference          String?
+  creditDays         Int?
+  discountPct        Float    @default(0)
+  sellerUserId       String?
+  version            Int      @default(1)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  lines QuoteLine[]
+  sales Sale[]
+
+  @@index([companyId, status])
+  @@index([technicalCaseId])
+}
+
+model QuoteLine {
+  id           String  @id @default(cuid())
+  quoteId      String
+  quote        Quote   @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  concept      String
+  quantity     Int     @default(1)
+  unitPrice    Float?
+  basePrice    Float?
+  incrementPct Float?
+  authorized   Boolean @default(false)
+}
+
+model Sale {
+  id        String   @id @default(cuid())
+  folio     String   @unique
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id])
+  clientId  String
+  client    Client   @relation(fields: [clientId], references: [id])
+  quoteId   String
+  quote     Quote    @relation(fields: [quoteId], references: [id])
+  createdAt DateTime @default(now())
+
+  lines SaleLine[]
+}
+
+model SaleLine {
+  id           String @id @default(cuid())
+  saleId       String
+  sale         Sale   @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  concept      String
+  qtySold      Int
+  qtyReceived  Int    @default(0)
+  qtyDelivered Int    @default(0)
+}
+
+model AgendaCategory {
+  id             String   @id @default(cuid())
+  companyId      String
+  company        Company  @relation(fields: [companyId], references: [id])
+  name           String
+  countsForGoals Boolean  @default(false)
+  active         Boolean  @default(true)
+
+  activities AgendaActivity[]
+
+  @@unique([companyId, name])
+}
+
+model AgendaActivity {
+  id           String          @id @default(cuid())
+  companyId    String
+  company      Company         @relation(fields: [companyId], references: [id])
+  authorUserId String
+  categoryId   String?
+  category     AgendaCategory? @relation(fields: [categoryId], references: [id])
+  clientId     String?
+  prospectId   String?
+  note         String
+  scheduledAt  DateTime
+  evidence     String?
+  createdAt    DateTime        @default(now())
+
+  @@index([companyId, scheduledAt])
+}
+
+model GoalType {
+  id        String  @id @default(cuid())
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+  name      String
+  active    Boolean @default(true)
+
+  goals SalesGoal[]
+
+  @@unique([companyId, name])
+}
+
+model SalesGoal {
+  id         String   @id @default(cuid())
+  companyId  String
+  company    Company  @relation(fields: [companyId], references: [id])
+  userId     String
+  goalTypeId String
+  goalType   GoalType @relation(fields: [goalTypeId], references: [id])
+  year       Int
+  month      Int
+  target     Int
+
+  @@unique([companyId, userId, goalTypeId, year, month])
 }
 
 model FunctionalHistory {

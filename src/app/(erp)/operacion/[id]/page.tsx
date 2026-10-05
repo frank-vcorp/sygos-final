@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { prepareFromCaseAction } from "@/app/(erp)/cotizaciones/actions";
 import {
   assignCaseAction,
   externalDocumentAction,
@@ -98,7 +99,12 @@ export default async function OperacionDetallePage({ params }: { params: Promise
             {row.externalDocument ? <p className="mt-1">Documento externo: {row.externalDocument}</p> : null}
             {original ? <p className="mt-1">Reparación de origen: <Link href={`/operacion/${original.id}`} className="text-[var(--accent)]">{original.folio}</Link></p> : null}
             {derived ? <p className="mt-1">Reparación en garantía: <Link href={`/operacion/${derived.id}`} className="text-[var(--accent)]">{derived.folio}</Link></p> : null}
-            {row.quotePending ? <p className="mt-3 text-[var(--muted)]">Queda pendiente de cotizar. La cotización se construye en la fase comercial.</p> : null}
+            {row.quotePending && can(session.role, "quote.price", session.activeCompanyCode) ? (
+              <form action={prepareFromCaseAction} className="mt-3">
+                <input type="hidden" name="caseId" value={row.id} />
+                <Button type="submit">Preparar cotización</Button>
+              </form>
+            ) : row.quotePending ? <p className="mt-3 text-[var(--muted)]">Queda pendiente de cotizar.</p> : null}
             {row.paidAt ? <p className="mt-1">Marcada como pagada {formatWhen(row.paidAt)}.</p> : null}
           </section>
           <section className="rounded-lg border border-[var(--line)] bg-white p-4">

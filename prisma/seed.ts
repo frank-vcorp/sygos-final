@@ -46,6 +46,7 @@ async function main() {
   await ensureVerificationUsers(systron.id, servomotores.id);
   await seedPriorities(systron.id, "SYSTRON");
   await seedPriorities(servomotores.id, "SERVOMOTORES");
+  await seedCommercialCatalogs(systron.id, servomotores.id);
 }
 
 async function seedPriorities(companyId: string, code: "SYSTRON" | "SERVOMOTORES") {
@@ -119,6 +120,23 @@ const VERIFICATION_USERS: Array<{ username: string; name: string; role: Role; co
   { username: "Ayudante", name: "Ayudante General", role: "AYUDANTE_GENERAL", company: "SERVOMOTORES" },
   { username: "Kiosco", name: "Kiosco de Asistencia", role: "KIOSCO_ASISTENCIA", company: "SYSTRON" },
 ];
+
+async function seedCommercialCatalogs(systronId: string, servomotoresId: string) {
+  for (const companyId of [systronId, servomotoresId]) {
+    for (const name of ["Visita", "Llamada", "Seguimiento"]) {
+      await prisma.agendaCategory.upsert({
+        where: { companyId_name: { companyId, name } },
+        update: {},
+        create: { companyId, name, countsForGoals: name === "Visita" },
+      });
+    }
+  }
+  await prisma.goalType.upsert({
+    where: { companyId_name: { companyId: systronId, name: "Clientes nuevos" } },
+    update: { active: true },
+    create: { companyId: systronId, name: "Clientes nuevos" },
+  });
+}
 
 async function ensureVerificationUsers(systronId: string, servomotoresId: string) {
   const password = process.env.VERIFICATION_PASSWORD?.trim() || "";

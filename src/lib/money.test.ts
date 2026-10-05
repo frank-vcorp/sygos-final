@@ -1,0 +1,22 @@
+import assert from "node:assert/strict";
+import { describe, it } from "node:test";
+import { finalFromBase, quoteTotals } from "./money";
+
+describe("cotización", () => {
+  it("calcula IVA de 16% después del descuento y en MXN", () => {
+    const totals = quoteTotals([{ quantity: 2, unitPrice: 1000 }], 10);
+    assert.equal(totals?.subtotal, 2000);
+    assert.equal(totals?.discount, 200);
+    assert.equal(totals?.base, 1800);
+    assert.equal(totals?.iva, 288);
+    assert.equal(totals?.total, 2088);
+  });
+
+  it("aplica el incremento congelado y no publica la base", () => {
+    assert.equal(finalFromBase(1000, 10), 1100);
+  });
+
+  it("no inventa un total si falta el precio", () => {
+    assert.equal(quoteTotals([{ quantity: 1, unitPrice: null }], 0), null);
+  });
+});
