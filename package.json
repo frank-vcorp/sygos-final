@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev -p 3010",
     "build": "next build",
-    "start": "prisma db push --skip-generate && tsx prisma/seed.ts && next start",
+    "start": "prisma db push --skip-generate --accept-data-loss && tsx prisma/seed.ts && next start",
     "postinstall": "prisma generate",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
