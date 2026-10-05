@@ -113,6 +113,45 @@ export async function toggleInventoryAction(formData: FormData) {
   redirect("/configuracion");
 }
 
+export async function updatePriorityAction(formData: FormData) {
+  "use server";
+  const session = await requireCompany();
+  if (!can(session.role, "config.company")) {
+    await setFlash({ tone: "error", message: "No tienes permiso para las prioridades." });
+    redirect("/configuracion");
+  }
+  const id = requiredText(formData.get("priorityId"), "Prioridad");
+  const slaMaxDays = optionalInt(formData.get("slaMaxDays"));
+  if (slaMaxDays == null || slaMaxDays < 1) {
+    await setFlash({ tone: "error", message: "El SLA máximo debe ser al menos un día hábil." });
+    redirect("/configuracion");
+  }
+  const updated = await prisma.priority.updateMany({
+    where: { id, companyId: session.activeCompanyId },
+    data: {
+      price: optionalMoney(formData.get("price")),
+      incrementPct: optionalMoney(formData.get("incrementPct")),
+      targetMinDays: optionalInt(formData.get("targetMinDays")),
+      targetMaxDays: optionalInt(formData.get("targetMaxDays")),
+      slaMaxDays,
+    },
+  });
+  if (updated.count === 0) {
+    await setFlash({ tone: "error", message: "Esa prioridad no es de esta empresa." });
+    redirect("/configuracion");
+  }
+  await setFlash({ tone: "ok", message: "Prioridad actualizada. Los casos ya abiertos conservan la fotografía anterior." });
+  redirect("/configuracion");
+}
+
+function optionalMoney(value: FormDataEntryValue | null) {
+  const text = optionalText(value);
+  if (!text) return null;
+  const amount = Number(text);
+  if (!Number.isFinite(amount) || amount < 0) throw new Error("El importe no es válido.");
+  return amount;
+}
+
 function isRedirect(error: unknown) {
   return typeof error === "object" && error !== null && "digest" in error && String((error as { digest?: string }).digest).startsWith("NEXT_REDIRECT");
 }

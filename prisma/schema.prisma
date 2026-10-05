@@ -24,11 +24,20 @@ model Company {
   updatedAt       DateTime @updatedAt
   version         Int      @default(1)
 
-  users        User[]
-  clients      Client[]
-  prospects    Prospect[]
-  suppliers    Supplier[]
-  integrations IntegrationSetting[]
+  users            User[]
+  clients          Client[]
+  prospects        Prospect[]
+  suppliers        Supplier[]
+  integrations     IntegrationSetting[]
+  equipmentTypes   EquipmentType[]
+  equipmentBrands  EquipmentBrand[]
+  originated       Equipment[]          @relation("EquipmentOrigin")
+  priorities       Priority[]
+  attentionsOrigin Attention[]          @relation("AttentionOrigin")
+  attentionsService Attention[]         @relation("AttentionService")
+  custodyMovements CustodyMovement[]
+  parts            Part[]
+  stockMovements   StockMovement[]
 }
 
 model User {
@@ -82,8 +91,10 @@ model Client {
   updatedAt        DateTime @updatedAt
   version          Int      @default(1)
 
-  contacts Contact[]
-  prospects Prospect[]
+  contacts   Contact[]
+  prospects  Prospect[]
+  equipments Equipment[]
+  attentions Attention[]
 
   @@index([companyId, name])
 }
@@ -174,6 +185,168 @@ model IntegrationSetting {
   updatedAt  DateTime @updatedAt
 
   @@unique([companyId, provider])
+}
+
+model EquipmentType {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id])
+  name      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@unique([companyId, name])
+}
+
+model EquipmentBrand {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id])
+  name      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  @@unique([companyId, name])
+}
+
+/// EQUI belongs to one company. MOT is a global physical identity with originCompanyId.
+model Equipment {
+  id              String   @id @default(cuid())
+  kind            String
+  folio           String   @unique
+  originCompanyId String
+  originCompany   Company  @relation("EquipmentOrigin", fields: [originCompanyId], references: [id])
+  clientId        String
+  client          Client   @relation(fields: [clientId], references: [id])
+  typeName        String?
+  brandName       String?
+  model           String
+  description     String?
+  serial          String?
+  custody         String
+  holderCompanyId String?
+  createdByUserId String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  version         Int      @default(1)
+
+  attentions Attention[]
+  movements  CustodyMovement[]
+
+  @@index([originCompanyId, kind])
+  @@index([custody])
+}
+
+model Priority {
+  id              String  @id @default(cuid())
+  companyId       String
+  company         Company @relation(fields: [companyId], references: [id])
+  attentionType   String
+  name            String
+  price           Float?
+  incrementPct    Float?
+  targetMinDays   Int?
+  targetMaxDays   Int?
+  slaMaxDays      Int
+  sortOrder       Int     @default(0)
+  active          Boolean @default(true)
+
+  @@unique([companyId, attentionType, name])
+}
+
+/// Service episode over a physical identity. Diagnosis execution belongs to a later phase.
+model Attention {
+  id                  String    @id @default(cuid())
+  equipmentId         String
+  equipment           Equipment @relation(fields: [equipmentId], references: [id])
+  originCompanyId     String
+  originCompany       Company   @relation("AttentionOrigin", fields: [originCompanyId], references: [id])
+  serviceCompanyId    String
+  serviceCompany      Company   @relation("AttentionService", fields: [serviceCompanyId], references: [id])
+  adminClientId       String
+  adminClient         Client    @relation(fields: [adminClientId], references: [id])
+  attentionType       String
+  priorityName        String
+  priorityPrice       Float?
+  priorityIncrementPct Float?
+  priorityTargetMin   Int?
+  priorityTargetMax   Int?
+  prioritySlaMaxDays  Int
+  reportedFault       String
+  antecedent          String?
+  deliveryInstructions String?
+  sellerUserId        String?
+  status              String    @default("ABIERTA")
+  slaStartedAt        DateTime?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  version             Int       @default(1)
+
+  movements CustodyMovement[]
+
+  @@index([equipmentId])
+  @@index([serviceCompanyId, status])
+}
+
+model CustodyMovement {
+  id               String    @id @default(cuid())
+  equipmentId      String
+  equipment        Equipment @relation(fields: [equipmentId], references: [id])
+  companyId        String
+  company          Company   @relation(fields: [companyId], references: [id])
+  attentionId      String?
+  attention        Attention? @relation(fields: [attentionId], references: [id])
+  kind             String
+  reason           String
+  receiverName     String?
+  deliveryMode     String?
+  contact          String?
+  enablingDocument String?
+  supplierId       String?
+  notes            String?
+  authorUserId     String
+  occurredAt       DateTime  @default(now())
+  cancelledAt      DateTime?
+  cancelReason     String?
+  createdAt        DateTime  @default(now())
+
+  @@index([equipmentId, createdAt])
+  @@index([companyId, kind])
+}
+
+model Part {
+  id          String   @id @default(cuid())
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id])
+  partNumber  String
+  description String
+  qty         Int      @default(0)
+  minQty      Int?
+  maxQty      Int?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  version     Int      @default(1)
+
+  movements StockMovement[]
+
+  @@unique([companyId, partNumber])
+}
+
+model StockMovement {
+  id           String   @id @default(cuid())
+  companyId    String
+  company      Company  @relation(fields: [companyId], references: [id])
+  partId       String
+  part         Part     @relation(fields: [partId], references: [id])
+  kind         String
+  quantity     Int
+  qtyAfter     Int
+  note         String?
+  authorUserId String
+  createdAt    DateTime @default(now())
+
+  @@index([partId, createdAt])
 }
 
 model FunctionalHistory {

@@ -12,7 +12,14 @@ export type Action =
   | "config.company"
   | "config.integrations"
   | "search.global"
-  | "nav.business";
+  | "nav.business"
+  | "equi.view"
+  | "equi.create"
+  | "mot.view"
+  | "mot.create"
+  | "attention.create"
+  | "custody.confirm"
+  | "inventory.operate";
 
 export function can(role: Role, action: Action, companyCode?: string | null): boolean {
   const admin = role === "ADMINISTRADOR";
@@ -53,6 +60,28 @@ export function can(role: Role, action: Action, companyCode?: string | null): bo
       return false;
     case "supplier.operate":
       return admin || ceo || coord || gerenteSy || gerenteSm;
+    case "equi.view":
+      return companyCode === "SYSTRON" && role !== "AYUDANTE_GENERAL" && role !== "KIOSCO_ASISTENCIA";
+    case "equi.create":
+      return companyCode === "SYSTRON" && (admin || ceo || coord || sales || gerenteSy);
+    case "mot.view":
+      if (role === "ALMACEN" || role === "AYUDANTE_GENERAL" || role === "KIOSCO_ASISTENCIA") return false;
+      if (companyCode === "SERVOMOTORES") return admin || ceo || coord || gerenteSm;
+      return companyCode === "SYSTRON" && (admin || ceo || coord || sales || gerenteSy || role === "SUPERVISOR_TECNICO" || role === "TECNICO");
+    case "mot.create":
+      if (companyCode === "SYSTRON") return admin || ceo || coord || sales;
+      if (companyCode === "SERVOMOTORES") return admin || ceo || coord || gerenteSm;
+      return false;
+    case "attention.create":
+      return can(role, "equi.create", companyCode) || can(role, "mot.create", companyCode);
+    case "custody.confirm":
+      if (companyCode === "SYSTRON") return admin || ceo || coord || gerenteSy || role === "ALMACEN";
+      if (companyCode === "SERVOMOTORES") return admin || ceo || coord || gerenteSm;
+      return false;
+    case "inventory.operate":
+      if (companyCode === "SYSTRON") return admin || ceo || gerenteSy || role === "ALMACEN";
+      if (companyCode === "SERVOMOTORES") return admin || ceo || gerenteSm;
+      return false;
     default:
       return false;
   }

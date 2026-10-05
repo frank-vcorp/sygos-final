@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync } from "fs";
 import { randomBytes } from "crypto";
 import { PrismaClient } from "@prisma/client";
 import { hashPassword, verifyPassword } from "../src/lib/crypto";
+import { initialPriorities } from "../src/lib/priorities";
 import { DEFAULT_MONTHLY_PURCHASE, DEFAULT_PURCHASE_LIMIT } from "../src/lib/roles";
 
 const prisma = new PrismaClient();
@@ -9,8 +10,8 @@ const prisma = new PrismaClient();
 async function main() {
   const systron = await prisma.company.upsert({
     where: { code: "SYSTRON" },
-    update: { name: "SYSTRON" },
-    create: { code: "SYSTRON", name: "SYSTRON" },
+    update: { name: "SYSTRON", inventoryEnabled: true },
+    create: { code: "SYSTRON", name: "SYSTRON", inventoryEnabled: true },
   });
   const servomotores = await prisma.company.upsert({
     where: { code: "SERVOMOTORES" },
@@ -42,6 +43,24 @@ async function main() {
   });
 
   await ensureSuperAdmin();
+  await seedPriorities(systron.id, "SYSTRON");
+  await seedPriorities(servomotores.id, "SERVOMOTORES");
+}
+
+async function seedPriorities(companyId: string, code: "SYSTRON" | "SERVOMOTORES") {
+  for (const priority of initialPriorities(code)) {
+    await prisma.priority.upsert({
+      where: {
+        companyId_attentionType_name: {
+          companyId,
+          attentionType: priority.attentionType,
+          name: priority.name,
+        },
+      },
+      update: {},
+      create: { companyId, ...priority },
+    });
+  }
 }
 
 const SUPERADMIN_USERNAME = "Systronia";

@@ -1,9 +1,10 @@
 import { redirect } from "next/navigation";
-import { saveIntegrationAction, toggleInventoryAction, updateCompanyAction } from "./actions";
+import { saveIntegrationAction, toggleInventoryAction, updateCompanyAction, updatePriorityAction } from "./actions";
 import { RegimenSelect } from "@/components/regimen-select";
 import { Button, controlClass, Field, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
+import { ATTENTION_LABEL, type AttentionType } from "@/lib/priorities";
 import { requireCompany } from "@/lib/session";
 
 export default async function ConfiguracionPage() {
@@ -36,11 +37,30 @@ export default async function ConfiguracionPage() {
         </form>
       ) : null}
 
+      {can(session.role, "config.company") ? (
+        <section className="mt-4 max-w-3xl space-y-3">
+          <h2 className="font-medium">Prioridades y SLA</h2>
+          <p className="text-sm text-[var(--muted)]">Cada empresa tiene su catálogo. Un cambio no altera atenciones ya creadas ni a la otra empresa.</p>
+          {(await prisma.priority.findMany({ where: { companyId: company.id }, orderBy: [{ attentionType: "asc" }, { sortOrder: "asc" }] })).map((priority) => (
+            <form key={priority.id} action={updatePriorityAction} className="grid gap-2 rounded-lg border border-[var(--line)] bg-white p-4 md:grid-cols-6">
+              <input type="hidden" name="priorityId" value={priority.id} />
+              <p className="text-sm font-medium md:col-span-6">{ATTENTION_LABEL[priority.attentionType as AttentionType] ?? priority.attentionType} · {priority.name}</p>
+              <Field label="Precio"><input name="price" defaultValue={priority.price ?? ""} className={controlClass} /></Field>
+              <Field label="Incremento %"><input name="incrementPct" defaultValue={priority.incrementPct ?? ""} className={controlClass} /></Field>
+              <Field label="Objetivo mín."><input name="targetMinDays" defaultValue={priority.targetMinDays ?? ""} className={controlClass} /></Field>
+              <Field label="Objetivo máx."><input name="targetMaxDays" defaultValue={priority.targetMaxDays ?? ""} className={controlClass} /></Field>
+              <Field label="SLA máximo"><input name="slaMaxDays" required defaultValue={priority.slaMaxDays} className={controlClass} /></Field>
+              <div className="flex items-end"><Button type="submit" tone="ghost">Guardar</Button></div>
+            </form>
+          ))}
+        </section>
+      ) : null}
+
       {session.role === "ADMINISTRADOR" && company.code === "SERVOMOTORES" ? (
         <form action={toggleInventoryAction} className="mt-4 max-w-xl rounded-lg border border-[var(--line)] bg-white p-4">
           <h2 className="font-medium">Inventario de Servomotores</h2>
           <p className="mt-1 text-sm text-[var(--muted)]">
-            {company.inventoryEnabled ? "Habilitado." : "Deshabilitado."} Habilitarlo no copia existencias de SYSTRON. El módulo de movimientos llega con la fase de inventario.
+            {company.inventoryEnabled ? "Habilitado y separado de SYSTRON." : "Deshabilitado. Las operaciones pueden continuar sin existencias."} Habilitarlo no copia el inventario de SYSTRON.
           </p>
           <input type="hidden" name="enabled" value={company.inventoryEnabled ? "no" : "si"} />
           <Button type="submit" tone="ghost" className="mt-3">{company.inventoryEnabled ? "Deshabilitar" : "Habilitar"}</Button>

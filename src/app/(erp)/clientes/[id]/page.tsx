@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import {
   addContactAction,
@@ -20,10 +21,19 @@ export default async function ClienteDetallePage({ params }: { params: Promise<{
   const { id } = await params;
   const client = await prisma.client.findFirst({
     where: { id, companyId: session.activeCompanyId },
-    include: { contacts: { orderBy: [{ isPrimary: "desc" }, { name: "asc" }] }, prospects: true },
+    include: {
+      contacts: { orderBy: [{ isPrimary: "desc" }, { name: "asc" }] },
+      prospects: true,
+      equipments: { where: { originCompanyId: session.activeCompanyId }, orderBy: { createdAt: "desc" }, take: 20 },
+    },
   });
   if (!client) notFound();
   if (client.isSystem) {
+    const motors = await prisma.equipment.findMany({
+      where: { kind: "MOT", originCompany: { code: "SYSTRON" } },
+      orderBy: { createdAt: "desc" },
+      take: 30,
+    });
     return (
       <>
         <PageHeader title={client.name} subtitle="Cliente intercompañía fijo" action={<Badge>Intercompañía</Badge>} />
@@ -31,6 +41,14 @@ export default async function ClienteDetallePage({ params }: { params: Promise<{
           <p>Las operaciones que SYSTRON envía a Servomotores usan este cliente. No se edita ni se inactiva.</p>
           <p className="mt-3">Régimen fiscal: {regimenLabel(client.taxRegime)}</p>
           <p className="mt-1">Requiere factura: {client.requiresInvoice ? "Sí" : "No"}</p>
+        </section>
+        <section className="mt-4 max-w-xl">
+          <h2 className="mb-2 font-medium">MOT intercompañía</h2>
+          {motors.length === 0 ? <p className="text-sm text-[var(--muted)]">Sin motores enviados por SYSTRON.</p> : (
+            <ul className="space-y-1 text-sm">
+              {motors.map((motor) => <li key={motor.id}><Link href={`/motores/${motor.id}`} className="text-[var(--accent)]">{motor.folio}</Link> · {motor.model}</li>)}
+            </ul>
+          )}
         </section>
       </>
     );
@@ -142,6 +160,20 @@ export default async function ClienteDetallePage({ params }: { params: Promise<{
           <Button type="submit" tone="ghost">Agregar contacto</Button>
         </form>
       </section>
+
+      {client.equipments.length > 0 ? (
+        <section className="mt-6">
+          <h2 className="mb-2 font-medium">Equipos</h2>
+          <ul className="space-y-1 text-sm">
+            {client.equipments.map((equipment) => (
+              <li key={equipment.id}>
+                <Link href={equipment.kind === "MOT" ? `/motores/${equipment.id}` : `/equipos/${equipment.id}`} className="text-[var(--accent)]">{equipment.folio}</Link>
+                {" · "}{equipment.model}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
       <History items={history} />
     </>

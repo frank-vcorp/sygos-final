@@ -23,6 +23,21 @@ describe("permisos de fase 1", () => {
     assert.equal(can("CEO", "config.integrations"), false);
   });
 
+  it("separa equipos, motores, almacén e inventario", () => {
+    assert.equal(can("VENTAS", "equi.create", "SYSTRON"), true);
+    assert.equal(can("VENTAS", "mot.create", "SYSTRON"), true);
+    assert.equal(can("VENTAS", "mot.create", "SERVOMOTORES"), false);
+    assert.equal(can("ALMACEN", "equi.view", "SYSTRON"), true);
+    assert.equal(can("ALMACEN", "mot.view", "SYSTRON"), false);
+    assert.equal(can("ALMACEN", "custody.confirm", "SYSTRON"), true);
+    assert.equal(can("ALMACEN", "custody.confirm", "SERVOMOTORES"), false);
+    assert.equal(can("GERENTE_OPERATIVO_SERVOMOTORES", "mot.create", "SERVOMOTORES"), true);
+    assert.equal(can("GERENTE_OPERATIVO_SERVOMOTORES", "custody.confirm", "SERVOMOTORES"), true);
+    assert.equal(can("GERENTE_OPERATIVO_SERVOMOTORES", "equi.view", "SERVOMOTORES"), false);
+    assert.equal(can("TECNICO", "inventory.operate", "SYSTRON"), false);
+    assert.equal(can("ALMACEN", "inventory.operate", "SYSTRON"), true);
+  });
+
   it("deja al ayudante y al kiosco fuera de los módulos de negocio", () => {
     assert.equal(can("AYUDANTE_GENERAL", "nav.business"), false);
     assert.equal(can("KIOSCO_ASISTENCIA", "nav.business"), false);

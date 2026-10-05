@@ -8,13 +8,21 @@ import { can } from "@/lib/permissions";
 import { ROLE_LABEL } from "@/lib/roles";
 import { getSession } from "@/lib/session";
 
-const LINKS = [
+const LINKS: Array<{
+  href: string;
+  label: string | ((code: string | null) => string);
+  show: (role: Parameters<typeof can>[0], code: string | null) => boolean;
+}> = [
   { href: "/inicio", label: "Inicio", show: () => true },
-  { href: "/clientes", label: "Clientes", show: (role: Parameters<typeof can>[0], code: string | null) => can(role, "client.create", code) || can(role, "client.edit", code) },
-  { href: "/prospectos", label: "Prospectos", show: (role: Parameters<typeof can>[0], code: string | null) => can(role, "prospect.operate", code) },
-  { href: "/proveedores", label: "Proveedores", show: (role: Parameters<typeof can>[0], code: string | null) => can(role, "supplier.operate", code) },
-  { href: "/usuarios", label: "Usuarios", show: (role: Parameters<typeof can>[0]) => can(role, "user.manage") },
-  { href: "/configuracion", label: "Configuración", show: (role: Parameters<typeof can>[0]) => can(role, "config.company") || can(role, "config.integrations") },
+  { href: "/clientes", label: "Clientes", show: (role, code) => can(role, "client.create", code) || can(role, "client.edit", code) },
+  { href: "/prospectos", label: "Prospectos", show: (role, code) => can(role, "prospect.operate", code) },
+  { href: "/equipos", label: "Equipos", show: (role, code) => can(role, "equi.view", code) },
+  { href: "/motores", label: "Motores", show: (role, code) => can(role, "mot.view", code) },
+  { href: "/custodia", label: (code) => (code === "SERVOMOTORES" ? "Custodia" : "Almacén"), show: (role, code) => can(role, "custody.confirm", code) },
+  { href: "/inventario", label: "Inventario", show: (role, code) => can(role, "inventory.operate", code) },
+  { href: "/proveedores", label: "Proveedores", show: (role, code) => can(role, "supplier.operate", code) },
+  { href: "/usuarios", label: "Usuarios", show: (role) => can(role, "user.manage") },
+  { href: "/configuracion", label: "Configuración", show: (role) => can(role, "config.company") || can(role, "config.integrations") },
 ];
 
 export default async function ErpLayout({ children }: { children: React.ReactNode }) {
@@ -37,7 +45,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
         <nav className="flex gap-1 overflow-x-auto px-2 pb-3 md:block md:px-2">
           {LINKS.filter((link) => link.show(session.role, session.activeCompanyCode)).map((link) => (
             <Link key={link.href} href={link.href} className="block whitespace-nowrap rounded-md px-3 py-2 text-sm hover:bg-[#f3f5f6]">
-              {link.label}
+              {typeof link.label === "function" ? link.label(session.activeCompanyCode) : link.label}
             </Link>
           ))}
           <Link href="/cuenta" className="block whitespace-nowrap rounded-md px-3 py-2 text-sm hover:bg-[#f3f5f6]">Cuenta</Link>

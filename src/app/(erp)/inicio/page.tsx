@@ -14,10 +14,14 @@ export default async function InicioPage() {
       </>
     );
   }
-  const [clients, prospects, suppliers] = await Promise.all([
+  const systron = session.activeCompanyCode === "SYSTRON";
+  const [clients, prospects, suppliers, custody] = await Promise.all([
     prisma.client.count({ where: { companyId: session.activeCompanyId, active: true } }),
     prisma.prospect.count({ where: { companyId: session.activeCompanyId, status: { in: ["NUEVO", "EN_SEGUIMIENTO"] } } }),
     prisma.supplier.count({ where: { companyId: session.activeCompanyId, active: true, isSystem: false } }),
+    systron
+      ? prisma.equipment.count({ where: { kind: "EQUI", originCompanyId: session.activeCompanyId, custody: "SIN_CUSTODIA" } })
+      : prisma.equipment.count({ where: { kind: "MOT", custody: "PENDIENTE_INGRESO", OR: [{ originCompanyId: session.activeCompanyId }, { originCompany: { code: "SYSTRON" } }] } }),
   ]);
   return (
     <>
@@ -26,10 +30,11 @@ export default async function InicioPage() {
         subtitle="Los registros de esta vista pertenecen solo a la empresa activa."
       />
       {can(session.role, "nav.business") ? (
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-4">
           <Card className="p-4"><p className="text-sm text-[var(--muted)]">Clientes activos</p><p className="text-2xl font-semibold">{clients}</p></Card>
           <Card className="p-4"><p className="text-sm text-[var(--muted)]">Prospectos abiertos</p><p className="text-2xl font-semibold">{prospects}</p></Card>
           <Card className="p-4"><p className="text-sm text-[var(--muted)]">Proveedores activos</p><p className="text-2xl font-semibold">{suppliers}</p></Card>
+          <Card className="p-4"><p className="text-sm text-[var(--muted)]">{systron ? "EQUI sin entrada" : "MOT por ingresar"}</p><p className="text-2xl font-semibold">{custody}</p></Card>
         </div>
       ) : (
         <Card className="p-4 text-sm">
