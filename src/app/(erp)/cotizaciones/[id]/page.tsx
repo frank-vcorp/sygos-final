@@ -37,7 +37,7 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
   const referencePrice = source?.attention.priorityPrice;
   const priced = quote.status !== "PENDIENTE_COTIZAR" || session.role !== "VENTAS";
   const totals = priced ? quoteTotals(linesForTotal(quote.lines, quote.quoteType, quote.status), quote.discountPct) : null;
-  const waitingEquipment = quote.status === "AUTORIZADA_PENDIENTE_EQUIPO" && !quote.technicalCaseId && (quote.quoteType === "DIAGNOSTICO" || quote.quoteType === "REPARACION");
+  const waitingEquipment = quote.status === "AUTORIZADA_PENDIENTE_EQUIPO" && !quote.equipmentId && !quote.technicalCaseId && (quote.quoteType === "DIAGNOSTICO" || quote.quoteType === "REPARACION");
   const [gear, priorities] = waitingEquipment
     ? await Promise.all([
         prisma.equipment.findMany({ where: { originCompanyId: session.activeCompanyId, clientId: quote.clientId }, orderBy: { createdAt: "desc" }, take: 50 }),
@@ -49,8 +49,10 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
     ? "Falta el precio de CEO o Administrador."
     : quote.status === "PENDIENTE_DECISION"
       ? "Falta la decisión del cliente."
-      : quote.status === "AUTORIZADA_PENDIENTE_EQUIPO"
-        ? "Falta crear o relacionar el equipo y confirmar su ingreso. Todavía no hay orden de servicio."
+        : quote.status === "AUTORIZADA_PENDIENTE_EQUIPO"
+        ? quote.equipment
+          ? "El equipo ya está relacionado. La operación arranca con la entrada física. Todavía no hay orden de servicio."
+          : "Falta crear o relacionar el equipo y confirmar su ingreso. Todavía no hay orden de servicio."
         : null;
   return (
     <>
