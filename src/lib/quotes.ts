@@ -263,8 +263,8 @@ export async function decideQuote(
     ? await prisma.technicalCase.findUnique({ where: { id: quote.technicalCaseId } })
     : null;
   const received = Boolean(equipment && equipment.custody === "EN_RESGUARDO");
-  const inShop = Boolean(received && diagnosis && equipment?.holderCompanyId === diagnosis.serviceCompanyId);
-  const needsEquipment = authorized && serviceQuote && !received;
+  const inShop = Boolean(received && diagnosis?.kind === "DIAGNOSTICO" && equipment?.holderCompanyId === diagnosis.serviceCompanyId);
+  const needsEquipment = authorized && serviceQuote && diagnosis?.kind !== "OS" && !received;
   const status = !authorized ? "NO_AUTORIZADA" : needsEquipment ? "AUTORIZADA_PENDIENTE_EQUIPO" : "AUTORIZADA";
   const creditDays = quote.client.creditDays;
   const saleFolio = status === "AUTORIZADA" && quote.quoteType === "VENTA_EQUIPO" ? await allocateFolio(quote.companyId, "VTA") : null;
@@ -320,7 +320,7 @@ export async function openWaitingRepairs(equipmentId: string, authorUserId: stri
   });
   for (const quote of quotes) {
     const diagnosis = await prisma.technicalCase.findUnique({ where: { id: quote.technicalCaseId! } });
-    if (!diagnosis || equipment.holderCompanyId !== diagnosis.serviceCompanyId) continue;
+    if (!diagnosis || diagnosis.kind !== "DIAGNOSTICO" || equipment.holderCompanyId !== diagnosis.serviceCompanyId) continue;
     const opened = await openRepairOrder(diagnosis.id, authorUserId);
     if (opened) {
       await prisma.quote.update({ where: { id: quote.id }, data: { status: "AUTORIZADA", version: { increment: 1 } } });
