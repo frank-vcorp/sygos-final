@@ -318,6 +318,7 @@ model Attention {
   deliveryInstructions String?
   sellerUserId        String?
   originalCaseId      String?
+  originQuoteId       String?
   status              String    @default("ABIERTA")
   slaStartedAt        DateTime?
   createdAt           DateTime  @default(now())

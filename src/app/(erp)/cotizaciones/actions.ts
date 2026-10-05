@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { setFlash } from "@/lib/flash";
 import { optionalText, parseVersion, requiredText } from "@/lib/form";
 import { can, type Action } from "@/lib/permissions";
-import { QUOTE_TYPES, type QuoteType, applyDiscount, createSellerQuote, decideQuote, linkIntercompanyQuote, prepareQuoteFromCase, setPrices } from "@/lib/quotes";
+import { QUOTE_TYPES, type QuoteType, applyDiscount, createSellerQuote, decideQuote, linkIntercompanyQuote, prepareQuoteFromCase, relateQuoteEquipment, setPrices } from "@/lib/quotes";
 import { requireCompany } from "@/lib/session";
 
 async function guard(action: Action) {
@@ -55,6 +55,27 @@ export async function createQuoteAction(formData: FormData) {
     if (isRedirect(error)) throw error;
     await setFlash({ tone: "error", message: messageOf(error) });
     redirect("/cotizaciones/nuevo");
+  }
+}
+
+export async function relateEquipmentAction(formData: FormData) {
+  "use server";
+  const target = back(formData);
+  try {
+    const session = await guard("quote.follow");
+    await relateQuoteEquipment(
+      session,
+      requiredText(formData.get("quoteId"), "Cotización"),
+      parseVersion(formData.get("version")),
+      requiredText(formData.get("equipmentId"), "Equipo"),
+      requiredText(formData.get("priorityId"), "Prioridad"),
+    );
+    await setFlash({ tone: "ok", message: "Equipo relacionado. La operación arranca cuando el equipo está en resguardo." });
+    redirect(target);
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    await setFlash({ tone: "error", message: messageOf(error) });
+    redirect(target);
   }
 }
 

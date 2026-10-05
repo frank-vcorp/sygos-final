@@ -307,6 +307,67 @@ export async function decideQuote(
   if (authorized && inShop && diagnosis) await openRepairOrder(diagnosis.id, actor.userId);
 }
 
+export async function relateQuoteEquipment(actor: Actor, quoteId: string, version: number, equipmentId: string, priorityId: string) {
+  const quote = await prisma.quote.findFirst({
+    where: { id: quoteId, companyId: actor.activeCompanyId },
+    include: { lines: true },
+  });
+  if (!quote || quote.status !== "AUTORIZADA_PENDIENTE_EQUIPO") throw new Error("Esta cotización no está esperando el equipo.");
+  if (quote.technicalCaseId) throw new Error("Esta cotización ya tiene operación técnica.");
+  if (quote.quoteType !== "DIAGNOSTICO" && quote.quoteType !== "REPARACION") throw new Error("Este tipo no abre operación al ingresar el equipo.");
+  const equipment = await prisma.equipment.findFirst({ where: { id: equipmentId, originCompanyId: actor.activeCompanyId, clientId: quote.clientId } });
+  if (!equipment) throw new Error("El equipo no es de este cliente en esta empresa.");
+  const attentionType = quote.quoteType === "REPARACION" ? "REPARACION" : "DIAGNOSTICO";
+  const priority = await prisma.priority.findFirst({ where: { id: priorityId, companyId: actor.activeCompanyId, attentionType, active: true } });
+  if (!priority) throw new Error("Selecciona una prioridad vigente de este servicio.");
+  const service = equipment.kind === "MOT"
+    ? await prisma.company.findUnique({ where: { code: "SERVOMOTORES" } })
+    : await prisma.company.findUnique({ where: { id: actor.activeCompanyId } });
+  if (!service) throw new Error("No está definida la empresa que ejecuta el servicio.");
+  const inShop = equipment.custody === "EN_RESGUARDO" && equipment.holderCompanyId === service.id;
+  const concept = quote.lines.find((line) => line.authorized)?.concept ?? quote.lines[0]?.concept ?? "Servicio autorizado";
+  const attention = await prisma.attention.create({
+    data: {
+      equipmentId: equipment.id,
+      originCompanyId: equipment.originCompanyId,
+      serviceCompanyId: service.id,
+      adminClientId: quote.clientId,
+      attentionType,
+      priorityName: priority.name,
+      priorityPrice: priority.price,
+      priorityIncrementPct: priority.incrementPct,
+      priorityTargetMin: priority.targetMinDays,
+      priorityTargetMax: priority.targetMaxDays,
+      prioritySlaMaxDays: priority.slaMaxDays,
+      reportedFault: concept,
+      sellerUserId: quote.sellerUserId,
+      originQuoteId: quote.id,
+      status: inShop ? "EN_PROCESO" : "ABIERTA",
+      slaStartedAt: inShop ? new Date() : null,
+    },
+  });
+  const updated = await prisma.quote.updateMany({
+    where: { id: quote.id, version },
+    data: { equipmentId: equipment.id, version: { increment: 1 } },
+  });
+  if (updated.count === 0) throw new ConcurrencyError();
+  await recordHistory({
+    companyId: actor.activeCompanyId,
+    entityType: "COTIZACION",
+    entityId: quote.id,
+    action: "EQUIPO",
+    summary: inShop
+      ? `${equipment.folio} quedó relacionado y ya está en resguardo. Arranca la operación.`
+      : `${equipment.folio} quedó relacionado. La operación arranca con la entrada física.`,
+    authorUserId: actor.userId,
+  });
+  if (!inShop) return;
+  const { openCase } = await import("./technical");
+  const created = await openCase(attention.id, attention.slaStartedAt ?? new Date());
+  if (!created) return;
+  await prisma.quote.update({ where: { id: quote.id }, data: { technicalCaseId: created.id, status: "AUTORIZADA" } });
+}
+
 export async function openWaitingRepairs(equipmentId: string, authorUserId: string) {
   const equipment = await prisma.equipment.findUnique({ where: { id: equipmentId } });
   if (!equipment || equipment.custody !== "EN_RESGUARDO" || !equipment.holderCompanyId) return;
@@ -325,6 +386,21 @@ export async function openWaitingRepairs(equipmentId: string, authorUserId: stri
     if (opened) {
       await prisma.quote.update({ where: { id: quote.id }, data: { status: "AUTORIZADA", version: { increment: 1 } } });
     }
+  }
+  const linked = await prisma.quote.findMany({
+    where: { equipmentId, status: "AUTORIZADA_PENDIENTE_EQUIPO", technicalCaseId: null },
+  });
+  for (const quote of linked) {
+    const attention = await prisma.attention.findFirst({
+      where: { originQuoteId: quote.id },
+      include: { technicalCases: { orderBy: { createdAt: "desc" }, take: 1 } },
+    });
+    const opened = attention?.technicalCases[0];
+    if (!opened) continue;
+    await prisma.quote.update({
+      where: { id: quote.id },
+      data: { technicalCaseId: opened.id, status: "AUTORIZADA", version: { increment: 1 } },
+    });
   }
 }
 

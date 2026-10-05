@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { decideAction, discountAction, linkBaseAction, setPricesAction } from "../actions";
+import { decideAction, discountAction, linkBaseAction, relateEquipmentAction, setPricesAction } from "../actions";
 import { ConfirmSubmit, SubmitButton } from "@/components/submit-button";
 import { Badge, controlClass, Field, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
@@ -37,6 +37,13 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
   const referencePrice = source?.attention.priorityPrice;
   const priced = quote.status !== "PENDIENTE_COTIZAR" || session.role !== "VENTAS";
   const totals = priced ? quoteTotals(linesForTotal(quote.lines, quote.quoteType, quote.status), quote.discountPct) : null;
+  const waitingEquipment = quote.status === "AUTORIZADA_PENDIENTE_EQUIPO" && !quote.technicalCaseId && (quote.quoteType === "DIAGNOSTICO" || quote.quoteType === "REPARACION");
+  const [gear, priorities] = waitingEquipment
+    ? await Promise.all([
+        prisma.equipment.findMany({ where: { originCompanyId: session.activeCompanyId, clientId: quote.clientId }, orderBy: { createdAt: "desc" }, take: 50 }),
+        prisma.priority.findMany({ where: { companyId: session.activeCompanyId, attentionType: quote.quoteType, active: true }, orderBy: { sortOrder: "asc" } }),
+      ])
+    : [[], []];
   const showBase = seesEconomicDetail(session.role, session.activeCompanyCode, quote.company.code, false);
   const missing = quote.status === "PENDIENTE_COTIZAR"
     ? "Falta el precio de CEO o Administrador."
@@ -122,6 +129,27 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
                 <ConfirmSubmit tone="primary" message="Se registrará la decisión del cliente. Revisa que sea la correcta.">Registrar decisión</ConfirmSubmit>
               </form>
             </>
+          ) : null}
+          {waitingEquipment && can(session.role, "quote.follow", session.activeCompanyCode) ? (
+            <form action={relateEquipmentAction} className="grid gap-2 rounded-lg border border-[var(--line)] bg-white p-4">
+              <h2 className="font-medium">Relacionar equipo</h2>
+              <p className="text-sm text-[var(--muted)]">La operación no arranca hasta que este equipo tenga entrada o ingreso físico.</p>
+              <input type="hidden" name="quoteId" value={quote.id} />
+              <input type="hidden" name="version" value={quote.version} />
+              <Field label="Equipo del cliente">
+                <select name="equipmentId" required className={controlClass} defaultValue="">
+                  <option value="">Selecciona</option>
+                  {gear.map((item) => <option key={item.id} value={item.id}>{item.folio} · {item.model}</option>)}
+                </select>
+              </Field>
+              <Field label="Prioridad del servicio">
+                <select name="priorityId" required className={controlClass} defaultValue="">
+                  <option value="">Selecciona</option>
+                  {priorities.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+                </select>
+              </Field>
+              <SubmitButton>Relacionar equipo</SubmitButton>
+            </form>
           ) : null}
           {session.activeCompanyCode === "SYSTRON" && quote.equipment?.kind === "MOT" && can(session.role, "quote.price", session.activeCompanyCode) ? (
             <form action={linkBaseAction} className="grid gap-2 rounded-lg border border-[var(--line)] bg-white p-4">
