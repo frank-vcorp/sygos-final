@@ -99,6 +99,9 @@ export default async function ProspectoDetallePage({ params }: { params: Promise
                 <option value="existente">Usar cliente existente</option>
               </select>
             </Field>
+            <Field label="Contacto del cliente nuevo" hint="Obligatorio solo al crear el cliente.">
+              <input name="contactName" className={controlClass} />
+            </Field>
             <Field label="Cliente existente">
               <select name="clientId" className={controlClass} defaultValue="">
                 <option value="">—</option>

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClientAction } from "../actions";
-import { RegimenSelect } from "@/components/regimen-select";
+import { ClientInvoiceFields } from "@/components/client-invoice-fields";
 import { Button, controlClass, Field, PageHeader } from "@/components/ui";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
@@ -10,7 +10,7 @@ export default async function NuevoClientePage() {
   if (!can(session.role, "client.create", session.activeCompanyCode)) redirect("/clientes");
   return (
     <>
-      <PageHeader title="Nuevo cliente" subtitle="Solo el nombre es obligatorio. Los datos fiscales se completan antes de facturar." />
+      <PageHeader title="Nuevo cliente" subtitle="El contacto es obligatorio. Los datos fiscales aparecen y se exigen solo si requiere factura." />
       <form action={createClientAction} className="grid max-w-2xl gap-4 rounded-lg border border-[var(--line)] bg-white p-4">
         <Field label="Nombre o razón social"><input name="name" className={controlClass} required /></Field>
         <Field label="Clasificación">
@@ -20,19 +20,14 @@ export default async function NuevoClientePage() {
             <option value="PREMIUM">Premium</option>
           </select>
         </Field>
-        <Field label="Requiere factura">
-          <select name="requiresInvoice" className={controlClass} defaultValue="">
-            <option value="">Definir después</option>
-            <option value="si">Sí</option>
-            <option value="no">No</option>
-          </select>
-        </Field>
+        <ClientInvoiceFields />
         <Field label="Días de crédito"><input name="creditDays" inputMode="numeric" className={controlClass} /></Field>
-        <Field label="RFC"><input name="rfc" className={controlClass} /></Field>
-        <Field label="Régimen fiscal" hint="Catálogo c_RegimenFiscal del SAT."><RegimenSelect name="taxRegime" /></Field>
-        <Field label="Código postal fiscal"><input name="fiscalZip" className={controlClass} /></Field>
-        <Field label="Domicilio fiscal"><textarea name="fiscalAddress" className={controlClass} rows={2} /></Field>
         <Field label="Dirección de entrega"><textarea name="deliveryAddress" className={controlClass} rows={2} /></Field>
+        <h2 className="font-medium">Contacto</h2>
+        <Field label="Nombre del contacto"><input name="contactName" required className={controlClass} /></Field>
+        <Field label="Puesto"><input name="contactRole" className={controlClass} /></Field>
+        <Field label="Teléfono"><input name="contactPhone" className={controlClass} /></Field>
+        <Field label="Correo"><input name="contactEmail" className={controlClass} /></Field>
         <Button type="submit">Guardar y abrir detalle</Button>
       </form>
     </>

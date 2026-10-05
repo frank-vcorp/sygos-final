@@ -44,17 +44,29 @@ function clientData(formData: FormData) {
   if (classification && classification !== "NORMAL" && classification !== "PREMIUM") {
     throw new Error("La clasificación debe ser Normal o Premium.");
   }
+  const requiresInvoice = optionalBool(formData.get("requiresInvoice"));
   return {
     name: requiredText(formData.get("name"), "Nombre o razón social"),
     classification,
-    requiresInvoice: optionalBool(formData.get("requiresInvoice")),
+    requiresInvoice,
     creditDays: optionalInt(formData.get("creditDays")),
-    rfc: optionalText(formData.get("rfc")),
-    taxRegime: parseRegimen(formData.get("taxRegime")),
-    fiscalZip: optionalText(formData.get("fiscalZip")),
-    fiscalAddress: optionalText(formData.get("fiscalAddress")),
+    ...fiscalIdentity(formData, requiresInvoice),
     deliveryAddress: optionalText(formData.get("deliveryAddress")),
   };
+}
+
+function fiscalIdentity(formData: FormData, requiresInvoice: boolean | null) {
+  const rfc = optionalText(formData.get("rfc"));
+  const taxRegime = parseRegimen(formData.get("taxRegime"));
+  const fiscalZip = optionalText(formData.get("fiscalZip"));
+  const fiscalAddress = optionalText(formData.get("fiscalAddress"));
+  if (requiresInvoice) {
+    if (!rfc) throw new Error("El RFC es obligatorio cuando el cliente requiere factura.");
+    if (!taxRegime) throw new Error("El régimen fiscal es obligatorio cuando el cliente requiere factura.");
+    if (!fiscalZip) throw new Error("El código postal fiscal es obligatorio cuando el cliente requiere factura.");
+    if (!fiscalAddress) throw new Error("El domicilio fiscal es obligatorio cuando el cliente requiere factura.");
+  }
+  return { rfc, taxRegime, fiscalZip, fiscalAddress };
 }
 
 export async function createClientAction(formData: FormData) {
@@ -62,9 +74,23 @@ export async function createClientAction(formData: FormData) {
   try {
     const session = await guard("client.create");
     const data = clientData(formData);
+    const contactName = requiredText(formData.get("contactName"), "Nombre del contacto");
     const ownerUserId = await ownerForCreator(session);
     const client = await prisma.client.create({
-      data: { ...data, companyId: session.activeCompanyId, ownerUserId },
+      data: {
+        ...data,
+        companyId: session.activeCompanyId,
+        ownerUserId,
+        contacts: {
+          create: {
+            name: contactName,
+            phone: optionalText(formData.get("contactPhone")),
+            roleTitle: optionalText(formData.get("contactRole")),
+            email: optionalText(formData.get("contactEmail")),
+            isPrimary: true,
+          },
+        },
+      },
     });
     await recordHistory({
       companyId: session.activeCompanyId,
@@ -229,7 +255,16 @@ export async function inactivateContactAction(formData: FormData) {
   });
   if (!contact) redirect("/clientes");
   await assertOwn(session, contact.clientId);
+  const active = await prisma.contact.count({ where: { clientId: contact.clientId, active: true } });
+  if (active <= 1) {
+    await setFlash({ tone: "error", message: "El cliente debe conservar al menos un contacto." });
+    redirect(`/clientes/${contact.clientId}`);
+  }
   await prisma.contact.update({ where: { id: contact.id }, data: { active: false, isPrimary: false } });
+  if (contact.isPrimary) {
+    const next = await prisma.contact.findFirst({ where: { clientId: contact.clientId, active: true }, orderBy: { name: "asc" } });
+    if (next) await prisma.contact.update({ where: { id: next.id }, data: { isPrimary: true } });
+  }
   await setFlash({ tone: "ok", message: "Contacto inactivado." });
   redirect(`/clientes/${contact.clientId}`);
 }

@@ -135,11 +135,13 @@ export async function convertProspectAction(formData: FormData) {
       });
       if (!client) throw new Error("El cliente no pertenece a la empresa activa.");
     } else if (mode === "nuevo") {
+      const contactName = requiredText(formData.get("contactName"), "Nombre del contacto");
       const client = await prisma.client.create({
         data: {
           companyId: session.activeCompanyId,
           name: prospect.name,
           ownerUserId: prospect.ownerUserId,
+          contacts: { create: { name: contactName, isPrimary: true } },
         },
       });
       clientId = client.id;

@@ -7,7 +7,7 @@ import {
   reassignClientAction,
   updateClientAction,
 } from "../actions";
-import { RegimenSelect } from "@/components/regimen-select";
+import { ClientInvoiceFields } from "@/components/client-invoice-fields";
 import { Badge, Button, controlClass, Field, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
@@ -86,18 +86,14 @@ export default async function ClienteDetallePage({ params }: { params: Promise<{
               <option value="PREMIUM">Premium</option>
             </select>
           </Field>
-          <Field label="Requiere factura" hint="Puede cambiar en operaciones abiertas. No reescribe facturas ya emitidas.">
-            <select name="requiresInvoice" defaultValue={client.requiresInvoice == null ? "" : client.requiresInvoice ? "si" : "no"} className={controlClass}>
-              <option value="">Sin definir</option>
-              <option value="si">Sí</option>
-              <option value="no">No</option>
-            </select>
-          </Field>
+          <ClientInvoiceFields
+            defaultRequires={client.requiresInvoice == null ? "" : client.requiresInvoice ? "si" : "no"}
+            rfc={client.rfc ?? ""}
+            taxRegime={client.taxRegime ?? ""}
+            fiscalZip={client.fiscalZip ?? ""}
+            fiscalAddress={client.fiscalAddress ?? ""}
+          />
           <Field label="Días de crédito"><input name="creditDays" defaultValue={client.creditDays ?? ""} className={controlClass} /></Field>
-          <Field label="RFC"><input name="rfc" defaultValue={client.rfc ?? ""} className={controlClass} /></Field>
-          <Field label="Régimen fiscal" hint="Catálogo c_RegimenFiscal del SAT."><RegimenSelect name="taxRegime" defaultValue={client.taxRegime} /></Field>
-          <Field label="Código postal fiscal"><input name="fiscalZip" defaultValue={client.fiscalZip ?? ""} className={controlClass} /></Field>
-          <Field label="Domicilio fiscal"><textarea name="fiscalAddress" defaultValue={client.fiscalAddress ?? ""} className={controlClass} rows={2} /></Field>
           <Field label="Dirección de entrega"><textarea name="deliveryAddress" defaultValue={client.deliveryAddress ?? ""} className={controlClass} rows={2} /></Field>
           <p className="text-sm text-[var(--muted)]">Responsable comercial: {owner?.name ?? "Sin asignar"}</p>
           <Button type="submit">Guardar</Button>
@@ -139,7 +135,7 @@ export default async function ClienteDetallePage({ params }: { params: Promise<{
       <section className="mt-6 rounded-lg border border-[var(--line)] bg-white p-4">
         <h2 className="font-medium">Contactos</h2>
         <ul className="mt-3 divide-y divide-[var(--line)]">
-          {client.contacts.filter((contact) => contact.active).length === 0 ? <li className="py-2 text-sm text-[var(--muted)]">Sin contactos activos.</li> : null}
+          {client.contacts.filter((contact) => contact.active).length === 0 ? <li className="py-2 text-sm text-[var(--danger)]">Falta el contacto obligatorio.</li> : null}
           {client.contacts.filter((contact) => contact.active).map((contact) => (
             <li key={contact.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
               <span>{contact.name}{contact.isPrimary ? " · principal" : ""}{contact.roleTitle ? ` · ${contact.roleTitle}` : ""}{contact.phone ? ` · ${contact.phone}` : ""}{contact.email ? ` · ${contact.email}` : ""}</span>
