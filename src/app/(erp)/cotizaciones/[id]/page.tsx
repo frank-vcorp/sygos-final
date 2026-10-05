@@ -20,7 +20,7 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
       companyId: session.activeCompanyId,
       ...(session.role === "VENTAS" ? { sellerUserId: session.userId } : {}),
     },
-    include: { client: true, lines: true, sales: true, company: true, equipment: true },
+    include: { client: { include: { contacts: { where: { active: true }, orderBy: [{ isPrimary: "desc" }, { name: "asc" }] } } }, lines: true, sales: true, company: true, equipment: true },
   });
   if (!quote) notFound();
   const base = quote.linkedQuoteId && (session.role === "ADMINISTRADOR" || session.role === "CEO")
@@ -28,6 +28,13 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
     : null;
   const history = await historyFor("COTIZACION", quote.id);
   const seller = await prisma.user.findUnique({ where: { id: session.userId }, select: { discountLimitPct: true } });
+  const source = quote.technicalCaseId
+    ? await prisma.technicalCase.findUnique({ where: { id: quote.technicalCaseId }, include: { attention: true } })
+    : null;
+  const repairOrder = source
+    ? await prisma.technicalCase.findFirst({ where: { spawnedFromId: source.id, kind: "OS" } })
+    : null;
+  const referencePrice = source?.attention.priorityPrice;
   const priced = quote.status !== "PENDIENTE_COTIZAR" || session.role !== "VENTAS";
   const totals = priced ? quoteTotals(quote.lines, quote.discountPct) : null;
   const showBase = seesEconomicDetail(session.role, session.activeCompanyCode, quote.company.code, false);
@@ -45,6 +52,10 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
         <section className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
           <p>Cliente: <Link href={`/clientes/${quote.client.id}`} className="text-[var(--accent)]">{quote.client.isSystem ? "SYSTRON · intercompañía" : quote.client.name}</Link></p>
           <p className="mt-1">Equipo: {quote.equipment ? <Link href={quote.equipment.kind === "MOT" ? `/motores/${quote.equipment.id}` : `/equipos/${quote.equipment.id}`} className="text-[var(--accent)]">{quote.equipment.folio}</Link> : [quote.preliminaryType, quote.preliminaryBrand, quote.preliminaryModel, quote.preliminarySerial].filter(Boolean).join(" · ") || "Sin equipo físico"}</p>
+          {source ? <p className="mt-1">Diagnóstico de origen: <Link href={`/operacion/${source.id}`} className="text-[var(--accent)]">{source.folio}</Link></p> : null}
+          {repairOrder ? <p className="mt-1">Orden de servicio: <Link href={`/operacion/${repairOrder.id}`} className="text-[var(--accent)]">{repairOrder.folio}</Link></p> : null}
+          {quote.client.contacts.length > 0 ? <p className="mt-1">Contactos: {quote.client.contacts.map((contact) => contact.name).join(", ")}</p> : <p className="mt-1 text-[var(--danger)]">Este cliente no tiene contactos activos.</p>}
+          {quote.status === "PENDIENTE_COTIZAR" && referencePrice != null ? <p className="mt-1">Referencia congelada de la prioridad: {money(referencePrice)}. El precio lo confirma CEO o Administrador.</p> : null}
           {quote.reference ? <p className="mt-1">Referencia: {quote.reference}</p> : null}
           {quote.creditDays != null ? <p className="mt-1">Crédito congelado: {quote.creditDays} días</p> : null}
           {missing ? <p className="mt-3 rounded-md bg-[var(--warn-soft)] px-3 py-2">{missing}</p> : null}
@@ -75,7 +86,7 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
               {quote.lines.map((line) => (
                 <Field key={line.id} label={line.incrementPct != null ? `${line.concept} · base, incremento ${line.incrementPct}%` : line.concept}>
                   <input type="hidden" name="lineId" value={line.id} />
-                  <input name="amount" required inputMode="decimal" className={controlClass} />
+                  <input name="amount" required inputMode="decimal" defaultValue={referencePrice ?? ""} className={controlClass} />
                 </Field>
               ))}
               <SubmitButton>Guardar precio</SubmitButton>

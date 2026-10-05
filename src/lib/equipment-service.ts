@@ -420,7 +420,11 @@ export async function registerMovement(
       });
     }
   });
-  if (isReceipt(input.kind)) await openPendingCases(equipment.id, input.occurredAt);
+  if (isReceipt(input.kind)) {
+    await openPendingCases(equipment.id, input.occurredAt);
+    const { openWaitingRepairs } = await import("./quotes");
+    await openWaitingRepairs(equipment.id, actor.userId);
+  }
   await recordHistory({
     companyId: actor.activeCompanyId,
     entityType: "EQUIPO",

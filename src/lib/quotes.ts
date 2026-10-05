@@ -94,18 +94,26 @@ export async function createSellerQuote(
 }
 
 export async function prepareQuoteFromCase(actor: Actor, caseId: string) {
+  return ensureQuoteFromCase(actor, caseId);
+}
+
+export async function ensureQuoteFromCase(actor: { userId: string; activeCompanyId: string }, caseId: string) {
   const existing = await prisma.quote.findFirst({ where: { technicalCaseId: caseId, companyId: actor.activeCompanyId } });
   if (existing) return existing;
   const row = await prisma.technicalCase.findUnique({
     where: { id: caseId },
-    include: { attention: true, equipment: true, serviceCompany: true },
+    include: { attention: true, equipment: true },
   });
   if (!row?.quotePending) throw new Error("Esta operación no está pendiente de cotizar.");
-  const clientId = row.attention.adminClientId;
-  const client = await prisma.client.findUnique({ where: { id: clientId } });
+  const clientId = row.equipment.originCompanyId === actor.activeCompanyId ? row.equipment.clientId : row.attention.adminClientId;
+  const client = await prisma.client.findUnique({
+    where: { id: clientId },
+    include: { contacts: { where: { active: true }, orderBy: [{ isPrimary: "desc" }, { name: "asc" }] } },
+  });
   if (!client) throw new Error("Falta el cliente de la cotización.");
-  const folio = await allocateFolio(actor.activeCompanyId, "COT");
   const repair = row.kind === "OS";
+  const concept = (row.resultText || row.attention.reportedFault).trim();
+  const folio = await allocateFolio(actor.activeCompanyId, "COT");
   const quote = await prisma.quote.create({
     data: {
       folio,
@@ -116,25 +124,25 @@ export async function prepareQuoteFromCase(actor: Actor, caseId: string) {
       equipmentId: row.equipmentId,
       technicalCaseId: row.id,
       sellerUserId: row.attention.sellerUserId,
+      reference: row.folio,
       lines: {
         create: [{
-          concept: row.attention.reportedFault,
+          concept,
           quantity: 1,
           incrementPct: repair ? row.attention.priorityIncrementPct : null,
-          unitPrice: repair ? null : row.attention.priorityPrice,
         }],
       },
     },
   });
-  if (!repair && row.attention.priorityPrice != null) {
-    await prisma.quote.update({ where: { id: quote.id }, data: { status: "PENDIENTE_DECISION" } });
-  }
+  const contactNames = client.contacts.map((contact) => contact.name).join(", ");
   await recordHistory({
     companyId: actor.activeCompanyId,
     entityType: "COTIZACION",
     entityId: quote.id,
     action: "ALTA",
-    summary: `${folio} preparada desde ${row.folio}.`,
+    summary: contactNames
+      ? `${folio} quedó pendiente de cotizar desde ${row.folio}. Contactos: ${contactNames}.`
+      : `${folio} quedó pendiente de cotizar desde ${row.folio}. El cliente no tiene contactos activos.`,
     authorUserId: actor.userId,
   });
   return quote;
@@ -209,7 +217,16 @@ export async function decideQuote(
   if (quote.lines.some((line) => line.unitPrice == null)) throw new Error("Falta el precio.");
   const chosen = authorized ? quote.lines.filter((line) => quote.quoteType !== "VENTA_EQUIPO" || lineIds.includes(line.id)) : [];
   if (authorized && chosen.length === 0) throw new Error("Selecciona al menos una línea autorizada.");
-  const needsEquipment = authorized && !quote.equipmentId && (quote.quoteType === "DIAGNOSTICO" || quote.quoteType === "REPARACION");
+  const serviceQuote = quote.quoteType === "DIAGNOSTICO" || quote.quoteType === "REPARACION";
+  const equipment = quote.equipmentId
+    ? await prisma.equipment.findUnique({ where: { id: quote.equipmentId } })
+    : null;
+  const diagnosis = quote.technicalCaseId
+    ? await prisma.technicalCase.findUnique({ where: { id: quote.technicalCaseId } })
+    : null;
+  const received = Boolean(equipment && equipment.custody === "EN_RESGUARDO");
+  const inShop = Boolean(received && diagnosis && equipment?.holderCompanyId === diagnosis.serviceCompanyId);
+  const needsEquipment = authorized && serviceQuote && !received;
   const status = !authorized ? "NO_AUTORIZADA" : needsEquipment ? "AUTORIZADA_PENDIENTE_EQUIPO" : "AUTORIZADA";
   const creditDays = quote.client.creditDays;
   const saleFolio = status === "AUTORIZADA" && quote.quoteType === "VENTA_EQUIPO" ? await allocateFolio(quote.companyId, "VTA") : null;
@@ -249,6 +266,61 @@ export async function decideQuote(
     summary: authorized ? `Decisión: ${status}. El crédito queda congelado.` : "El cliente no autorizó. Se conserva el historial.",
     authorUserId: actor.userId,
   });
+  if (authorized && inShop && diagnosis) await openRepairOrder(diagnosis.id, actor.userId);
+}
+
+export async function openWaitingRepairs(equipmentId: string, authorUserId: string) {
+  const equipment = await prisma.equipment.findUnique({ where: { id: equipmentId } });
+  if (!equipment || equipment.custody !== "EN_RESGUARDO" || !equipment.holderCompanyId) return;
+  const quotes = await prisma.quote.findMany({
+    where: {
+      equipmentId,
+      status: "AUTORIZADA_PENDIENTE_EQUIPO",
+      quoteType: { in: ["DIAGNOSTICO", "REPARACION"] },
+      technicalCaseId: { not: null },
+    },
+  });
+  for (const quote of quotes) {
+    const diagnosis = await prisma.technicalCase.findUnique({ where: { id: quote.technicalCaseId! } });
+    if (!diagnosis || equipment.holderCompanyId !== diagnosis.serviceCompanyId) continue;
+    const opened = await openRepairOrder(diagnosis.id, authorUserId);
+    if (opened) {
+      await prisma.quote.update({ where: { id: quote.id }, data: { status: "AUTORIZADA", version: { increment: 1 } } });
+    }
+  }
+}
+
+async function openRepairOrder(diagnosisCaseId: string, authorUserId: string) {
+  const diagnosis = await prisma.technicalCase.findUnique({
+    where: { id: diagnosisCaseId },
+    include: { attention: true },
+  });
+  if (!diagnosis) return null;
+  const existing = await prisma.technicalCase.findFirst({ where: { spawnedFromId: diagnosis.id, kind: "OS" } });
+  if (existing) return existing;
+  const folio = await allocateFolio(diagnosis.serviceCompanyId, "OS");
+  const created = await prisma.technicalCase.create({
+    data: {
+      folio,
+      attentionId: diagnosis.attentionId,
+      equipmentId: diagnosis.equipmentId,
+      serviceCompanyId: diagnosis.serviceCompanyId,
+      kind: "OS",
+      status: "EN_ESPERA",
+      spawnedFromId: diagnosis.id,
+      slaDueAt: diagnosis.slaDueAt,
+      quotePending: false,
+    },
+  });
+  await recordHistory({
+    companyId: diagnosis.serviceCompanyId,
+    entityType: "OPERACION",
+    entityId: created.id,
+    action: "ALTA",
+    summary: `${folio} abierta porque la cotización fue autorizada y el equipo ya está en resguardo.`,
+    authorUserId,
+  });
+  return created;
 }
 
 export async function linkIntercompanyQuote(actor: Actor, baseQuoteId: string, customerQuoteId: string) {

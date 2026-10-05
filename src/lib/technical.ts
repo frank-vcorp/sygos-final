@@ -198,6 +198,10 @@ export async function finishDiagnosis(actor: Actor, caseId: string, version: num
     summary: servomotores ? "Diagnóstico terminado y validado por quien lo ejecutó en Servomotores." : "Diagnóstico terminado. Queda pendiente la validación del Gerente Operativo.",
     authorUserId: actor.userId,
   });
+  if (quotePending) {
+    const { ensureQuoteFromCase } = await import("./quotes");
+    await ensureQuoteFromCase(actor, row.id);
+  }
 }
 
 export async function validateDiagnosis(actor: Actor, caseId: string, version: number, decision: "VALIDAR" | "DEVOLVER" | "VALIDA" | "NO_PROCEDENTE", reason: string | null) {
@@ -250,6 +254,10 @@ export async function validateDiagnosis(actor: Actor, caseId: string, version: n
     summary: warranty ? `Garantía ${decision === "VALIDA" ? "válida" : "no procedente"}.` : "Diagnóstico validado.",
     authorUserId: actor.userId,
   });
+  if (!warranty && quotePending) {
+    const { ensureQuoteFromCase } = await import("./quotes");
+    await ensureQuoteFromCase(actor, row.id);
+  }
 }
 
 async function spawnWarrantyRepair(diagnosisCaseId: string, authorUserId: string) {
