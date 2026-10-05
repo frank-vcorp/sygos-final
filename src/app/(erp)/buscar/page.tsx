@@ -22,7 +22,7 @@ export default async function BuscarPage({ searchParams }: { searchParams: Promi
   const systron = session.activeCompanyCode === "SERVOMOTORES"
     ? await prisma.company.findUnique({ where: { code: "SYSTRON" } })
     : null;
-  const [clients, prospects, suppliers, equipment, parts] = await Promise.all([
+  const [clients, prospects, suppliers, equipment, parts, operations] = await Promise.all([
     prisma.client.findMany({ where: { companyId: session.activeCompanyId, name: contains }, take: 20 }),
     prisma.prospect.findMany({ where: { companyId: session.activeCompanyId, name: contains }, take: 20 }),
     prisma.supplier.findMany({ where: { companyId: session.activeCompanyId, isSystem: false, name: contains }, take: 20 }),
@@ -41,6 +41,13 @@ export default async function BuscarPage({ searchParams }: { searchParams: Promi
       where: { companyId: session.activeCompanyId, OR: [{ partNumber: contains }, { description: contains }] },
       take: 20,
     }),
+    prisma.technicalCase.findMany({
+      where: {
+        folio: contains,
+        OR: [{ serviceCompanyId: session.activeCompanyId }, { equipment: { originCompanyId: session.activeCompanyId } }],
+      },
+      take: 20,
+    }),
   ]);
   const rows = [
     ...clients.map((row) => ({ href: `/clientes/${row.id}`, kind: "Cliente", label: row.name })),
@@ -48,6 +55,7 @@ export default async function BuscarPage({ searchParams }: { searchParams: Promi
     ...suppliers.map((row) => ({ href: `/proveedores/${row.id}`, kind: "Proveedor", label: row.name })),
     ...equipment.map((row) => ({ href: row.kind === "MOT" ? `/motores/${row.id}` : `/equipos/${row.id}`, kind: row.kind, label: `${row.folio} · ${row.model}` })),
     ...parts.map((row) => ({ href: "/inventario", kind: "Refacción", label: `${row.partNumber} · ${row.description}` })),
+    ...operations.map((row) => ({ href: `/operacion/${row.id}`, kind: row.kind === "OS" ? "Orden de servicio" : "Diagnóstico", label: row.folio })),
   ];
   return (
     <>

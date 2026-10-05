@@ -4,6 +4,7 @@ import { allocateFolio } from "./folios";
 import { ConcurrencyError } from "./form";
 import { recordHistory } from "./history";
 import { isAttentionType, type AttentionType } from "./priorities";
+import { assertWarrantyOrigin, openCase, openPendingCases } from "./technical";
 
 type Actor = {
   userId: string;
@@ -116,10 +117,10 @@ export async function createMot(
     deliveryInstructions: string | null;
   },
 ) {
-  if (!isAttentionType(input.attentionType)) throw new Error("Selecciona el tipo de atención.");
-  if (input.attentionType === "DIAGNOSTICO_GARANTIA" && !input.antecedent) {
-    throw new Error("Diagnóstico de Garantía exige el antecedente.");
+  if (input.attentionType === "DIAGNOSTICO_GARANTIA") {
+    throw new Error("La garantía se abre sobre un equipo que ya tuvo una reparación, no en el alta del MOT.");
   }
+  if (!isAttentionType(input.attentionType)) throw new Error("Selecciona el tipo de atención.");
   const client = await ownClient(actor, input.clientId);
   const priority = await freezePriority(actor.activeCompanyId, input.attentionType, input.priorityId);
   const servomotores = await prisma.company.findUnique({ where: { code: "SERVOMOTORES" } });
@@ -187,12 +188,15 @@ export async function createAttention(
     reportedFault: string;
     antecedent: string | null;
     deliveryInstructions: string | null;
+    originalCaseId: string | null;
     version: number;
   },
 ) {
   if (!isAttentionType(input.attentionType)) throw new Error("Selecciona el tipo de atención.");
-  if (input.attentionType === "DIAGNOSTICO_GARANTIA" && !input.antecedent) {
-    throw new Error("Diagnóstico de Garantía exige el antecedente.");
+  if (input.attentionType === "DIAGNOSTICO_GARANTIA") {
+    if (!input.antecedent) throw new Error("Describe el antecedente del reclamo de garantía.");
+    if (!input.originalCaseId) throw new Error("Selecciona la reparación pagada que origina la garantía.");
+    await assertWarrantyOrigin(input.equipmentId, input.originalCaseId);
   }
   const equipment = await prisma.equipment.findUnique({ where: { id: input.equipmentId } });
   if (!equipment || equipment.originCompanyId !== actor.activeCompanyId) {
@@ -238,11 +242,13 @@ export async function createAttention(
         antecedent: input.antecedent,
         deliveryInstructions: input.deliveryInstructions,
         sellerUserId: actor.role === "VENTAS" ? actor.userId : client.ownerUserId,
+        originalCaseId: input.originalCaseId,
         status: inServiceCustody ? "EN_PROCESO" : "ABIERTA",
         slaStartedAt: inServiceCustody ? new Date() : null,
       },
     });
   });
+  if (attention.slaStartedAt) await openCase(attention.id, attention.slaStartedAt);
   await recordHistory({
     companyId: actor.activeCompanyId,
     entityType: "EQUIPO",
@@ -335,6 +341,7 @@ export async function registerMovement(
       });
     }
   });
+  if (isReceipt(input.kind)) await openPendingCases(equipment.id, input.occurredAt);
   await recordHistory({
     companyId: actor.activeCompanyId,
     entityType: "EQUIPO",

@@ -31,7 +31,7 @@ export async function EquipmentDetail({ id, expectedKind }: { id: string; expect
     include: {
       client: true,
       originCompany: true,
-      attentions: { orderBy: { createdAt: "desc" }, include: { adminClient: true } },
+      attentions: { orderBy: { createdAt: "desc" }, include: { adminClient: true, technicalCases: true } },
       movements: { orderBy: { createdAt: "desc" } },
     },
   });
@@ -42,6 +42,10 @@ export async function EquipmentDetail({ id, expectedKind }: { id: string; expect
   const suppliers = can(session.role, "custody.confirm", session.activeCompanyCode)
     ? await prisma.supplier.findMany({ where: { companyId: session.activeCompanyId, active: true, isSystem: false }, orderBy: { name: "asc" } })
     : [];
+  const repairs = await prisma.technicalCase.findMany({
+    where: { equipmentId: equipment.id, kind: "OS", status: "TERMINADA", paidAt: { not: null }, spawnedFromId: null },
+    select: { id: true, folio: true },
+  });
   const priorities = equipment.originCompanyId === session.activeCompanyId
     ? await prisma.priority.findMany({ where: { companyId: session.activeCompanyId, active: true }, orderBy: { sortOrder: "asc" } })
     : [];
@@ -82,7 +86,12 @@ export async function EquipmentDetail({ id, expectedKind }: { id: string; expect
               <ul className="space-y-2">
                 {equipment.attentions.map((attention) => (
                   <li key={attention.id} className="rounded-lg border border-[var(--line)] bg-white p-3 text-sm">
-                    <p className="font-medium">{ATTENTION_LABEL[attention.attentionType as AttentionType] ?? attention.attentionType} · {attention.priorityName}</p>
+                    <p className="font-medium">
+                      {ATTENTION_LABEL[attention.attentionType as AttentionType] ?? attention.attentionType} · {attention.priorityName}
+                      {attention.technicalCases.map((item) => (
+                        <Link key={item.id} href={`/operacion/${item.id}`} className="ml-2 text-[var(--accent)]">{item.folio}</Link>
+                      ))}
+                    </p>
                     <p className="mt-1">{attention.reportedFault}</p>
                     <p className="mt-1 text-[var(--muted)]">
                       {attention.status === "ABIERTA" ? "SLA aún no inicia." : `SLA iniciado ${attention.slaStartedAt ? formatWhen(attention.slaStartedAt) : ""}.`}
@@ -135,7 +144,7 @@ export async function EquipmentDetail({ id, expectedKind }: { id: string; expect
               suppliers={suppliers.map((supplier) => ({ id: supplier.id, name: supplier.name }))}
             />
           ) : null}
-          {canAttend ? <AttentionForm equipmentId={equipment.id} kind={expectedKind} version={equipment.version} priorities={priorities} /> : null}
+          {canAttend ? <AttentionForm equipmentId={equipment.id} kind={expectedKind} version={equipment.version} priorities={priorities} repairs={repairs} /> : null}
           <section className="rounded-lg border border-[var(--line)] bg-white p-4">
             <h2 className="font-medium">Historial</h2>
             <ul className="mt-2 space-y-2 text-sm">

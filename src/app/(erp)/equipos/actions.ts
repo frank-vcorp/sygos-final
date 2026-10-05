@@ -85,6 +85,7 @@ export async function createAttentionAction(formData: FormData) {
       reportedFault: requiredText(formData.get("reportedFault"), "Falla reportada"),
       antecedent: optionalText(formData.get("antecedent")),
       deliveryInstructions: optionalText(formData.get("deliveryInstructions")),
+      originalCaseId: optionalText(formData.get("originalCaseId")),
       version: parseVersion(formData.get("version")),
     });
     await setFlash({ tone: "ok", message: "Atención creada. El SLA inicia con la recepción física." });

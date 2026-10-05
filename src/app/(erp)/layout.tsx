@@ -18,6 +18,7 @@ const LINKS: Array<{
   { href: "/prospectos", label: "Prospectos", show: (role, code) => can(role, "prospect.operate", code) },
   { href: "/equipos", label: "Equipos", show: (role, code) => can(role, "equi.view", code) },
   { href: "/motores", label: "Motores", show: (role, code) => can(role, "mot.view", code) },
+  { href: "/operacion", label: "Operación", show: (role, code) => role !== "ALMACEN" && (can(role, "equi.view", code) || can(role, "mot.view", code)) },
   { href: "/custodia", label: (code) => (code === "SERVOMOTORES" ? "Custodia" : "Almacén"), show: (role, code) => can(role, "custody.confirm", code) },
   { href: "/inventario", label: "Inventario", show: (role, code) => can(role, "inventory.operate", code) },
   { href: "/proveedores", label: "Proveedores", show: (role, code) => can(role, "supplier.operate", code) },

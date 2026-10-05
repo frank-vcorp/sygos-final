@@ -19,11 +19,13 @@ export function AttentionForm({
   kind,
   version,
   priorities,
+  repairs,
 }: {
   equipmentId: string;
   kind: "EQUI" | "MOT";
   version: number;
   priorities: PriorityRow[];
+  repairs: Array<{ id: string; folio: string }>;
 }) {
   return (
     <form action={createAttentionAction} className="grid gap-3 rounded-lg border border-[var(--line)] bg-white p-4">
@@ -53,7 +55,13 @@ export function AttentionForm({
         </select>
       </Field>
       <Field label="Falla reportada"><textarea name="reportedFault" required rows={3} className={controlClass} /></Field>
-      <Field label="Antecedente" hint="Obligatorio solo en Diagnóstico de Garantía."><input name="antecedent" className={controlClass} /></Field>
+      <Field label="Reparación de origen" hint="Obligatoria en Diagnóstico de Garantía. Debe estar terminada, pagada y dentro de seis meses desde su salida.">
+        <select name="originalCaseId" className={controlClass} defaultValue="">
+          <option value="">Sin reparación previa</option>
+          {repairs.map((repair) => <option key={repair.id} value={repair.id}>{repair.folio}</option>)}
+        </select>
+      </Field>
+      <Field label="Antecedente" hint="Contexto del reclamo. En garantía no sustituye la reparación de origen."><input name="antecedent" className={controlClass} /></Field>
       {kind === "MOT" ? (
         <Field label="Instrucciones de entrega" hint="Solo lo necesario para una entrega directa. No incluye precio.">
           <textarea name="deliveryInstructions" rows={2} className={controlClass} />

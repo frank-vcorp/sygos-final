@@ -35,6 +35,7 @@ model Company {
   priorities       Priority[]
   attentionsOrigin Attention[]          @relation("AttentionOrigin")
   attentionsService Attention[]         @relation("AttentionService")
+  technicalCases   TechnicalCase[]
   custodyMovements CustodyMovement[]
   parts            Part[]
   stockMovements   StockMovement[]
@@ -56,8 +57,9 @@ model User {
   updatedAt              DateTime @updatedAt
   version                Int      @default(1)
 
-  sessions Session[]
-  history  FunctionalHistory[]
+  sessions       Session[]
+  history        FunctionalHistory[]
+  technicalCases TechnicalCase[]
 }
 
 model Session {
@@ -230,8 +232,9 @@ model Equipment {
   updatedAt       DateTime @updatedAt
   version         Int      @default(1)
 
-  attentions Attention[]
-  movements  CustodyMovement[]
+  attentions     Attention[]
+  movements      CustodyMovement[]
+  technicalCases TechnicalCase[]
 
   @@index([originCompanyId, kind])
   @@index([custody])
@@ -276,16 +279,88 @@ model Attention {
   antecedent          String?
   deliveryInstructions String?
   sellerUserId        String?
+  originalCaseId      String?
   status              String    @default("ABIERTA")
   slaStartedAt        DateTime?
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
   version             Int       @default(1)
 
-  movements CustodyMovement[]
+  movements      CustodyMovement[]
+  technicalCases TechnicalCase[]
 
   @@index([equipmentId])
   @@index([serviceCompanyId, status])
+}
+
+model TechnicalCase {
+  id                  String    @id @default(cuid())
+  folio               String    @unique
+  attentionId         String
+  attention           Attention @relation(fields: [attentionId], references: [id])
+  equipmentId         String
+  equipment           Equipment @relation(fields: [equipmentId], references: [id])
+  serviceCompanyId    String
+  serviceCompany      Company   @relation(fields: [serviceCompanyId], references: [id])
+  kind                String
+  status              String
+  assigneeUserId      String?
+  assignee            User?     @relation(fields: [assigneeUserId], references: [id])
+  externalSupplierId  String?
+  externalDocument    String?
+  resultText          String?
+  warrantyDecision    String?
+  commercialDecision  String?
+  commercialReason    String?
+  originalCaseId      String?
+  spawnedFromId       String?
+  paidAt              DateTime?
+  quotePending        Boolean   @default(false)
+  returnReason        String?
+  slaDueAt            DateTime?
+  finishedByUserId    String?
+  validatedByUserId   String?
+  validatedAt         DateTime?
+  version             Int       @default(1)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  logs     TechnicalLog[]
+  requests PartRequest[]
+
+  @@index([serviceCompanyId, status])
+  @@index([equipmentId])
+  @@index([attentionId])
+}
+
+model TechnicalLog {
+  id           String        @id @default(cuid())
+  caseId       String
+  case         TechnicalCase @relation(fields: [caseId], references: [id])
+  body         String
+  authorUserId String
+  createdAt    DateTime      @default(now())
+
+  @@index([caseId, createdAt])
+}
+
+model PartRequest {
+  id           String        @id @default(cuid())
+  caseId       String
+  case         TechnicalCase @relation(fields: [caseId], references: [id])
+  companyId    String
+  partNumber   String
+  description  String
+  link         String?
+  qtyRequested Int
+  qtyReceived  Int           @default(0)
+  qtyIssued    Int           @default(0)
+  status       String        @default("SOLICITADA")
+  version      Int           @default(1)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  @@index([caseId])
 }
 
 model CustodyMovement {
