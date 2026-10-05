@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { allowedMovements, nextCustody } from "./custody";
+import { allowedMovements, nextCustody, reasonsFor } from "./custody";
 
 describe("custodia física", () => {
   it("recibe un EQUI en almacén y deja salir a prueba sin cerrarlo", () => {
@@ -14,6 +14,17 @@ describe("custodia física", () => {
     assert.throws(() => nextCustody("MOT", "PENDIENTE_INGRESO", "ENTRADA"));
     assert.equal(nextCustody("MOT", "PENDIENTE_INGRESO", "INGRESO"), "EN_RESGUARDO");
     assert.deepEqual(allowedMovements("MOT", "EN_RESGUARDO"), ["SALIDA_PRUEBA", "SALIDA_PROVEEDOR", "EGRESO"]);
+  });
+
+  it("toma el motivo de entrada del catálogo del almacén", () => {
+    assert.deepEqual(reasonsFor("ENTRADA"), [
+      "Diagnóstico",
+      "Reparación",
+      "Diagnóstico de Garantía",
+      "Venta de equipo",
+      "Retorno de proveedor",
+    ]);
+    assert.deepEqual(reasonsFor("SALIDA_PRUEBA"), ["Salida a prueba"]);
   });
 
   it("no simula retorno si el equipo permanece fuera después de la prueba", () => {

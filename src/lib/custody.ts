@@ -31,6 +31,21 @@ export const CUSTODY_LABEL: Record<Custody, string> = {
   FUERA: "Fuera",
 };
 
+export const MOVEMENT_REASONS: Record<MovementKind, readonly string[]> = {
+  ENTRADA: ["Diagnóstico", "Reparación", "Diagnóstico de Garantía", "Venta de equipo", "Retorno de proveedor"],
+  INGRESO: ["Diagnóstico", "Reparación", "Diagnóstico de Garantía", "Venta de equipo", "Retorno de proveedor"],
+  SALIDA_PRUEBA: ["Salida a prueba"],
+  RETORNO: ["Salida a prueba"],
+  SALIDA_PROVEEDOR: ["Diagnóstico", "Reparación", "Diagnóstico de Garantía"],
+  RETORNO_PROVEEDOR: ["Retorno de proveedor"],
+  SALIDA: ["Diagnóstico", "Reparación", "Diagnóstico de Garantía", "Venta de equipo", "Salida a prueba"],
+  EGRESO: ["Diagnóstico", "Reparación", "Diagnóstico de Garantía", "Venta de equipo", "Salida a prueba"],
+};
+
+export function reasonsFor(movement: MovementKind): readonly string[] {
+  return MOVEMENT_REASONS[movement];
+}
+
 export const MOVEMENT_LABEL: Record<MovementKind, string> = {
   ENTRADA: "Entrada",
   INGRESO: "Ingreso",

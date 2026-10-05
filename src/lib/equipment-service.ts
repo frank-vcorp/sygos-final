@@ -1,5 +1,5 @@
 import { prisma } from "./db";
-import { nextCustody, isReceipt, type Custody, type MovementKind } from "./custody";
+import { nextCustody, isReceipt, reasonsFor, type Custody, type MovementKind } from "./custody";
 import { allocateFolio } from "./folios";
 import { ConcurrencyError } from "./form";
 import { recordHistory } from "./history";
@@ -300,6 +300,9 @@ export async function registerMovement(
       where: { id: input.supplierId, companyId: actor.activeCompanyId, active: true },
     });
     if (!supplier) throw new Error("Ese proveedor no está activo en esta empresa.");
+  }
+  if (!reasonsFor(input.kind).includes(input.reason)) {
+    throw new Error("El motivo no pertenece al catálogo de este movimiento.");
   }
   const kind = equipment.kind === "MOT" ? "MOT" : "EQUI";
   const custody = nextCustody(kind, equipment.custody as Custody, input.kind);

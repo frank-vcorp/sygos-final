@@ -1,6 +1,7 @@
 import { cancelMovementAction, createAttentionAction, movementAction } from "@/app/(erp)/equipos/actions";
+import { MovementReasonFields } from "@/components/movement-reason-fields";
 import { Button, controlClass, Field } from "@/components/ui";
-import { allowedMovements, MOVEMENT_LABEL, type Custody, type MovementKind } from "@/lib/custody";
+import { allowedMovements, type Custody, type MovementKind } from "@/lib/custody";
 import { ATTENTION_LABEL, ATTENTION_TYPES, prioritySummary } from "@/lib/priorities";
 
 type PriorityRow = {
@@ -93,16 +94,7 @@ export function MovementForm({
       <input type="hidden" name="equipmentId" value={equipmentId} />
       <input type="hidden" name="kind" value={kind} />
       <input type="hidden" name="version" value={version} />
-      <Field label="Movimiento">
-        <select name="movement" required className={controlClass}>
-          {movements.map((movement) => (
-            <option key={movement} value={movement}>{MOVEMENT_LABEL[movement]}</option>
-          ))}
-        </select>
-      </Field>
-      <Field label="Motivo">
-        <input name="reason" required className={controlClass} placeholder="Diagnóstico, reparación, venta, retorno…" />
-      </Field>
+      <MovementReasonFields movements={movements} />
       <Field label="Fecha y hora"><input name="occurredAt" type="datetime-local" className={controlClass} /></Field>
       <Field label="Persona que recibe" hint="No se convierte en cliente. Obligatoria en salida a prueba y en salida definitiva.">
         <input name="receiverName" className={controlClass} />
