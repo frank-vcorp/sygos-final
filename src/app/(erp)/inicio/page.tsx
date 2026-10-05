@@ -15,13 +15,14 @@ export default async function InicioPage() {
     );
   }
   const systron = session.activeCompanyCode === "SYSTRON";
+  const own = session.role === "VENTAS" ? { ownerUserId: session.userId } : {};
   const [clients, prospects, suppliers, custody] = await Promise.all([
-    prisma.client.count({ where: { companyId: session.activeCompanyId, active: true } }),
-    prisma.prospect.count({ where: { companyId: session.activeCompanyId, status: { in: ["NUEVO", "EN_SEGUIMIENTO"] } } }),
+    prisma.client.count({ where: { companyId: session.activeCompanyId, active: true, ...own } }),
+    prisma.prospect.count({ where: { companyId: session.activeCompanyId, status: { in: ["NUEVO", "EN_SEGUIMIENTO"] }, ...own } }),
     prisma.supplier.count({ where: { companyId: session.activeCompanyId, active: true, isSystem: false } }),
     systron
-      ? prisma.equipment.count({ where: { kind: "EQUI", originCompanyId: session.activeCompanyId, custody: "SIN_CUSTODIA" } })
-      : prisma.equipment.count({ where: { kind: "MOT", custody: "PENDIENTE_INGRESO", OR: [{ originCompanyId: session.activeCompanyId }, { originCompany: { code: "SYSTRON" } }] } }),
+      ? prisma.equipment.count({ where: { kind: "EQUI", originCompanyId: session.activeCompanyId, custody: "SIN_CUSTODIA", ...(session.role === "VENTAS" ? { client: own } : {}) } })
+      : prisma.equipment.count({ where: { kind: "MOT", custody: "PENDIENTE_INGRESO", OR: [{ originCompanyId: session.activeCompanyId }, { originCompany: { code: "SYSTRON" } }], ...(session.role === "VENTAS" ? { client: own } : {}) } }),
   ]);
   return (
     <>
