@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { startServiceAction } from "../../actions";
 import { EquipmentCatalogFields } from "@/components/equipment-catalog-fields";
+import { QuickPanel } from "@/components/quick-panel";
 import { Button, controlClass, Field, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
@@ -54,10 +55,10 @@ export default async function NuevoServicioPage({ params }: { params: Promise<{ 
           </select>
         </Field>
         {warranty ? null : (
-          <>
-            <Field label="Nombre del cliente nuevo"><input name="newClientName" className={controlClass} /></Field>
-            <Field label="Contacto del cliente nuevo"><input name="contactName" className={controlClass} /></Field>
-          </>
+          <QuickPanel label="Alta rápida de cliente">
+            <Field label="Nombre del cliente"><input name="newClientName" className={controlClass} /></Field>
+            <Field label="Contacto"><input name="contactName" className={controlClass} /></Field>
+          </QuickPanel>
         )}
         <Field label="Equipo existente" hint={warranty ? "La garantía exige un equipo que ya tuvo una reparación pagada." : "Vacío para dar de alta el equipo ahora."}>
           <select name="equipmentId" className={controlClass} defaultValue="" required={warranty}>
@@ -66,8 +67,8 @@ export default async function NuevoServicioPage({ params }: { params: Promise<{ 
           </select>
         </Field>
         {warranty ? null : (
-          <>
-            <Field label="Tipo de equipo nuevo">
+          <QuickPanel label="Alta rápida de equipo">
+            <Field label="EQUI o MOT">
               <select name="equipmentKind" className={controlClass} defaultValue={session.activeCompanyCode === "SERVOMOTORES" ? "MOT" : "EQUI"}>
                 {session.activeCompanyCode === "SYSTRON" ? <option value="EQUI">EQUI</option> : null}
                 <option value="MOT">MOT</option>
@@ -79,7 +80,7 @@ export default async function NuevoServicioPage({ params }: { params: Promise<{ 
               models={models.map((row) => ({ type: row.type.name, brand: row.brand.name, model: row.name }))}
             />
             <Field label="Serie"><input name="serial" className={controlClass} /></Field>
-          </>
+          </QuickPanel>
         )}
         <Field label="Prioridad">
           <select name="priorityId" required className={controlClass}>

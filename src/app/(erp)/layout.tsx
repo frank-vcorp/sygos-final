@@ -12,6 +12,8 @@ type NavLink = {
   href: string;
   label: string | ((code: string | null) => string);
   show: (role: Parameters<typeof can>[0], code: string | null) => boolean;
+  createHref?: string;
+  showCreate?: (role: Parameters<typeof can>[0], code: string | null) => boolean;
 };
 
 const seesService = (role: Parameters<typeof can>[0], code: string | null) =>
@@ -22,9 +24,9 @@ const GROUPS: Array<{ title: string | null; links: NavLink[] }> = [
   {
     title: "Comercial",
     links: [
-      { href: "/clientes", label: "Clientes", show: (role, code) => can(role, "client.create", code) || can(role, "client.edit", code) },
-      { href: "/prospectos", label: "Prospectos", show: (role, code) => can(role, "prospect.operate", code) },
-      { href: "/cotizaciones", label: "Cotizaciones", show: (role, code) => can(role, "quote.create", code) || can(role, "quote.price", code) },
+      { href: "/clientes", label: "Clientes", show: (role, code) => can(role, "client.create", code) || can(role, "client.edit", code), createHref: "/clientes/nuevo", showCreate: (role, code) => can(role, "client.create", code) },
+      { href: "/prospectos", label: "Prospectos", show: (role, code) => can(role, "prospect.operate", code), createHref: "/prospectos/nuevo", showCreate: (role, code) => can(role, "prospect.operate", code) },
+      { href: "/cotizaciones", label: "Cotizaciones", show: (role, code) => can(role, "quote.create", code) || can(role, "quote.price", code), createHref: "/cotizaciones/nuevo", showCreate: (role, code) => can(role, "quote.create", code) },
       { href: "/ventas", label: "Ventas", show: (role, code) => can(role, "agenda.use", code) || can(role, "quote.follow", code) },
       { href: "/agenda", label: "Agenda", show: (role, code) => can(role, "agenda.use", code) },
     ],
@@ -32,17 +34,17 @@ const GROUPS: Array<{ title: string | null; links: NavLink[] }> = [
   {
     title: "Servicios",
     links: [
-      { href: "/servicios/diagnostico", label: "Diagnóstico", show: seesService },
-      { href: "/servicios/reparacion", label: "Reparación", show: seesService },
-      { href: "/servicios/garantia", label: "Diagnóstico de Garantía", show: seesService },
+      { href: "/servicios/diagnostico", label: "Diagnóstico", show: seesService, createHref: "/servicios/diagnostico/nuevo", showCreate: (role, code) => can(role, "attention.create", code) },
+      { href: "/servicios/reparacion", label: "Reparación", show: seesService, createHref: "/servicios/reparacion/nuevo", showCreate: (role, code) => can(role, "attention.create", code) },
+      { href: "/servicios/garantia", label: "Diagnóstico de Garantía", show: seesService, createHref: "/servicios/garantia/nuevo", showCreate: (role, code) => can(role, "attention.create", code) },
       { href: "/operacion", label: "En proceso", show: seesService },
     ],
   },
   {
     title: "Taller",
     links: [
-      { href: "/equipos", label: "Equipos", show: (role, code) => can(role, "equi.view", code) },
-      { href: "/motores", label: "Motores", show: (role, code) => can(role, "mot.view", code) },
+      { href: "/equipos", label: "Equipos", show: (role, code) => can(role, "equi.view", code), createHref: "/equipos/nuevo", showCreate: (role, code) => can(role, "equi.create", code) },
+      { href: "/motores", label: "Motores", show: (role, code) => can(role, "mot.view", code), createHref: "/motores/nuevo", showCreate: (role, code) => can(role, "mot.create", code) },
       { href: "/custodia", label: (code) => (code === "SERVOMOTORES" ? "Custodia" : "Almacén"), show: (role, code) => can(role, "custody.confirm", code) },
       { href: "/inventario", label: "Inventario", show: (role, code) => can(role, "inventory.operate", code) },
     ],
@@ -50,7 +52,7 @@ const GROUPS: Array<{ title: string | null; links: NavLink[] }> = [
   {
     title: "Administración",
     links: [
-      { href: "/proveedores", label: "Proveedores", show: (role, code) => can(role, "supplier.operate", code) },
+      { href: "/proveedores", label: "Proveedores", show: (role, code) => can(role, "supplier.operate", code), createHref: "/proveedores/nuevo", showCreate: (role, code) => can(role, "supplier.operate", code) },
       { href: "/usuarios", label: "Usuarios", show: (role) => can(role, "user.manage") },
       { href: "/configuracion", label: "Configuración", show: (role) => can(role, "config.company") || can(role, "config.integrations") },
     ],
@@ -90,6 +92,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
                 .map((link) => ({
                   href: link.href,
                   label: typeof link.label === "function" ? link.label(session.activeCompanyCode) : link.label,
+                  createHref: link.showCreate?.(session.role, session.activeCompanyCode) ? link.createHref : undefined,
                 })),
             })).filter((group) => group.links.length > 0),
             { title: null, links: [{ href: "/cuenta", label: "Cuenta" }] },
