@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { finalFromBase, quoteTotals } from "./money";
+import { finalFromBase, linesForTotal, quoteTotals } from "./money";
 
 describe("cotización", () => {
   it("calcula IVA de 16% después del descuento y en MXN", () => {
@@ -18,5 +18,14 @@ describe("cotización", () => {
 
   it("no inventa un total si falta el precio", () => {
     assert.equal(quoteTotals([{ quantity: 1, unitPrice: null }], 0), null);
+  });
+
+  it("en una venta autorizada el total usa solo las líneas autorizadas", () => {
+    const lines = [
+      { quantity: 1, unitPrice: 18000, authorized: true },
+      { quantity: 1, unitPrice: 9000, authorized: false },
+    ];
+    const chosen = linesForTotal(lines, "VENTA_EQUIPO", "AUTORIZADA");
+    assert.equal(quoteTotals(chosen, 0)?.total, 20880);
   });
 });

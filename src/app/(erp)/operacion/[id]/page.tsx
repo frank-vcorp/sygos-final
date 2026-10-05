@@ -68,7 +68,9 @@ export default async function OperacionDetallePage({ params }: { params: Promise
     : [];
   const history = await historyFor("OPERACION", row.id);
   const derived = await prisma.technicalCase.findFirst({ where: { spawnedFromId: row.id }, select: { id: true, folio: true } });
+  const parent = row.spawnedFromId ? await prisma.technicalCase.findUnique({ where: { id: row.spawnedFromId }, select: { id: true, folio: true, kind: true } }) : null;
   const original = row.originalCaseId ? await prisma.technicalCase.findUnique({ where: { id: row.originalCaseId }, select: { id: true, folio: true } }) : null;
+  const repairAfterDiagnosis = row.kind === "OS" && row.attention.attentionType === "DIAGNOSTICO";
   const equipmentHref = row.equipment.kind === "MOT" ? `/motores/${row.equipmentId}` : `/equipos/${row.equipmentId}`;
   const closed = ["VALIDADO", "TERMINADA", "SIN_REPARACION"].includes(row.status);
   const warranty = row.attention.attentionType === "DIAGNOSTICO_GARANTIA" && row.kind === "DIAGNOSTICO";
@@ -88,8 +90,9 @@ export default async function OperacionDetallePage({ params }: { params: Promise
         <div className="space-y-4">
           <section className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
             <p>Equipo: <Link href={equipmentHref} className="text-[var(--accent)]">{row.equipment.folio}</Link> · {row.equipment.model}</p>
-            <p className="mt-1">Atención: {ATTENTION_LABEL[row.attention.attentionType as AttentionType] ?? row.attention.attentionType}</p>
-            <p className="mt-1">Prioridad congelada: {row.attention.priorityName}{row.attention.priorityPrice != null ? ` · $${row.attention.priorityPrice.toLocaleString("es-MX")}` : ""}{row.attention.priorityIncrementPct != null ? ` · incremento ${row.attention.priorityIncrementPct}%` : ""}</p>
+            <p className="mt-1">Atención: {repairAfterDiagnosis ? "Reparación" : ATTENTION_LABEL[row.attention.attentionType as AttentionType] ?? row.attention.attentionType}</p>
+            {parent?.kind === "DIAGNOSTICO" ? <p className="mt-1">Diagnóstico de origen: <Link href={`/operacion/${parent.id}`} className="text-[var(--accent)]">{parent.folio}</Link></p> : null}
+            <p className="mt-1">{repairAfterDiagnosis ? "Prioridad del diagnóstico" : "Prioridad congelada"}: {row.attention.priorityName}{row.attention.priorityPrice != null ? ` · $${row.attention.priorityPrice.toLocaleString("es-MX")}` : ""}{row.attention.priorityIncrementPct != null ? ` · incremento ${row.attention.priorityIncrementPct}%` : ""}</p>
             <p className="mt-1">Falla: {row.attention.reportedFault}</p>
             <p className="mt-1">SLA: {row.slaDueAt ? formatWhen(row.slaDueAt) : "Aún no inicia"}</p>
             <p className="mt-1">Responsable: {row.externalSupplierId ? "Servicio externo" : row.assignee?.name ?? "Sin asignar"}</p>
@@ -257,7 +260,7 @@ export default async function OperacionDetallePage({ params }: { params: Promise
                 <Button type="submit" tone="ghost">Reabrir</Button>
               </form>
             ) : null}
-            {row.kind === "OS" && row.status === "TERMINADA" && !row.spawnedFromId && !row.paidAt && (session.role === "CEO" || session.role === "ADMINISTRADOR") ? (
+            {row.kind === "OS" && row.status === "TERMINADA" && row.attention.attentionType !== "DIAGNOSTICO_GARANTIA" && !row.paidAt && (session.role === "CEO" || session.role === "ADMINISTRADOR") ? (
               <form action={markPaidAction}>
                 <input type="hidden" name="caseId" value={row.id} />
                 <Button type="submit" tone="ghost">Marcar reparación pagada</Button>

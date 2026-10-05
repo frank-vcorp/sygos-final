@@ -58,6 +58,7 @@ export default async function CustodiaPage({ searchParams }: { searchParams: Pro
           <Link key={key} href={`/custodia?vista=${key}`} className={`rounded-md px-3 py-2 text-sm ${view === key ? "bg-[var(--accent)] text-white" : "border border-[var(--line)] bg-white"}`}>{label}</Link>
         ))}
       </div>
+      {systron && can(session.role, "sale.receive", session.activeCompanyCode) ? <SaleQueue companyId={session.activeCompanyId} /> : null}
       {rows.length === 0 ? (
         <Empty title="Sin equipos en esta vista" body="La custodia cambia solo cuando alguien confirma el movimiento." />
       ) : (
@@ -78,5 +79,36 @@ export default async function CustodiaPage({ searchParams }: { searchParams: Pro
         </Table>
       )}
     </>
+  );
+}
+
+async function SaleQueue({ companyId }: { companyId: string }) {
+  const sales = await prisma.sale.findMany({
+    where: { companyId },
+    include: { client: true, lines: true },
+    orderBy: { createdAt: "desc" },
+    take: 30,
+  });
+  const open = sales.filter((sale) => sale.lines.some((line) => line.qtyReceived < line.qtySold || line.qtyDelivered < line.qtyReceived));
+  if (open.length === 0) return null;
+  return (
+    <section className="mb-4 rounded-lg border border-[var(--line)] bg-white p-4">
+      <h2 className="font-medium">Mercancía de venta</h2>
+      <p className="mt-1 text-sm text-[var(--muted)]">Recepción y entrega de lo autorizado. No entra al inventario de refacciones.</p>
+      <ul className="mt-3 space-y-2 text-sm">
+        {open.map((sale) => {
+          const pendingReceive = sale.lines.reduce((sum, line) => sum + Math.max(0, line.qtySold - line.qtyReceived), 0);
+          const pendingDeliver = sale.lines.reduce((sum, line) => sum + Math.max(0, line.qtyReceived - line.qtyDelivered), 0);
+          return (
+            <li key={sale.id}>
+              <Link href={`/ventas/${sale.id}`} className="font-medium text-[var(--accent)]">{sale.folio}</Link>
+              {" · "}{sale.client.name}
+              {pendingReceive > 0 ? ` · por recibir ${pendingReceive}` : ""}
+              {pendingDeliver > 0 ? ` · por entregar ${pendingDeliver}` : ""}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }

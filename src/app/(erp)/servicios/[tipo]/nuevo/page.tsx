@@ -38,7 +38,7 @@ export default async function NuevoServicioPage({ params }: { params: Promise<{ 
     prisma.catalogModel.findMany({ include: { type: true, brand: true } }),
     warranty
       ? prisma.technicalCase.findMany({
-          where: { kind: "OS", status: "TERMINADA", paidAt: { not: null }, spawnedFromId: null, equipment: { originCompanyId: session.activeCompanyId } },
+          where: { kind: "OS", status: "TERMINADA", paidAt: { not: null }, attention: { attentionType: { not: "DIAGNOSTICO_GARANTIA" } }, equipment: { originCompanyId: session.activeCompanyId } },
           select: { id: true, folio: true },
         })
       : Promise.resolve([]),

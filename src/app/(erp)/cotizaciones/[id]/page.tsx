@@ -6,7 +6,7 @@ import { Badge, controlClass, Field, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
 import { historyFor } from "@/lib/history";
-import { money, quoteTotals } from "@/lib/money";
+import { linesForTotal, money, quoteTotals } from "@/lib/money";
 import { can } from "@/lib/permissions";
 import { QUOTE_STATUS_LABEL, QUOTE_TYPE_LABEL, seesEconomicDetail, type QuoteType } from "@/lib/quotes";
 import { requireCompany } from "@/lib/session";
@@ -36,7 +36,7 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
     : null;
   const referencePrice = source?.attention.priorityPrice;
   const priced = quote.status !== "PENDIENTE_COTIZAR" || session.role !== "VENTAS";
-  const totals = priced ? quoteTotals(quote.lines, quote.discountPct) : null;
+  const totals = priced ? quoteTotals(linesForTotal(quote.lines, quote.quoteType, quote.status), quote.discountPct) : null;
   const showBase = seesEconomicDetail(session.role, session.activeCompanyCode, quote.company.code, false);
   const missing = quote.status === "PENDIENTE_COTIZAR"
     ? "Falta el precio de CEO o Administrador."
@@ -52,7 +52,7 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
         <section className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
           <p>Cliente: <Link href={`/clientes/${quote.client.id}`} className="text-[var(--accent)]">{quote.client.isSystem ? "SYSTRON · intercompañía" : quote.client.name}</Link></p>
           <p className="mt-1">Equipo: {quote.equipment ? <Link href={quote.equipment.kind === "MOT" ? `/motores/${quote.equipment.id}` : `/equipos/${quote.equipment.id}`} className="text-[var(--accent)]">{quote.equipment.folio}</Link> : [quote.preliminaryType, quote.preliminaryBrand, quote.preliminaryModel, quote.preliminarySerial].filter(Boolean).join(" · ") || "Sin equipo físico"}</p>
-          {source ? <p className="mt-1">Diagnóstico de origen: <Link href={`/operacion/${source.id}`} className="text-[var(--accent)]">{source.folio}</Link></p> : null}
+          {source ? <p className="mt-1">{source.kind === "OS" ? "Orden de servicio" : "Diagnóstico de origen"}: <Link href={`/operacion/${source.id}`} className="text-[var(--accent)]">{source.folio}</Link></p> : null}
           {repairOrder ? <p className="mt-1">Orden de servicio: <Link href={`/operacion/${repairOrder.id}`} className="text-[var(--accent)]">{repairOrder.folio}</Link></p> : null}
           {quote.client.contacts.length > 0 ? <p className="mt-1">Contactos: {quote.client.contacts.map((contact) => contact.name).join(", ")}</p> : <p className="mt-1 text-[var(--danger)]">Este cliente no tiene contactos activos.</p>}
           {quote.status === "PENDIENTE_COTIZAR" && referencePrice != null ? <p className="mt-1">Referencia congelada de la prioridad: {money(referencePrice)}. El precio lo confirma CEO o Administrador.</p> : null}
@@ -64,7 +64,7 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
             <tbody>
               {quote.lines.map((line) => (
                 <tr key={line.id}>
-                  <td className="py-1">{line.concept}{line.authorized ? " · autorizada" : ""}</td>
+                  <td className="py-1">{line.concept}{quote.status === "AUTORIZADA" && quote.quoteType === "VENTA_EQUIPO" ? (line.authorized ? " · autorizada" : " · no autorizada") : line.authorized ? " · autorizada" : ""}</td>
                   <td>{line.quantity}</td>
                   {priced ? <td>{showBase && line.basePrice != null ? `${money(line.basePrice)} base · final ${money(line.unitPrice)}` : money(line.unitPrice)}</td> : null}
                 </tr>
@@ -123,7 +123,7 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
               </form>
             </>
           ) : null}
-          {session.activeCompanyCode === "SYSTRON" && can(session.role, "quote.price", session.activeCompanyCode) ? (
+          {session.activeCompanyCode === "SYSTRON" && quote.equipment?.kind === "MOT" && can(session.role, "quote.price", session.activeCompanyCode) ? (
             <form action={linkBaseAction} className="grid gap-2 rounded-lg border border-[var(--line)] bg-white p-4">
               <h2 className="font-medium">Ligar cotización base</h2>
               <input type="hidden" name="quoteId" value={quote.id} />

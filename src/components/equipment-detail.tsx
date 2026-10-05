@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
 import { historyFor } from "@/lib/history";
 import { can } from "@/lib/permissions";
+import { openPendingCases } from "@/lib/technical";
 import { ATTENTION_LABEL, type AttentionType } from "@/lib/priorities";
 import { requireCompany } from "@/lib/session";
 
@@ -16,6 +17,11 @@ export async function EquipmentDetail({ id, expectedKind }: { id: string; expect
     ? can(session.role, "equi.view", session.activeCompanyCode)
     : can(session.role, "mot.view", session.activeCompanyCode);
   if (!allowed) notFound();
+  try {
+    await openPendingCases(id, new Date());
+  } catch {
+    // La ficha sigue mostrando la custodia si el diagnóstico no pudo abrirse.
+  }
   const systron = await prisma.company.findUnique({ where: { code: "SYSTRON" } });
   const equipment = await prisma.equipment.findFirst({
     where: {
@@ -43,7 +49,7 @@ export async function EquipmentDetail({ id, expectedKind }: { id: string; expect
     ? await prisma.supplier.findMany({ where: { companyId: session.activeCompanyId, active: true, isSystem: false }, orderBy: { name: "asc" } })
     : [];
   const repairs = await prisma.technicalCase.findMany({
-    where: { equipmentId: equipment.id, kind: "OS", status: "TERMINADA", paidAt: { not: null }, spawnedFromId: null },
+    where: { equipmentId: equipment.id, kind: "OS", status: "TERMINADA", paidAt: { not: null }, attention: { attentionType: { not: "DIAGNOSTICO_GARANTIA" } } },
     select: { id: true, folio: true },
   });
   const priorities = equipment.originCompanyId === session.activeCompanyId

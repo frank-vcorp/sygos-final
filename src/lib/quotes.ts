@@ -145,6 +145,44 @@ export async function ensureQuoteFromCase(actor: { userId: string; activeCompany
       : `${folio} quedó pendiente de cotizar desde ${row.folio}. El cliente no tiene contactos activos.`,
     authorUserId: actor.userId,
   });
+  if (row.equipment.kind === "MOT" && row.equipment.originCompanyId !== actor.activeCompanyId) {
+    await ensureOriginQuote(row, quote.id, actor.userId);
+  }
+  return quote;
+}
+
+async function ensureOriginQuote(
+  row: { id: string; folio: string; equipmentId: string; resultText: string | null; attention: { reportedFault: string; sellerUserId: string | null }; equipment: { originCompanyId: string; clientId: string } },
+  baseQuoteId: string,
+  authorUserId: string,
+) {
+  const existing = await prisma.quote.findFirst({ where: { technicalCaseId: row.id, companyId: row.equipment.originCompanyId } });
+  if (existing) return existing;
+  const concept = (row.resultText || row.attention.reportedFault).trim();
+  const folio = await allocateFolio(row.equipment.originCompanyId, "COT");
+  const quote = await prisma.quote.create({
+    data: {
+      folio,
+      companyId: row.equipment.originCompanyId,
+      clientId: row.equipment.clientId,
+      quoteType: "DIAGNOSTICO",
+      status: "PENDIENTE_COTIZAR",
+      equipmentId: row.equipmentId,
+      technicalCaseId: row.id,
+      linkedQuoteId: baseQuoteId,
+      sellerUserId: row.attention.sellerUserId,
+      reference: row.folio,
+      lines: { create: [{ concept, quantity: 1 }] },
+    },
+  });
+  await recordHistory({
+    companyId: row.equipment.originCompanyId,
+    entityType: "COTIZACION",
+    entityId: quote.id,
+    action: "ALTA",
+    summary: `${folio} quedó pendiente de cotizar en SYSTRON desde ${row.folio}. El precio base de Servomotores no se muestra al vendedor.`,
+    authorUserId,
+  });
   return quote;
 }
 

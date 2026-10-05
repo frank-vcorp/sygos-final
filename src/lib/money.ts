@@ -5,6 +5,14 @@ export function lineAmount(quantity: number, unitPrice: number | null): number |
   return roundMoney(quantity * unitPrice);
 }
 
+export function linesForTotal<T extends { authorized?: boolean }>(lines: T[], quoteType: string, status: string): T[] {
+  if (quoteType === "VENTA_EQUIPO" && status === "AUTORIZADA") {
+    const chosen = lines.filter((line) => line.authorized);
+    if (chosen.length > 0) return chosen;
+  }
+  return lines;
+}
+
 export function quoteTotals(lines: Array<{ quantity: number; unitPrice: number | null }>, discountPct: number) {
   const priced = lines.every((line) => line.unitPrice != null);
   if (!priced) return null;

@@ -333,7 +333,7 @@ model Attention {
 
 model TechnicalCase {
   id                  String    @id @default(cuid())
-  folio               String    @unique
+  folio               String
   attentionId         String
   attention           Attention @relation(fields: [attentionId], references: [id])
   equipmentId         String
@@ -366,6 +366,7 @@ model TechnicalCase {
   logs     TechnicalLog[]
   requests PartRequest[]
 
+  @@unique([serviceCompanyId, folio])
   @@index([serviceCompanyId, status])
   @@index([equipmentId])
   @@index([attentionId])
@@ -464,7 +465,7 @@ model StockMovement {
 
 model Quote {
   id                 String   @id @default(cuid())
-  folio              String   @unique
+  folio              String
   companyId          String
   company            Company  @relation(fields: [companyId], references: [id])
   clientId           String
@@ -490,6 +491,7 @@ model Quote {
   lines QuoteLine[]
   sales Sale[]
 
+  @@unique([companyId, folio])
   @@index([companyId, status])
   @@index([technicalCaseId])
 }
@@ -508,7 +510,7 @@ model QuoteLine {
 
 model Sale {
   id        String   @id @default(cuid())
-  folio     String   @unique
+  folio     String
   companyId String
   company   Company  @relation(fields: [companyId], references: [id])
   clientId  String
@@ -518,6 +520,8 @@ model Sale {
   createdAt DateTime @default(now())
 
   lines SaleLine[]
+
+  @@unique([companyId, folio])
 }
 
 model SaleLine {

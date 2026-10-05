@@ -2,9 +2,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Badge, Button, Empty, ListCap, PageHeader, Table, Td, Th, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
-import { money, quoteTotals } from "@/lib/money";
+import { linesForTotal, money, quoteTotals } from "@/lib/money";
 import { can } from "@/lib/permissions";
-import { QUOTE_STATUS_LABEL, QUOTE_TYPE_LABEL, type QuoteType } from "@/lib/quotes";
+import { ensureQuoteFromCase, QUOTE_STATUS_LABEL, QUOTE_TYPE_LABEL, type QuoteType } from "@/lib/quotes";
 import { requireCompany } from "@/lib/session";
 
 export default async function CotizacionesPage({ searchParams }: { searchParams: Promise<{ vista?: string; q?: string }> }) {
@@ -15,6 +15,23 @@ export default async function CotizacionesPage({ searchParams }: { searchParams:
   const { vista, q } = await searchParams;
   const query = (q ?? "").trim();
   const pending = vista === "pendientes";
+  if (pending && can(session.role, "quote.price", session.activeCompanyCode)) {
+    const missing = await prisma.technicalCase.findMany({
+      where: { serviceCompanyId: session.activeCompanyId, quotePending: true },
+      select: { id: true },
+      take: 50,
+    });
+    for (const row of missing) {
+      const linked = await prisma.quote.findFirst({ where: { technicalCaseId: row.id, companyId: session.activeCompanyId } });
+      if (!linked) {
+        try {
+          await ensureQuoteFromCase(session, row.id);
+        } catch {
+          // La bandeja conserva la operación si la cotización no pudo nacer.
+        }
+      }
+    }
+  }
   const quotes = await prisma.quote.findMany({
     where: {
       companyId: session.activeCompanyId,
@@ -71,7 +88,7 @@ export default async function CotizacionesPage({ searchParams }: { searchParams:
           <tbody>
             {quotes.map((quote) => {
               const hidePrice = session.role === "VENTAS" && quote.status === "PENDIENTE_COTIZAR";
-              const totals = hidePrice ? null : quoteTotals(quote.lines, quote.discountPct);
+              const totals = hidePrice ? null : quoteTotals(linesForTotal(quote.lines, quote.quoteType, quote.status), quote.discountPct);
               return (
                 <tr key={quote.id}>
                   <Td><Link href={`/cotizaciones/${quote.id}`} className="font-medium text-[var(--accent)]">{quote.folio}</Link></Td>

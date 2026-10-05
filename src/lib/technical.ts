@@ -30,7 +30,7 @@ export async function openPendingCases(equipmentId: string, receivedAt: Date) {
     where: { equipmentId, slaStartedAt: { not: null }, technicalCases: { none: {} } },
   });
   for (const attention of attentions) {
-    await openCase(attention.id, receivedAt);
+    await openCase(attention.id, attention.slaStartedAt ?? receivedAt);
   }
 }
 
@@ -324,6 +324,10 @@ export async function finishRepair(actor: Actor, caseId: string, version: number
       : "Sin reparación. El cargo queda para la decisión comercial.",
     authorUserId: actor.userId,
   });
+  if (!warranty) {
+    const { ensureQuoteFromCase } = await import("./quotes");
+    await ensureQuoteFromCase(actor, row.id);
+  }
 }
 
 export async function reopenCase(actor: Actor, caseId: string, version: number, reason: string) {
@@ -367,7 +371,7 @@ export async function captureExternalDocument(actor: Actor, caseId: string, vers
 export async function markRepairPaid(actor: Actor, caseId: string) {
   if (actor.role !== "ADMINISTRADOR" && actor.role !== "CEO") throw new Error("Solo CEO o Administrador marcan la reparación como pagada.");
   const row = await loadCase(caseId);
-  if (row.kind !== "OS" || row.status !== "TERMINADA" || row.spawnedFromId) {
+  if (row.kind !== "OS" || row.status !== "TERMINADA" || row.attention.attentionType === "DIAGNOSTICO_GARANTIA") {
     throw new Error("Solo una reparación terminada, que no sea de garantía, inicia un periodo de garantía.");
   }
   await prisma.technicalCase.update({ where: { id: row.id }, data: { paidAt: new Date(), version: { increment: 1 } } });
