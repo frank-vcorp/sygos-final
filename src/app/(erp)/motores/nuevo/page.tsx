@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createMotAction } from "@/app/(erp)/equipos/actions";
+import { EquipmentCatalogFields } from "@/components/equipment-catalog-fields";
 import { Button, controlClass, Field, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
@@ -9,7 +10,7 @@ import { requireCompany } from "@/lib/session";
 export default async function NuevoMotPage() {
   const session = await requireCompany();
   if (!can(session.role, "mot.create", session.activeCompanyCode)) redirect("/motores");
-  const [clients, priorities] = await Promise.all([
+  const [clients, priorities, types, brands, models] = await Promise.all([
     prisma.client.findMany({
       where: {
         companyId: session.activeCompanyId,
@@ -21,6 +22,9 @@ export default async function NuevoMotPage() {
       take: 200,
     }),
     prisma.priority.findMany({ where: { companyId: session.activeCompanyId, active: true }, orderBy: [{ attentionType: "asc" }, { sortOrder: "asc" }] }),
+    prisma.catalogType.findMany({ orderBy: { name: "asc" } }),
+    prisma.catalogBrand.findMany({ orderBy: { name: "asc" } }),
+    prisma.catalogModel.findMany({ include: { type: true, brand: true } }),
   ]);
   return (
     <>
@@ -37,8 +41,11 @@ export default async function NuevoMotPage() {
             {clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}
           </select>
         </Field>
-        <Field label="Marca"><input name="brand" className={controlClass} /></Field>
-        <Field label="Modelo o identificación"><input name="model" required className={controlClass} /></Field>
+        <EquipmentCatalogFields
+          types={types.map((type) => type.name)}
+          brands={brands.map((brand) => brand.name)}
+          models={models.map((row) => ({ type: row.type.name, brand: row.brand.name, model: row.name }))}
+        />
         <Field label="Descripción"><textarea name="description" rows={2} className={controlClass} /></Field>
         <Field label="Serie"><input name="serial" className={controlClass} /></Field>
         <Field label="Tipo de atención">

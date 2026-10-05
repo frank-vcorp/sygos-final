@@ -1,6 +1,7 @@
-import { mkdirSync, writeFileSync } from "fs";
+import { mkdirSync, readFileSync, writeFileSync } from "fs";
 import { randomBytes } from "crypto";
 import { PrismaClient } from "@prisma/client";
+import { catalogKey } from "../src/lib/catalog-key";
 import { hashPassword, verifyPassword } from "../src/lib/crypto";
 import { initialPriorities } from "../src/lib/priorities";
 import { DEFAULT_MONTHLY_PURCHASE, DEFAULT_PURCHASE_LIMIT, isPurchaseManager, type Role } from "../src/lib/roles";
@@ -47,6 +48,7 @@ async function main() {
   await seedPriorities(systron.id, "SYSTRON");
   await seedPriorities(servomotores.id, "SERVOMOTORES");
   await seedCommercialCatalogs(systron.id, servomotores.id);
+  await seedEquipmentCatalog();
 }
 
 async function seedPriorities(companyId: string, code: "SYSTRON" | "SERVOMOTORES") {
@@ -120,6 +122,34 @@ const VERIFICATION_USERS: Array<{ username: string; name: string; role: Role; co
   { username: "Ayudante", name: "Ayudante General", role: "AYUDANTE_GENERAL", company: "SERVOMOTORES" },
   { username: "Kiosco", name: "Kiosco de Asistencia", role: "KIOSCO_ASISTENCIA", company: "SYSTRON" },
 ];
+
+async function seedEquipmentCatalog() {
+  const rows = JSON.parse(readFileSync(new URL("../src/data/equipo-catalogo.json", import.meta.url), "utf8")) as Array<{ type: string; brand: string; model: string }>;
+  const types = new Map<string, string>();
+  const brands = new Map<string, string>();
+  for (const row of rows) {
+    const typeKey = catalogKey(row.type);
+    const brandKey = catalogKey(row.brand);
+    const modelKey = catalogKey(row.model);
+    let typeId = types.get(typeKey);
+    if (!typeId) {
+      const type = await prisma.catalogType.upsert({ where: { key: typeKey }, update: {}, create: { name: row.type, key: typeKey } });
+      typeId = type.id;
+      types.set(typeKey, typeId);
+    }
+    let brandId = brands.get(brandKey);
+    if (!brandId) {
+      const brand = await prisma.catalogBrand.upsert({ where: { key: brandKey }, update: {}, create: { name: row.brand, key: brandKey } });
+      brandId = brand.id;
+      brands.set(brandKey, brandId);
+    }
+    await prisma.catalogModel.upsert({
+      where: { typeId_brandId_key: { typeId, brandId, key: modelKey } },
+      update: {},
+      create: { typeId, brandId, name: row.model, key: modelKey },
+    });
+  }
+}
 
 async function seedCommercialCatalogs(systronId: string, servomotoresId: string) {
   for (const companyId of [systronId, servomotoresId]) {

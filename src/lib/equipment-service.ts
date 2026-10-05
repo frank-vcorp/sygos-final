@@ -3,6 +3,7 @@ import { nextCustody, isReceipt, reasonsFor, type Custody, type MovementKind } f
 import { allocateFolio } from "./folios";
 import { ConcurrencyError } from "./form";
 import { recordHistory } from "./history";
+import { rememberCatalog } from "./catalog";
 import { isAttentionType, type AttentionType } from "./priorities";
 import { assertWarrantyOrigin, openCase, openPendingCases } from "./technical";
 
@@ -24,32 +25,6 @@ async function ownClient(actor: Actor, clientId: string) {
   return client;
 }
 
-async function catalogName(companyId: string, kind: "type" | "brand", id: string | null, created: string | null) {
-  if (created) {
-    if (kind === "type") {
-      const row = await prisma.equipmentType.upsert({
-        where: { companyId_name: { companyId, name: created } },
-        update: { active: true },
-        create: { companyId, name: created },
-      });
-      return row.name;
-    }
-    const row = await prisma.equipmentBrand.upsert({
-      where: { companyId_name: { companyId, name: created } },
-      update: { active: true },
-      create: { companyId, name: created },
-    });
-    return row.name;
-  }
-  if (!id) throw new Error(kind === "type" ? "Selecciona o crea el tipo." : "Selecciona o crea la marca.");
-  const row =
-    kind === "type"
-      ? await prisma.equipmentType.findFirst({ where: { id, companyId, active: true } })
-      : await prisma.equipmentBrand.findFirst({ where: { id, companyId, active: true } });
-  if (!row) throw new Error(kind === "type" ? "El tipo no pertenece a esta empresa." : "La marca no pertenece a esta empresa.");
-  return row.name;
-}
-
 async function freezePriority(companyId: string, attentionType: AttentionType, priorityId: string) {
   const priority = await prisma.priority.findFirst({
     where: { id: priorityId, companyId, attentionType, active: true },
@@ -62,10 +37,8 @@ export async function createEqui(
   actor: Actor,
   input: {
     clientId: string;
-    typeId: string | null;
-    newType: string | null;
-    brandId: string | null;
-    newBrand: string | null;
+    typeName: string;
+    brandName: string;
     model: string;
     description: string | null;
     serial: string | null;
@@ -73,8 +46,7 @@ export async function createEqui(
 ) {
   if (actor.activeCompanyCode !== "SYSTRON") throw new Error("EQUI solo se crea en SYSTRON.");
   const client = await ownClient(actor, input.clientId);
-  const typeName = await catalogName(actor.activeCompanyId, "type", input.typeId, input.newType);
-  const brandName = await catalogName(actor.activeCompanyId, "brand", input.brandId, input.newBrand);
+  const identity = await rememberCatalog(input.typeName, input.brandName, input.model);
   const folio = await allocateFolio(actor.activeCompanyId, "EQUI");
   const equipment = await prisma.equipment.create({
     data: {
@@ -82,9 +54,9 @@ export async function createEqui(
       folio,
       originCompanyId: actor.activeCompanyId,
       clientId: client.id,
-      typeName,
-      brandName,
-      model: input.model,
+      typeName: identity.typeName,
+      brandName: identity.brandName,
+      model: identity.modelName,
       description: input.description,
       serial: input.serial,
       custody: "SIN_CUSTODIA",
@@ -106,6 +78,7 @@ export async function createMot(
   actor: Actor,
   input: {
     clientId: string;
+    typeName: string;
     brand: string | null;
     model: string;
     description: string | null;
@@ -122,6 +95,7 @@ export async function createMot(
   }
   if (!isAttentionType(input.attentionType)) throw new Error("Selecciona el tipo de atención.");
   const client = await ownClient(actor, input.clientId);
+  const identity = await rememberCatalog(input.typeName, input.brand ?? "", input.model);
   const priority = await freezePriority(actor.activeCompanyId, input.attentionType, input.priorityId);
   const servomotores = await prisma.company.findUnique({ where: { code: "SERVOMOTORES" } });
   if (!servomotores) throw new Error("Falta la empresa Servomotores.");
@@ -137,8 +111,9 @@ export async function createMot(
       folio,
       originCompanyId: actor.activeCompanyId,
       clientId: client.id,
-      brandName: input.brand,
-      model: input.model,
+      typeName: identity.typeName,
+      brandName: identity.brandName,
+      model: identity.modelName,
       description: input.description,
       serial: input.serial,
       custody: "PENDIENTE_INGRESO",
@@ -305,18 +280,16 @@ export async function startService(
     if (input.equipmentKind === "EQUI") {
       const equipment = await createEqui(actor, {
         clientId,
-        typeId: null,
-        newType: input.typeName,
-        brandId: null,
-        newBrand: input.brandName,
-        model: input.model ?? "",
+        typeName: input.typeName ?? "",
+        brandName: input.brandName ?? "",
+        model: input.model,
         description: null,
         serial: input.serial,
       });
       equipmentId = equipment.id;
     } else if (input.equipmentKind === "MOT") {
-      if (!input.model) throw new Error("El modelo es obligatorio.");
       const client = await ownClient(actor, clientId);
+      const identity = await rememberCatalog(input.typeName ?? "", input.brandName ?? "", input.model);
       const folio = await allocateFolio(actor.activeCompanyId, "MOT");
       const equipment = await prisma.equipment.create({
         data: {
@@ -324,8 +297,9 @@ export async function startService(
           folio,
           originCompanyId: actor.activeCompanyId,
           clientId: client.id,
-          brandName: input.brandName,
-          model: input.model,
+          typeName: identity.typeName,
+          brandName: identity.brandName,
+          model: identity.modelName,
           serial: input.serial,
           custody: "PENDIENTE_INGRESO",
           createdByUserId: actor.userId,

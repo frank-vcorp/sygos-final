@@ -222,6 +222,32 @@ model EquipmentBrand {
   @@unique([companyId, name])
 }
 
+model CatalogType {
+  id     String         @id @default(cuid())
+  name   String
+  key    String         @unique
+  models CatalogModel[]
+}
+
+model CatalogBrand {
+  id     String         @id @default(cuid())
+  name   String
+  key    String         @unique
+  models CatalogModel[]
+}
+
+model CatalogModel {
+  id      String       @id @default(cuid())
+  typeId  String
+  type    CatalogType  @relation(fields: [typeId], references: [id])
+  brandId String
+  brand   CatalogBrand @relation(fields: [brandId], references: [id])
+  name    String
+  key     String
+
+  @@unique([typeId, brandId, key])
+}
+
 /// EQUI belongs to one company. MOT is a global physical identity with originCompanyId.
 model Equipment {
   id              String   @id @default(cuid())

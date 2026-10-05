@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { startServiceAction } from "../../actions";
+import { EquipmentCatalogFields } from "@/components/equipment-catalog-fields";
 import { Button, controlClass, Field, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
@@ -19,7 +20,7 @@ export default async function NuevoServicioPage({ params }: { params: Promise<{ 
   const attentionType = TYPES[tipo as keyof typeof TYPES];
   if (!attentionType) notFound();
   const warranty = attentionType === "DIAGNOSTICO_GARANTIA";
-  const [clients, equipment, priorities, repairs] = await Promise.all([
+  const [clients, equipment, priorities, types, brands, models, repairs] = await Promise.all([
     prisma.client.findMany({
       where: { companyId: session.activeCompanyId, active: true, isSystem: false, ...(session.role === "VENTAS" ? { ownerUserId: session.userId } : {}) },
       orderBy: { name: "asc" },
@@ -31,6 +32,9 @@ export default async function NuevoServicioPage({ params }: { params: Promise<{ 
       take: 100,
     }),
     prisma.priority.findMany({ where: { companyId: session.activeCompanyId, attentionType, active: true }, orderBy: { sortOrder: "asc" } }),
+    prisma.catalogType.findMany({ orderBy: { name: "asc" } }),
+    prisma.catalogBrand.findMany({ orderBy: { name: "asc" } }),
+    prisma.catalogModel.findMany({ include: { type: true, brand: true } }),
     warranty
       ? prisma.technicalCase.findMany({
           where: { kind: "OS", status: "TERMINADA", paidAt: { not: null }, spawnedFromId: null, equipment: { originCompanyId: session.activeCompanyId } },
@@ -69,9 +73,11 @@ export default async function NuevoServicioPage({ params }: { params: Promise<{ 
                 <option value="MOT">MOT</option>
               </select>
             </Field>
-            <Field label="Tipo" hint="Para un EQUI nuevo."><input name="typeName" className={controlClass} /></Field>
-            <Field label="Marca"><input name="brandName" className={controlClass} /></Field>
-            <Field label="Modelo"><input name="model" className={controlClass} /></Field>
+            <EquipmentCatalogFields
+              types={types.map((type) => type.name)}
+              brands={brands.map((brand) => brand.name)}
+              models={models.map((row) => ({ type: row.type.name, brand: row.brand.name, model: row.name }))}
+            />
             <Field label="Serie"><input name="serial" className={controlClass} /></Field>
           </>
         )}

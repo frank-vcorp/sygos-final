@@ -1,0 +1,4092 @@
+[
+  {
+    "type": "AMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6076-H102"
+  },
+  {
+    "type": "AMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6078-H206#H500"
+  },
+  {
+    "type": "AMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6079-H208"
+  },
+  {
+    "type": "AMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6096-H105"
+  },
+  {
+    "type": "AMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6096-H203"
+  },
+  {
+    "type": "AMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6096-H208"
+  },
+  {
+    "type": "AMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6100-H001"
+  },
+  {
+    "type": "AMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6102-H202#H520"
+  },
+  {
+    "type": "AMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6102-H206#H520"
+  },
+  {
+    "type": "AMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6240-H105"
+  },
+  {
+    "type": "AMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6240-H206"
+  },
+  {
+    "type": "AMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6270-H100#H600"
+  },
+  {
+    "type": "AMPLIFICADOR",
+    "brand": "HAAS",
+    "model": "30 AMP"
+  },
+  {
+    "type": "AMPLIFICADOR",
+    "brand": "HAAS",
+    "model": "30 AMP  SMART AMP ASSY"
+  },
+  {
+    "type": "AMPLIFICADOR",
+    "brand": "HAAS",
+    "model": "30 AMP."
+  },
+  {
+    "type": "AMPLIFICADOR",
+    "brand": "HAAS",
+    "model": "30A"
+  },
+  {
+    "type": "AMPLIFICADOR",
+    "brand": "HAAS",
+    "model": "32 AMP"
+  },
+  {
+    "type": "AMPLIFICADOR",
+    "brand": "HAAS",
+    "model": "32-5550J"
+  },
+  {
+    "type": "AMPLIFICADOR",
+    "brand": "HAAS",
+    "model": "4015 N- D"
+  },
+  {
+    "type": "AMPLIFICADOR",
+    "brand": "HAAS",
+    "model": "4015H-E"
+  },
+  {
+    "type": "AMPLIFICADOR",
+    "brand": "HAAS",
+    "model": "4015J-A"
+  },
+  {
+    "type": "AMPLIFICADOR",
+    "brand": "HAAS",
+    "model": "45 AMP"
+  },
+  {
+    "type": "AMPLIFICADOR",
+    "brand": "HAAS",
+    "model": "45 AMP SMART AMP ASSY"
+  },
+  {
+    "type": "AMPLIFICADOR",
+    "brand": "HAAS",
+    "model": "45 AMP."
+  },
+  {
+    "type": "AMPLIFICADOR",
+    "brand": "HAAS",
+    "model": "45HP"
+  },
+  {
+    "type": "AMPLIFICADOR",
+    "brand": "HAAS",
+    "model": "60 AMP"
+  },
+  {
+    "type": "AMPLIFICADOR",
+    "brand": "HAAS",
+    "model": "60 AMP."
+  },
+  {
+    "type": "AMPLIFICADOR",
+    "brand": "HAAS",
+    "model": "60 AMPS"
+  },
+  {
+    "type": "AMPLIFICADOR",
+    "brand": "HAAS",
+    "model": "60A"
+  },
+  {
+    "type": "AMPLIFICADOR",
+    "brand": "HAAS",
+    "model": "90 AM"
+  },
+  {
+    "type": "AMPLIFICADOR",
+    "brand": "HAAS",
+    "model": "90 AMP"
+  },
+  {
+    "type": "AMPLIFICADOR",
+    "brand": "HAAS",
+    "model": "90 HP"
+  },
+  {
+    "type": "AMPLIFICADOR",
+    "brand": "HAAS",
+    "model": "BVC3 01/02."
+  },
+  {
+    "type": "AMPLIFICADOR",
+    "brand": "HAAS",
+    "model": "HAAS 30AMP"
+  },
+  {
+    "type": "AMPLIFICADOR",
+    "brand": "HAAS",
+    "model": "HAAS 45AMP"
+  },
+  {
+    "type": "AMPLIFICADOR",
+    "brand": "HAAS",
+    "model": "HAAS 60A"
+  },
+  {
+    "type": "AMPLIFICADOR",
+    "brand": "HAAS",
+    "model": "HAAS 90A"
+  },
+  {
+    "type": "ARRANCADOR",
+    "brand": "ABB",
+    "model": "PSE105-600-70"
+  },
+  {
+    "type": "ARRANCADOR",
+    "brand": "ALLEN BRADLEY",
+    "model": "150-F108NBD"
+  },
+  {
+    "type": "ARRANCADOR",
+    "brand": "PARKER",
+    "model": "459800191691"
+  },
+  {
+    "type": "ARRANCADOR",
+    "brand": "SIEMENS",
+    "model": "3RW4075-2BB34"
+  },
+  {
+    "type": "ARRANCADOR",
+    "brand": "SIEMENS",
+    "model": "3RW5234-6AC14"
+  },
+  {
+    "type": "ARRANCADOR",
+    "brand": "SIEMENS",
+    "model": "3RW5246-6AC14"
+  },
+  {
+    "type": "ARRANCADOR",
+    "brand": "WEG",
+    "model": "SSW060205T2257SSZ"
+  },
+  {
+    "type": "ARRANCADOR SUAVE",
+    "brand": "ABB",
+    "model": "PSTX250-600-70"
+  },
+  {
+    "type": "ARRANCADOR SUAVE",
+    "brand": "ALLEN BRADLEY",
+    "model": "SMCFLEX 150-F317NBD"
+  },
+  {
+    "type": "ARRANCADOR SUAVE",
+    "brand": "SIEMENS",
+    "model": "3RW4056-6BB34"
+  },
+  {
+    "type": "ARRANCADOR SUAVE",
+    "brand": "WEG",
+    "model": "SSW060170Y2257SSZ"
+  },
+  {
+    "type": "BOTONERA",
+    "brand": "OKUMA",
+    "model": "C-9222-4053-3"
+  },
+  {
+    "type": "BOTONERA",
+    "brand": "TAKISAWA",
+    "model": "2Y1D-SS-4040-S-R1"
+  },
+  {
+    "type": "BOTONERA",
+    "brand": "TAKISAWA",
+    "model": "ZY1D-SS4040-5-R1"
+  },
+  {
+    "type": "BOTONERA",
+    "brand": "TAKISAWA",
+    "model": "ZY1D-SS4040-5-R1 117719-008"
+  },
+  {
+    "type": "CABLE",
+    "brand": "FANUC",
+    "model": "XP23R"
+  },
+  {
+    "type": "CABLE",
+    "brand": "HAAS",
+    "model": "4 HILOS"
+  },
+  {
+    "type": "CABLE",
+    "brand": "OMRON",
+    "model": "X64"
+  },
+  {
+    "type": "CARGADOR DE BATERÍAS",
+    "brand": "ENERSYS",
+    "model": "E13-IN-5C"
+  },
+  {
+    "type": "CARGADOR DE BATERÍAS",
+    "brand": "ENERSYS",
+    "model": "EI3-HL-4Y"
+  },
+  {
+    "type": "CARGADOR DE BATERÍAS",
+    "brand": "ENERSYS",
+    "model": "EI3-IN-5C"
+  },
+  {
+    "type": "CARGADOR DE MONTACARGAS",
+    "brand": "ENERSYS",
+    "model": "E13-HL-4Y"
+  },
+  {
+    "type": "CARGADOR DE MONTACARGAS",
+    "brand": "ENERSYS",
+    "model": "EI3-HL-4G"
+  },
+  {
+    "type": "CONTROLADOR",
+    "brand": "ABB",
+    "model": "3HAB8101-3/10A"
+  },
+  {
+    "type": "CONTROLADOR",
+    "brand": "ABB",
+    "model": "3HAB8101-4/05A"
+  },
+  {
+    "type": "CONTROLADOR",
+    "brand": "ABB",
+    "model": "3HAB8101-8-12B"
+  },
+  {
+    "type": "CONTROLADOR",
+    "brand": "ABB",
+    "model": "3HAB8101-8/14A"
+  },
+  {
+    "type": "CONTROLADOR",
+    "brand": "ABB",
+    "model": "3HAB8101-8/14C"
+  },
+  {
+    "type": "CONTROLADOR",
+    "brand": "ABB",
+    "model": "3HAB8101-8/15A"
+  },
+  {
+    "type": "CONTROLADOR",
+    "brand": "ABB",
+    "model": "3HAB8101-8/17A"
+  },
+  {
+    "type": "CONTROLADOR",
+    "brand": "ABB",
+    "model": "IRC5 COMPACT"
+  },
+  {
+    "type": "CONTROLADOR",
+    "brand": "ABB",
+    "model": "OMD800E480C"
+  },
+  {
+    "type": "CONTROLADOR",
+    "brand": "ABB",
+    "model": "RDCU-12C"
+  },
+  {
+    "type": "CONTROLADOR",
+    "brand": "ALLEN BRADLEY",
+    "model": "22B-D2P3N104"
+  },
+  {
+    "type": "CONTROLADOR",
+    "brand": "ENERSYS",
+    "model": "6LA20671"
+  },
+  {
+    "type": "CONTROLADOR",
+    "brand": "FANUC",
+    "model": "A02B-0168-B053"
+  },
+  {
+    "type": "CONTROLADOR",
+    "brand": "FANUC",
+    "model": "A02B-0266-B501"
+  },
+  {
+    "type": "CONTROLADOR",
+    "brand": "FANUC",
+    "model": "A02B-0285-B801"
+  },
+  {
+    "type": "CONTROLADOR",
+    "brand": "FANUC",
+    "model": "A02B-0297-B803"
+  },
+  {
+    "type": "CONTROLADOR",
+    "brand": "FANUC",
+    "model": "A02B-0299-B802"
+  },
+  {
+    "type": "CONTROLADOR",
+    "brand": "FANUC",
+    "model": "MAIN-C A16B-3200-0060/03A"
+  },
+  {
+    "type": "CONTROLADOR",
+    "brand": "OKUMA",
+    "model": "E4809-03Y-003/ E100-224-050-010"
+  },
+  {
+    "type": "CONTROLADOR",
+    "brand": "SIEMENS",
+    "model": "6FC5247-0AA00-0AA2"
+  },
+  {
+    "type": "CONTROLADOR",
+    "brand": "SIEMENS",
+    "model": "RWR462.10"
+  },
+  {
+    "type": "CONTROLADOR",
+    "brand": "SIGMATEK",
+    "model": "ROBOTDRIVE M3-1"
+  },
+  {
+    "type": "CONTROLADOR",
+    "brand": "TAKISAWA",
+    "model": "ZY1D-SS4040-5-R1"
+  },
+  {
+    "type": "CONTROLADOR",
+    "brand": "TOSHIBA",
+    "model": "MDT94B-3B"
+  },
+  {
+    "type": "CONTROLADOR DE PRESIÓN",
+    "brand": "EMERSON",
+    "model": "543-0109-01"
+  },
+  {
+    "type": "CONTROLADOR DE PRESIÓN",
+    "brand": "EMERSON",
+    "model": "543-0273-00"
+  },
+  {
+    "type": "CONVERTIDOR",
+    "brand": "REXROTH",
+    "model": "EFC5610-4K00-3P4-MDB-NN-FCPNN-L1NN"
+  },
+  {
+    "type": "CONVERTIDOR",
+    "brand": "SIEMENS",
+    "model": "77-964-2300"
+  },
+  {
+    "type": "CPU",
+    "brand": "ABB",
+    "model": "PM554-T-ETH"
+  },
+  {
+    "type": "CPU",
+    "brand": "ABB",
+    "model": "PM554-TP-ETH"
+  },
+  {
+    "type": "CPU",
+    "brand": "FANUC",
+    "model": "A028-0130-B511"
+  },
+  {
+    "type": "CPU",
+    "brand": "FANUC",
+    "model": "A02B-0236-B532"
+  },
+  {
+    "type": "CPU",
+    "brand": "FANUC",
+    "model": "A04B-0099-B303"
+  },
+  {
+    "type": "CPU",
+    "brand": "HEIDENHAIN",
+    "model": "MC6241 / ID653220-03R10"
+  },
+  {
+    "type": "CPU",
+    "brand": "YASKAWA",
+    "model": "SGDZ --  BS61AN7A --FK -- E"
+  },
+  {
+    "type": "DOCKING STATION",
+    "brand": "SIEMENS",
+    "model": "6ABAV7676-1AB00-0AA0"
+  },
+  {
+    "type": "DOCKING STATION",
+    "brand": "SIEMENS",
+    "model": "6AV7676-1AB00-00AA0"
+  },
+  {
+    "type": "DOCKING STATION",
+    "brand": "SIEMENS",
+    "model": "6AV7676-1AB00-0AA0"
+  },
+  {
+    "type": "ENCODER",
+    "brand": "FANUC",
+    "model": "A290-0561-V501"
+  },
+  {
+    "type": "ENCODER",
+    "brand": "FANUC",
+    "model": "A860-0027-001-032"
+  },
+  {
+    "type": "ENCODER",
+    "brand": "FANUC",
+    "model": "A860-0330-T021"
+  },
+  {
+    "type": "ENCODER",
+    "brand": "FANUC",
+    "model": "A860-0356-X011"
+  },
+  {
+    "type": "ENCODER",
+    "brand": "FANUC",
+    "model": "A860-0356-X011 10"
+  },
+  {
+    "type": "ENCODER",
+    "brand": "FANUC",
+    "model": "A860-0356-X011 6"
+  },
+  {
+    "type": "ENCODER",
+    "brand": "FANUC",
+    "model": "A860-0360"
+  },
+  {
+    "type": "ENCODER",
+    "brand": "FANUC",
+    "model": "A860-0360-T001"
+  },
+  {
+    "type": "ENCODER",
+    "brand": "FANUC",
+    "model": "A860-0360-T01"
+  },
+  {
+    "type": "ENCODER",
+    "brand": "FANUC",
+    "model": "A860-0360-T021"
+  },
+  {
+    "type": "ENCODER",
+    "brand": "FANUC",
+    "model": "A860-0360-T21"
+  },
+  {
+    "type": "ENCODER",
+    "brand": "FANUC",
+    "model": "A860-0365-V501"
+  },
+  {
+    "type": "ENCODER",
+    "brand": "FANUC",
+    "model": "A860-2000-T301"
+  },
+  {
+    "type": "ENCODER",
+    "brand": "FANUC",
+    "model": "A860-2000-T321"
+  },
+  {
+    "type": "ENCODER",
+    "brand": "HEIDENHAIN",
+    "model": "376 846-DY S4"
+  },
+  {
+    "type": "ENCODER",
+    "brand": "HEIDENHAIN",
+    "model": "376846 DY"
+  },
+  {
+    "type": "ENCODER",
+    "brand": "HEIDENHAIN",
+    "model": "426102403S12-03"
+  },
+  {
+    "type": "ENCODER",
+    "brand": "HEIDENHAIN",
+    "model": "ROD426102603S12-03"
+  },
+  {
+    "type": "ENCODER",
+    "brand": "SIEMENS",
+    "model": "6FX2001-2CF00"
+  },
+  {
+    "type": "ENCODER",
+    "brand": "SIEMENS",
+    "model": "6FX2001-2GF00"
+  },
+  {
+    "type": "ESCÁNER LÁSER",
+    "brand": "OMRON",
+    "model": "OS32C-BP"
+  },
+  {
+    "type": "ESCÁNER LÁSER",
+    "brand": "OMRON",
+    "model": "OS32C-SP1"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "ALLEN BRADLEY",
+    "model": "1746-P2"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "ALLEN BRADLEY",
+    "model": "2094-BC01-M01-S"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "DELTA",
+    "model": "CSRA-CPS01KB"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "DELTA",
+    "model": "CZ056-60437"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "FANUC",
+    "model": "A06B-6077-H106"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "FANUC",
+    "model": "A06B-6077-H111"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "FANUC",
+    "model": "A06B-6098-H111"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "FANUC",
+    "model": "A06B-6110-H037"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "FANUC",
+    "model": "A06B-6120-H011"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "FANUC",
+    "model": "A06B-6140-H026"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "FANUC",
+    "model": "A16B-2203-0910"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "FRONIUS",
+    "model": "DPS 2500 PLASMA-BALZERS"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "HAAS",
+    "model": "5150 REV E"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "HAAS",
+    "model": "69- 200Rev D"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "HAAS",
+    "model": "69-2000"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "HAAS",
+    "model": "69-2000A"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "HAAS",
+    "model": "PBUS-W024B"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "HAAS",
+    "model": "PSUP-K"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "MITSUBISHI",
+    "model": "MDS-B-CV-220"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "MITSUBISHI",
+    "model": "MDS-C1-CV-185"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "MITSUBISHI",
+    "model": "MDS-CH-CV-150"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "MITSUBISHI",
+    "model": "MDS-CH-CV-260"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "MITSUBISHI",
+    "model": "MDS-D-CV-300"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "MITSUBISHI",
+    "model": "MDS-D2-CV-185"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "MITSUBISHI",
+    "model": "MDS-DH-CV-300"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "MITSUBISHI",
+    "model": "MR-33-CR55K"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "MITSUBISHI",
+    "model": "MR-J3-CV37K4"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "MITSUBISHI",
+    "model": "QX084B"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "NUM",
+    "model": "MDLL2015Q00"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "OKUMA",
+    "model": "1006-2200-036-007"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "OKUMA",
+    "model": "MPS 20B"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "OKUMA",
+    "model": "PSU-30-ACL"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "OMRON",
+    "model": "S8F5/G300024CD"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "OMRON",
+    "model": "S8JX-N60024C"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "PHOENIX CONTACT",
+    "model": "EOE15010307"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "PHOENIX CONTACT",
+    "model": "QUINT-PS-100-240AC/24DC/10"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "PHOENIX CONTACT",
+    "model": "QUINT-PS-3X400-500AC/24DC/40"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "PHOENIX CONTACT",
+    "model": "QUINT4-PS/1AC/24DC/10"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "REXROTH",
+    "model": "HVE03.2-W030N"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "SCHNEIDER ELECTRIC",
+    "model": "ABL7UPS24200"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "SIEMENS",
+    "model": "3RX9 501-0BA00"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "SIEMENS",
+    "model": "6EP1 333-1SL 11"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "SIEMENS",
+    "model": "6EP1334-2BA20"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "SIEMENS",
+    "model": "6EP1436-3BA00"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "SIEMENS",
+    "model": "6EP1437-2BA20"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "SIEMENS",
+    "model": "6ES7307-1EA00-0AA0"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "SIEMENS",
+    "model": "6EV 3055 ODC"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "SIEMENS",
+    "model": "6SL3130-7TE25-5AA3"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "SIEMENS",
+    "model": "6SL3130-7TE31-2AA3."
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "SIEMENS",
+    "model": "6SN1145-1BA02-0CA1"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "SIEMENS",
+    "model": "A5E30947477-H3"
+  },
+  {
+    "type": "FUENTE DE ALIMENTACIÓN",
+    "brand": "SIGMATEK",
+    "model": "DPS 001 / -1A14/14NT"
+  },
+  {
+    "type": "HMI",
+    "brand": "ALLEN BRADLEY",
+    "model": "2711P-T10C22A9P"
+  },
+  {
+    "type": "HMI",
+    "brand": "ALLEN BRADLEY",
+    "model": "2711P-T7C22A9P"
+  },
+  {
+    "type": "HMI",
+    "brand": "ALLEN BRADLEY",
+    "model": "2711P-T7C22D9P"
+  },
+  {
+    "type": "HMI",
+    "brand": "DELTA",
+    "model": "DOP-112MX"
+  },
+  {
+    "type": "HMI",
+    "brand": "EATON",
+    "model": "XP-504-10-A10-A01-2B"
+  },
+  {
+    "type": "HMI",
+    "brand": "FANUC",
+    "model": "A02B-0236-B618"
+  },
+  {
+    "type": "HMI",
+    "brand": "GEFRAN",
+    "model": "NTG3P-BW/STN-S-4M-2S-0-D-1M/25"
+  },
+  {
+    "type": "HMI",
+    "brand": "MITSUBISHI",
+    "model": "EPC730X"
+  },
+  {
+    "type": "HMI",
+    "brand": "OMRON",
+    "model": "NS8-TV00B-V2"
+  },
+  {
+    "type": "HMI",
+    "brand": "PARKER",
+    "model": "XTA-010-3R2-33"
+  },
+  {
+    "type": "HMI",
+    "brand": "PHOENIX CONTACT",
+    "model": "BL2 PPC 2000 (2404846)"
+  },
+  {
+    "type": "HMI",
+    "brand": "SCHNEIDER ELECTRIC",
+    "model": "HMIS5T"
+  },
+  {
+    "type": "HMI",
+    "brand": "SCHNEIDER ELECTRIC",
+    "model": "HMIST6500"
+  },
+  {
+    "type": "HMI",
+    "brand": "SIEMENS",
+    "model": "6AV2 124-0GC01-0AX0"
+  },
+  {
+    "type": "HMI",
+    "brand": "SIEMENS",
+    "model": "6AV2 125-2GB23 0AX0"
+  },
+  {
+    "type": "HMI",
+    "brand": "SIEMENS",
+    "model": "6AV2124-0MC01-0AX0"
+  },
+  {
+    "type": "HMI",
+    "brand": "SIEMENS",
+    "model": "6AV2125-2JB23-0AX0"
+  },
+  {
+    "type": "HMI",
+    "brand": "SIEMENS",
+    "model": "6AV7240-1AC05-0HA0"
+  },
+  {
+    "type": "HMI",
+    "brand": "SIEMENS",
+    "model": "6FC5203-0AF05-0AB0"
+  },
+  {
+    "type": "HMI",
+    "brand": "SIEMENS",
+    "model": "TP1200 COMFORT 6AV2 124-0MC01-0AX0"
+  },
+  {
+    "type": "MEMBRANA",
+    "brand": "HAAS",
+    "model": "P/N 61-0201"
+  },
+  {
+    "type": "MEMBRANA",
+    "brand": "SIEMENS",
+    "model": "OXYMAT 6"
+  },
+  {
+    "type": "MOTOR",
+    "brand": "ABB",
+    "model": "PS 90/6-57-P-LSS-4280"
+  },
+  {
+    "type": "MOTOR",
+    "brand": "BALDOR",
+    "model": "CEM2334T"
+  },
+  {
+    "type": "MOTOR",
+    "brand": "BALDOR",
+    "model": "CH23347"
+  },
+  {
+    "type": "MOTOR",
+    "brand": "FANUC",
+    "model": "A09B-0377-86-75"
+  },
+  {
+    "type": "MOTOR",
+    "brand": "HITACHI",
+    "model": "JEC-2137-2000"
+  },
+  {
+    "type": "MOTOR",
+    "brand": "LENZE",
+    "model": "MGFQUTA100-22"
+  },
+  {
+    "type": "MOTOR",
+    "brand": "MITSUBISHI",
+    "model": "HF-SP81MK-S12"
+  },
+  {
+    "type": "MOTOR",
+    "brand": "MITSUBISHI",
+    "model": "SJ-V18.5-02T-U05"
+  },
+  {
+    "type": "MOTOR",
+    "brand": "SIEMENS",
+    "model": "1LA7163-2AA"
+  },
+  {
+    "type": "MOTOR",
+    "brand": "SIEMENS",
+    "model": "3-MOT 1CV3204A"
+  },
+  {
+    "type": "MOTOR",
+    "brand": "SIEMENS",
+    "model": "GP100 1LE22253CB216AA3"
+  },
+  {
+    "type": "MOTOR",
+    "brand": "TOSHIBA",
+    "model": "SAM1083-KBKM"
+  },
+  {
+    "type": "MOTOR",
+    "brand": "WEG",
+    "model": "2.2 KW."
+  },
+  {
+    "type": "MOTOR",
+    "brand": "WEG",
+    "model": "IB21/2-10-2"
+  },
+  {
+    "type": "MOTOR",
+    "brand": "WEG",
+    "model": "M07B-05337"
+  },
+  {
+    "type": "MOTOR",
+    "brand": "WEG",
+    "model": "M07K-52413"
+  },
+  {
+    "type": "MÓDULO",
+    "brand": "FANUC",
+    "model": "A02B-0309-C001"
+  },
+  {
+    "type": "MÓDULO",
+    "brand": "FANUC",
+    "model": "A02B-0323-C205"
+  },
+  {
+    "type": "MÓDULO",
+    "brand": "FANUC",
+    "model": "A03B-0815-C001"
+  },
+  {
+    "type": "MÓDULO",
+    "brand": "FANUC",
+    "model": "A03B-0815-C002"
+  },
+  {
+    "type": "MÓDULO",
+    "brand": "FANUC",
+    "model": "A03B-0815-C003"
+  },
+  {
+    "type": "MÓDULO",
+    "brand": "FANUC",
+    "model": "A06B-6096-H203"
+  },
+  {
+    "type": "MÓDULO",
+    "brand": "FANUC",
+    "model": "A06B-6117-H303"
+  },
+  {
+    "type": "MÓDULO",
+    "brand": "FANUC",
+    "model": "A06B-6130-H003"
+  },
+  {
+    "type": "MÓDULO",
+    "brand": "GEFRAN",
+    "model": "R-D/A8"
+  },
+  {
+    "type": "MÓDULO",
+    "brand": "GEFRAN",
+    "model": "R-E16"
+  },
+  {
+    "type": "MÓDULO",
+    "brand": "GEFRAN",
+    "model": "R-ETH100"
+  },
+  {
+    "type": "MÓDULO",
+    "brand": "GEFRAN",
+    "model": "R-U16"
+  },
+  {
+    "type": "MÓDULO",
+    "brand": "NUM",
+    "model": "FXPC004NN1HDR10"
+  },
+  {
+    "type": "MÓDULO",
+    "brand": "SIEMENS",
+    "model": "6AU1425-2AD00-0AA0"
+  },
+  {
+    "type": "MÓDULO",
+    "brand": "SIEMENS",
+    "model": "6SE6400-1PB00-0AA0"
+  },
+  {
+    "type": "MÓDULO",
+    "brand": "SIEMENS",
+    "model": "6SL3120-0TE13-0AA4"
+  },
+  {
+    "type": "MÓDULO",
+    "brand": "SIEMENS",
+    "model": "6SL3120-1TE21-8AA3"
+  },
+  {
+    "type": "MÓDULO",
+    "brand": "SIEMENS",
+    "model": "6SL3120-2TE13-0AA3"
+  },
+  {
+    "type": "MÓDULO",
+    "brand": "SIEMENS",
+    "model": "6SL3120-2TE13-0AA4"
+  },
+  {
+    "type": "MÓDULO",
+    "brand": "SIEMENS",
+    "model": "6SL3120-2TE21-0AA3"
+  },
+  {
+    "type": "MÓDULO",
+    "brand": "SIEMENS",
+    "model": "6SL3120-2TE21-0AA4"
+  },
+  {
+    "type": "MÓDULO",
+    "brand": "SIGMATEK",
+    "model": "12-008-167-O"
+  },
+  {
+    "type": "MÓDULO DE AMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6114-H106"
+  },
+  {
+    "type": "MÓDULO DE AMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6240-H211"
+  },
+  {
+    "type": "MÓDULO DE COMUNICACIÓN",
+    "brand": "GEFRAN",
+    "model": "R- U16"
+  },
+  {
+    "type": "MÓDULO DE COMUNICACIÓN",
+    "brand": "SCHNEIDER ELECTRIC",
+    "model": "BMENOC0301"
+  },
+  {
+    "type": "MÓDULO DE COMUNICACIÓN",
+    "brand": "SIGMATEK",
+    "model": "CP 731"
+  },
+  {
+    "type": "MÓDULO DE CONTROL",
+    "brand": "HEIDENHAIN",
+    "model": "MC 422C"
+  },
+  {
+    "type": "MÓDULO DE CONTROL",
+    "brand": "SCHNEIDER ELECTRIC",
+    "model": "ILM62CMD20A000"
+  },
+  {
+    "type": "MÓDULO DE CONTROL",
+    "brand": "SIGMATEK",
+    "model": "9751.259.01"
+  },
+  {
+    "type": "MÓDULO DE ENTRADAS",
+    "brand": "ALLEN BRADLEY",
+    "model": "SLC 500 1746-NT4"
+  },
+  {
+    "type": "MÓDULO DE ENTRADAS",
+    "brand": "OKUMA",
+    "model": "D16-503-104/00"
+  },
+  {
+    "type": "MÓDULO DE LÍNEA",
+    "brand": "SIEMENS",
+    "model": "6SL3130-6TE21-6AA4"
+  },
+  {
+    "type": "MÓDULO DE LÍNEA",
+    "brand": "SIEMENS",
+    "model": "6SL3130-7TE23-6AA3"
+  },
+  {
+    "type": "PANEL",
+    "brand": "EATON",
+    "model": "XVS-440-12MPI-1-10"
+  },
+  {
+    "type": "PANEL",
+    "brand": "FANUC",
+    "model": "A13B-0195-C012"
+  },
+  {
+    "type": "PANEL",
+    "brand": "OMRON",
+    "model": "NS8-TV01B-V2"
+  },
+  {
+    "type": "PANEL",
+    "brand": "PHOENIX CONTACT",
+    "model": "VL PPC 2000"
+  },
+  {
+    "type": "PANEL",
+    "brand": "SIEMENS",
+    "model": "6AV2 123-2GB03-0AX0"
+  },
+  {
+    "type": "PANEL",
+    "brand": "SIEMENS",
+    "model": "6AV2 124-0GC01-0AX0"
+  },
+  {
+    "type": "PANEL",
+    "brand": "SIEMENS",
+    "model": "6AV2 124-0JC01-0AX0"
+  },
+  {
+    "type": "PANEL",
+    "brand": "SIEMENS",
+    "model": "6AV7842-0BC10-0CB0"
+  },
+  {
+    "type": "PANEL",
+    "brand": "SIEMENS",
+    "model": "SIMATIC C7-621"
+  },
+  {
+    "type": "PANEL",
+    "brand": "SIEMENS",
+    "model": "SINUMERIK PCU50.3B-C"
+  },
+  {
+    "type": "PANEL",
+    "brand": "TOSHIBA",
+    "model": "211215383"
+  },
+  {
+    "type": "PANEL",
+    "brand": "TOSHIBA",
+    "model": "O545E PLUS"
+  },
+  {
+    "type": "PANEL DE CONTROL",
+    "brand": "FANUC",
+    "model": "160i-MB."
+  },
+  {
+    "type": "PANEL DE CONTROL",
+    "brand": "SIEMENS",
+    "model": "6FC3888-5MF."
+  },
+  {
+    "type": "PANTALLA",
+    "brand": "ALLEN BRADLEY",
+    "model": "2711P-RP8D"
+  },
+  {
+    "type": "PANTALLA",
+    "brand": "ALLEN BRADLEY",
+    "model": "2711P-T6C20D8"
+  },
+  {
+    "type": "PANTALLA",
+    "brand": "ALLEN BRADLEY",
+    "model": "2711P-T7C22D9P"
+  },
+  {
+    "type": "PANTALLA",
+    "brand": "ALLEN BRADLEY",
+    "model": "2711T-B10I1N1"
+  },
+  {
+    "type": "PANTALLA",
+    "brand": "ALLEN BRADLEY",
+    "model": "PANELVIEW-800 HMI"
+  },
+  {
+    "type": "PANTALLA",
+    "brand": "EATON",
+    "model": "XP-503-10-A10-A00-1B"
+  },
+  {
+    "type": "PANTALLA",
+    "brand": "EATON",
+    "model": "XVS-460-84MPI-1-10"
+  },
+  {
+    "type": "PANTALLA",
+    "brand": "FANUC",
+    "model": "A02B-0247-B545"
+  },
+  {
+    "type": "PANTALLA",
+    "brand": "FANUC",
+    "model": "A02B-0281-B502."
+  },
+  {
+    "type": "PANTALLA",
+    "brand": "FANUC",
+    "model": "A02B-0281-C071"
+  },
+  {
+    "type": "PANTALLA",
+    "brand": "HEIDENHAIN",
+    "model": "BF 760 ID 732 589-01"
+  },
+  {
+    "type": "PANTALLA",
+    "brand": "NUM",
+    "model": "APHE000783"
+  },
+  {
+    "type": "PANTALLA",
+    "brand": "NUM",
+    "model": "FS151 APHE000783"
+  },
+  {
+    "type": "PANTALLA",
+    "brand": "OKUMA",
+    "model": "OSP-P2002"
+  },
+  {
+    "type": "PANTALLA",
+    "brand": "OMRON",
+    "model": "NS8-TV01B-V2"
+  },
+  {
+    "type": "PANTALLA",
+    "brand": "PHOENIX CONTACT",
+    "model": "VL PPC 6015 RE 01"
+  },
+  {
+    "type": "PANTALLA",
+    "brand": "REXROTH",
+    "model": "BTV04.2GN-FW"
+  },
+  {
+    "type": "PANTALLA",
+    "brand": "SIEMENS",
+    "model": "6AV2 124-0MC01-0AX0"
+  },
+  {
+    "type": "PANTALLA",
+    "brand": "SIEMENS",
+    "model": "6AV2 124-1GC01-0AX0C-POTC5133"
+  },
+  {
+    "type": "PANTALLA",
+    "brand": "SIEMENS",
+    "model": "6AV2125-2JB23-0AX0"
+  },
+  {
+    "type": "PANTALLA",
+    "brand": "SIEMENS",
+    "model": "6AV6 643-0BA01-1AX0"
+  },
+  {
+    "type": "PANTALLA",
+    "brand": "SIEMENS",
+    "model": "6AV6 648-0CC11-3AX0"
+  },
+  {
+    "type": "PANTALLA",
+    "brand": "SIEMENS",
+    "model": "6AV7842-0BC10-0CB0"
+  },
+  {
+    "type": "PANTALLA",
+    "brand": "SIGMATEK",
+    "model": "12-200-1921-K"
+  },
+  {
+    "type": "PANTALLA ESCÁNER",
+    "brand": "SIEMENS",
+    "model": "6AL2037-0AA00-2XA1"
+  },
+  {
+    "type": "PANTALLA ESCÁNER",
+    "brand": "SIEMENS",
+    "model": "6AL2037-0AB10-2XB1"
+  },
+  {
+    "type": "PANTALLA TÁCTIL",
+    "brand": "SIEMENS",
+    "model": "6AV2 124-0MC01-0AX0"
+  },
+  {
+    "type": "PANTALLA TÁCTIL",
+    "brand": "SIEMENS",
+    "model": "6AV6 648-0CC11-3AX0"
+  },
+  {
+    "type": "PANTALLA TÁCTIL",
+    "brand": "SIEMENS",
+    "model": "6AV6-648-0BC11-3AX0"
+  },
+  {
+    "type": "PANTALLA TÁCTIL",
+    "brand": "SIEMENS",
+    "model": "6AV6-648-0BE11-3AX0"
+  },
+  {
+    "type": "PANTALLA TÁCTIL",
+    "brand": "SIEMENS",
+    "model": "6AV6-648-OBC11-3AX0"
+  },
+  {
+    "type": "PANTALLA TÁCTIL",
+    "brand": "SIEMENS",
+    "model": "6VA2 124-0MC01-0AX0"
+  },
+  {
+    "type": "PANTALLA TÁCTIL",
+    "brand": "SIGMATEK",
+    "model": "12-200-1921-K"
+  },
+  {
+    "type": "PANTALLA TÁCTIL",
+    "brand": "SIGMATEK",
+    "model": "12-200-1922-K1"
+  },
+  {
+    "type": "PLC",
+    "brand": "ALLEN BRADLEY",
+    "model": "1761-L32AWA"
+  },
+  {
+    "type": "PLC",
+    "brand": "CAREL",
+    "model": "PC03000AL0"
+  },
+  {
+    "type": "PLC",
+    "brand": "CAREL",
+    "model": "PCO3000AL0"
+  },
+  {
+    "type": "PLC",
+    "brand": "MITSUBISHI",
+    "model": "FX2NC-32MT-DSS"
+  },
+  {
+    "type": "PLC",
+    "brand": "OMRON",
+    "model": "CJ1W-MAD42"
+  },
+  {
+    "type": "PLC",
+    "brand": "OMRON",
+    "model": "TJ1-FL02"
+  },
+  {
+    "type": "PLC",
+    "brand": "SIEMENS",
+    "model": "6ES7 288-1CR40-0AA0"
+  },
+  {
+    "type": "PLC",
+    "brand": "SIEMENS",
+    "model": "SIMATIC S7 - 300."
+  },
+  {
+    "type": "SERVO CONTROLADOR",
+    "brand": "ABB",
+    "model": "3HAB8101-8/15A"
+  },
+  {
+    "type": "SERVO CONTROLADOR",
+    "brand": "ABB",
+    "model": "3HAB8101-8/17A"
+  },
+  {
+    "type": "SERVO CONTROLADOR",
+    "brand": "ALLEN BRADLEY",
+    "model": "1394-SJT10-T-RL"
+  },
+  {
+    "type": "SERVO CONTROLADOR",
+    "brand": "ALLEN BRADLEY",
+    "model": "1394C-AM75-IH"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "ALLEN BRADLEY",
+    "model": "2097-V33PR3-LM"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "ALLEN BRADLEY",
+    "model": "2198-H008-ERS2"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "ALLEN BRADLEY",
+    "model": "2198-H025-ERS"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "DELTA",
+    "model": "VFD300VL43B-J"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A02B-0168-B053"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B- 6096- H305"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6047-H040"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6078-H202#H500"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6078-H206#H500"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6079-H101"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6079-H104"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6079-H301"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6093-H154"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6093-H174"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6096-H102"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6096-H105"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6096-H201"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6096-H203"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6096-H203-R"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6096-H206"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6096-H208"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6102-H202#H520"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6102H202#520"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6107-H002"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6111-H030#H550"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6114-H105"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6114-H211"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6117-H208"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6120-H011"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6121-H006 #H550"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6127-H110"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6130-H003"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6141-H022#H580"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6172-H002 C"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6220-H011#H600"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6240-H2011"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6240-H211"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6270-H100#H600"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6400-H102"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A6B-6096- H102"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A99L-0162-0001"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "HAAS",
+    "model": "30 AMP"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "HAAS",
+    "model": "45 AMP"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "HAAS",
+    "model": "60 AMP"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "HAAS",
+    "model": "90 AMP"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "MITSUBISHI",
+    "model": "MDS-CH-V1-45"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "MITSUBISHI",
+    "model": "MDS-D-V2-4040"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "MITSUBISHI",
+    "model": "MDS-EH-V2-40"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "MITSUBISHI",
+    "model": "MDSD2V3-404040"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "MITSUBISHI",
+    "model": "MR - J2 - 100CT."
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "MITSUBISHI",
+    "model": "MR-J2-200CT"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "MITSUBISHI",
+    "model": "MR-J3-40A"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "MITSUBISHI",
+    "model": "MR-J3-DU30KB"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "MITSUBISHI",
+    "model": "MR-J4-200B4-RJ"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "OKUMA",
+    "model": "MIV03-1-B1"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "REXROTH",
+    "model": "DMD01.1-W022N"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "SIEMENS",
+    "model": "6SE7026-0TD61-Z"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "SIEMENS",
+    "model": "6SL3120-1TE31-3AA3"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "YASKAWA",
+    "model": "CACR-SR"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "YASKAWA",
+    "model": "CACR-SR30SB1BSY124"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "YASKAWA",
+    "model": "SGDM-10ADA"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "YASKAWA",
+    "model": "SGDM-1EAC-NX1"
+  },
+  {
+    "type": "SERVOAMPLIFICADOR",
+    "brand": "YASKAWA",
+    "model": "SGDM-75AC-NX1"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "ABB",
+    "model": "Q3HAC17333-1"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "ALLEN BRADLEY",
+    "model": "164994"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "ALLEN BRADLEY",
+    "model": "CAT VPL-B1304E-PJ12AA"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "ALLEN BRADLEY",
+    "model": "MPL-A420P-MJ74AA"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "ALLEN BRADLEY",
+    "model": "MPL-B310P-MJ74AA"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "ALLEN BRADLEY",
+    "model": "MPL-B330F-M-X224"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "ALLEN BRADLEY",
+    "model": "TLY-A130T-HK62AA"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "ALLEN BRADLEY",
+    "model": "TLY-A2530P-HJ62AA"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "ALLEN BRADLEY",
+    "model": "VPL-B1654B-PJ12AA"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "BALDOR",
+    "model": "62-0074B"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "CONTROL TECHNIQUES",
+    "model": "142U2E300BACAA165240"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "EMERSON",
+    "model": "XVM-6011-TBNS-0000"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "FANUC",
+    "model": "0850-B395#3000"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "FANUC",
+    "model": "4KW"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "FANUC",
+    "model": "A06B-0075-B003"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "FANUC",
+    "model": "A06B-0147-B077#7000"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "FANUC",
+    "model": "A06B-0205-B000"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "FANUC",
+    "model": "A06B-0216-B400#0100"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "FANUC",
+    "model": "A06B-0253-B100"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "FANUC",
+    "model": "A06B-0266-B100"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "FANUC",
+    "model": "A06B-0272-B100"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "FANUC",
+    "model": "A06B-0313-B033"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "FANUC",
+    "model": "A06B-0373-B675#7075"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "FANUC",
+    "model": "A06B-0377-B675#7075"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "FANUC",
+    "model": "A06B-0590-B202"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "FANUC",
+    "model": "A06B-0758-B961#0146"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "FANUC",
+    "model": "A06B-0850-B395"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "FANUC",
+    "model": "A06B-1429-B120#0121"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "FANUC",
+    "model": "A06B-2061-B007"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "FANUC",
+    "model": "A860-0360-V501"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "FANUC",
+    "model": "MILLAC EJE X"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "FANUC",
+    "model": "MOTOR SPEC"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "FANUC",
+    "model": "YANG 2"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "LENZE",
+    "model": "MCA17N23-NN0B0 U"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "LENZE",
+    "model": "MCS06C41-SRSB0-A11N-ST5S00N-R08U"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "MITSUBISHI",
+    "model": "HA-LP22K2B"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "MITSUBISHI",
+    "model": "HC- SF102X."
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "MITSUBISHI",
+    "model": "HC-H103S"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "MITSUBISHI",
+    "model": "HC102T-SZ"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "MITSUBISHI",
+    "model": "HF-H54T"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "MITSUBISHI",
+    "model": "HF-H54T-A48"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "MITSUBISHI",
+    "model": "HF-KP73B"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "MITSUBISHI",
+    "model": "HF-SP131MBK-S2"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "MITSUBISHI",
+    "model": "HF-SP352B"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "MITSUBISHI",
+    "model": "HF-SP801M4-S2"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "MITSUBISHI",
+    "model": "HF-SP81MK-S12"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "MITSUBISHI",
+    "model": "HG-JR11K1MB"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "MITSUBISHI",
+    "model": "HG-JR15K1MB"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "MITSUBISHI",
+    "model": "HG-SF 152K"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "MITSUBISHI",
+    "model": "HG-SR1524"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "MITSUBISHI",
+    "model": "HG-SR2024B"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "MITSUBISHI",
+    "model": "HG-SR7024B"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "OKUMA",
+    "model": "BL-ME40M-40TN"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "OMRON",
+    "model": "AC R88M640030H52"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "OMRON",
+    "model": "R88M-640030H-S2-D"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "PARKER",
+    "model": "ACM2N0150-4/1-3"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "PARKER",
+    "model": "SMB14256155282I644"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "PARKER",
+    "model": "SMBA10056065192I644"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "PARKER",
+    "model": "SME8230038142164B94."
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "PARKER",
+    "model": "SME8230038142I64B94"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "REXROTH",
+    "model": "MDD112C-N-030-N2L-130PB0"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "REXROTH",
+    "model": "MSK040B-0600-NN-M1-UG0-NNNN"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "REXROTH",
+    "model": "MSK071E-0450-NN-M1-UG1-NNNN"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "SCHNEIDER ELECTRIC",
+    "model": "65.222..3-003"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "SCHNEIDER ELECTRIC",
+    "model": "BSH0553P01A2A"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "SCHNEIDER ELECTRIC",
+    "model": "ILM0701P12A0000"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "SCHNEIDER ELECTRIC",
+    "model": "SH055/80005/0/0/00/00/00/11/00"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "SCHNEIDER ELECTRIC",
+    "model": "SH070/60030/0/0/00/00/00/0"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "SCHNEIDER ELECTRIC",
+    "model": "SH140/30120/0/0/00/00/00/01/00"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "SCHNEIDER ELECTRIC",
+    "model": "SH140/30200/0/0/00/00/00/01/00"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "SCHNEIDER ELECTRIC",
+    "model": "SH140/30330/0/1/00/00/00/10/00"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "SCHNEIDER ELECTRIC",
+    "model": "SH30553P12F2100"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "SCHNEIDER ELECTRIC",
+    "model": "SH31001P12A2000"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "SCHNEIDER ELECTRIC",
+    "model": "SH31402P11F2000"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "SCHNEIDER ELECTRIC",
+    "model": "SM 100-40-350-P1-44"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "SCHNEIDER ELECTRIC",
+    "model": "SM 140-30-120-PO-45-S1-B1"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "SCHNEIDER ELECTRIC",
+    "model": "SM-070/60/020/P1/45/S1/B1"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "SCHNEIDER ELECTRIC",
+    "model": "SM-100/30/080/P0/45/S1/B1"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "SCHNEIDER ELECTRIC",
+    "model": "SM-140/30/210/P0/45/S1/B1"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "SIEMENS",
+    "model": "1FK7042-2AK71-1RG0"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "SIEMENS",
+    "model": "1FK7086-4CF7 1-1BH0"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "SIEMENS",
+    "model": "1FK7105-2AF71-1TH0"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "SIEMENS",
+    "model": "1FT5046-0AK71-1-Z"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "SIEMENS",
+    "model": "1FT5076-1AC71-1AB0"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "SIEMENS",
+    "model": "1FT6105-8AF71-3ED2"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "SIEMENS",
+    "model": "1FT7086-5AC70-1BB2-Z"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "SIEMENS",
+    "model": "1PH7107-2HF02-0BA0"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "SIEMENS",
+    "model": "1PH7137-2HG02-0BA6"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "SIEMENS",
+    "model": "1PH7163-2NG00-0LJ0"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "SIEMENS",
+    "model": "1ft7044- 1AF71-1BH1"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "SIEMENS",
+    "model": "IPH7137-7J02-OBB3."
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "YASKAWA",
+    "model": "SGME-04VF14"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "YASKAWA",
+    "model": "SGME-04VF14200V"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "YASKAWA",
+    "model": "SGMG-09A2AB"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "YASKAWA",
+    "model": "SGMGH - 13DCA6S"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "YASKAWA",
+    "model": "SGMGV-13ADA-HA11"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "YASKAWA",
+    "model": "SGMGV-20A3A2S"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "YASKAWA",
+    "model": "SGMRV-37ANA-YR12"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "YASKAWA",
+    "model": "USAEM-09TF33-B"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "YASKAWA",
+    "model": "USAGED-09AS1S"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "YASKAWA",
+    "model": "USAREM-08TF21"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "YASKAWA",
+    "model": "USAREM-09TF33-B"
+  },
+  {
+    "type": "SERVOMOTOR",
+    "brand": "YASKAWA",
+    "model": "USASEM-08TF12-D"
+  },
+  {
+    "type": "SOLDADORA",
+    "brand": "FRONIUS",
+    "model": "4,075,150,631,R"
+  },
+  {
+    "type": "SOLDADORA",
+    "brand": "FRONIUS",
+    "model": "DPS 2500"
+  },
+  {
+    "type": "SOLDADORA",
+    "brand": "FRONIUS",
+    "model": "DPS 2500 PLASMA-BALZERS"
+  },
+  {
+    "type": "SOLDADORA",
+    "brand": "FRONIUS",
+    "model": "DPS 2500 plasma"
+  },
+  {
+    "type": "SOLDADORA",
+    "brand": "FRONIUS",
+    "model": "K5100159"
+  },
+  {
+    "type": "SOLDADORA",
+    "brand": "FRONIUS",
+    "model": "TRANSPOKET 3500"
+  },
+  {
+    "type": "SOLDADORA",
+    "brand": "YASKAWA",
+    "model": "YWE-E350-BN2"
+  },
+  {
+    "type": "SOLDADORA DE PLASMA",
+    "brand": "FRONIUS",
+    "model": "DPS 2500 PLASMA-BALZERS"
+  },
+  {
+    "type": "SOLDADORA DE PLASMA",
+    "brand": "FRONIUS",
+    "model": "DPS 2500 PLASMA-PULS."
+  },
+  {
+    "type": "SOLDADORA DE PLASMA",
+    "brand": "FRONIUS",
+    "model": "DPS 2500 plasma"
+  },
+  {
+    "type": "SPINDLE",
+    "brand": "FANUC",
+    "model": "A06B-6044-H103"
+  },
+  {
+    "type": "SPINDLE",
+    "brand": "FANUC",
+    "model": "A06B-6063-H222#H510"
+  },
+  {
+    "type": "SPINDLE",
+    "brand": "FANUC",
+    "model": "A06B-6064-H318#H550"
+  },
+  {
+    "type": "SPINDLE",
+    "brand": "FANUC",
+    "model": "A06B-6088-H215#H500"
+  },
+  {
+    "type": "SPINDLE",
+    "brand": "FANUC",
+    "model": "A06B-6102-H222#H520"
+  },
+  {
+    "type": "SPINDLE",
+    "brand": "FANUC",
+    "model": "A06B-6134-H303#A"
+  },
+  {
+    "type": "SPINDLE",
+    "brand": "MITSUBISHI",
+    "model": "MDS-B-SP-150"
+  },
+  {
+    "type": "TARJETA",
+    "brand": "CAREL",
+    "model": "LS CAREL 04645A"
+  },
+  {
+    "type": "TARJETA",
+    "brand": "CAREL",
+    "model": "RITRI02011311"
+  },
+  {
+    "type": "TARJETA",
+    "brand": "FANUC",
+    "model": "A16B-2201-0311"
+  },
+  {
+    "type": "TARJETA",
+    "brand": "FANUC",
+    "model": "A16B-2201-0311/10D"
+  },
+  {
+    "type": "TARJETA",
+    "brand": "FANUC",
+    "model": "A16B-2600-0150/03A"
+  },
+  {
+    "type": "TARJETA",
+    "brand": "FANUC",
+    "model": "A16B-3200-0060"
+  },
+  {
+    "type": "TARJETA",
+    "brand": "FANUC",
+    "model": "A20B-8100-033 4/05C"
+  },
+  {
+    "type": "TARJETA",
+    "brand": "FANUC",
+    "model": "A350-8101-T184/01"
+  },
+  {
+    "type": "TARJETA",
+    "brand": "FANUC",
+    "model": "NE-2C02-105-C05"
+  },
+  {
+    "type": "TARJETA",
+    "brand": "FANUC",
+    "model": "TEC A PCB-A2"
+  },
+  {
+    "type": "TARJETA",
+    "brand": "GEFRAN",
+    "model": "454564"
+  },
+  {
+    "type": "TARJETA",
+    "brand": "HAAS",
+    "model": "#65-4023P"
+  },
+  {
+    "type": "TARJETA",
+    "brand": "HAAS",
+    "model": "-3080V Revisión A"
+  },
+  {
+    "type": "TARJETA",
+    "brand": "HAAS",
+    "model": "-3280C Rev. G"
+  },
+  {
+    "type": "TARJETA",
+    "brand": "HAAS",
+    "model": "-3280C Rev.H"
+  },
+  {
+    "type": "TARJETA",
+    "brand": "HAAS",
+    "model": "-3283C REV N"
+  },
+  {
+    "type": "TARJETA",
+    "brand": "HAAS",
+    "model": "-5502 REVB"
+  },
+  {
+    "type": "TARJETA",
+    "brand": "HAAS",
+    "model": "3080T REV H"
+  },
+  {
+    "type": "TARJETA",
+    "brand": "HAAS",
+    "model": "3092K RevA"
+  },
+  {
+    "type": "TARJETA",
+    "brand": "HAAS",
+    "model": "32-5222A"
+  },
+  {
+    "type": "TARJETA",
+    "brand": "HAAS",
+    "model": "34-3094B"
+  },
+  {
+    "type": "TARJETA",
+    "brand": "HAAS",
+    "model": "3480C"
+  },
+  {
+    "type": "TARJETA",
+    "brand": "HAAS",
+    "model": "65-4410_B"
+  },
+  {
+    "type": "TARJETA",
+    "brand": "HAAS",
+    "model": "IOPCB - W CCA"
+  },
+  {
+    "type": "TARJETA",
+    "brand": "HAAS",
+    "model": "IOPCB-U CCA-3080U"
+  },
+  {
+    "type": "TARJETA",
+    "brand": "HAAS",
+    "model": "MAIN-CON"
+  },
+  {
+    "type": "TARJETA",
+    "brand": "HAAS",
+    "model": "SM17021841"
+  },
+  {
+    "type": "TARJETA",
+    "brand": "HAAS",
+    "model": "SM26063552"
+  },
+  {
+    "type": "TARJETA",
+    "brand": "HAAS",
+    "model": "ST3910256 SEP2010"
+  },
+  {
+    "type": "TARJETA",
+    "brand": "HITACHI",
+    "model": "HC-CTL-Q2"
+  },
+  {
+    "type": "TARJETA",
+    "brand": "HITACHI",
+    "model": "HIMC 1106"
+  },
+  {
+    "type": "TARJETA",
+    "brand": "MITSUBISHI",
+    "model": "190213"
+  },
+  {
+    "type": "TARJETA",
+    "brand": "REXROTH",
+    "model": "VT 5041-25/1"
+  },
+  {
+    "type": "TARJETA",
+    "brand": "SIEMENS",
+    "model": "6SN1118-0DK21-0AA1"
+  },
+  {
+    "type": "TARJETA",
+    "brand": "SIEMENS",
+    "model": "DO-B2164-1B"
+  },
+  {
+    "type": "TARJETA",
+    "brand": "SIGMATEK",
+    "model": "0331.555.02"
+  },
+  {
+    "type": "TARJETA",
+    "brand": "TAKISAWA",
+    "model": "PCB4869"
+  },
+  {
+    "type": "TARJETA DE CONTROL",
+    "brand": "ABB",
+    "model": "3HAC 022286-001/05"
+  },
+  {
+    "type": "TARJETA DE CONTROL",
+    "brand": "FANUC",
+    "model": "A16B-3300-0033"
+  },
+  {
+    "type": "TARJETA DE CONTROL",
+    "brand": "FANUC",
+    "model": "A20B-2101-0012/04B"
+  },
+  {
+    "type": "TARJETA DE CONTROL",
+    "brand": "HAAS",
+    "model": "-4058B REV. F"
+  },
+  {
+    "type": "TARJETA DE CONTROL",
+    "brand": "HAAS",
+    "model": "-4058C REV.R"
+  },
+  {
+    "type": "TARJETA DE CONTROL",
+    "brand": "HAAS",
+    "model": "-4058CT REV.N"
+  },
+  {
+    "type": "TARJETA DE CONTROL",
+    "brand": "SIEMENS",
+    "model": "X 816"
+  },
+  {
+    "type": "TARJETA DE ENCODER",
+    "brand": "SIEMENS",
+    "model": "6SE7090-0XX84 0FB0"
+  },
+  {
+    "type": "TARJETA DE ENCODER",
+    "brand": "SIEMENS",
+    "model": "6SE7090-0XX84-0FE0"
+  },
+  {
+    "type": "TARJETA DE SERVOAMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6400-H102 C"
+  },
+  {
+    "type": "TARJETA DE SERVOAMPLIFICADOR",
+    "brand": "FANUC",
+    "model": "A06B-6400-H102 D"
+  },
+  {
+    "type": "TEACH PENDANT",
+    "brand": "ABB",
+    "model": "3HNE00313-1"
+  },
+  {
+    "type": "TEACH PENDANT",
+    "brand": "ABB",
+    "model": "DSQC 679"
+  },
+  {
+    "type": "TEACH PENDANT",
+    "brand": "ABB",
+    "model": "DSQS 679"
+  },
+  {
+    "type": "TEACH PENDANT",
+    "brand": "FANUC",
+    "model": "372"
+  },
+  {
+    "type": "TEACH PENDANT",
+    "brand": "FANUC",
+    "model": "A05B-2255-C101#EMH"
+  },
+  {
+    "type": "TEACH PENDANT",
+    "brand": "FANUC",
+    "model": "A05B-2256 C113#ESW"
+  },
+  {
+    "type": "TEACH PENDANT",
+    "brand": "TAKISAWA",
+    "model": "ZY1D- SS4040-5 -R1."
+  },
+  {
+    "type": "TEACH PENDANT",
+    "brand": "TAKISAWA",
+    "model": "ZY1D-SS4040-5-R1"
+  },
+  {
+    "type": "TEACH PENDANT",
+    "brand": "YASKAWA",
+    "model": "A433640"
+  },
+  {
+    "type": "TEACH PENDANT",
+    "brand": "YASKAWA",
+    "model": "JZRCR-YPP21"
+  },
+  {
+    "type": "TEACH PENDANT",
+    "brand": "YASKAWA",
+    "model": "JZRCR-YPP21-1"
+  },
+  {
+    "type": "TEACH PENDANT",
+    "brand": "YASKAWA",
+    "model": "MOTOMAN YKS-001E"
+  },
+  {
+    "type": "TECLADO",
+    "brand": "FANUC",
+    "model": "A02B-0323-C128"
+  },
+  {
+    "type": "TECLADO",
+    "brand": "OKUMA",
+    "model": "PNC3A-15KBV-QI V1.0"
+  },
+  {
+    "type": "UPS",
+    "brand": "EMERSON",
+    "model": "SDU 500"
+  },
+  {
+    "type": "UPS",
+    "brand": "MITSUBISHI",
+    "model": "Fw-S10R- 1.5 K"
+  },
+  {
+    "type": "UPS",
+    "brand": "SIEMENS",
+    "model": "6EP4137-3AB00-2AY0"
+  },
+  {
+    "type": "VARIADOR DC",
+    "brand": "PARKER",
+    "model": "590P 53327032 P00 U4V0"
+  },
+  {
+    "type": "VARIADOR DC",
+    "brand": "PARKER",
+    "model": "590P-53311020-P00-U4V0."
+  },
+  {
+    "type": "VARIADOR DC",
+    "brand": "PARKER",
+    "model": "590PD-0011-UK-0"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ABB",
+    "model": "ACS150-03E-05A6-4"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ABB",
+    "model": "ACS150-03E-08A8-4"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ABB",
+    "model": "ACS355-03E-05A6-4"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ABB",
+    "model": "ACS355-03E-08A8-4"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ABB",
+    "model": "ACS355-03E-31A0-2"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ABB",
+    "model": "ACS355-03E-31A0-4"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ABB",
+    "model": "ACS355-03U-04A1-4"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ABB",
+    "model": "ACS380-040S-038A-4"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ABB",
+    "model": "ACS510-01-290A-4(0EM)"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ABB",
+    "model": "ACS550-01-072A 4"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ABB",
+    "model": "ACS800-04M-0320-5+E208+H360+J400+K458+P901+P916+P920+0R715"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ABB",
+    "model": "ACS880-01-027A-5+N5050+N8015"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ABB",
+    "model": "ACS880-01-096A-5"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ABB",
+    "model": "ACS880-01-096A-5+D150+E200+K475+L517"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ABB",
+    "model": "ACX550"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ALLEN BRADLEY",
+    "model": "1336F-B060-AE-ES"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ALLEN BRADLEY",
+    "model": "1394C-SJT10-T"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ALLEN BRADLEY",
+    "model": "2094-BC02-M02-M"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ALLEN BRADLEY",
+    "model": "2094-BC04-M013-M"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ALLEN BRADLEY",
+    "model": "2094-BM01-S"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ALLEN BRADLEY",
+    "model": "2094-BM01-SB1120"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ALLEN BRADLEY",
+    "model": "2094-SE02F-M00-S0"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ALLEN BRADLEY",
+    "model": "2097-V33PR5"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ALLEN BRADLEY",
+    "model": "2097-V34PR5-LM"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ALLEN BRADLEY",
+    "model": "20A-D-3P4-A-3-AYNNNNN"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ALLEN BRADLEY",
+    "model": "20A-D-3P4-A-O-AYNNNC0"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ALLEN BRADLEY",
+    "model": "20A-D-3PA-A-O-AYNNNC0"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ALLEN BRADLEY",
+    "model": "20B C 030 A 0 AYNANC0"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ALLEN BRADLEY",
+    "model": "20B D 077 A 0 AYNANA0"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ALLEN BRADLEY",
+    "model": "20BC022AYNANC0"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ALLEN BRADLEY",
+    "model": "20BC105A0ANNANC0"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ALLEN BRADLEY",
+    "model": "20BD014A3AYNANC0"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ALLEN BRADLEY",
+    "model": "20BD027A0AYNACC1."
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ALLEN BRADLEY",
+    "model": "20DC022Α0ΕΥΝΑΝΑΝΕ"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ALLEN BRADLEY",
+    "model": "20F11ND014AA0NNNNN"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ALLEN BRADLEY",
+    "model": "20F1A ND 125AA0NNNNN"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ALLEN BRADLEY",
+    "model": "20F1AND125AN0NNNNN"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ALLEN BRADLEY",
+    "model": "20F1AND248"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ALLEN BRADLEY",
+    "model": "20G11 N C 104 JA0NNNNN"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ALLEN BRADLEY",
+    "model": "20P41AD014RA0NNN"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ALLEN BRADLEY",
+    "model": "2198-H015-ERS2"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ALLEN BRADLEY",
+    "model": "2198-H025-ER52"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ALLEN BRADLEY",
+    "model": "2198-H025-ERS"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ALLEN BRADLEY",
+    "model": "2198-H025-ERS2"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ALLEN BRADLEY",
+    "model": "2198-H040-ERS2"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ALLEN BRADLEY",
+    "model": "22A D1P4N104"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ALLEN BRADLEY",
+    "model": "22A-D2P3N104"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ALLEN BRADLEY",
+    "model": "22A-D4P0N104"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ALLEN BRADLEY",
+    "model": "22C-D08A103"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ALLEN BRADLEY",
+    "model": "22C-D208A103"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ALLEN BRADLEY",
+    "model": "22F-B4P2N103"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ALLEN BRADLEY",
+    "model": "22F-D2P5N103"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ALLEN BRADLEY",
+    "model": "25B-D013N114"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ALLEN BRADLEY",
+    "model": "25B-D2P3N104"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "ALLEN BRADLEY",
+    "model": "POWERFLEX 40"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "BALDOR",
+    "model": "712-47-175-S001"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "BALDOR",
+    "model": "FADAL 215"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "BALDOR",
+    "model": "ID15H201-2"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "BALDOR",
+    "model": "IHH205-E"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "BALDOR",
+    "model": "VS1GV45-1B"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "BALDOR",
+    "model": "VS1PF430-9"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "BALDOR",
+    "model": "ZD18H415-E"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "BALDOR",
+    "model": "ZHH440/E"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "CONTROL TECHNIQUES",
+    "model": "Cuantum III"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "CONTROL TECHNIQUES",
+    "model": "DIN3380150BM"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "CONTROL TECHNIQUES",
+    "model": "SP2403"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "CONTROL TECHNIQUES",
+    "model": "SP4402"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "CONTROL TECHNIQUES",
+    "model": "SP4403"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "CONTROL TECHNIQUES",
+    "model": "SP6402"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "DELTA",
+    "model": "ASD-B2-0421-B"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "DELTA",
+    "model": "TDU045E100"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "DELTA",
+    "model": "VDF370F23A"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "DELTA",
+    "model": "VFD007L21A"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "DELTA",
+    "model": "VFD055C43A-21"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "DELTA",
+    "model": "VFD110CH43A-21"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "DELTA",
+    "model": "VFD150B43A"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "DELTA",
+    "model": "VFD300VL43B-J"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "DELTA",
+    "model": "VFD45AMS43ANSAA"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "DELTA",
+    "model": "VFD900C43A"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "EATON",
+    "model": "DA1-342D2FB-B66C"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "EATON",
+    "model": "DG1-353D3FB-C21C"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "EATON",
+    "model": "MMX34AA014F0-0"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "EMERSON",
+    "model": "DST1401"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "EMERSON",
+    "model": "EP202-P00-ENR0"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "EMERSON",
+    "model": "PCM-15"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "FANUC",
+    "model": "A06B- 8096- H203."
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "FANUC",
+    "model": "A06B-6044-H008"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "FANUC",
+    "model": "A06B-6055-H108"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "FANUC",
+    "model": "A06B-6055-H208"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "FANUC",
+    "model": "A06B-6078-H202#H500"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "FANUC",
+    "model": "A06B-6078-H206#H500"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "FANUC",
+    "model": "A06B-6079-H206"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "FANUC",
+    "model": "A06B-6088-H222#H500"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "FANUC",
+    "model": "A06B-6102-H202#H520"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "FANUC",
+    "model": "A06B-6102-H222#H520"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "FANUC",
+    "model": "A06B-6110-H030"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "FANUC",
+    "model": "A06B-6111-H037#H570"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "FANUC",
+    "model": "A06B-6134-H302"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "FANUC",
+    "model": "A06B-6200-H037"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "GEFRAN",
+    "model": "XVY-EV"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "GEFRAN",
+    "model": "XVY-EV-43570-KBC"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "HAAS",
+    "model": "20/15 HP"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "HAAS",
+    "model": "VECTOR 20HP"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "HEIDENHAIN",
+    "model": "UM 114D"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "HITACHI",
+    "model": "11LB2"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "HITACHI",
+    "model": "HFC-VAH 12LF3"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "HITACHI",
+    "model": "P1 - 00930- HBF."
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "HITACHI",
+    "model": "P1-00930-HBF"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "HITACHI",
+    "model": "SJ700-450HFF2"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "HITACHI",
+    "model": "SJ700D-040HFUF3"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "LENZE",
+    "model": "E82EV152_2C900"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "LENZE",
+    "model": "E82EV152_4C"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "LENZE",
+    "model": "E82MV251_2B001"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "LENZE",
+    "model": "E94ASHE0074"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "LENZE",
+    "model": "EVF8222-C-V003"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "LENZE",
+    "model": "EVS9322-ESV004"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "MITSUBISHI",
+    "model": "BN638A134G51"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "MITSUBISHI",
+    "model": "E08-1086-23"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "MITSUBISHI",
+    "model": "FR-A220E-5.5K-UL"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "MITSUBISHI",
+    "model": "FR-A520-15K"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "MITSUBISHI",
+    "model": "FR-A540-55K-CH"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "MITSUBISHI",
+    "model": "FR-A720-1.5K"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "MITSUBISHI",
+    "model": "FR-E740-230SC-NA"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "MITSUBISHI",
+    "model": "FR-SF-2-7.5K-C"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "MITSUBISHI",
+    "model": "MDS- DH - V1 - 80W"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "MITSUBISHI",
+    "model": "MDS-B-SP-110"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "MITSUBISHI",
+    "model": "MDS-B-SP-220"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "MITSUBISHI",
+    "model": "MDS-B-SP-260"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "MITSUBISHI",
+    "model": "MDS-B-SPH-300"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "MITSUBISHI",
+    "model": "MDS-B-V1-35"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "MITSUBISHI",
+    "model": "MDS-B-V1-70"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "MITSUBISHI",
+    "model": "MDS-B-V2-1005"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "MITSUBISHI",
+    "model": "MDS-C1-V1-70"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "MITSUBISHI",
+    "model": "MDS-CH-SP-110"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "MITSUBISHI",
+    "model": "MDS-CH-V2-2010"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "MITSUBISHI",
+    "model": "MDS-D-SP-320"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "MITSUBISHI",
+    "model": "MDS-DH-SP-200"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "MITSUBISHI",
+    "model": "MDS-DH-V1-20"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "MITSUBISHI",
+    "model": "MDS-DH-V2-8080"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "MITSUBISHI",
+    "model": "MDSC1SPAH260RT"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "MITSUBISHI",
+    "model": "MR-J2-60CT"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "MITSUBISHI",
+    "model": "MR-J2S-350B-S041U703"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "MITSUBISHI",
+    "model": "MR-J2S-60B-S041U638"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "MITSUBISHI",
+    "model": "MR-J3-11KA4-LC078"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "MITSUBISHI",
+    "model": "MR-J3-22KB4"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "NUM",
+    "model": "MDLA2021Q00"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "NUM",
+    "model": "MDLU3000A0CAN00"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "NUM",
+    "model": "MDLU3000B0CAN00"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "NUM",
+    "model": "MDLUX075A000N0I"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "OKUMA",
+    "model": "1006-1231-35D-110 2.7"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "OKUMA",
+    "model": "BL-D30-D"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "OKUMA",
+    "model": "MIV0404A-1-B5"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "OKUMA",
+    "model": "MIV15-3-V1"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "OMRON",
+    "model": "605X BC112-TD"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "PARKER",
+    "model": "590P-533111020-P00-U4V0"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "PARKER",
+    "model": "590P-53350042-A00-U4A0"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "PARKER",
+    "model": "590P/0500/500/0041/UK/ARM/0/230/0"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "PARKER",
+    "model": "890CD-531200B0-000-1A50A"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "PARKER",
+    "model": "890CD-532100B0-000-1A50A"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "PARKER",
+    "model": "890SD-532590D0-B00-1A000"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "REXROTH",
+    "model": "DDS 2.1-W100-D"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "REXROTH",
+    "model": "HC502.1E-W0012-A-03-NNN"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "REXROTH",
+    "model": "HCS02.1E-W0012-A-03-NNNN"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "REXROTH",
+    "model": "HCS02.1E=W0012-A-03-NNNN"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "REXROTH",
+    "model": "HMS01- W0020-A-07- NNNN"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "REXROTH",
+    "model": "HMS01.1N-W0210-A-07-NNNN"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SCHNEIDER ELECTRIC",
+    "model": "ALTIVAR 340 ATV340D15N4"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SCHNEIDER ELECTRIC",
+    "model": "ALTIVAR 630"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SCHNEIDER ELECTRIC",
+    "model": "ATV 320U15N4C."
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SCHNEIDER ELECTRIC",
+    "model": "ATV312HU40N4"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SCHNEIDER ELECTRIC",
+    "model": "ATV312HU75N4"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SCHNEIDER ELECTRIC",
+    "model": "ATV61HC25N4D"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SCHNEIDER ELECTRIC",
+    "model": "ATV61HD15N4"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SCHNEIDER ELECTRIC",
+    "model": "ATV61HD75N4Z."
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SCHNEIDER ELECTRIC",
+    "model": "ATV630U75N4"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SCHNEIDER ELECTRIC",
+    "model": "ATY71HD30N4"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SCHNEIDER ELECTRIC",
+    "model": "LXM62DD15DXXXXX."
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SCHNEIDER ELECTRIC",
+    "model": "LXM62DD27C2100"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SCHNEIDER ELECTRIC",
+    "model": "LXM62DD27DXXXXX"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SCHNEIDER ELECTRIC",
+    "model": "MC-4/11/01/400"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SCHNEIDER ELECTRIC",
+    "model": "MC-4/11/03/400"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SCHNEIDER ELECTRIC",
+    "model": "SK5402"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SIEMENS",
+    "model": "1P 6SL3120-1TE24-5AA3"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SIEMENS",
+    "model": "65EG440-2UD41-3GA1"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SIEMENS",
+    "model": "6AU1425-0AA00-0AA0"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SIEMENS",
+    "model": "6FC5247-0AA00-0AA3"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SIEMENS",
+    "model": "6SE3211-5BA40"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SIEMENS",
+    "model": "6SE3215-2BB40"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SIEMENS",
+    "model": "6SE6420-2AD23-0BA1"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SIEMENS",
+    "model": "6SE6440-2UC17-5AA1"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SIEMENS",
+    "model": "6SE6440-2UC31-8EA1"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SIEMENS",
+    "model": "6SE6440-2UD13-7AA1"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SIEMENS",
+    "model": "6SE7018-0TA51"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SIEMENS",
+    "model": "6SE7021-0TP50-Z"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SIEMENS",
+    "model": "6SE7021-3TB51-Z"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SIEMENS",
+    "model": "6SE7021-3TB61-Z"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SIEMENS",
+    "model": "6SE7023-4EP50-Z"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SIEMENS",
+    "model": "6SE7026-0TD61"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SIEMENS",
+    "model": "6SE7026-0TD61-Z"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SIEMENS",
+    "model": "6SE9531-7DK40"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SIEMENS",
+    "model": "6SL3120-1TE23-0AA4"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SIEMENS",
+    "model": "6SL3120-1TE24-5AA3"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SIEMENS",
+    "model": "6SL3120-1TE24-5AA3."
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SIEMENS",
+    "model": "6SL3120-1TE26-0AA3"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SIEMENS",
+    "model": "6SL3120-1TE26-0AA3."
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SIEMENS",
+    "model": "6SL3120-2TE13-0AA4"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SIEMENS",
+    "model": "6SL3120-2TE21-8AA3"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SIEMENS",
+    "model": "6SL3120-2TE21-8AA3."
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SIEMENS",
+    "model": "6SL3130-6AE15-0AB1"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SIEMENS",
+    "model": "6SL3210-1KE12-3AF2"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SIEMENS",
+    "model": "6SL3224-0BE41-1UA0"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SIEMENS",
+    "model": "6SN1112-1AC01-0AA1"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SIEMENS",
+    "model": "6SN1118-0DM23-0AA0"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SIEMENS",
+    "model": "6SN1123-1AA00-0AA0"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SIEMENS",
+    "model": "6SN1123-1AA00-0AA1"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SIEMENS",
+    "model": "6SN1123-1AA00-0BA1"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SIEMENS",
+    "model": "6SN1123-1AA00-0CA1"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SIEMENS",
+    "model": "6SN1123-1AA00-0DA1"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SIEMENS",
+    "model": "6SN1123-1AA00-0LA1"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SIEMENS",
+    "model": "6SN1123-1AB00-0BA1"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SIEMENS",
+    "model": "6SN1123-1AB00-0HA2"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SIEMENS",
+    "model": "6SN1123-1AB00-OBA1"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SIEMENS",
+    "model": "SINAMICS G120C PN 6SL3210-1KE23-8UF1"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SIEMENS",
+    "model": "SINUMERIK 840D NCU-BOX 13A"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SIGMATEK",
+    "model": "SDD310-43"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "SIGMATEK",
+    "model": "SDD310-43W"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "TOSHIBA",
+    "model": "VFA7-4220PY-A3A"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "TOSHIBA",
+    "model": "VFAS3-4370PC (7)"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "TOSHIBA",
+    "model": "VFMB1-4022PL"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "TOSHIBA",
+    "model": "VFS15-2015PM"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "YASKAWA",
+    "model": "CACR-IR20SEB P00 B11"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "YASKAWA",
+    "model": "CACR-JU102ADABY500AA"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "YASKAWA",
+    "model": "CIMR VA4A0018FAA"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "YASKAWA",
+    "model": "CIMR-F7U4090"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "YASKAWA",
+    "model": "CIMR-JC4A0002BAA"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "YASKAWA",
+    "model": "CIMR-M5A20150-XXXX"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "YASKAWA",
+    "model": "CIMR-VU4A0005BAA"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "YASKAWA",
+    "model": "CIPR-GA80U4044ABMA-AAAANA"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "YASKAWA",
+    "model": "CPCR-IN"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "YASKAWA",
+    "model": "SGD7S-1R6A30A"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "YASKAWA",
+    "model": "SGD7S-5R5A30A"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "YASKAWA",
+    "model": "SGDB-10ADG"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "YASKAWA",
+    "model": "SGDH-08AE-S"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "YASKAWA",
+    "model": "SGDM-75AC-NX1"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "YASKAWA",
+    "model": "XD-02-MSD0-E"
+  },
+  {
+    "type": "VARIADOR DE FRECUENCIA",
+    "brand": "YASKAWA",
+    "model": "XD-04-MSD0-E"
+  },
+  {
+    "type": "VECTOR",
+    "brand": "BALDOR",
+    "model": "INV - 0040"
+  },
+  {
+    "type": "VECTOR",
+    "brand": "BALDOR",
+    "model": "INV-0020"
+  },
+  {
+    "type": "VECTOR",
+    "brand": "HAAS",
+    "model": "20 15 HP"
+  },
+  {
+    "type": "VECTOR",
+    "brand": "HAAS",
+    "model": "20 HP"
+  },
+  {
+    "type": "VECTOR",
+    "brand": "HAAS",
+    "model": "20/15"
+  },
+  {
+    "type": "VECTOR",
+    "brand": "HAAS",
+    "model": "20/15 HP"
+  },
+  {
+    "type": "VECTOR",
+    "brand": "HAAS",
+    "model": "20/15 HP."
+  },
+  {
+    "type": "VECTOR",
+    "brand": "HAAS",
+    "model": "29 10082 REV B"
+  },
+  {
+    "type": "VECTOR",
+    "brand": "HAAS",
+    "model": "29-10071-REV B"
+  },
+  {
+    "type": "VECTOR",
+    "brand": "HAAS",
+    "model": "40 HP"
+  },
+  {
+    "type": "VECTOR",
+    "brand": "HAAS",
+    "model": "40/30 HP"
+  },
+  {
+    "type": "VECTOR",
+    "brand": "HAAS",
+    "model": "HFD-4"
+  },
+  {
+    "type": "VECTOR",
+    "brand": "HAAS",
+    "model": "VECTOR  40 HP"
+  },
+  {
+    "type": "VECTOR",
+    "brand": "HAAS",
+    "model": "VECTOR 20 HP"
+  },
+  {
+    "type": "VECTOR",
+    "brand": "HAAS",
+    "model": "VECTOR DRIVE  40hp"
+  },
+  {
+    "type": "VECTOR",
+    "brand": "HAAS",
+    "model": "VECTOR HAAS 40 HP"
+  },
+  {
+    "type": "VECTOR",
+    "brand": "WEG",
+    "model": "CFW300B10P0B2DB20"
+  }
+]
