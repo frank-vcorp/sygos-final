@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { Badge, Empty, PageHeader, Table, Td, Th } from "@/components/ui";
+import { Badge, Button, Empty, ListCap, PageHeader, Table, Td, Th, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { ATTENTION_LABEL, type AttentionType } from "@/lib/priorities";
@@ -12,18 +12,21 @@ const TYPES = {
   garantia: "DIAGNOSTICO_GARANTIA",
 } as const;
 
-export default async function ServiciosPage({ params }: { params: Promise<{ tipo: string }> }) {
+export default async function ServiciosPage({ params, searchParams }: { params: Promise<{ tipo: string }>; searchParams: Promise<{ q?: string }> }) {
   const session = await requireCompany();
   if (session.role === "ALMACEN" || (!can(session.role, "equi.view", session.activeCompanyCode) && !can(session.role, "mot.view", session.activeCompanyCode))) {
     redirect("/inicio");
   }
   const { tipo } = await params;
+  const { q } = await searchParams;
+  const query = (q ?? "").trim();
   const attentionType = TYPES[tipo as keyof typeof TYPES];
   if (!attentionType) notFound();
   const systron = session.activeCompanyCode === "SERVOMOTORES" ? await prisma.company.findUnique({ where: { code: "SYSTRON" } }) : null;
   const rows = await prisma.attention.findMany({
     where: {
       attentionType,
+      ...(query ? { OR: [{ equipment: { folio: { contains: query } } }, { equipment: { client: { name: { contains: query } } } }, { reportedFault: { contains: query } }] } : {}),
       equipment: {
         ...(session.role === "VENTAS" ? { client: { ownerUserId: session.userId } } : {}),
         ...(session.activeCompanyCode === "SYSTRON"
@@ -42,7 +45,17 @@ export default async function ServiciosPage({ params }: { params: Promise<{ tipo
         subtitle="Desde aquí se abre el servicio. El ingreso físico sigue en Taller."
         action={can(session.role, "attention.create", session.activeCompanyCode) ? <Link href={`/servicios/${tipo}/nuevo`} className="rounded-md bg-[var(--accent)] px-3 py-2 text-sm font-medium text-white">Nuevo</Link> : null}
       />
-      {rows.length === 0 ? <Empty title="Sin servicios de este tipo" body="Al abrirlo puedes dar de alta el cliente y el equipo si todavía no existen." /> : (
+      <form className="mb-4 flex gap-2" action={`/servicios/${tipo}`}>
+        <input name="q" defaultValue={query} placeholder="Folio, cliente o falla" className="rounded-md border border-[var(--line)] px-3 py-2 text-sm" />
+        <Button type="submit" tone="ghost">Buscar</Button>
+      </form>
+      {rows.length === 0 ? (
+        <Empty
+          title={query ? "Sin coincidencias" : "Sin servicios de este tipo"}
+          body={query ? `Nada coincide con «${query}».` : "Al abrirlo puedes dar de alta el cliente y el equipo si todavía no existen."}
+          action={query ? <TextLink href={`/servicios/${tipo}`}>Quitar búsqueda</TextLink> : can(session.role, "attention.create", session.activeCompanyCode) ? <TextLink href={`/servicios/${tipo}/nuevo`}>Abrir servicio</TextLink> : undefined}
+        />
+      ) : (
         <Table>
           <thead><tr><Th>Equipo</Th><Th>Cliente</Th><Th>Prioridad</Th><Th>Estado</Th></tr></thead>
           <tbody>
@@ -61,6 +74,7 @@ export default async function ServiciosPage({ params }: { params: Promise<{ tipo
           </tbody>
         </Table>
       )}
+      <ListCap shown={rows.length} />
     </>
   );
 }

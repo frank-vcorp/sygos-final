@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Badge, Button, Empty, PageHeader, Table, Td, Th } from "@/components/ui";
+import { Badge, Button, Empty, ListCap, PageHeader, Table, Td, Th, TextLink } from "@/components/ui";
 import { CUSTODY_LABEL, type Custody } from "@/lib/custody";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
@@ -36,7 +36,11 @@ export default async function EquiposPage({ searchParams }: { searchParams: Prom
         <Button type="submit" tone="ghost">Buscar</Button>
       </form>
       {rows.length === 0 ? (
-        <Empty title="No hay equipos" body="Un EQUI se crea al identificar una unidad física. No se generan equipos de demostración." />
+        <Empty
+          title={query ? "Sin coincidencias" : "No hay equipos"}
+          body={query ? `Nada coincide con «${query}».` : "Un EQUI se crea al identificar una unidad física. No se generan equipos de demostración."}
+          action={query ? <TextLink href="/equipos">Quitar búsqueda</TextLink> : can(session.role, "equi.create", session.activeCompanyCode) ? <TextLink href="/equipos/nuevo">Nuevo EQUI</TextLink> : undefined}
+        />
       ) : (
         <Table>
           <thead><tr><Th>Folio</Th><Th>Cliente</Th><Th>Identificación</Th><Th>Custodia</Th></tr></thead>
@@ -52,6 +56,7 @@ export default async function EquiposPage({ searchParams }: { searchParams: Prom
           </tbody>
         </Table>
       )}
+      <ListCap shown={rows.length} />
     </>
   );
 }

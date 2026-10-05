@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { createMotAction } from "@/app/(erp)/equipos/actions";
 import { EquipmentCatalogFields } from "@/components/equipment-catalog-fields";
+import { ServiceTypePriority } from "@/components/service-type-priority";
 import { Button, controlClass, Field, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
@@ -29,6 +30,7 @@ export default async function NuevoMotPage() {
   return (
     <>
       <PageHeader
+        back={{ href: "/motores", label: "Motores" }}
         title="Nuevo MOT"
         subtitle={session.activeCompanyCode === "SYSTRON"
           ? "La identidad es global. El trabajo físico queda pendiente de ingreso en Servomotores y no entra al almacén SYSTRON."
@@ -48,26 +50,12 @@ export default async function NuevoMotPage() {
         />
         <Field label="Descripción"><textarea name="description" rows={2} className={controlClass} /></Field>
         <Field label="Serie"><input name="serial" className={controlClass} /></Field>
-        <Field label="Tipo de atención">
-          <select name="attentionType" required className={controlClass}>
-            <option value="">Selecciona</option>
-            {ATTENTION_TYPES.map((type) => <option key={type} value={type}>{ATTENTION_LABEL[type]}</option>)}
-          </select>
-        </Field>
-        <Field label="Prioridad">
-          <select name="priorityId" required className={controlClass}>
-            <option value="">Selecciona</option>
-            {ATTENTION_TYPES.map((type) => (
-              <optgroup key={type} label={ATTENTION_LABEL[type]}>
-                {priorities.filter((row) => row.attentionType === type).map((row) => (
-                  <option key={row.id} value={row.id}>{prioritySummary(row)}</option>
-                ))}
-              </optgroup>
-            ))}
-          </select>
-        </Field>
+        <ServiceTypePriority
+          hint="La garantía se abre desde Servicios, sobre un equipo que ya tuvo una reparación pagada."
+          types={ATTENTION_TYPES.filter((type) => type !== "DIAGNOSTICO_GARANTIA").map((type) => ({ value: type, label: ATTENTION_LABEL[type] }))}
+          priorities={priorities.filter((row) => row.attentionType !== "DIAGNOSTICO_GARANTIA").map((row) => ({ id: row.id, attentionType: row.attentionType, label: prioritySummary(row) }))}
+        />
         <Field label="Falla reportada"><textarea name="reportedFault" required rows={3} className={controlClass} /></Field>
-        <Field label="Antecedente" hint="Obligatorio en Diagnóstico de Garantía."><input name="antecedent" className={controlClass} /></Field>
         <Field label="Instrucciones de entrega"><textarea name="deliveryInstructions" rows={2} className={controlClass} /></Field>
         <Button type="submit">Crear folio MOT</Button>
       </form>

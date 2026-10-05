@@ -37,6 +37,7 @@ export async function createEquiAction(formData: FormData) {
       description: optionalText(formData.get("description")),
       serial: optionalText(formData.get("serial")),
     });
+    await setFlash({ tone: "ok", message: `${equipment.folio} quedó registrado. El SLA inicia cuando se confirme la entrada física.` });
     redirect(`/equipos/${equipment.id}`);
   } catch (error) {
     if (isRedirect(error)) throw error;
@@ -62,6 +63,7 @@ export async function createMotAction(formData: FormData) {
       antecedent: optionalText(formData.get("antecedent")),
       deliveryInstructions: optionalText(formData.get("deliveryInstructions")),
     });
+    await setFlash({ tone: "ok", message: `${equipment.folio} quedó registrado. El ingreso físico todavía está pendiente.` });
     redirect(`/motores/${equipment.id}`);
   } catch (error) {
     if (isRedirect(error)) throw error;

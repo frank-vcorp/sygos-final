@@ -18,7 +18,7 @@ export default async function VentaDetallePage({ params }: { params: Promise<{ i
   const canMove = can(session.role, "sale.receive", session.activeCompanyCode);
   return (
     <>
-      <PageHeader title={sale.folio} subtitle={`Venta de ${sale.client.name}`} />
+      <PageHeader back={{ href: "/ventas", label: "Panel de ventas" }} title={sale.folio} subtitle={`Venta de ${sale.client.name}`} />
       <p className="mb-4 text-sm">Cotización <Link href={`/cotizaciones/${sale.quoteId}`} className="text-[var(--accent)]">{sale.quote.folio}</Link>. La mercancía no entra al inventario de refacciones. Factura y remisión llegan en la fase siguiente.</p>
       <ul className="space-y-3">
         {sale.lines.map((line) => (
@@ -40,7 +40,7 @@ export default async function VentaDetallePage({ params }: { params: Promise<{ i
                   <Button type="submit" tone="ghost">Entregar</Button>
                 </form>
               </div>
-            ) : null}
+            ) : <p className="mt-2 text-[var(--muted)]">Recepción y entrega las registra almacén.</p>}
           </li>
         ))}
       </ul>

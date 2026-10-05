@@ -4,14 +4,21 @@ export function PageHeader({
   title,
   subtitle,
   action,
+  back,
 }: {
   title: string;
   subtitle?: string;
   action?: React.ReactNode;
+  back?: { href: string; label: string };
 }) {
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
       <div>
+        {back ? (
+          <Link href={back.href} className="mb-1 inline-flex text-sm text-[var(--muted)] hover:text-[var(--accent)]">
+            ← {back.label}
+          </Link>
+        ) : null}
         <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
         {subtitle ? <p className="mt-1 text-sm text-[var(--muted)]">{subtitle}</p> : null}
       </div>
@@ -73,13 +80,19 @@ export function Card({ children, className = "" }: { children: React.ReactNode; 
   return <section className={`rounded-lg border border-[var(--line)] bg-white ${className}`}>{children}</section>;
 }
 
-export function Empty({ title, body }: { title: string; body: string }) {
+export function Empty({ title, body, action }: { title: string; body: string; action?: React.ReactNode }) {
   return (
     <div className="rounded-lg border border-dashed border-[var(--line)] bg-white px-6 py-10 text-center">
       <p className="font-medium">{title}</p>
       <p className="mt-1 text-sm text-[var(--muted)]">{body}</p>
+      {action ? <div className="mt-3">{action}</div> : null}
     </div>
   );
+}
+
+export function ListCap({ shown, cap = 100 }: { shown: number; cap?: number }) {
+  if (shown < cap) return null;
+  return <p className="mt-2 text-xs text-[var(--muted)]">Mostrando los primeros {cap}. Acota la búsqueda para ver el resto.</p>;
 }
 
 export function Alert({ tone, message }: { tone: "ok" | "error"; message: string }) {

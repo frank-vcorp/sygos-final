@@ -6,6 +6,7 @@ import {
   reactivateProspectAction,
   updateProspectAction,
 } from "../actions";
+import { ConvertProspect } from "@/components/convert-prospect";
 import { Badge, Button, controlClass, Field, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
@@ -47,7 +48,7 @@ export default async function ProspectoDetallePage({ params }: { params: Promise
 
   return (
     <>
-      <PageHeader title={prospect.name} action={<Badge>{LABEL[prospect.status] ?? prospect.status}</Badge>} />
+      <PageHeader back={{ href: "/prospectos", label: "Prospectos" }} title={prospect.name} action={<Badge>{LABEL[prospect.status] ?? prospect.status}</Badge>} />
       {open ? (
         <form action={updateProspectAction} className="mb-4 grid max-w-xl gap-3 rounded-lg border border-[var(--line)] bg-white p-4">
           <input type="hidden" name="id" value={prospect.id} />
@@ -88,36 +89,13 @@ export default async function ProspectoDetallePage({ params }: { params: Promise
       </section>
 
       {open ? (
-        <div className="mt-4 grid gap-4 lg:grid-cols-2">
-          <form action={convertProspectAction} className="space-y-3 rounded-lg border border-[var(--line)] bg-white p-4">
-            <input type="hidden" name="id" value={prospect.id} />
-            <input type="hidden" name="version" value={prospect.version} />
-            <h2 className="font-medium">Convertir</h2>
-            <Field label="Destino">
-              <select name="mode" className={controlClass} defaultValue="nuevo">
-                <option value="nuevo">Crear cliente nuevo</option>
-                <option value="existente">Usar cliente existente</option>
-              </select>
-            </Field>
-            <Field label="Contacto del cliente nuevo" hint="Obligatorio solo al crear el cliente.">
-              <input name="contactName" className={controlClass} />
-            </Field>
-            <Field label="Cliente existente">
-              <select name="clientId" className={controlClass} defaultValue="">
-                <option value="">—</option>
-                {clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}
-              </select>
-            </Field>
-            <Button type="submit">Convertir a cliente</Button>
-          </form>
-          <form action={discardProspectAction} className="space-y-3 rounded-lg border border-[var(--line)] bg-white p-4">
-            <input type="hidden" name="id" value={prospect.id} />
-            <input type="hidden" name="version" value={prospect.version} />
-            <h2 className="font-medium">Descartar</h2>
-            <Field label="Motivo"><input name="reason" className={controlClass} /></Field>
-            <Button type="submit" tone="danger">Descartar</Button>
-          </form>
-        </div>
+        <ConvertProspect
+          prospectId={prospect.id}
+          version={prospect.version}
+          clients={clients.map((client) => ({ id: client.id, name: client.name }))}
+          convertAction={convertProspectAction}
+          discardAction={discardProspectAction}
+        />
       ) : null}
 
       {prospect.status === "DESCARTADO" && (session.role === "CEO" || session.role === "ADMINISTRADOR") ? (
@@ -131,6 +109,7 @@ export default async function ProspectoDetallePage({ params }: { params: Promise
       <section className="mt-6">
         <h2 className="mb-2 font-medium">Historial</h2>
         <ul className="space-y-2 text-sm">
+          {history.length === 0 ? <li className="text-[var(--muted)]">Sin entradas en el historial.</li> : null}
           {history.map((item) => (
             <li key={item.id} className="rounded-md border border-[var(--line)] bg-white px-3 py-2">
               <span className="text-[var(--muted)]">{formatWhen(item.createdAt)} · {item.author?.name ?? "Sistema"}</span>

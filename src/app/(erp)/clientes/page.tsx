@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Button, Empty, PageHeader, Table, Td, Th } from "@/components/ui";
+import { Button, Empty, ListCap, PageHeader, Table, Td, Th, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
@@ -43,7 +43,11 @@ export default async function ClientesPage({ searchParams }: { searchParams: Pro
         <Button type="submit" tone="ghost">Filtrar</Button>
       </form>
       {clients.length === 0 ? (
-        <Empty title="No hay clientes" body="El catálogo de esta empresa está vacío con el filtro actual. El sistema no trae clientes de demostración." />
+        <Empty
+          title={query || estado === "inactivos" ? "Sin coincidencias" : "No hay clientes"}
+          body={query || estado === "inactivos" ? "Nada coincide con el filtro. El sistema no trae clientes de demostración." : "El catálogo de esta empresa está vacío. El sistema no trae clientes de demostración."}
+          action={query || estado === "inactivos" ? <TextLink href="/clientes">Quitar filtro</TextLink> : can(session.role, "client.create", session.activeCompanyCode) ? <TextLink href="/clientes/nuevo">Nuevo cliente</TextLink> : undefined}
+        />
       ) : (
         <Table>
           <thead><tr><Th>Cliente</Th><Th>Responsable</Th><Th>Crédito</Th><Th>Factura</Th></tr></thead>
@@ -59,6 +63,7 @@ export default async function ClientesPage({ searchParams }: { searchParams: Pro
           </tbody>
         </Table>
       )}
+      <ListCap shown={clients.length} />
     </>
   );
 }

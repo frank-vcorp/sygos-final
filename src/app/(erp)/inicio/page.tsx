@@ -31,11 +31,11 @@ export default async function InicioPage() {
         subtitle="Los registros de esta vista pertenecen solo a la empresa activa."
       />
       {can(session.role, "nav.business") ? (
-        <div className="grid gap-3 sm:grid-cols-4">
-          <Card className="p-4"><p className="text-sm text-[var(--muted)]">Clientes activos</p><p className="text-2xl font-semibold">{clients}</p></Card>
-          <Card className="p-4"><p className="text-sm text-[var(--muted)]">Prospectos abiertos</p><p className="text-2xl font-semibold">{prospects}</p></Card>
-          <Card className="p-4"><p className="text-sm text-[var(--muted)]">Proveedores activos</p><p className="text-2xl font-semibold">{suppliers}</p></Card>
-          <Card className="p-4"><p className="text-sm text-[var(--muted)]">{systron ? "EQUI sin entrada" : "MOT por ingresar"}</p><p className="text-2xl font-semibold">{custody}</p></Card>
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <HomeCard href={can(session.role, "client.edit", session.activeCompanyCode) || can(session.role, "client.create", session.activeCompanyCode) ? "/clientes" : undefined} label="Clientes activos" value={clients} />
+          <HomeCard href={can(session.role, "prospect.operate", session.activeCompanyCode) ? "/prospectos" : undefined} label="Prospectos abiertos" value={prospects} />
+          <HomeCard href={can(session.role, "supplier.operate", session.activeCompanyCode) ? "/proveedores" : undefined} label="Proveedores activos" value={suppliers} />
+          <HomeCard href={systron && can(session.role, "equi.view", session.activeCompanyCode) ? "/equipos" : !systron && can(session.role, "mot.view", session.activeCompanyCode) ? "/motores" : undefined} label={systron ? "EQUI sin entrada" : "MOT por ingresar"} value={custody} />
         </div>
       ) : (
         <Card className="p-4 text-sm">
@@ -46,4 +46,14 @@ export default async function InicioPage() {
       )}
     </>
   );
+}
+
+function HomeCard({ href, label, value }: { href?: string; label: string; value: number }) {
+  const body = (
+    <Card className="p-4">
+      <p className="text-sm text-[var(--muted)]">{label}</p>
+      <p className="text-2xl font-semibold">{value}</p>
+    </Card>
+  );
+  return href ? <Link href={href} className="block rounded-lg hover:ring-2 hover:ring-[var(--accent)]">{body}</Link> : body;
 }

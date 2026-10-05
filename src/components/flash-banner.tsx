@@ -7,7 +7,12 @@ import type { Flash } from "@/lib/flash";
 
 export function FlashBanner({ flash }: { flash: Flash }) {
   useEffect(() => {
+    document.getElementById("aviso")?.scrollIntoView({ block: "nearest" });
     void clearFlashAction();
   }, []);
-  return <Alert tone={flash.tone} message={flash.message} />;
+  return (
+    <div id="aviso">
+      <Alert tone={flash.tone} message={flash.message} />
+    </div>
+  );
 }

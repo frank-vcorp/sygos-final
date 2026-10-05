@@ -43,6 +43,7 @@ export async function startServiceAction(formData: FormData) {
       deliveryInstructions: optionalText(formData.get("deliveryInstructions")),
     });
     const equipment = await import("@/lib/db").then(({ prisma }) => prisma.equipment.findUnique({ where: { id: attention.equipmentId } }));
+    await setFlash({ tone: "ok", message: "Servicio abierto. El SLA inicia cuando se confirme la entrada física." });
     redirect(equipment?.kind === "MOT" ? `/motores/${attention.equipmentId}` : `/equipos/${attention.equipmentId}`);
   } catch (error) {
     if (typeof error === "object" && error !== null && "digest" in error && String((error as { digest?: string }).digest).startsWith("NEXT_REDIRECT")) throw error;

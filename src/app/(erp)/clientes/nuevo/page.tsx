@@ -10,7 +10,7 @@ export default async function NuevoClientePage() {
   if (!can(session.role, "client.create", session.activeCompanyCode)) redirect("/clientes");
   return (
     <>
-      <PageHeader title="Nuevo cliente" subtitle="El contacto es obligatorio. Los datos fiscales aparecen y se exigen solo si requiere factura." />
+      <PageHeader back={{ href: "/clientes", label: "Clientes" }} title="Nuevo cliente" subtitle="El contacto es obligatorio. Los datos fiscales aparecen y se exigen solo si requiere factura." />
       <form action={createClientAction} className="grid max-w-2xl gap-4 rounded-lg border border-[var(--line)] bg-white p-4">
         <Field label="Nombre o razón social"><input name="name" className={controlClass} required /></Field>
         <Field label="Clasificación">

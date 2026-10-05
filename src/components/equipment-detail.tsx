@@ -63,6 +63,7 @@ export async function EquipmentDetail({ id, expectedKind }: { id: string; expect
   return (
     <>
       <PageHeader
+        back={{ href: expectedKind === "EQUI" ? "/equipos" : "/motores", label: expectedKind === "EQUI" ? "Equipos" : "Motores" }}
         title={equipment.folio}
         subtitle={expectedKind === "EQUI" ? "Identidad física EQUI" : "Identidad física MOT"}
         action={<Badge>{CUSTODY_LABEL[equipment.custody as Custody] ?? equipment.custody}</Badge>}
@@ -94,7 +95,7 @@ export async function EquipmentDetail({ id, expectedKind }: { id: string; expect
                     </p>
                     <p className="mt-1">{attention.reportedFault}</p>
                     <p className="mt-1 text-[var(--muted)]">
-                      {attention.status === "ABIERTA" ? "SLA aún no inicia." : `SLA iniciado ${attention.slaStartedAt ? formatWhen(attention.slaStartedAt) : ""}.`}
+                      {attention.status === "ABIERTA" ? "SLA aún no inicia. Empieza cuando se confirma la entrada física." : `SLA iniciado ${attention.slaStartedAt ? formatWhen(attention.slaStartedAt) : ""}.`}
                       {attention.antecedent ? ` Antecedente: ${attention.antecedent}.` : ""}
                     </p>
                     {attention.deliveryInstructions ? <p className="mt-1">Entrega: {attention.deliveryInstructions}</p> : null}

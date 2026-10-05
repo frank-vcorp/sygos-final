@@ -26,7 +26,7 @@ export default async function NuevoEquiPage() {
   ]);
   return (
     <>
-      <PageHeader title="Nuevo EQUI" subtitle="Crea la identidad física. La entrada de almacén se confirma después." />
+      <PageHeader back={{ href: "/equipos", label: "Equipos" }} title="Nuevo EQUI" subtitle="Crea la identidad física. La entrada de almacén se confirma después." />
       <form action={createEquiAction} className="grid max-w-xl gap-4 rounded-lg border border-[var(--line)] bg-white p-4">
         <Field label="Cliente">
           <select name="clientId" required className={controlClass}>

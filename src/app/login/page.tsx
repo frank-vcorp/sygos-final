@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import { loginAction } from "@/app/auth-actions";
 import { FlashBanner } from "@/components/flash-banner";
-import { Button, controlClass, Field } from "@/components/ui";
+import { SubmitButton } from "@/components/submit-button";
+import { controlClass, Field } from "@/components/ui";
 import { takeFlash } from "@/lib/flash";
 import { getSession } from "@/lib/session";
 
@@ -17,12 +18,12 @@ export default async function LoginPage() {
       <form action={loginAction} className="mt-6 space-y-4 rounded-lg border border-[var(--line)] bg-white p-5">
         {flash ? <FlashBanner flash={flash} /> : null}
         <Field label="Usuario">
-          <input name="username" autoComplete="username" className={controlClass} />
+          <input name="username" required autoComplete="username" className={controlClass} />
         </Field>
         <Field label="Contraseña">
-          <input name="password" type="password" autoComplete="current-password" className={controlClass} />
+          <input name="password" required type="password" autoComplete="current-password" className={controlClass} />
         </Field>
-        <Button type="submit" className="w-full">Entrar</Button>
+        <SubmitButton className="w-full" pendingLabel="Entrando…">Entrar</SubmitButton>
       </form>
     </main>
   );

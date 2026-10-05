@@ -13,7 +13,7 @@ export default async function NuevoUsuarioPage() {
   const roles = ROLES.filter((role) => role !== "ADMINISTRADOR" || can(session.role, "user.manageAdmins"));
   return (
     <>
-      <PageHeader title="Nuevo usuario" subtitle="Un usuario operativo pertenece a una empresa. CEO, Coordinación y Administrador trabajan en ambas." />
+      <PageHeader back={{ href: "/usuarios", label: "Usuarios" }} title="Nuevo usuario" subtitle="Un usuario operativo pertenece a una empresa. CEO, Coordinación y Administrador trabajan en ambas." />
       <form action={createUserAction} className="grid max-w-xl gap-4 rounded-lg border border-[var(--line)] bg-white p-4">
         <Field label="Nombre"><input name="name" required className={controlClass} /></Field>
         <Field label="Usuario"><input name="username" required className={controlClass} autoComplete="off" /></Field>

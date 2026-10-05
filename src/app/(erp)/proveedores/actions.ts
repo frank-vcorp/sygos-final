@@ -44,6 +44,7 @@ export async function createSupplierAction(formData: FormData) {
       summary: "Proveedor creado.",
       authorUserId: session.userId,
     });
+    await setFlash({ tone: "ok", message: "Proveedor creado." });
     redirect(`/proveedores/${supplier.id}`);
   } catch (error) {
     if (isRedirect(error)) throw error;

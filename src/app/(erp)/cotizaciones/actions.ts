@@ -49,6 +49,7 @@ export async function createQuoteAction(formData: FormData) {
       concepts,
       contactIds: formData.getAll("contactId").map(String).filter(Boolean),
     });
+    await setFlash({ tone: "ok", message: `${quote.folio} quedó registrada, sin precio.` });
     redirect(`/cotizaciones/${quote.id}`);
   } catch (error) {
     if (isRedirect(error)) throw error;

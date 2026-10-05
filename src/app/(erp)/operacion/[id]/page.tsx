@@ -78,6 +78,7 @@ export default async function OperacionDetallePage({ params }: { params: Promise
   return (
     <>
       <PageHeader
+        back={{ href: "/operacion", label: "En proceso" }}
         title={row.folio}
         subtitle={`${row.kind === "OS" ? "Orden de servicio" : "Diagnóstico"} · ${row.serviceCompany.name}`}
         action={<Badge tone={row.quotePending ? "warn" : "neutral"}>{CASE_STATUS_LABEL[row.status] ?? row.status}</Badge>}

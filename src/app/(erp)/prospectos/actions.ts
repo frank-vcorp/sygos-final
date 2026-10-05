@@ -52,6 +52,7 @@ export async function createProspectAction(formData: FormData) {
       summary: "Prospecto creado en estado Nuevo.",
       authorUserId: session.userId,
     });
+    await setFlash({ tone: "ok", message: "Prospecto creado." });
     redirect(`/prospectos/${prospect.id}`);
   } catch (error) {
     if (isRedirect(error)) throw error;

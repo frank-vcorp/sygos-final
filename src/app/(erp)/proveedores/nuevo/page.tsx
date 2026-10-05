@@ -9,7 +9,7 @@ export default async function NuevoProveedorPage() {
   if (!can(session.role, "supplier.operate")) redirect("/inicio");
   return (
     <>
-      <PageHeader title="Nuevo proveedor" subtitle="Al crear bastan el nombre y el contacto que ya tengas. Lo fiscal se exige cuando una compra o un pago lo necesite." />
+      <PageHeader back={{ href: "/proveedores", label: "Proveedores" }} title="Nuevo proveedor" subtitle="Al crear bastan el nombre y el contacto que ya tengas. Lo fiscal se exige cuando una compra o un pago lo necesite." />
       <form action={createSupplierAction} className="grid max-w-xl gap-4 rounded-lg border border-[var(--line)] bg-white p-4">
         <Field label="Nombre o razón social"><input name="name" required className={controlClass} /></Field>
         <Field label="Contacto"><input name="contactName" className={controlClass} /></Field>

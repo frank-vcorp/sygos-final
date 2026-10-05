@@ -7,17 +7,17 @@ import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
 
-export default async function AgendaPage({ searchParams }: { searchParams: Promise<{ vista?: string }> }) {
+export default async function AgendaPage({ searchParams }: { searchParams: Promise<{ vista?: string; fecha?: string; slot?: string }> }) {
   const session = await requireCompany();
   if (!can(session.role, "agenda.use", session.activeCompanyCode)) redirect("/inicio");
-  const { vista } = await searchParams;
-  const now = new Date();
-  const start = new Date(now);
-  const end = new Date(now);
+  const { vista: rawVista, fecha, slot } = await searchParams;
+  const vista = rawVista === "semana" || rawVista === "mes" ? rawVista : "dia";
+  const anchor = /^\d{4}-\d{2}-\d{2}$/.test(fecha ?? "") ? fecha! : todayKey();
+  const start = parseDay(anchor);
+  const end = new Date(start);
   if (vista === "semana") end.setDate(end.getDate() + 7);
-  else if (vista === "mes") end.setDate(end.getDate() + 31);
+  else if (vista === "mes") end.setMonth(end.getMonth() + 1);
   else end.setDate(end.getDate() + 1);
-  start.setHours(0, 0, 0, 0);
   const [activities, categories, sellers, goalType] = await Promise.all([
     prisma.agendaActivity.findMany({
       where: { companyId: session.activeCompanyId, scheduledAt: { gte: start, lt: end }, ...(session.role === "VENTAS" ? { authorUserId: session.userId } : {}) },
@@ -32,20 +32,27 @@ export default async function AgendaPage({ searchParams }: { searchParams: Promi
   ]);
   return (
     <>
-      <PageHeader title="Agenda comercial" subtitle="Día, semana o mes. No genera recordatorios." />
-      <div className="mb-4 flex gap-2">
+      <PageHeader title="Agenda comercial" subtitle="Elige un horario en el calendario para agendar. No genera recordatorios." />
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <a href={`/agenda?vista=${vista}&fecha=${shiftDay(anchor, vista, -1)}`} className="rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm">Anterior</a>
+        <a href={`/agenda?vista=${vista}&fecha=${todayKey()}`} className="rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm">Hoy</a>
+        <a href={`/agenda?vista=${vista}&fecha=${shiftDay(anchor, vista, 1)}`} className="rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm">Siguiente</a>
         {[["dia", "Día"], ["semana", "Semana"], ["mes", "Mes"]].map(([key, label]) => (
-          <a key={key} href={`/agenda?vista=${key}`} className={`rounded-md px-3 py-2 text-sm ${(vista ?? "dia") === key ? "bg-[var(--accent)] text-white" : "border border-[var(--line)] bg-white"}`}>{label}</a>
+          <a key={key} href={`/agenda?vista=${key}&fecha=${anchor}`} className={`rounded-md px-3 py-2 text-sm ${vista === key ? "bg-[var(--accent)] text-white" : "border border-[var(--line)] bg-white"}`}>{label}</a>
         ))}
+        <span className="text-sm text-[var(--muted)]">{anchor}</span>
       </div>
       <AgendaCalendar
-        view={vista === "semana" || vista === "mes" ? vista : "dia"}
+        view={vista}
+        anchor={anchor}
         activities={activities.map((item) => ({ id: item.id, note: item.note, category: item.category?.name ?? "Actividad", at: item.scheduledAt.toISOString() }))}
       />
-      <div className="mt-4">
-        <QuickPanel label="Nueva actividad">
+      <div className="mt-4" id="nueva">
+        <QuickPanel label="Nueva actividad" defaultOpen={Boolean(slot)}>
           <form action={createActivityAction} className="grid gap-3">
-            <Field label="Cuándo"><input name="scheduledAt" type="datetime-local" required className={controlClass} /></Field>
+            <input type="hidden" name="vista" value={vista} />
+            <input type="hidden" name="fecha" value={anchor} />
+            <Field label="Cuándo"><input name="scheduledAt" type="datetime-local" required defaultValue={slot ?? ""} className={controlClass} /></Field>
             <Field label="Categoría">
               <select name="categoryId" className={controlClass} defaultValue="">
                 <option value="">Sin categoría</option>
@@ -71,4 +78,23 @@ export default async function AgendaPage({ searchParams }: { searchParams: Promi
       ) : null}
     </>
   );
+}
+
+function todayKey() {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Mexico_City", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+}
+
+function parseDay(value: string) {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, (month || 1) - 1, day || 1);
+}
+
+function shiftDay(value: string, vista: string, delta: number) {
+  const date = parseDay(value);
+  if (vista === "mes") date.setMonth(date.getMonth() + delta);
+  else if (vista === "semana") date.setDate(date.getDate() + delta * 7);
+  else date.setDate(date.getDate() + delta);
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
 }

@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { decideAction, discountAction, linkBaseAction, setPricesAction } from "../actions";
-import { Badge, Button, controlClass, Field, PageHeader } from "@/components/ui";
+import { ConfirmSubmit, SubmitButton } from "@/components/submit-button";
+import { Badge, controlClass, Field, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
 import { historyFor } from "@/lib/history";
@@ -26,6 +27,7 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
     ? await prisma.quote.findUnique({ where: { id: quote.linkedQuoteId }, include: { lines: true, company: true } })
     : null;
   const history = await historyFor("COTIZACION", quote.id);
+  const seller = await prisma.user.findUnique({ where: { id: session.userId }, select: { discountLimitPct: true } });
   const priced = quote.status !== "PENDIENTE_COTIZAR" || session.role !== "VENTAS";
   const totals = priced ? quoteTotals(quote.lines, quote.discountPct) : null;
   const showBase = seesEconomicDetail(session.role, session.activeCompanyCode, quote.company.code, false);
@@ -38,7 +40,7 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
         : null;
   return (
     <>
-      <PageHeader title={quote.folio} subtitle={QUOTE_TYPE_LABEL[quote.quoteType as QuoteType] ?? quote.quoteType} action={<Badge>{QUOTE_STATUS_LABEL[quote.status] ?? quote.status}</Badge>} />
+      <PageHeader back={{ href: "/cotizaciones", label: "Cotizaciones" }} title={quote.folio} subtitle={QUOTE_TYPE_LABEL[quote.quoteType as QuoteType] ?? quote.quoteType} action={<Badge>{QUOTE_STATUS_LABEL[quote.status] ?? quote.status}</Badge>} />
       <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
         <section className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
           <p>Cliente: <Link href={`/clientes/${quote.client.id}`} className="text-[var(--accent)]">{quote.client.isSystem ? "SYSTRON · intercompañía" : quote.client.name}</Link></p>
@@ -76,7 +78,7 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
                   <input name="amount" required inputMode="decimal" className={controlClass} />
                 </Field>
               ))}
-              <Button type="submit">Guardar precio</Button>
+              <SubmitButton>Guardar precio</SubmitButton>
             </form>
           ) : null}
           {quote.status === "PENDIENTE_DECISION" && can(session.role, "quote.follow", session.activeCompanyCode) ? (
@@ -85,21 +87,28 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
                 <h2 className="font-medium">Descuento</h2>
                 <input type="hidden" name="quoteId" value={quote.id} />
                 <input type="hidden" name="version" value={quote.version} />
-                <input name="discountPct" required defaultValue={quote.discountPct} className={controlClass} />
-                <Button type="submit" tone="ghost">Aplicar</Button>
+                <Field label="Porcentaje" hint={seller?.discountLimitPct != null ? `Tu límite es ${seller.discountLimitPct}%.` : "Tu usuario no tiene un tope de descuento."}>
+                  <input name="discountPct" required defaultValue={quote.discountPct} className={controlClass} />
+                </Field>
+                <SubmitButton tone="ghost">Aplicar</SubmitButton>
               </form>
               <form action={decideAction} className="grid gap-2 rounded-lg border border-[var(--line)] bg-white p-4">
                 <h2 className="font-medium">Decisión del cliente</h2>
                 <input type="hidden" name="quoteId" value={quote.id} />
                 <input type="hidden" name="version" value={quote.version} />
-                {quote.quoteType === "VENTA_EQUIPO" ? quote.lines.map((line) => (
-                  <label key={line.id} className="flex items-center gap-2 text-sm"><input type="checkbox" name="authorizedLine" value={line.id} /> {line.concept}</label>
-                )) : null}
+                {quote.quoteType === "VENTA_EQUIPO" ? (
+                  <div className="grid gap-1">
+                    <p className="text-xs text-[var(--muted)]">Marca las líneas que el cliente autorizó.</p>
+                    {quote.lines.map((line) => (
+                      <label key={line.id} className="flex items-center gap-2 text-sm"><input type="checkbox" name="authorizedLine" value={line.id} /> {line.concept}</label>
+                    ))}
+                  </div>
+                ) : null}
                 <select name="decision" className={controlClass}>
                   <option value="si">Autorizada</option>
                   <option value="no">No autorizada</option>
                 </select>
-                <Button type="submit">Registrar decisión</Button>
+                <ConfirmSubmit tone="primary" message="Se registrará la decisión del cliente. Revisa que sea la correcta.">Registrar decisión</ConfirmSubmit>
               </form>
             </>
           ) : null}
@@ -107,8 +116,10 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
             <form action={linkBaseAction} className="grid gap-2 rounded-lg border border-[var(--line)] bg-white p-4">
               <h2 className="font-medium">Ligar cotización base</h2>
               <input type="hidden" name="quoteId" value={quote.id} />
-              <input name="baseQuoteId" required placeholder="Id de la cotización de Servomotores" className={controlClass} />
-              <Button type="submit" tone="ghost">Ligar</Button>
+              <Field label="Cotización de Servomotores" hint="Pega el folio o el identificador de la cotización base.">
+                <input name="baseQuoteId" required placeholder="COT-… o identificador" className={controlClass} />
+              </Field>
+              <SubmitButton tone="ghost">Ligar</SubmitButton>
             </form>
           ) : null}
           <ul className="space-y-2 text-sm">

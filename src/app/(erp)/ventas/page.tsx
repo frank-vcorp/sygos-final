@@ -47,7 +47,7 @@ export default async function VentasPage() {
           <h2 className="font-medium">Agenda</h2>
           {agenda.length === 0 ? <Empty title="Sin actividades próximas" body="Registra una desde la agenda. No se crean tareas solas." /> : (
             <ul className="mt-2 space-y-2 text-sm">
-              {agenda.map((item) => <li key={item.id}>{formatWhen(item.scheduledAt)} · {item.category?.name ?? "Actividad"} · {item.note}</li>)}
+              {agenda.map((item) => <li key={item.id}><Link href="/agenda" className="text-[var(--accent)]">{formatWhen(item.scheduledAt)}</Link> · {item.category?.name ?? "Actividad"} · {item.note}</li>)}
             </ul>
           )}
         </section>

@@ -100,6 +100,7 @@ export async function createClientAction(formData: FormData) {
       summary: `Alta de cliente. Responsable inicial: ${ownerUserId ? "asignado" : "sin usuario CEO activo"}.`,
       authorUserId: session.userId,
     });
+    await setFlash({ tone: "ok", message: "Cliente creado." });
     redirect(`/clientes/${client.id}`);
   } catch (error) {
     if (isRedirect(error)) throw error;

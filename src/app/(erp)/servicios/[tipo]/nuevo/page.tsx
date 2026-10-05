@@ -45,7 +45,7 @@ export default async function NuevoServicioPage({ params }: { params: Promise<{ 
   ]);
   return (
     <>
-      <PageHeader title={`Nuevo ${ATTENTION_LABEL[attentionType as AttentionType]}`} subtitle="Si el cliente o el equipo no existen, se dan de alta aquí y el flujo sigue en Taller." />
+      <PageHeader back={{ href: `/servicios/${tipo}`, label: ATTENTION_LABEL[attentionType as AttentionType] }} title={`Nuevo ${ATTENTION_LABEL[attentionType as AttentionType]}`} subtitle="Si el cliente o el equipo no existen, se dan de alta aquí y el flujo sigue en Taller. El SLA inicia con la entrada física." />
       <form action={startServiceAction} className="grid max-w-2xl gap-4 rounded-lg border border-[var(--line)] bg-white p-4">
         <input type="hidden" name="attentionType" value={attentionType} />
         <Field label="Cliente existente">

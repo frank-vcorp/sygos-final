@@ -23,6 +23,7 @@ export function EquipmentCatalogFields({ types, brands, models }: { types: strin
     <div className="grid gap-3">
       <Field label="Modelo" hint="Escribe y elige una sugerencia. Si no existe, se piden tipo y marca.">
         <input
+          required
           className={controlClass}
           value={picked ? picked.model : query}
           onChange={(event) => {
@@ -75,7 +76,7 @@ export function EquipmentCatalogFields({ types, brands, models }: { types: strin
 function SearchPick({ label, query, setQuery, options }: { label: string; query: string; setQuery: (value: string) => void; options: string[] }) {
   return (
     <Field label={label}>
-      <input value={query} onChange={(event) => setQuery(event.target.value)} className={controlClass} placeholder="Escribe para buscar o capturar" />
+      <input required value={query} onChange={(event) => setQuery(event.target.value)} className={controlClass} placeholder="Escribe para buscar o capturar" />
       {query && options.length > 0 ? (
         <div className="mt-1 rounded-md border border-[var(--line)] bg-white">
           {options.map((option) => (

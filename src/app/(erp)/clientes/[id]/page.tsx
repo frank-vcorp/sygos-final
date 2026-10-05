@@ -8,7 +8,8 @@ import {
   updateClientAction,
 } from "../actions";
 import { ClientInvoiceFields } from "@/components/client-invoice-fields";
-import { Badge, Button, controlClass, Field, PageHeader } from "@/components/ui";
+import { ConfirmSubmit, SubmitButton } from "@/components/submit-button";
+import { Badge, Button, controlClass, Field, PageHeader, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
 import { historyFor } from "@/lib/history";
@@ -36,7 +37,7 @@ export default async function ClienteDetallePage({ params }: { params: Promise<{
     });
     return (
       <>
-        <PageHeader title={client.name} subtitle="Cliente intercompañía fijo" action={<Badge>Intercompañía</Badge>} />
+        <PageHeader back={{ href: "/clientes", label: "Clientes" }} title={client.name} subtitle="Cliente intercompañía fijo" action={<Badge>Intercompañía</Badge>} />
         <section className="max-w-xl rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
           <p>Las operaciones que SYSTRON envía a Servomotores usan este cliente. No se edita ni se inactiva.</p>
           <p className="mt-3">Régimen fiscal: {regimenLabel(client.taxRegime)}</p>
@@ -55,7 +56,14 @@ export default async function ClienteDetallePage({ params }: { params: Promise<{
   }
   if (session.role === "VENTAS" && client.ownerUserId !== session.userId) notFound();
   if (!can(session.role, "client.edit", session.activeCompanyCode)) redirect("/inicio");
-  const owner = client.ownerUserId ? await prisma.user.findUnique({ where: { id: client.ownerUserId } }) : null;
+  const [owner, quotes] = await Promise.all([
+    client.ownerUserId ? prisma.user.findUnique({ where: { id: client.ownerUserId } }) : Promise.resolve(null),
+    prisma.quote.findMany({
+      where: { clientId: client.id, companyId: session.activeCompanyId, ...(session.role === "VENTAS" ? { sellerUserId: session.userId } : {}) },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+    }),
+  ]);
   const history = await historyFor("CLIENTE", client.id);
   const candidates = can(session.role, "client.reassign")
     ? await prisma.user.findMany({
@@ -70,6 +78,7 @@ export default async function ClienteDetallePage({ params }: { params: Promise<{
   return (
     <>
       <PageHeader
+        back={{ href: "/clientes", label: "Clientes" }}
         title={client.name}
         subtitle={client.active ? "Cliente activo" : "Cliente inactivo"}
         action={client.active ? <Badge tone="ok">Activo</Badge> : <Badge tone="danger">Inactivo</Badge>}
@@ -117,7 +126,7 @@ export default async function ClienteDetallePage({ params }: { params: Promise<{
               <input type="hidden" name="id" value={client.id} />
               <input type="hidden" name="version" value={client.version} />
               <p className="mb-3 text-sm">Inactivar conserva el historial y lo saca de los listados activos.</p>
-              <Button type="submit" tone="danger">Inactivar cliente</Button>
+              <ConfirmSubmit message="El cliente quedará inactivo. El historial se conserva.">Inactivar cliente</ConfirmSubmit>
             </form>
           ) : null}
           <section className="rounded-lg border border-[var(--line)] bg-white p-4">
@@ -127,7 +136,13 @@ export default async function ClienteDetallePage({ params }: { params: Promise<{
                 <li key={prospect.id}><a className="text-[var(--accent)]" href={`/prospectos/${prospect.id}`}>{prospect.name}</a></li>
               ))}
             </ul>
-            <p className="mt-3 text-xs text-[var(--muted)]">Equipos, cotizaciones, ventas y cobranza aparecen aquí cuando existan.</p>
+            <h3 className="mt-4 font-medium">Cotizaciones</h3>
+            {quotes.length === 0 ? <p className="mt-1 text-sm text-[var(--muted)]">Todavía no hay cotizaciones de este cliente.</p> : (
+              <ul className="mt-1 space-y-1 text-sm">
+                {quotes.map((quote) => <li key={quote.id}><Link className="text-[var(--accent)]" href={`/cotizaciones/${quote.id}`}>{quote.folio}</Link> · {quote.status}</li>)}
+              </ul>
+            )}
+            {can(session.role, "quote.create", session.activeCompanyCode) ? <p className="mt-2"><TextLink href={`/cotizaciones/nuevo?clientId=${client.id}`}>Nueva cotización</TextLink></p> : null}
           </section>
         </div>
       </div>
@@ -141,14 +156,14 @@ export default async function ClienteDetallePage({ params }: { params: Promise<{
               <span>{contact.name}{contact.isPrimary ? " · principal" : ""}{contact.roleTitle ? ` · ${contact.roleTitle}` : ""}{contact.phone ? ` · ${contact.phone}` : ""}{contact.email ? ` · ${contact.email}` : ""}</span>
               <form action={inactivateContactAction}>
                 <input type="hidden" name="contactId" value={contact.id} />
-                <button className="text-[var(--danger)]" type="submit">Inactivar</button>
+                <ConfirmSubmit message="El contacto quedará inactivo. Debe quedar al menos un contacto activo.">Inactivar</ConfirmSubmit>
               </form>
             </li>
           ))}
         </ul>
         <form action={addContactAction} className="mt-4 grid gap-3 md:grid-cols-2">
           <input type="hidden" name="clientId" value={client.id} />
-          <Field label="Nombre"><input name="name" className={controlClass} /></Field>
+          <Field label="Nombre"><input name="name" required className={controlClass} /></Field>
           <Field label="Puesto"><input name="roleTitle" className={controlClass} /></Field>
           <Field label="Teléfono"><input name="phone" className={controlClass} /></Field>
           <Field label="Correo"><input name="email" className={controlClass} /></Field>

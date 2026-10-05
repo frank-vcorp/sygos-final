@@ -29,7 +29,9 @@ export async function createActivityAction(formData: FormData) {
     if (isRedirect(error)) throw error;
     await setFlash({ tone: "error", message: error instanceof Error ? error.message : "No se pudo guardar." });
   }
-  redirect("/agenda");
+  const vista = optionalText(formData.get("vista")) ?? "dia";
+  const fecha = optionalText(formData.get("fecha"));
+  redirect(`/agenda?vista=${vista}${fecha ? `&fecha=${fecha}` : ""}`);
 }
 
 export async function saveGoalAction(formData: FormData) {
