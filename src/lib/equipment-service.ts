@@ -260,6 +260,108 @@ export async function createAttention(
   return attention;
 }
 
+export async function startService(
+  actor: Actor,
+  input: {
+    attentionType: AttentionType;
+    clientId: string | null;
+    newClientName: string | null;
+    contactName: string | null;
+    equipmentId: string | null;
+    equipmentKind: "EQUI" | "MOT" | null;
+    model: string | null;
+    typeName: string | null;
+    brandName: string | null;
+    serial: string | null;
+    priorityId: string;
+    reportedFault: string;
+    antecedent: string | null;
+    originalCaseId: string | null;
+    deliveryInstructions: string | null;
+  },
+) {
+  let clientId = input.clientId;
+  if (!input.equipmentId && !clientId) {
+    if (!input.newClientName || !input.contactName) throw new Error("Para un cliente nuevo indica el nombre y un contacto.");
+    const ownerUserId = await ownerFor(actor);
+    const created = await prisma.client.create({
+      data: {
+        companyId: actor.activeCompanyId,
+        name: input.newClientName,
+        ownerUserId,
+        contacts: { create: { name: input.contactName, isPrimary: true } },
+      },
+    });
+    clientId = created.id;
+  }
+  let equipmentId = input.equipmentId;
+  let version = 1;
+  if (!equipmentId) {
+    if (!clientId) throw new Error("Selecciona el cliente.");
+    if (!input.model) throw new Error("El modelo es obligatorio.");
+    if (input.attentionType === "DIAGNOSTICO_GARANTIA") {
+      throw new Error("La garantía se abre sobre un equipo que ya tuvo una reparación pagada.");
+    }
+    if (input.equipmentKind === "EQUI") {
+      const equipment = await createEqui(actor, {
+        clientId,
+        typeId: null,
+        newType: input.typeName,
+        brandId: null,
+        newBrand: input.brandName,
+        model: input.model ?? "",
+        description: null,
+        serial: input.serial,
+      });
+      equipmentId = equipment.id;
+    } else if (input.equipmentKind === "MOT") {
+      if (!input.model) throw new Error("El modelo es obligatorio.");
+      const client = await ownClient(actor, clientId);
+      const folio = await allocateFolio(actor.activeCompanyId, "MOT");
+      const equipment = await prisma.equipment.create({
+        data: {
+          kind: "MOT",
+          folio,
+          originCompanyId: actor.activeCompanyId,
+          clientId: client.id,
+          brandName: input.brandName,
+          model: input.model,
+          serial: input.serial,
+          custody: "PENDIENTE_INGRESO",
+          createdByUserId: actor.userId,
+        },
+      });
+      equipmentId = equipment.id;
+    } else {
+      throw new Error("Indica si el equipo es EQUI o MOT.");
+    }
+  } else {
+    const current = await prisma.equipment.findFirst({ where: { id: equipmentId, originCompanyId: actor.activeCompanyId } });
+    if (!current) throw new Error("Ese equipo no pertenece a la empresa activa.");
+    version = current.version;
+    clientId = current.clientId;
+  }
+  return createAttention(actor, {
+    equipmentId,
+    attentionType: input.attentionType,
+    priorityId: input.priorityId,
+    reportedFault: input.reportedFault,
+    antecedent: input.antecedent,
+    deliveryInstructions: input.deliveryInstructions,
+    originalCaseId: input.originalCaseId,
+    version,
+  });
+}
+
+async function ownerFor(actor: Actor) {
+  if (actor.role === "VENTAS" || actor.role === "GERENTE_OPERATIVO_SERVOMOTORES" || actor.role === "CEO") return actor.userId;
+  if (actor.role === "COORDINACION_ADMINISTRACION" || actor.role === "ADMINISTRADOR") {
+    const ceo = await prisma.user.findFirst({ where: { role: "CEO", active: true }, orderBy: { username: "asc" } });
+    return ceo?.id ?? null;
+  }
+  return null;
+}
+
 export async function registerMovement(
   actor: Actor,
   input: {

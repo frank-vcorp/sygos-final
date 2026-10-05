@@ -1,32 +1,60 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { logoutAction, switchCompanyAction, viewAsAction } from "@/app/auth-actions";
 import { FlashBanner } from "@/components/flash-banner";
+import { SideNav } from "@/components/side-nav";
 import { prisma } from "@/lib/db";
 import { takeFlash } from "@/lib/flash";
 import { can } from "@/lib/permissions";
 import { ROLE_LABEL, isRole } from "@/lib/roles";
 import { getSession } from "@/lib/session";
 
-const LINKS: Array<{
+type NavLink = {
   href: string;
   label: string | ((code: string | null) => string);
   show: (role: Parameters<typeof can>[0], code: string | null) => boolean;
-}> = [
-  { href: "/inicio", label: "Inicio", show: () => true },
-  { href: "/clientes", label: "Clientes", show: (role, code) => can(role, "client.create", code) || can(role, "client.edit", code) },
-  { href: "/prospectos", label: "Prospectos", show: (role, code) => can(role, "prospect.operate", code) },
-  { href: "/equipos", label: "Equipos", show: (role, code) => can(role, "equi.view", code) },
-  { href: "/motores", label: "Motores", show: (role, code) => can(role, "mot.view", code) },
-  { href: "/operacion", label: "Operación", show: (role, code) => role !== "ALMACEN" && (can(role, "equi.view", code) || can(role, "mot.view", code)) },
-  { href: "/cotizaciones", label: "Cotizaciones", show: (role, code) => can(role, "quote.create", code) || can(role, "quote.price", code) },
-  { href: "/ventas", label: "Ventas", show: (role, code) => can(role, "agenda.use", code) || can(role, "quote.follow", code) },
-  { href: "/agenda", label: "Agenda", show: (role, code) => can(role, "agenda.use", code) },
-  { href: "/custodia", label: (code) => (code === "SERVOMOTORES" ? "Custodia" : "Almacén"), show: (role, code) => can(role, "custody.confirm", code) },
-  { href: "/inventario", label: "Inventario", show: (role, code) => can(role, "inventory.operate", code) },
-  { href: "/proveedores", label: "Proveedores", show: (role, code) => can(role, "supplier.operate", code) },
-  { href: "/usuarios", label: "Usuarios", show: (role) => can(role, "user.manage") },
-  { href: "/configuracion", label: "Configuración", show: (role) => can(role, "config.company") || can(role, "config.integrations") },
+};
+
+const seesService = (role: Parameters<typeof can>[0], code: string | null) =>
+  role !== "ALMACEN" && (can(role, "equi.view", code) || can(role, "mot.view", code));
+
+const GROUPS: Array<{ title: string | null; links: NavLink[] }> = [
+  { title: null, links: [{ href: "/inicio", label: "Inicio", show: () => true }] },
+  {
+    title: "Comercial",
+    links: [
+      { href: "/clientes", label: "Clientes", show: (role, code) => can(role, "client.create", code) || can(role, "client.edit", code) },
+      { href: "/prospectos", label: "Prospectos", show: (role, code) => can(role, "prospect.operate", code) },
+      { href: "/cotizaciones", label: "Cotizaciones", show: (role, code) => can(role, "quote.create", code) || can(role, "quote.price", code) },
+      { href: "/ventas", label: "Ventas", show: (role, code) => can(role, "agenda.use", code) || can(role, "quote.follow", code) },
+      { href: "/agenda", label: "Agenda", show: (role, code) => can(role, "agenda.use", code) },
+    ],
+  },
+  {
+    title: "Servicios",
+    links: [
+      { href: "/servicios/diagnostico", label: "Diagnóstico", show: seesService },
+      { href: "/servicios/reparacion", label: "Reparación", show: seesService },
+      { href: "/servicios/garantia", label: "Diagnóstico de Garantía", show: seesService },
+      { href: "/operacion", label: "En proceso", show: seesService },
+    ],
+  },
+  {
+    title: "Taller",
+    links: [
+      { href: "/equipos", label: "Equipos", show: (role, code) => can(role, "equi.view", code) },
+      { href: "/motores", label: "Motores", show: (role, code) => can(role, "mot.view", code) },
+      { href: "/custodia", label: (code) => (code === "SERVOMOTORES" ? "Custodia" : "Almacén"), show: (role, code) => can(role, "custody.confirm", code) },
+      { href: "/inventario", label: "Inventario", show: (role, code) => can(role, "inventory.operate", code) },
+    ],
+  },
+  {
+    title: "Administración",
+    links: [
+      { href: "/proveedores", label: "Proveedores", show: (role, code) => can(role, "supplier.operate", code) },
+      { href: "/usuarios", label: "Usuarios", show: (role) => can(role, "user.manage") },
+      { href: "/configuracion", label: "Configuración", show: (role) => can(role, "config.company") || can(role, "config.integrations") },
+    ],
+  },
 ];
 
 export default async function ErpLayout({ children }: { children: React.ReactNode }) {
@@ -46,21 +74,27 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
     : [];
 
   return (
-    <div className="min-h-screen md:grid md:grid-cols-[220px_1fr]">
+    <div className="min-h-screen md:grid md:grid-cols-[240px_1fr]">
       <aside className="border-b border-[var(--line)] bg-white md:border-b-0 md:border-r">
         <div className="px-4 py-4">
           <p className="text-xs font-semibold tracking-wide text-[var(--muted)]">SYGOS 3.0</p>
           <p className="mt-1 text-sm font-medium">{session.name}</p>
           <p className="text-xs text-[var(--muted)]">{ROLE_LABEL[session.role]}</p>
         </div>
-        <nav className="flex gap-1 overflow-x-auto px-2 pb-3 md:block md:px-2">
-          {LINKS.filter((link) => link.show(session.role, session.activeCompanyCode)).map((link) => (
-            <Link key={link.href} href={link.href} className="block whitespace-nowrap rounded-md px-3 py-2 text-sm hover:bg-[#f3f5f6]">
-              {typeof link.label === "function" ? link.label(session.activeCompanyCode) : link.label}
-            </Link>
-          ))}
-          <Link href="/cuenta" className="block whitespace-nowrap rounded-md px-3 py-2 text-sm hover:bg-[#f3f5f6]">Cuenta</Link>
-        </nav>
+        <SideNav
+          groups={[
+            ...GROUPS.map((group) => ({
+              title: group.title,
+              links: group.links
+                .filter((link) => link.show(session.role, session.activeCompanyCode))
+                .map((link) => ({
+                  href: link.href,
+                  label: typeof link.label === "function" ? link.label(session.activeCompanyCode) : link.label,
+                })),
+            })).filter((group) => group.links.length > 0),
+            { title: null, links: [{ href: "/cuenta", label: "Cuenta" }] },
+          ]}
+        />
       </aside>
       <div>
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--line)] bg-white px-4 py-3">
