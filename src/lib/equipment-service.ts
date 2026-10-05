@@ -272,8 +272,8 @@ export async function startService(
   let equipmentId = input.equipmentId;
   let version = 1;
   if (!equipmentId) {
-    if (!clientId) throw new Error("Selecciona el cliente.");
-    if (!input.model) throw new Error("El modelo es obligatorio.");
+    if (!clientId) throw new Error("Elige un cliente o abre el alta rápida e indica su nombre y un contacto.");
+    if (!input.model) throw new Error("Elige un equipo existente o escribe el modelo en el alta rápida de equipo.");
     if (input.attentionType === "DIAGNOSTICO_GARANTIA") {
       throw new Error("La garantía se abre sobre un equipo que ya tuvo una reparación pagada.");
     }

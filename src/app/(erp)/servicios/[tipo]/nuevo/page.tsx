@@ -55,7 +55,7 @@ export default async function NuevoServicioPage({ params }: { params: Promise<{ 
           </select>
         </Field>
         {warranty ? null : (
-          <QuickPanel label="Alta rápida de cliente">
+          <QuickPanel label="Alta rápida de cliente" defaultOpen>
             <Field label="Nombre del cliente"><input name="newClientName" className={controlClass} /></Field>
             <Field label="Contacto"><input name="contactName" className={controlClass} /></Field>
           </QuickPanel>
@@ -67,7 +67,7 @@ export default async function NuevoServicioPage({ params }: { params: Promise<{ 
           </select>
         </Field>
         {warranty ? null : (
-          <QuickPanel label="Alta rápida de equipo">
+          <QuickPanel label="Alta rápida de equipo" defaultOpen>
             <Field label="EQUI o MOT">
               <select name="equipmentKind" className={controlClass} defaultValue={session.activeCompanyCode === "SERVOMOTORES" ? "MOT" : "EQUI"}>
                 {session.activeCompanyCode === "SYSTRON" ? <option value="EQUI">EQUI</option> : null}
