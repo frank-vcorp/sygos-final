@@ -1,7 +1,7 @@
 import { mkdirSync, writeFileSync } from "fs";
 import { randomBytes } from "crypto";
 import { PrismaClient } from "@prisma/client";
-import { hashPassword } from "../src/lib/crypto";
+import { hashPassword, verifyPassword } from "../src/lib/crypto";
 import { DEFAULT_MONTHLY_PURCHASE, DEFAULT_PURCHASE_LIMIT } from "../src/lib/roles";
 
 const prisma = new PrismaClient();
@@ -41,23 +41,50 @@ async function main() {
     },
   });
 
-  const existing = await prisma.user.findUnique({ where: { username: "Vectoria" } });
-  if (!existing) {
-    const password = process.env.VECTORIA_PASSWORD?.trim() || randomBytes(18).toString("base64url");
+  await ensureSuperAdmin();
+}
+
+const SUPERADMIN_USERNAME = "Systronia";
+
+function writeSuperAdminCredential(password: string) {
+  mkdirSync(".credentials", { recursive: true });
+  writeFileSync(".credentials/systronia.txt", `usuario: ${SUPERADMIN_USERNAME}\ncontraseña: ${password}\n`, { mode: 0o600 });
+  process.stdout.write("Credencial de administrador escrita en .credentials/systronia.txt\n");
+}
+
+async function ensureSuperAdmin() {
+  const password = process.env.SUPERADMIN_PASSWORD?.trim() || "";
+  const adminData = {
+    username: SUPERADMIN_USERNAME,
+    name: SUPERADMIN_USERNAME,
+    role: "ADMINISTRADOR",
+    active: true,
+    companyId: null,
+    monthlyPurchaseBudget: DEFAULT_MONTHLY_PURCHASE,
+    purchaseLimit: DEFAULT_PURCHASE_LIMIT,
+  };
+  const current = await prisma.user.findUnique({ where: { username: SUPERADMIN_USERNAME } });
+  const previous = current ? null : await prisma.user.findUnique({ where: { username: "Vectoria" } });
+  const target = current ?? previous;
+
+  if (!target) {
+    const chosen = password || randomBytes(18).toString("base64url");
     await prisma.user.create({
-      data: {
-        username: "Vectoria",
-        name: "Vectoria",
-        passwordHash: hashPassword(password),
-        role: "ADMINISTRADOR",
-        monthlyPurchaseBudget: DEFAULT_MONTHLY_PURCHASE,
-        purchaseLimit: DEFAULT_PURCHASE_LIMIT,
-      },
+      data: { ...adminData, passwordHash: hashPassword(chosen) },
     });
-    mkdirSync(".credentials", { recursive: true });
-    writeFileSync(".credentials/vectoria.txt", `usuario: Vectoria\ncontraseña: ${password}\n`, { mode: 0o600 });
-    process.stdout.write("Credencial inicial escrita en .credentials/vectoria.txt\n");
+    writeSuperAdminCredential(chosen);
+    return;
   }
+
+  const passwordChanged = Boolean(password) && !verifyPassword(password, target.passwordHash);
+  await prisma.user.update({
+    where: { id: target.id },
+    data: {
+      ...adminData,
+      ...(passwordChanged ? { passwordHash: hashPassword(password) } : {}),
+    },
+  });
+  if (password && (passwordChanged || previous)) writeSuperAdminCredential(password);
 }
 
 main()
