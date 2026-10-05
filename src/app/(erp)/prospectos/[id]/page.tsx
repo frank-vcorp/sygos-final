@@ -1,0 +1,141 @@
+import { notFound, redirect } from "next/navigation";
+import {
+  addProspectActivityAction,
+  convertProspectAction,
+  discardProspectAction,
+  reactivateProspectAction,
+  updateProspectAction,
+} from "../actions";
+import { Badge, Button, controlClass, Field, PageHeader } from "@/components/ui";
+import { prisma } from "@/lib/db";
+import { formatWhen } from "@/lib/form";
+import { historyFor } from "@/lib/history";
+import { can } from "@/lib/permissions";
+import { requireCompany } from "@/lib/session";
+
+const LABEL: Record<string, string> = {
+  NUEVO: "Nuevo",
+  EN_SEGUIMIENTO: "En seguimiento",
+  CONVERTIDO: "Convertido",
+  DESCARTADO: "Descartado",
+};
+
+export default async function ProspectoDetallePage({ params }: { params: Promise<{ id: string }> }) {
+  const session = await requireCompany();
+  if (!can(session.role, "prospect.operate", session.activeCompanyCode)) redirect("/inicio");
+  const { id } = await params;
+  const prospect = await prisma.prospect.findFirst({
+    where: { id, companyId: session.activeCompanyId },
+    include: { activities: { orderBy: { createdAt: "desc" } }, client: true },
+  });
+  if (!prospect) notFound();
+  if (session.role === "VENTAS" && prospect.ownerUserId !== session.userId) notFound();
+  const open = prospect.status === "NUEVO" || prospect.status === "EN_SEGUIMIENTO";
+  const clients = open
+    ? await prisma.client.findMany({
+        where: { companyId: session.activeCompanyId, active: true, isSystem: false },
+        orderBy: { name: "asc" },
+        take: 200,
+      })
+    : [];
+  const history = await historyFor("PROSPECTO", prospect.id);
+  const authors = await prisma.user.findMany({
+    where: { id: { in: prospect.activities.map((activity) => activity.authorUserId) } },
+    select: { id: true, name: true },
+  });
+  const authorName = new Map(authors.map((author) => [author.id, author.name]));
+
+  return (
+    <>
+      <PageHeader title={prospect.name} action={<Badge>{LABEL[prospect.status] ?? prospect.status}</Badge>} />
+      {open ? (
+        <form action={updateProspectAction} className="mb-4 grid max-w-xl gap-3 rounded-lg border border-[var(--line)] bg-white p-4">
+          <input type="hidden" name="id" value={prospect.id} />
+          <input type="hidden" name="version" value={prospect.version} />
+          <Field label="Empresa o nombre"><input name="name" defaultValue={prospect.name} className={controlClass} /></Field>
+          <Field label="Fuente"><input name="source" defaultValue={prospect.source ?? ""} className={controlClass} /></Field>
+          <Field label="Nota"><textarea name="note" defaultValue={prospect.note ?? ""} rows={3} className={controlClass} /></Field>
+          <Button type="submit" tone="ghost">Guardar datos</Button>
+        </form>
+      ) : (
+        <p className="mb-4 text-sm text-[var(--muted)]">{prospect.note}</p>
+      )}
+
+      {prospect.client ? (
+        <p className="mb-4 text-sm">Cliente resultante: <a className="font-medium text-[var(--accent)]" href={`/clientes/${prospect.client.id}`}>{prospect.client.name}</a></p>
+      ) : null}
+
+      <section className="rounded-lg border border-[var(--line)] bg-white p-4">
+        <h2 className="font-medium">Seguimiento</h2>
+        <p className="mt-1 text-xs text-[var(--muted)]">La fecha siguiente es informativa. No genera recordatorios.</p>
+        <ul className="mt-3 space-y-2 text-sm">
+          {prospect.activities.length === 0 ? <li className="text-[var(--muted)]">Sin actividades.</li> : prospect.activities.map((activity) => (
+            <li key={activity.id}>
+              <span className="text-[var(--muted)]">{formatWhen(activity.createdAt)} · {authorName.get(activity.authorUserId) ?? "Usuario"}</span>
+              <p>{activity.note}</p>
+              {activity.nextFollowUp ? <p className="text-[var(--muted)]">Siguiente: {formatWhen(activity.nextFollowUp)}</p> : null}
+            </li>
+          ))}
+        </ul>
+        {open ? (
+          <form action={addProspectActivityAction} className="mt-4 grid gap-3">
+            <input type="hidden" name="id" value={prospect.id} />
+            <Field label="Nota"><textarea name="note" required rows={2} className={controlClass} /></Field>
+            <Field label="Siguiente seguimiento"><input type="date" name="nextFollowUp" className={controlClass} /></Field>
+            <Button type="submit">Registrar actividad</Button>
+          </form>
+        ) : null}
+      </section>
+
+      {open ? (
+        <div className="mt-4 grid gap-4 lg:grid-cols-2">
+          <form action={convertProspectAction} className="space-y-3 rounded-lg border border-[var(--line)] bg-white p-4">
+            <input type="hidden" name="id" value={prospect.id} />
+            <input type="hidden" name="version" value={prospect.version} />
+            <h2 className="font-medium">Convertir</h2>
+            <Field label="Destino">
+              <select name="mode" className={controlClass} defaultValue="nuevo">
+                <option value="nuevo">Crear cliente nuevo</option>
+                <option value="existente">Usar cliente existente</option>
+              </select>
+            </Field>
+            <Field label="Cliente existente">
+              <select name="clientId" className={controlClass} defaultValue="">
+                <option value="">—</option>
+                {clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}
+              </select>
+            </Field>
+            <Button type="submit">Convertir a cliente</Button>
+          </form>
+          <form action={discardProspectAction} className="space-y-3 rounded-lg border border-[var(--line)] bg-white p-4">
+            <input type="hidden" name="id" value={prospect.id} />
+            <input type="hidden" name="version" value={prospect.version} />
+            <h2 className="font-medium">Descartar</h2>
+            <Field label="Motivo"><input name="reason" className={controlClass} /></Field>
+            <Button type="submit" tone="danger">Descartar</Button>
+          </form>
+        </div>
+      ) : null}
+
+      {prospect.status === "DESCARTADO" && (session.role === "CEO" || session.role === "ADMINISTRADOR") ? (
+        <form action={reactivateProspectAction} className="mt-4 rounded-lg border border-[var(--line)] bg-white p-4">
+          <input type="hidden" name="id" value={prospect.id} />
+          <input type="hidden" name="version" value={prospect.version} />
+          <Button type="submit" tone="ghost">Reactivar a En seguimiento</Button>
+        </form>
+      ) : null}
+
+      <section className="mt-6">
+        <h2 className="mb-2 font-medium">Historial</h2>
+        <ul className="space-y-2 text-sm">
+          {history.map((item) => (
+            <li key={item.id} className="rounded-md border border-[var(--line)] bg-white px-3 py-2">
+              <span className="text-[var(--muted)]">{formatWhen(item.createdAt)} · {item.author?.name ?? "Sistema"}</span>
+              <p>{item.summary}</p>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </>
+  );
+}
