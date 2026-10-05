@@ -19,6 +19,9 @@ export type AppSession = {
   activeCompanyId: string | null;
   activeCompanyCode: string | null;
   activeCompanyName: string | null;
+  realUserId: string;
+  realRole: Role;
+  impersonating: boolean;
 };
 
 export async function startSession(username: string, password: string): Promise<AppSession | null> {
@@ -57,10 +60,19 @@ export async function getSession(): Promise<AppSession | null> {
 async function loadSession(token: string): Promise<AppSession | null> {
   const row = await prisma.session.findUnique({
     where: { tokenHash: hashToken(token) },
-    include: { user: { include: { company: true } } },
+    include: {
+      user: { include: { company: true } },
+      impersonatedUser: { include: { company: true } },
+    },
   });
   if (!row || row.expiresAt.getTime() < Date.now() || !row.user.active) return null;
   if (!isRole(row.user.role)) return null;
+
+  const impersonated = row.user.role === "ADMINISTRADOR" && row.impersonatedUser?.active && isRole(row.impersonatedUser.role) && row.impersonatedUser.role !== "ADMINISTRADOR"
+    ? row.impersonatedUser
+    : null;
+  const actor = impersonated ?? row.user;
+  if (!isRole(actor.role)) return null;
 
   let activeCompanyCode: string | null = null;
   let activeCompanyName: string | null = null;
@@ -72,15 +84,18 @@ async function loadSession(token: string): Promise<AppSession | null> {
 
   return {
     sessionId: row.id,
-    userId: row.user.id,
-    username: row.user.username,
-    name: row.user.name,
-    role: row.user.role,
-    homeCompanyId: row.user.companyId,
-    homeCompanyCode: row.user.company?.code ?? null,
+    userId: actor.id,
+    username: actor.username,
+    name: actor.name,
+    role: actor.role,
+    homeCompanyId: actor.companyId,
+    homeCompanyCode: actor.company?.code ?? null,
     activeCompanyId: row.activeCompanyId,
     activeCompanyCode,
     activeCompanyName,
+    realUserId: row.user.id,
+    realRole: row.user.role,
+    impersonating: Boolean(impersonated),
   };
 }
 

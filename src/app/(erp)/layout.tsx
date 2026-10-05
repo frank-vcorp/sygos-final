@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { logoutAction, switchCompanyAction } from "@/app/auth-actions";
+import { logoutAction, switchCompanyAction, viewAsAction } from "@/app/auth-actions";
 import { FlashBanner } from "@/components/flash-banner";
 import { prisma } from "@/lib/db";
 import { takeFlash } from "@/lib/flash";
 import { can } from "@/lib/permissions";
-import { ROLE_LABEL } from "@/lib/roles";
+import { ROLE_LABEL, isRole } from "@/lib/roles";
 import { getSession } from "@/lib/session";
 
 const LINKS: Array<{
@@ -34,6 +34,13 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
     ? await prisma.company.findMany({ where: { id: session.homeCompanyId } })
     : await prisma.company.findMany({ orderBy: { name: "asc" } });
   const business = can(session.role, "nav.business");
+  const viewAsUsers = session.realRole === "ADMINISTRADOR"
+    ? await prisma.user.findMany({
+        where: { active: true, role: { not: "ADMINISTRADOR" } },
+        include: { company: true },
+        orderBy: [{ role: "asc" }, { name: "asc" }],
+      })
+    : [];
 
   return (
     <div className="min-h-screen md:grid md:grid-cols-[220px_1fr]">
@@ -77,6 +84,26 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
             )}
           </div>
           <div className="flex items-center gap-3">
+            {session.realRole === "ADMINISTRADOR" ? (
+              <form action={viewAsAction} className="flex items-center gap-2">
+                <label className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]" htmlFor="view-as">Ver como</label>
+                <select
+                  id="view-as"
+                  name="userId"
+                  key={session.impersonating ? session.userId : "admin"}
+                  defaultValue={session.impersonating ? session.userId : ""}
+                  className="rounded-md border border-[var(--line)] bg-white px-2 py-1 text-sm"
+                >
+                  <option value="">Administrador</option>
+                  {viewAsUsers.filter((user) => isRole(user.role)).map((user) => (
+                    <option key={user.id} value={user.id}>
+                      {user.name}{user.company ? ` · ${user.company.name}` : ""}
+                    </option>
+                  ))}
+                </select>
+                <button className="text-sm font-medium text-[var(--accent)]" type="submit">Aplicar</button>
+              </form>
+            ) : null}
             {can(session.role, "search.global") && session.activeCompanyId ? (
               <form action="/buscar" className="flex">
                 <input name="q" placeholder="Buscar en esta empresa" className="w-48 rounded-md border border-[var(--line)] px-2 py-1 text-sm md:w-64" />
@@ -88,6 +115,15 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
           </div>
         </header>
         <div className="px-4 py-6 md:px-8">
+          {session.impersonating ? (
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-[#ead9a8] bg-[var(--warn-soft)] px-3 py-2 text-sm">
+              <p>Viendo como <strong>{session.name}</strong> · {ROLE_LABEL[session.role]}. Lo que guardes queda a nombre de esta cuenta.</p>
+              <form action={viewAsAction}>
+                <input type="hidden" name="userId" value="" />
+                <button className="font-medium text-[var(--accent)]" type="submit">Volver a Administrador</button>
+              </form>
+            </div>
+          ) : null}
           {!business ? (
             <p className="mb-4 rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm">
               Esta cuenta no opera módulos de negocio.

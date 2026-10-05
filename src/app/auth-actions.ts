@@ -3,6 +3,8 @@ import { prisma } from "@/lib/db";
 import { setFlash } from "@/lib/flash";
 import { optionalText, requiredText } from "@/lib/form";
 import { verifyPassword } from "@/lib/crypto";
+import { needsExplicitCompany } from "@/lib/permissions";
+import { isRole } from "@/lib/roles";
 import { endSession, requireSession, setActiveCompany, startSession } from "@/lib/session";
 
 export async function loginAction(formData: FormData) {
@@ -50,9 +52,43 @@ export async function switchCompanyAction(formData: FormData) {
   redirect(next.startsWith("/") ? next : "/inicio");
 }
 
+export async function viewAsAction(formData: FormData) {
+  "use server";
+  const session = await requireSession();
+  if (session.realRole !== "ADMINISTRADOR") {
+    await setFlash({ tone: "error", message: "Solo el Administrador puede ver como otro perfil." });
+    redirect("/inicio");
+  }
+  const userId = optionalText(formData.get("userId"));
+  if (!userId) {
+    await prisma.session.update({
+      where: { id: session.sessionId },
+      data: { impersonatedUserId: null },
+    });
+    redirect("/inicio");
+  }
+  const target = await prisma.user.findUnique({ where: { id: userId } });
+  if (!target || !target.active || !isRole(target.role) || target.role === "ADMINISTRADOR") {
+    await setFlash({ tone: "error", message: "Esa cuenta no se puede usar para ver el sistema." });
+    redirect("/inicio");
+  }
+  await prisma.session.update({
+    where: { id: session.sessionId },
+    data: {
+      impersonatedUserId: target.id,
+      activeCompanyId: needsExplicitCompany(target.role) ? null : target.companyId,
+    },
+  });
+  redirect(needsExplicitCompany(target.role) ? "/empresa" : "/inicio");
+}
+
 export async function changeOwnPasswordAction(formData: FormData) {
   "use server";
   const session = await requireSession();
+  if (session.impersonating) {
+    await setFlash({ tone: "error", message: "Vuelve al Administrador antes de cambiar una contraseña." });
+    redirect("/cuenta");
+  }
   const current = requiredText(formData.get("current"), "Contraseña actual");
   const next = requiredText(formData.get("next"), "Contraseña nueva");
   if (next.length < 10) throw new Error("La contraseña nueva debe tener al menos 10 caracteres.");
