@@ -54,7 +54,7 @@ export default async function CobranzaPage() {
             <tbody>
               {payables.map((row) => (
                 <tr key={row.id}>
-                  <Td>{row.document.folio}</Td>
+                  <Td>{row.document?.folio ?? "Compra"}</Td>
                   <Td>{money(row.balance)}</Td>
                   <Td><Badge>{row.status === "SALDADA" ? "Saldada" : row.status === "PARCIAL" ? "Parcial" : "Abierta"}</Badge></Td>
                 </tr>

@@ -1,5 +1,6 @@
 import { prisma } from "./db";
 import { allocateFolio } from "./folios";
+import { recordCompanyCash } from "./purchases";
 import { ConcurrencyError } from "./form";
 import { recordHistory } from "./history";
 import { linesForTotal, quoteTotals, roundMoney } from "./money";
@@ -298,7 +299,10 @@ export async function registerClientPayment(
       applications: { create: [{ receivableId: receivable.id, amount: roundMoney(input.amount), confirmedAt: immediate ? new Date() : null }] },
     },
   });
-  if (immediate) await applyReceivable(receivable.id, roundMoney(input.amount));
+  if (immediate) {
+    await applyReceivable(receivable.id, roundMoney(input.amount));
+    await recordCompanyCash(actor.activeCompanyId, "INGRESO", roundMoney(input.amount), input.method, folio, payment.id);
+  }
   await recordHistory({
     companyId: actor.activeCompanyId,
     entityType: "PAGO",
@@ -329,6 +333,7 @@ export async function validatePayment(actor: Actor, paymentId: string) {
   });
   if (!payment) throw new Error("Ese pago no está pendiente en esta empresa.");
   await prisma.payment.update({ where: { id: payment.id }, data: { status: "VALIDADO" } });
+  await recordCompanyCash(payment.companyId, "INGRESO", payment.amount, payment.method, payment.folio, payment.id);
   for (const application of payment.applications) {
     if (application.receivableId) await applyReceivable(application.receivableId, application.amount);
     await prisma.paymentApplication.update({ where: { id: application.id }, data: { confirmedAt: new Date() } });
@@ -395,7 +400,7 @@ export async function confirmIntercompanyPayment(actor: Actor, paymentId: string
         where: { id: application.payable.id },
         data: { balance, status: balanceStatus(balance, application.payable.amount) },
       });
-      const receivable = application.payable.document.receivable;
+      const receivable = application.payable.document?.receivable;
       if (receivable) {
         const next = roundMoney(receivable.balance - application.amount);
         await tx.receivable.update({
@@ -406,6 +411,9 @@ export async function confirmIntercompanyPayment(actor: Actor, paymentId: string
       await tx.paymentApplication.update({ where: { id: application.id }, data: { confirmedAt: new Date() } });
     }
   });
+  await recordCompanyCash(payment.companyId, "EGRESO", payment.amount, payment.method, payment.folio, payment.id);
+  const servomotores = await prisma.company.findUnique({ where: { code: "SERVOMOTORES" } });
+  if (servomotores) await recordCompanyCash(servomotores.id, "INGRESO", payment.amount, payment.method, payment.folio, `${payment.id}-sm`);
   await recordHistory({
     companyId: actor.activeCompanyId,
     entityType: "PAGO",

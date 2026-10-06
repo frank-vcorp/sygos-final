@@ -43,6 +43,20 @@ async function main() {
     },
   });
 
+  for (const companyId of [systron.id, servomotores.id]) {
+    for (const account of [
+      { suffix: "caja", name: "Caja", kind: "EFECTIVO" },
+      { suffix: "banco", name: "Banco", kind: "BANCO" },
+      { suffix: "tarjeta", name: "Tarjeta", kind: "TARJETA" },
+    ]) {
+      await prisma.financeAccount.upsert({
+        where: { companyId_name: { companyId, name: account.name } },
+        update: {},
+        create: { id: `account-${account.suffix}-${companyId}`, companyId, name: account.name, kind: account.kind, balance: account.kind === "BANCO" ? 50000 : 0 },
+      });
+    }
+  }
+
   await ensureSuperAdmin();
   await ensureVerificationUsers(systron.id, servomotores.id);
   await seedPriorities(systron.id, "SYSTRON");

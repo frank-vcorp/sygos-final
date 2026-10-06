@@ -30,7 +30,11 @@ export type Action =
   | "invoice.issue"
   | "payment.register"
   | "payment.validate"
-  | "receivable.view";
+  | "receivable.view"
+  | "purchase.operate"
+  | "purchase.authorize"
+  | "finance.view"
+  | "finance.manage";
 
 export function can(role: Role, action: Action, companyCode?: string | null): boolean {
   const admin = role === "ADMINISTRADOR";
@@ -124,6 +128,15 @@ export function can(role: Role, action: Action, companyCode?: string | null): bo
       return admin || ceo || coord;
     case "receivable.view":
       return admin || ceo || coord || sales || gerenteSm;
+    case "purchase.operate":
+      if (admin || ceo || coord) return true;
+      if (companyCode === "SYSTRON") return gerenteSy;
+      return companyCode === "SERVOMOTORES" && gerenteSm;
+    case "purchase.authorize":
+      return admin || ceo;
+    case "finance.view":
+    case "finance.manage":
+      return admin || ceo || coord;
     default:
       return false;
   }

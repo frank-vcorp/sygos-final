@@ -49,6 +49,9 @@ model Company {
   receivables      Receivable[]
   payables         Payable[]
   payments         Payment[]
+  financeAccounts  FinanceAccount[]
+  financeMovements FinanceMovement[]
+  purchases        Purchase[]
 }
 
 model User {
@@ -183,6 +186,7 @@ model Supplier {
   version       Int      @default(1)
 
   payables Payable[]
+  purchases Purchase[]
 
   @@index([companyId, name])
 }
@@ -676,8 +680,9 @@ model Payable {
   company          Company         @relation(fields: [companyId], references: [id])
   supplierId       String
   supplier         Supplier        @relation(fields: [supplierId], references: [id])
-  documentId       String          @unique
-  document         BillingDocument @relation(fields: [documentId], references: [id])
+  documentId       String?         @unique
+  document         BillingDocument? @relation(fields: [documentId], references: [id])
+  purchaseId       String?         @unique
   equipmentId      String?
   amount           Float
   balance          Float
@@ -733,6 +738,68 @@ model CollectionNote {
   followUpAt    DateTime?
   authorUserId  String
   createdAt     DateTime   @default(now())
+}
+
+model FinanceAccount {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id])
+  name      String
+  kind      String
+  balance   Float    @default(0)
+  active    Boolean  @default(true)
+
+  movements FinanceMovement[]
+
+  @@unique([companyId, name])
+}
+
+model FinanceMovement {
+  id            String         @id @default(cuid())
+  companyId     String
+  company       Company        @relation(fields: [companyId], references: [id])
+  accountId     String
+  account       FinanceAccount @relation(fields: [accountId], references: [id])
+  direction     String
+  amount        Float
+  category      String
+  originType    String?
+  originId      String?
+  note          String?
+  pendingProof  Boolean        @default(false)
+  proofNote     String?
+  createdAt     DateTime       @default(now())
+
+  @@index([companyId, createdAt])
+}
+
+model Purchase {
+  id               String    @id @default(cuid())
+  folio            String
+  companyId        String
+  company          Company   @relation(fields: [companyId], references: [id])
+  kind             String
+  status           String
+  supplierId       String?
+  supplier         Supplier? @relation(fields: [supplierId], references: [id])
+  concept          String
+  quantity         Int       @default(1)
+  amount           Float
+  authorizedAmount Float?
+  destination      String
+  destinationRef   String?
+  settlement       String?
+  requesterUserId  String
+  accountId        String?
+  payableId        String?
+  movementId       String?
+  cancelReason     String?
+  version          Int       @default(1)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@unique([companyId, folio])
+  @@index([companyId, status])
 }
 
 model FunctionalHistory {

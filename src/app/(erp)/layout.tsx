@@ -32,6 +32,8 @@ const GROUPS: Array<{ title: string | null; links: NavLink[] }> = [
       { href: "/facturacion", label: "Facturación", show: (role, code) => can(role, "invoice.request", code) || can(role, "invoice.issue", code), createHref: "/facturacion/nuevo", showCreate: (role, code) => can(role, "invoice.issue", code) },
       { href: "/cobranza", label: "Cobranza", show: (role, code) => can(role, "receivable.view", code) },
       { href: "/pagos", label: "Pagos", show: (role, code) => can(role, "payment.register", code) || can(role, "payment.validate", code), createHref: "/pagos/nuevo", showCreate: (role, code) => can(role, "payment.register", code) },
+      { href: "/compras", label: "Compras", show: (role, code) => can(role, "purchase.operate", code), createHref: "/compras/nueva", showCreate: (role, code) => can(role, "purchase.operate", code) },
+      { href: "/finanzas", label: "Finanzas", show: (role, code) => can(role, "finance.view", code) },
     ],
   },
   {

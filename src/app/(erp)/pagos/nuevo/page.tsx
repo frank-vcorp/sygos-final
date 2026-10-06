@@ -44,7 +44,7 @@ export default async function NuevoPagoPage() {
           <p className="text-sm text-[var(--muted)]">Sale de una cuenta de SYSTRON. Servomotores confirma la entrada. Puede ser parcial.</p>
           <Field label="Cuenta por pagar">
             <select name="payableId" required className={controlClass}>
-              {payables.map((row) => <option key={row.id} value={row.id}>{row.document.folio} · saldo {money(row.balance)}</option>)}
+              {payables.map((row) => <option key={row.id} value={row.id}>{row.document?.folio ?? "Compra"} · saldo {money(row.balance)}</option>)}
             </select>
           </Field>
           <Field label="Importe"><input name="amount" required type="number" min="0.01" step="0.01" className={controlClass} /></Field>
