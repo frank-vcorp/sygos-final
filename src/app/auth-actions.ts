@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/db";
+import { prismaProd } from "@/lib/db";
 import { setFlash } from "@/lib/flash";
 import { optionalText, requiredText } from "@/lib/form";
 import { verifyPassword } from "@/lib/crypto";
@@ -38,7 +38,7 @@ export async function switchCompanyAction(formData: FormData) {
     await setFlash({ tone: "error", message: "Selecciona una empresa." });
     redirect("/empresa");
   }
-  const company = await prisma.company.findUnique({ where: { id: companyId } });
+  const company = await prismaProd.company.findUnique({ where: { id: companyId } });
   if (!company) {
     await setFlash({ tone: "error", message: "La empresa no existe." });
     redirect("/empresa");
@@ -61,18 +61,18 @@ export async function viewAsAction(formData: FormData) {
   }
   const userId = optionalText(formData.get("userId"));
   if (!userId) {
-    await prisma.session.update({
+    await prismaProd.session.update({
       where: { id: session.sessionId },
       data: { impersonatedUserId: null },
     });
     redirect("/inicio");
   }
-  const target = await prisma.user.findUnique({ where: { id: userId } });
+  const target = await prismaProd.user.findUnique({ where: { id: userId } });
   if (!target || !target.active || !isRole(target.role) || target.role === "ADMINISTRADOR") {
     await setFlash({ tone: "error", message: "Esa cuenta no se puede usar para ver el sistema." });
     redirect("/inicio");
   }
-  await prisma.session.update({
+  await prismaProd.session.update({
     where: { id: session.sessionId },
     data: {
       impersonatedUserId: target.id,
@@ -92,13 +92,13 @@ export async function changeOwnPasswordAction(formData: FormData) {
   const current = requiredText(formData.get("current"), "Contraseña actual");
   const next = requiredText(formData.get("next"), "Contraseña nueva");
   if (next.length < 10) throw new Error("La contraseña nueva debe tener al menos 10 caracteres.");
-  const user = await prisma.user.findUnique({ where: { id: session.userId } });
+  const user = await prismaProd.user.findUnique({ where: { id: session.userId } });
   if (!user || !verifyPassword(current, user.passwordHash)) {
     await setFlash({ tone: "error", message: "La contraseña actual no coincide." });
     redirect("/cuenta");
   }
   const { hashPassword } = await import("@/lib/crypto");
-  await prisma.user.update({ where: { id: user.id }, data: { passwordHash: hashPassword(next) } });
+  await prismaProd.user.update({ where: { id: user.id }, data: { passwordHash: hashPassword(next) } });
   await setFlash({ tone: "ok", message: "Contraseña actualizada." });
   redirect("/cuenta");
 }

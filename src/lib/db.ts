@@ -1,12 +1,12 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { PrismaClient } from "@prisma/client";
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from "fs";
-import { resolve } from "path";
-import { cache } from "react";
 import { cookies } from "next/headers";
+import { resolve } from "path";
 import { hashToken } from "./crypto";
 import { SESSION_COOKIE } from "./session-cookie";
 
-export const requestFlags = cache(() => ({ sandbox: false }));
+const sandboxContext = new AsyncLocalStorage<boolean>();
 
 const globalForPrisma = globalThis as unknown as { prismaProd?: PrismaClient; prismaTest?: PrismaClient | null };
 
@@ -40,7 +40,36 @@ export function isParticipant(meta: SandboxMeta, userId: string, role: string) {
 }
 
 export function sandboxFor(userId: string, role: string) {
-  return isParticipant(readSandbox(), userId, role);
+  return isParticipant(readSandbox(), userId, role) && existsSync(sandboxDatabasePath());
+}
+
+export function bindSandbox(active: boolean) {
+  sandboxContext.enterWith(active);
+}
+
+export function sandboxBound() {
+  return sandboxContext.getStore() === true;
+}
+
+export async function inSandbox() {
+  if (sandboxBound()) return true;
+  try {
+    const token = (await cookies()).get(SESSION_COOKIE)?.value;
+    if (!token) return false;
+    const row = await prismaProd.session.findUnique({
+      where: { tokenHash: hashToken(token) },
+      include: { user: true, impersonatedUser: true },
+    });
+    if (!row || row.expiresAt.getTime() < Date.now() || !row.user.active) return false;
+    const impersonated =
+      row.user.role === "ADMINISTRADOR" && row.impersonatedUser?.active && row.impersonatedUser.role !== "ADMINISTRADOR"
+        ? row.impersonatedUser
+        : null;
+    const actor = impersonated ?? row.user;
+    return sandboxFor(actor.id, actor.role);
+  } catch {
+    return false;
+  }
 }
 
 export const prismaProd =
@@ -52,39 +81,11 @@ export const prismaProd =
 if (process.env.NODE_ENV !== "production") globalForPrisma.prismaProd = prismaProd;
 
 function testClient() {
+  if (!existsSync(sandboxDatabasePath())) throw new Error("La copia de pruebas no está disponible.");
   if (!globalForPrisma.prismaTest) {
     globalForPrisma.prismaTest = new PrismaClient({ datasourceUrl: `file:${sandboxDatabasePath()}` });
   }
   return globalForPrisma.prismaTest;
-}
-
-const cacheHits = new Map<string, { at: number; yes: boolean }>();
-
-export async function inSandbox() {
-  try {
-    if (requestFlags().sandbox) return true;
-  } catch {
-    return false;
-  }
-  const meta = readSandbox();
-  if (!meta.active) return false;
-  try {
-    const token = (await cookies()).get(SESSION_COOKIE)?.value;
-    if (!token) return false;
-    const tokenHash = hashToken(token);
-    const hit = cacheHits.get(tokenHash);
-    if (hit && Date.now() - hit.at < 3000) return hit.yes;
-    const row = await prismaProd.session.findUnique({
-      where: { tokenHash },
-      include: { user: true, impersonatedUser: true },
-    });
-    const actor = row?.user.role === "ADMINISTRADOR" && row.impersonatedUser?.active ? row.impersonatedUser : row?.user;
-    const yes = Boolean(actor && sandboxFor(actor.id, actor.role));
-    cacheHits.set(tokenHash, { at: Date.now(), yes });
-    return yes;
-  } catch {
-    return false;
-  }
 }
 
 export async function activateSandbox(userIds: string[], roles: string[]) {
@@ -92,15 +93,16 @@ export async function activateSandbox(userIds: string[], roles: string[]) {
   if (current.active) throw new Error("Ya hay un modo de pruebas activo. Hay que finalizarlo antes de abrir otro.");
   if (userIds.length === 0 && roles.length === 0) throw new Error("Selecciona usuarios o roles.");
   const target = sandboxDatabasePath();
+  if (target === productionDatabasePath()) throw new Error("La copia de pruebas no puede ser la base real.");
   if (existsSync(target)) unlinkSync(target);
+  await prismaProd.$executeRawUnsafe("PRAGMA wal_checkpoint(TRUNCATE)");
   await prismaProd.$executeRawUnsafe(`VACUUM INTO '${target.replaceAll("'", "''")}'`);
+  if (!existsSync(target)) throw new Error("No se pudo crear la copia de pruebas.");
   if (globalForPrisma.prismaTest) {
     await globalForPrisma.prismaTest.$disconnect();
     globalForPrisma.prismaTest = null;
   }
-  const meta: SandboxMeta = { active: true, userIds, roles };
-  writeFileSync(metaPath(), JSON.stringify(meta));
-  cacheHits.clear();
+  writeFileSync(metaPath(), JSON.stringify({ active: true, userIds, roles } satisfies SandboxMeta));
 }
 
 export async function finishSandbox() {
@@ -111,7 +113,13 @@ export async function finishSandbox() {
   writeFileSync(metaPath(), JSON.stringify({ active: false, userIds: [], roles: [] }));
   const target = sandboxDatabasePath();
   if (existsSync(target)) unlinkSync(target);
-  cacheHits.clear();
+  bindSandbox(false);
+}
+
+const ALWAYS_PROD = new Set(["session"]);
+
+async function useTest(model: PropertyKey) {
+  return (await inSandbox()) && !ALWAYS_PROD.has(String(model));
 }
 
 function wrapDelegate(prop: PropertyKey, delegate: object) {
@@ -120,7 +128,7 @@ function wrapDelegate(prop: PropertyKey, delegate: object) {
       const fn = (target as Record<PropertyKey, unknown>)[op];
       if (typeof fn !== "function") return fn;
       return async (...args: unknown[]) => {
-        if (await inSandbox()) {
+        if (await useTest(prop)) {
           const model = (testClient() as unknown as Record<PropertyKey, Record<PropertyKey, (...a: unknown[]) => unknown>>)[prop];
           return model[op](...args);
         }
@@ -132,10 +140,10 @@ function wrapDelegate(prop: PropertyKey, delegate: object) {
 
 export const prisma = new Proxy(prismaProd, {
   get(target, prop) {
-    if (prop === "$transaction") {
+    if (prop === "$transaction" || prop === "$queryRaw" || prop === "$executeRaw" || prop === "$queryRawUnsafe" || prop === "$executeRawUnsafe") {
       return async (...args: unknown[]) => {
-        const client = (await inSandbox() ? testClient() : target) as unknown as { $transaction: (...a: unknown[]) => unknown };
-        return client.$transaction(...args);
+        const client = ((await useTest(prop)) ? testClient() : target) as unknown as Record<PropertyKey, (...a: unknown[]) => unknown>;
+        return client[prop](...args);
       };
     }
     const value = (target as unknown as Record<PropertyKey, unknown>)[prop];

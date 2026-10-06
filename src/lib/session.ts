@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { prisma, requestFlags, sandboxFor } from "./db";
+import { bindSandbox, prismaProd, sandboxFor } from "./db";
 import { hashToken, newSessionToken, verifyPassword } from "./crypto";
 import { SESSION_COOKIE } from "./session-cookie";
 import { isRole, type Role } from "./roles";
@@ -25,7 +25,7 @@ export type AppSession = {
 };
 
 export async function startSession(username: string, password: string): Promise<AppSession | null> {
-  const user = await prisma.user.findUnique({
+  const user = await prismaProd.user.findUnique({
     where: { username },
     include: { company: true },
   });
@@ -36,7 +36,7 @@ export async function startSession(username: string, password: string): Promise<
   const { token, tokenHash } = newSessionToken();
   const activeCompanyId = needsExplicitCompany(user.role) ? null : user.companyId;
   const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
-  await prisma.session.create({
+  await prismaProd.session.create({
     data: { userId: user.id, tokenHash, activeCompanyId, expiresAt },
   });
   const jar = await cookies();
@@ -58,7 +58,7 @@ export async function getSession(): Promise<AppSession | null> {
 }
 
 async function loadSession(token: string): Promise<AppSession | null> {
-  const row = await prisma.session.findUnique({
+  const row = await prismaProd.session.findUnique({
     where: { tokenHash: hashToken(token) },
     include: {
       user: { include: { company: true } },
@@ -77,12 +77,12 @@ async function loadSession(token: string): Promise<AppSession | null> {
   let activeCompanyCode: string | null = null;
   let activeCompanyName: string | null = null;
   if (row.activeCompanyId) {
-    const company = await prisma.company.findUnique({ where: { id: row.activeCompanyId } });
+    const company = await prismaProd.company.findUnique({ where: { id: row.activeCompanyId } });
     activeCompanyCode = company?.code ?? null;
     activeCompanyName = company?.name ?? null;
   }
 
-  requestFlags().sandbox = sandboxFor(actor.id, actor.role);
+  bindSandbox(sandboxFor(actor.id, actor.role));
 
   return {
     sessionId: row.id,
@@ -123,13 +123,13 @@ export async function endSession() {
   const jar = await cookies();
   const token = jar.get(SESSION_COOKIE)?.value;
   if (token) {
-    await prisma.session.deleteMany({ where: { tokenHash: hashToken(token) } });
+    await prismaProd.session.deleteMany({ where: { tokenHash: hashToken(token) } });
   }
   jar.delete(SESSION_COOKIE);
 }
 
 export async function setActiveCompany(sessionId: string, companyId: string) {
-  await prisma.session.update({
+  await prismaProd.session.update({
     where: { id: sessionId },
     data: { activeCompanyId: companyId },
   });
