@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { issueDocumentAction, retryFiscalAction } from "../actions";
+import { HistoryTimeline } from "@/components/history-timeline";
 import { Badge, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
@@ -44,7 +45,7 @@ export default async function DocumentoPage({ params }: { params: Promise<{ id: 
           </form>
         ) : null}
       </section>
-      <ul className="mt-4 space-y-2 text-sm">{history.map((item) => <li key={item.id}><span className="text-[var(--muted)]">{formatWhen(item.createdAt)}</span> · {item.summary}</li>)}</ul>
+      <HistoryTimeline className="mt-6" items={history.map((item) => ({ id: item.id, createdAt: item.createdAt, summary: item.summary, authorName: item.author?.name }))} />
     </>
   );
 }

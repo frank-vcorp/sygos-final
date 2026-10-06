@@ -8,10 +8,10 @@ import {
   updateClientAction,
 } from "../actions";
 import { ClientInvoiceFields } from "@/components/client-invoice-fields";
+import { HistoryTimeline } from "@/components/history-timeline";
 import { ConfirmSubmit, SubmitButton } from "@/components/submit-button";
 import { Badge, Button, controlClass, DetailGrid, Field, PageHeader, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
-import { formatWhen } from "@/lib/form";
 import { historyFor } from "@/lib/history";
 import { can } from "@/lib/permissions";
 import { regimenLabel } from "@/lib/sat-regimen";
@@ -197,17 +197,5 @@ export default async function ClienteDetallePage({ params }: { params: Promise<{
 
 function History({ items }: { items: Awaited<ReturnType<typeof historyFor>> }) {
   if (items.length === 0) return null;
-  return (
-    <section className="mt-6">
-      <h2 className="mb-2 font-medium">Historial</h2>
-      <ul className="space-y-2 text-sm">
-        {items.map((item) => (
-          <li key={item.id} className="rounded-md border border-[var(--line)] bg-white px-3 py-2">
-            <span className="text-[var(--muted)]">{formatWhen(item.createdAt)} · {item.author?.name ?? "Sistema"}</span>
-            <p>{item.summary}</p>
-          </li>
-        ))}
-      </ul>
-    </section>
-  );
+  return <HistoryTimeline className="mt-6" items={items.map((item) => ({ id: item.id, createdAt: item.createdAt, summary: item.summary, authorName: item.author?.name }))} />;
 }

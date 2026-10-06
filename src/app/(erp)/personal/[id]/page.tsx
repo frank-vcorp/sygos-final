@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { bajaAction, bossAction, documentAction, laborIdAction, salaryAction, scheduleAction, vacationBalanceAction, vacationDecisionAction, vacationRequestAction } from "../actions";
+import { HistoryTimeline } from "@/components/history-timeline";
 import { Badge, controlClass, Field, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { historyFor } from "@/lib/history";
@@ -130,7 +131,7 @@ export default async function ColaboradorPage({ params }: { params: Promise<{ id
           <button className="text-sm text-[var(--danger)]">Registrar baja</button>
         </form>
       ) : null}
-      <ul className="mt-4 space-y-2 text-sm">{history.map((item) => <li key={item.id}><span className="text-[var(--muted)]">{formatWhen(item.createdAt)}</span> · {item.summary}</li>)}</ul>
+      <HistoryTimeline className="mt-6" items={history.map((item) => ({ id: item.id, createdAt: item.createdAt, summary: item.summary, authorName: item.author?.name }))} />
     </>
   );
 }

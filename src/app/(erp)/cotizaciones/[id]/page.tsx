@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { requestDocumentAction, requestIntercompanyAction } from "@/app/(erp)/facturacion/actions";
 import { decideAction, discountAction, linkBaseAction, relateEquipmentAction, sendQuoteMailAction, setPricesAction } from "../actions";
+import { HistoryTimeline } from "@/components/history-timeline";
 import { ConfirmSubmit, SubmitButton } from "@/components/submit-button";
 import { Badge, controlClass, DetailGrid, Field, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
@@ -192,9 +193,7 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
               <SubmitButton tone="ghost">Ligar</SubmitButton>
             </form>
           ) : null}
-          <ul className="space-y-2 text-sm">
-            {history.map((item) => <li key={item.id}><span className="text-[var(--muted)]">{formatWhen(item.createdAt)}</span> · {item.summary}</li>)}
-          </ul>
+          <HistoryTimeline items={history.map((item) => ({ id: item.id, createdAt: item.createdAt, summary: item.summary, authorName: item.author?.name }))} />
         </div>
       </DetailGrid>
     </>

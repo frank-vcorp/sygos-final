@@ -16,6 +16,7 @@ import {
   startCaseAction,
   validateAction,
 } from "../actions";
+import { HistoryTimeline } from "@/components/history-timeline";
 import { Badge, Button, controlClass, DetailGrid, Field, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
@@ -279,20 +280,10 @@ export default async function OperacionDetallePage({ params }: { params: Promise
                 <Button type="submit">Guardar decisión</Button>
               </form>
             ) : null}
-            <section className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
-              <h2 className="font-medium">Historial</h2>
-              <ul className="mt-2 space-y-2">
-                {history.map((item) => <li key={item.id}><span className="text-[var(--muted)]">{formatWhen(item.createdAt)}</span> · {item.summary}</li>)}
-              </ul>
-            </section>
+            <HistoryTimeline items={history.map((item) => ({ id: item.id, createdAt: item.createdAt, summary: item.summary, authorName: item.author?.name }))} />
           </div>
         ) : (
-          <section className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
-            <h2 className="font-medium">Historial</h2>
-            <ul className="mt-2 space-y-2">
-              {history.map((item) => <li key={item.id}><span className="text-[var(--muted)]">{formatWhen(item.createdAt)}</span> · {item.summary}</li>)}
-            </ul>
-          </section>
+          <HistoryTimeline items={history.map((item) => ({ id: item.id, createdAt: item.createdAt, summary: item.summary, authorName: item.author?.name }))} />
         )}
       </DetailGrid>
     </>

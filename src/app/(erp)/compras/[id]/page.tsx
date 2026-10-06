@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { cancelOrderAction, changeOrderAction, decideOrderAction, discardDirectAction, editDirectAction, processPurchaseAction } from "../actions";
+import { HistoryTimeline } from "@/components/history-timeline";
 import { Badge, controlClass, Field, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { historyFor } from "@/lib/history";
-import { formatWhen } from "@/lib/form";
 import { money } from "@/lib/money";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
@@ -103,7 +103,7 @@ export default async function CompraPage({ params }: { params: Promise<{ id: str
           <button className="rounded-md border border-[var(--line)] px-3 py-2 text-sm">Cancelar</button>
         </form>
       ) : null}
-      <ul className="mt-4 space-y-2 text-sm">{history.map((item) => <li key={item.id}><span className="text-[var(--muted)]">{formatWhen(item.createdAt)}</span> · {item.summary}</li>)}</ul>
+      <HistoryTimeline className="mt-6" items={history.map((item) => ({ id: item.id, createdAt: item.createdAt, summary: item.summary, authorName: item.author?.name }))} />
     </>
   );
 }

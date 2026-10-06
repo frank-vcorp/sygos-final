@@ -1,8 +1,8 @@
 import { notFound, redirect } from "next/navigation";
 import { setUserActiveAction, updateUserAction } from "../actions";
+import { HistoryTimeline } from "@/components/history-timeline";
 import { Badge, Button, controlClass, Field, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
-import { formatWhen } from "@/lib/form";
 import { historyFor } from "@/lib/history";
 import { can, canSeeUser } from "@/lib/permissions";
 import { isPurchaseManager, isRole, ROLE_LABEL } from "@/lib/roles";
@@ -40,14 +40,7 @@ export default async function UsuarioDetallePage({ params }: { params: Promise<{
           <Button type="submit" tone={user.active ? "danger" : "ghost"}>{user.active ? "Desactivar" : "Reactivar"}</Button>
         </form>
       ) : null}
-      <ul className="mt-6 space-y-2 text-sm">
-        {history.map((item) => (
-          <li key={item.id} className="rounded-md border border-[var(--line)] bg-white px-3 py-2">
-            <span className="text-[var(--muted)]">{formatWhen(item.createdAt)} · {item.author?.name ?? "Sistema"}</span>
-            <p>{item.summary}</p>
-          </li>
-        ))}
-      </ul>
+      <HistoryTimeline className="mt-6" items={history.map((item) => ({ id: item.id, createdAt: item.createdAt, summary: item.summary, authorName: item.author?.name }))} />
     </>
   );
 }

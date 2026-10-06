@@ -7,6 +7,7 @@ import {
   updateProspectAction,
 } from "../actions";
 import { ConvertProspect } from "@/components/convert-prospect";
+import { HistoryTimeline } from "@/components/history-timeline";
 import { Badge, Button, controlClass, Field, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
@@ -106,18 +107,7 @@ export default async function ProspectoDetallePage({ params }: { params: Promise
         </form>
       ) : null}
 
-      <section className="mt-6">
-        <h2 className="mb-2 font-medium">Historial</h2>
-        <ul className="space-y-2 text-sm">
-          {history.length === 0 ? <li className="text-[var(--muted)]">Sin entradas en el historial.</li> : null}
-          {history.map((item) => (
-            <li key={item.id} className="rounded-md border border-[var(--line)] bg-white px-3 py-2">
-              <span className="text-[var(--muted)]">{formatWhen(item.createdAt)} · {item.author?.name ?? "Sistema"}</span>
-              <p>{item.summary}</p>
-            </li>
-          ))}
-        </ul>
-      </section>
+      <HistoryTimeline className="mt-6" items={history.map((item) => ({ id: item.id, createdAt: item.createdAt, summary: item.summary, authorName: item.author?.name }))} />
     </>
   );
 }

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AttentionForm, CancelMovementForm, MovementForm } from "@/components/custody-forms";
+import { HistoryTimeline } from "@/components/history-timeline";
 import { Badge, DetailGrid, PageHeader, Table, Td, Th } from "@/components/ui";
 import { CUSTODY_LABEL, MOVEMENT_LABEL, type Custody, type MovementKind } from "@/lib/custody";
 import { prisma } from "@/lib/db";
@@ -152,14 +153,7 @@ export async function EquipmentDetail({ id, expectedKind }: { id: string; expect
             />
           ) : null}
           {canAttend ? <AttentionForm equipmentId={equipment.id} kind={expectedKind} version={equipment.version} priorities={priorities} repairs={repairs} /> : null}
-          <section className="rounded-lg border border-[var(--line)] bg-white p-4">
-            <h2 className="font-medium">Historial</h2>
-            <ul className="mt-2 space-y-2 text-sm">
-              {history.map((row) => (
-                <li key={row.id}><span className="text-[var(--muted)]">{formatWhen(row.createdAt)}</span> · {row.summary}</li>
-              ))}
-            </ul>
-          </section>
+          <HistoryTimeline items={history.map((row) => ({ id: row.id, createdAt: row.createdAt, summary: row.summary, authorName: row.author?.name }))} />
         </div>
       </DetailGrid>
     </>
