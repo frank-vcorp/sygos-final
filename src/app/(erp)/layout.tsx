@@ -101,9 +101,9 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
 
   const sidebar = (
     <>
-        <div className="mb-3 border-b border-[#e1e6e3] px-5 pb-5 pt-6">
+        <div className="mb-3 border-b border-[#dce4ed] px-5 pb-5 pt-6">
           <SygosLogo />
-          <div className="mt-5 rounded-lg bg-white px-3 py-2.5 ring-1 ring-[#e1e6e3]">
+          <div className="mt-5 rounded-lg bg-white px-3 py-2.5 ring-1 ring-[#dce4ed]">
             <p className="text-sm font-semibold">{session.name}</p>
             <p className="mt-0.5 text-xs text-[var(--muted)]">{ROLE_LABEL[session.role]}</p>
           </div>

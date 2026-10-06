@@ -16,7 +16,7 @@ export function SideNav({
         const links = group.links.map((link) => {
             const active = path === link.href || (link.href !== "/inicio" && path.startsWith(`${link.href}/`));
             return (
-              <div key={link.href} className={`flex min-h-10 items-center rounded-lg transition-colors ${active ? "bg-[var(--accent)] text-white" : "text-[#35423d] hover:bg-[var(--accent-soft)]"}`}>
+              <div key={link.href} className={`flex min-h-10 items-center rounded-lg transition-colors ${active ? "bg-[var(--accent)] text-white" : "text-[#263b55] hover:bg-[var(--accent-soft)]"}`}>
                 <Link href={link.href} className="block min-w-0 flex-1 px-3 py-2 text-[14px] font-medium">
                   {link.label}
                 </Link>
@@ -31,7 +31,7 @@ export function SideNav({
         if (!group.title) return <div key={`plain-${group.links.map((link) => link.href).join("-")}`} className="space-y-1">{links}</div>;
         return (
           <details key={`${group.title}-${path}`} open={groupActive} className="group rounded-lg">
-            <summary className={`flex min-h-10 cursor-pointer list-none items-center justify-between rounded-lg px-3 text-[12px] font-bold uppercase tracking-[0.08em] ${groupActive ? "text-[var(--accent)]" : "text-[var(--muted)] hover:bg-[#f1f4f2]"}`}>
+            <summary className={`flex min-h-10 cursor-pointer list-none items-center justify-between rounded-lg px-3 text-[12px] font-bold uppercase tracking-[0.08em] ${groupActive ? "text-[var(--accent)]" : "text-[var(--muted)] hover:bg-[#edf5f8]"}`}>
               {group.title}
               <span className="text-base transition-transform group-open:rotate-90" aria-hidden>›</span>
             </summary>

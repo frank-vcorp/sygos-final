@@ -19,7 +19,7 @@ export function PageHeader({
             ← {back.label}
           </Link>
         ) : null}
-        <h1 className="text-2xl font-semibold tracking-tight text-[#14251e] md:text-[30px] md:leading-tight">{title}</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-[#0b1f3a] md:text-[30px] md:leading-tight">{title}</h1>
         {subtitle ? <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted)]">{subtitle}</p> : null}
       </div>
       {action}

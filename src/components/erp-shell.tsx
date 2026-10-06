@@ -14,9 +14,13 @@ export function ErpShell({
   children: React.ReactNode;
 }) {
   const [open, setOpen] = useState(false);
+  const [collapsed, setCollapsed] = useState(false);
   const path = usePathname();
 
   useEffect(() => setOpen(false), [path]);
+  useEffect(() => {
+    setCollapsed(window.localStorage.getItem("sygos_sidebar_collapsed") === "si");
+  }, []);
   useEffect(() => {
     if (!open) return;
     const close = (event: KeyboardEvent) => {
@@ -30,8 +34,20 @@ export function ErpShell({
     };
   }, [open]);
 
+  function toggleCollapsed() {
+    setCollapsed((current) => {
+      const next = !current;
+      window.localStorage.setItem("sygos_sidebar_collapsed", next ? "si" : "no");
+      return next;
+    });
+  }
+
   return (
-    <div data-erp-shell className="min-h-screen md:grid md:grid-cols-[280px_minmax(0,1fr)]">
+    <div
+      data-erp-shell
+      data-sidebar-collapsed={collapsed ? "true" : "false"}
+      className={`min-h-screen md:grid ${collapsed ? "md:grid-cols-[72px_minmax(0,1fr)]" : "md:grid-cols-[280px_minmax(0,1fr)]"}`}
+    >
       <div data-erp-chrome className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-[var(--line)] bg-white px-4 md:hidden print:hidden">
         <button
           type="button"
@@ -57,7 +73,7 @@ export function ErpShell({
 
       <aside
         data-erp-chrome
-        className={`fixed inset-y-0 left-0 z-50 w-[min(86vw,320px)] overflow-y-auto border-r border-[#d9e0dc] bg-[#fbfcfb] transition-transform md:sticky md:top-0 md:z-20 md:h-screen md:w-auto md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 w-[min(86vw,320px)] overflow-y-auto border-r border-[#d7e1ec] bg-[#f8fbfd] transition-[transform,width] md:sticky md:top-0 md:z-20 md:h-screen md:w-auto md:translate-x-0 ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
         aria-label="Navegación principal"
@@ -72,7 +88,18 @@ export function ErpShell({
             ×
           </button>
         </div>
-        {sidebar}
+        <div className={`hidden md:flex ${collapsed ? "justify-center px-2 py-5" : "absolute right-3 top-3 z-10"}`}>
+          <button
+            type="button"
+            onClick={toggleCollapsed}
+            className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg border border-[#d7e1ec] bg-white text-2xl font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
+            aria-label={collapsed ? "Expandir menú lateral" : "Contraer menú lateral"}
+            title={collapsed ? "Expandir menú lateral" : "Contraer menú lateral"}
+          >
+            {collapsed ? "›" : "‹"}
+          </button>
+        </div>
+        <div className={collapsed ? "md:hidden" : ""}>{sidebar}</div>
       </aside>
 
       <div className="min-w-0">

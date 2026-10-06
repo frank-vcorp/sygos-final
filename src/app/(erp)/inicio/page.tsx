@@ -89,9 +89,9 @@ export default async function InicioPage() {
 function HomeCard({ href, label, value, index }: { href?: string; label: string; value: number; index: string }) {
   const body = (
     <Card className="relative overflow-hidden p-5">
-      <span className="absolute right-4 top-3 text-xs font-bold tracking-widest text-[#c7d5ce]">{index}</span>
+      <span className="absolute right-4 top-3 text-xs font-bold tracking-widest text-[#b9dce2]">{index}</span>
       <p className="text-sm font-medium text-[var(--muted)]">{label}</p>
-      <p className="mt-3 text-4xl font-semibold tracking-tight text-[#14251e]">{value}</p>
+      <p className="mt-3 text-4xl font-semibold tracking-tight text-[#0b1f3a]">{value}</p>
       <div className="mt-4 h-1 w-10 rounded-full bg-[var(--accent)]" />
     </Card>
   );
@@ -101,7 +101,7 @@ function HomeCard({ href, label, value, index }: { href?: string; label: string;
 function QuickLink({ href, title, body }: { href: string; title: string; body: string }) {
   return (
     <Link href={href} className="group flex min-h-28 items-center justify-between gap-4 rounded-lg border border-[var(--line)] bg-white p-5 transition-colors hover:border-[var(--accent)] hover:bg-[var(--accent-soft)]">
-      <div><p className="font-semibold text-[#14251e]">{title}</p><p className="mt-1 text-sm text-[var(--muted)]">{body}</p></div>
+      <div><p className="font-semibold text-[#0b1f3a]">{title}</p><p className="mt-1 text-sm text-[var(--muted)]">{body}</p></div>
       <span className="text-2xl text-[var(--accent)] transition-transform group-hover:translate-x-1" aria-hidden>→</span>
     </Link>
   );

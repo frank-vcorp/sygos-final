@@ -2,18 +2,18 @@
 
 :root {
   color-scheme: light;
-  --bg: #f4f5f7;
+  --bg: #f3f6fa;
   --surface: #ffffff;
-  --ink: #1c2128;
-  --muted: #5c6770;
-  --line: #e3e6ea;
-  --accent: #1f4b3a;
-  --accent-soft: #e7f0eb;
+  --ink: #0b1f3a;
+  --muted: #5d6b7d;
+  --line: #dce4ed;
+  --accent: #073b78;
+  --accent-soft: #e5f6f8;
   --danger: #8c2f2f;
   --danger-soft: #f8ecec;
   --warn: #8a5a12;
   --warn-soft: #f8f1e4;
-  --ok: #1f4b3a;
+  --ok: #008d9b;
 }
 
 html,
