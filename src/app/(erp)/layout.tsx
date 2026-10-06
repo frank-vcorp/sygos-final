@@ -20,7 +20,10 @@ const seesService = (role: Parameters<typeof can>[0], code: string | null) =>
   role !== "ALMACEN" && (can(role, "equi.view", code) || can(role, "mot.view", code));
 
 const GROUPS: Array<{ title: string | null; links: NavLink[] }> = [
-  { title: null, links: [{ href: "/inicio", label: "Inicio", show: () => true }] },
+  { title: null, links: [
+    { href: "/inicio", label: "Inicio", show: () => true },
+    { href: "/panel", label: "Panel", show: (role) => can(role, "panel.view") },
+  ] },
   {
     title: "Comercial",
     links: [
@@ -44,6 +47,8 @@ const GROUPS: Array<{ title: string | null; links: NavLink[] }> = [
       { href: "/personal/horas", label: "Horas extra", show: (role, code) => can(role, "overtime.capture", code) || can(role, "personnel.authorize") },
       { href: "/nomina", label: "Nómina", show: (role) => can(role, "personnel.manage") },
       { href: "/comisiones", label: "Comisiones", show: (role) => can(role, "personnel.manage") },
+      { href: "/produccion", label: "Producción", show: (role) => can(role, "production.view") },
+      { href: "/reportes", label: "Reportes", show: (role) => can(role, "report.view") },
       { href: "/kiosco", label: "Kiosco", show: (role) => role === "KIOSCO_ASISTENCIA" },
     ],
   },

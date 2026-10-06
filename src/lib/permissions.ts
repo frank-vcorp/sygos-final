@@ -38,7 +38,10 @@ export type Action =
   | "personnel.manage"
   | "personnel.authorize"
   | "overtime.capture"
-  | "kiosk.punch";
+  | "kiosk.punch"
+  | "panel.view"
+  | "production.view"
+  | "report.view";
 
 export function can(role: Role, action: Action, companyCode?: string | null): boolean {
   const admin = role === "ADMINISTRADOR";
@@ -150,6 +153,12 @@ export function can(role: Role, action: Action, companyCode?: string | null): bo
       return admin || ceo || gerenteSy || gerenteSm || role === "SUPERVISOR_TECNICO" || role === "TECNICO" || role === "VENTAS" || role === "ALMACEN";
     case "kiosk.punch":
       return role === "KIOSCO_ASISTENCIA" || admin;
+    case "panel.view":
+      return admin || ceo || coord || sales || gerenteSy || gerenteSm || role === "SUPERVISOR_TECNICO" || role === "TECNICO";
+    case "production.view":
+      return admin || ceo || coord || gerenteSm;
+    case "report.view":
+      return admin || ceo || coord || sales || gerenteSy || gerenteSm || role === "SUPERVISOR_TECNICO" || role === "ALMACEN";
     default:
       return false;
   }
