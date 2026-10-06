@@ -29,6 +29,9 @@ const GROUPS: Array<{ title: string | null; links: NavLink[] }> = [
       { href: "/cotizaciones", label: "Cotizaciones", show: (role, code) => can(role, "quote.create", code) || can(role, "quote.price", code), createHref: "/cotizaciones/nuevo", showCreate: (role, code) => can(role, "quote.create", code) },
       { href: "/ventas", label: "Ventas", show: (role, code) => can(role, "agenda.use", code) || can(role, "quote.follow", code) },
       { href: "/agenda", label: "Agenda", show: (role, code) => can(role, "agenda.use", code) },
+      { href: "/facturacion", label: "Facturación", show: (role, code) => can(role, "invoice.request", code) || can(role, "invoice.issue", code), createHref: "/facturacion/nuevo", showCreate: (role, code) => can(role, "invoice.issue", code) },
+      { href: "/cobranza", label: "Cobranza", show: (role, code) => can(role, "receivable.view", code) },
+      { href: "/pagos", label: "Pagos", show: (role, code) => can(role, "payment.register", code) || can(role, "payment.validate", code), createHref: "/pagos/nuevo", showCreate: (role, code) => can(role, "payment.register", code) },
     ],
   },
   {

@@ -45,6 +45,10 @@ model Company {
   agendaActivities AgendaActivity[]
   goalTypes        GoalType[]
   salesGoals       SalesGoal[]
+  billingDocuments BillingDocument[]
+  receivables      Receivable[]
+  payables         Payable[]
+  payments         Payment[]
 }
 
 model User {
@@ -108,6 +112,9 @@ model Client {
   attentions Attention[]
   quotes     Quote[]
   sales      Sale[]
+  billingDocuments BillingDocument[]
+  receivables      Receivable[]
+  payments         Payment[]
 
   @@index([companyId, name])
 }
@@ -174,6 +181,8 @@ model Supplier {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   version       Int      @default(1)
+
+  payables Payable[]
 
   @@index([companyId, name])
 }
@@ -491,6 +500,7 @@ model Quote {
 
   lines QuoteLine[]
   sales Sale[]
+  billingDocuments BillingDocument[]
 
   @@unique([companyId, folio])
   @@index([companyId, status])
@@ -589,6 +599,140 @@ model SalesGoal {
   target     Int
 
   @@unique([companyId, userId, goalTypeId, year, month])
+}
+
+model BillingDocument {
+  id                String    @id @default(cuid())
+  folio             String
+  companyId         String
+  company           Company   @relation(fields: [companyId], references: [id])
+  kind              String
+  status            String
+  clientId          String
+  client            Client    @relation(fields: [clientId], references: [id])
+  quoteId           String?
+  quote             Quote?    @relation(fields: [quoteId], references: [id])
+  technicalCaseId   String?
+  saleId            String?
+  equipmentId       String?
+  concept           String
+  subtotal          Float
+  iva               Float
+  total             Float
+  creditDays        Int       @default(0)
+  rfcSnapshot       String?
+  issuedAt          DateTime?
+  dueAt             DateTime?
+  fiscalStatus      String    @default("NO_APLICA")
+  fiscalError       String?
+  requestedByUserId String?
+  issuedByUserId    String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  version           Int       @default(1)
+
+  receivable Receivable?
+  payable    Payable?
+  lines      BillingLine[]
+
+  @@unique([companyId, folio])
+  @@index([companyId, status])
+}
+
+model BillingLine {
+  id         String          @id @default(cuid())
+  documentId String
+  document   BillingDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  concept    String
+  quantity   Int
+  unitPrice  Float
+  amount     Float
+}
+
+model Receivable {
+  id           String          @id @default(cuid())
+  companyId    String
+  company      Company         @relation(fields: [companyId], references: [id])
+  documentId   String          @unique
+  document     BillingDocument @relation(fields: [documentId], references: [id])
+  clientId     String
+  client       Client          @relation(fields: [clientId], references: [id])
+  sellerUserId String?
+  amount       Float
+  balance      Float
+  dueAt        DateTime
+  status       String
+  createdAt    DateTime        @default(now())
+
+  applications PaymentApplication[]
+  notes        CollectionNote[]
+
+  @@index([companyId, status])
+}
+
+model Payable {
+  id               String          @id @default(cuid())
+  companyId        String
+  company          Company         @relation(fields: [companyId], references: [id])
+  supplierId       String
+  supplier         Supplier        @relation(fields: [supplierId], references: [id])
+  documentId       String          @unique
+  document         BillingDocument @relation(fields: [documentId], references: [id])
+  equipmentId      String?
+  amount           Float
+  balance          Float
+  dueAt            DateTime
+  status           String
+  createdAt        DateTime        @default(now())
+
+  applications PaymentApplication[]
+
+  @@index([companyId, status])
+}
+
+model Payment {
+  id           String   @id @default(cuid())
+  folio        String
+  companyId    String
+  company      Company  @relation(fields: [companyId], references: [id])
+  clientId     String?
+  client       Client?  @relation(fields: [clientId], references: [id])
+  amount       Float
+  method       String
+  receipt      String
+  destination  String
+  status       String
+  kind         String
+  authorUserId String
+  createdAt    DateTime @default(now())
+
+  applications PaymentApplication[]
+
+  @@unique([companyId, folio])
+  @@index([companyId, status])
+}
+
+model PaymentApplication {
+  id           String      @id @default(cuid())
+  paymentId    String
+  payment      Payment     @relation(fields: [paymentId], references: [id])
+  receivableId String?
+  receivable   Receivable? @relation(fields: [receivableId], references: [id])
+  payableId    String?
+  payable      Payable?    @relation(fields: [payableId], references: [id])
+  amount       Float
+  confirmedAt  DateTime?
+}
+
+model CollectionNote {
+  id            String     @id @default(cuid())
+  receivableId  String
+  receivable    Receivable @relation(fields: [receivableId], references: [id])
+  note          String
+  promiseAmount Float?
+  followUpAt    DateTime?
+  authorUserId  String
+  createdAt     DateTime   @default(now())
 }
 
 model FunctionalHistory {

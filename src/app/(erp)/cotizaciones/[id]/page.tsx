@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { requestDocumentAction, requestIntercompanyAction } from "@/app/(erp)/facturacion/actions";
 import { decideAction, discountAction, linkBaseAction, relateEquipmentAction, setPricesAction } from "../actions";
 import { ConfirmSubmit, SubmitButton } from "@/components/submit-button";
 import { Badge, controlClass, Field, PageHeader } from "@/components/ui";
@@ -84,6 +85,29 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
             <p className="mt-3">Subtotal {money(totals.subtotal)} · descuento {quote.discountPct}% · IVA {money(totals.iva)} · total {money(totals.total)}</p>
           ) : null}
           {quote.sales.map((sale) => <p key={sale.id} className="mt-2">Venta <Link href={`/ventas/${sale.id}`} className="text-[var(--accent)]">{sale.folio}</Link></p>)}
+          {quote.status === "AUTORIZADA" && can(session.role, "invoice.request", session.activeCompanyCode) ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {quote.client.isSystem && session.activeCompanyCode === "SERVOMOTORES" ? (
+                <form action={requestIntercompanyAction}>
+                  <input type="hidden" name="quoteId" value={quote.id} />
+                  <button className="rounded-md border border-[var(--line)] px-3 py-2 text-sm">Solicitar factura a SYSTRON</button>
+                </form>
+              ) : !quote.client.isSystem ? (
+                <>
+                  <form action={requestDocumentAction}>
+                    <input type="hidden" name="quoteId" value={quote.id} />
+                    <input type="hidden" name="kind" value="FACTURA" />
+                    <button className="rounded-md border border-[var(--line)] px-3 py-2 text-sm">Solicitar factura</button>
+                  </form>
+                  <form action={requestDocumentAction}>
+                    <input type="hidden" name="quoteId" value={quote.id} />
+                    <input type="hidden" name="kind" value="REMISION" />
+                    <button className="rounded-md border border-[var(--line)] px-3 py-2 text-sm">Solicitar remisión</button>
+                  </form>
+                </>
+              ) : null}
+            </div>
+          ) : null}
           {base ? <p className="mt-3 text-[var(--muted)]">Base Servomotores {base.folio}: {money(quoteTotals(base.lines, base.discountPct)?.total)}. El vendedor no ve este importe.</p> : null}
         </section>
         <div className="space-y-4">

@@ -25,7 +25,12 @@ export type Action =
   | "quote.follow"
   | "sale.receive"
   | "agenda.use"
-  | "goals.manage";
+  | "goals.manage"
+  | "invoice.request"
+  | "invoice.issue"
+  | "payment.register"
+  | "payment.validate"
+  | "receivable.view";
 
 export function can(role: Role, action: Action, companyCode?: string | null): boolean {
   const admin = role === "ADMINISTRADOR";
@@ -107,6 +112,18 @@ export function can(role: Role, action: Action, companyCode?: string | null): bo
       return admin || ceo || sales || gerenteSm;
     case "goals.manage":
       return (admin || ceo) && companyCode === "SYSTRON";
+    case "invoice.request":
+      if (admin || ceo || coord) return true;
+      if (companyCode === "SYSTRON") return sales;
+      return companyCode === "SERVOMOTORES" && gerenteSm;
+    case "invoice.issue":
+      return admin || ceo || coord;
+    case "payment.register":
+      return admin || ceo || coord || sales || gerenteSm;
+    case "payment.validate":
+      return admin || ceo || coord;
+    case "receivable.view":
+      return admin || ceo || coord || sales || gerenteSm;
     default:
       return false;
   }
