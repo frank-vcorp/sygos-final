@@ -62,9 +62,7 @@ export async function inSandbox() {
   if (!meta.active) return false;
   try {
     const token = (await cookies()).get(SESSION_COOKIE)?.value;
-    const marked = (await cookies()).get("sygos_sandbox")?.value === "1";
     if (!token) return false;
-    if (marked) return true;
     const tokenHash = hashToken(token);
     const hit = cache.get(tokenHash);
     if (hit && Date.now() - hit.at < 3000) return hit.yes;
