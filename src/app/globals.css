@@ -54,11 +54,32 @@ summary {
 }
 
 @media print {
+  @page {
+    size: letter;
+    margin: 12mm;
+  }
+
   body {
     background: white;
   }
 
   [data-erp-chrome] {
     display: none !important;
+  }
+
+  .quote-document {
+    color: #111827;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .quote-document thead {
+    display: table-header-group;
+  }
+
+  .quote-document tr,
+  .quote-document dl,
+  .quote-document footer {
+    break-inside: avoid;
   }
 }

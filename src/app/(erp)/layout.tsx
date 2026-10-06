@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { logoutAction, switchCompanyAction, viewAsAction } from "@/app/auth-actions";
+import { CompanyLogo, SygosLogo } from "@/components/brand-logo";
 import { FlashBanner } from "@/components/flash-banner";
 import { ErpShell } from "@/components/erp-shell";
 import { SideNav } from "@/components/side-nav";
@@ -101,8 +102,8 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
   const sidebar = (
     <>
         <div className="px-4 py-4">
-          <p className="text-xs font-semibold tracking-wide text-[var(--muted)]">SYGOS 3.0</p>
-          <p className="mt-1 text-sm font-medium">{session.name}</p>
+          <SygosLogo />
+          <p className="mt-3 text-sm font-medium">{session.name}</p>
           <p className="text-xs text-[var(--muted)]">{ROLE_LABEL[session.role]}</p>
         </div>
         <SideNav
@@ -126,6 +127,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
     <header className="border-b border-[var(--line)] bg-white px-4 py-3 md:px-6">
       <div className="mx-auto flex max-w-[1600px] flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 flex-1 items-center gap-3">
+            <CompanyLogo code={session.activeCompanyCode} className="hidden lg:inline-flex" />
             <span className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Empresa activa</span>
             {companies.length > 1 ? (
               <form action={switchCompanyAction} className="flex min-w-0 items-center">

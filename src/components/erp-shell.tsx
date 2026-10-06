@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import { SygosLogo } from "./brand-logo";
 
 export function ErpShell({
   sidebar,
@@ -41,7 +42,7 @@ export function ErpShell({
         >
           ☰
         </button>
-        <span className="text-sm font-semibold tracking-wide">SYGOS 3.0</span>
+        <SygosLogo compact />
         <span className="w-11" aria-hidden />
       </div>
 
