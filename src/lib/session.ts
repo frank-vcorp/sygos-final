@@ -1,6 +1,6 @@
 import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
-import { prisma } from "./db";
+import { prisma, requestFlags, sandboxFor } from "./db";
 import { hashToken, newSessionToken, verifyPassword } from "./crypto";
 import { SESSION_COOKIE } from "./session-cookie";
 import { isRole, type Role } from "./roles";
@@ -81,6 +81,8 @@ async function loadSession(token: string): Promise<AppSession | null> {
     activeCompanyCode = company?.code ?? null;
     activeCompanyName = company?.name ?? null;
   }
+
+  requestFlags().sandbox = sandboxFor(actor.id, actor.role);
 
   return {
     sessionId: row.id,

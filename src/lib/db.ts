@@ -1,9 +1,12 @@
 import { PrismaClient } from "@prisma/client";
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from "fs";
 import { resolve } from "path";
+import { cache } from "react";
 import { cookies } from "next/headers";
 import { hashToken } from "./crypto";
 import { SESSION_COOKIE } from "./session-cookie";
+
+export const requestFlags = cache(() => ({ sandbox: false }));
 
 const globalForPrisma = globalThis as unknown as { prismaProd?: PrismaClient; prismaTest?: PrismaClient | null };
 
@@ -55,16 +58,21 @@ function testClient() {
   return globalForPrisma.prismaTest;
 }
 
-const cache = new Map<string, { at: number; yes: boolean }>();
+const cacheHits = new Map<string, { at: number; yes: boolean }>();
 
 export async function inSandbox() {
+  try {
+    if (requestFlags().sandbox) return true;
+  } catch {
+    return false;
+  }
   const meta = readSandbox();
   if (!meta.active) return false;
   try {
     const token = (await cookies()).get(SESSION_COOKIE)?.value;
     if (!token) return false;
     const tokenHash = hashToken(token);
-    const hit = cache.get(tokenHash);
+    const hit = cacheHits.get(tokenHash);
     if (hit && Date.now() - hit.at < 3000) return hit.yes;
     const row = await prismaProd.session.findUnique({
       where: { tokenHash },
@@ -72,7 +80,7 @@ export async function inSandbox() {
     });
     const actor = row?.user.role === "ADMINISTRADOR" && row.impersonatedUser?.active ? row.impersonatedUser : row?.user;
     const yes = Boolean(actor && sandboxFor(actor.id, actor.role));
-    cache.set(tokenHash, { at: Date.now(), yes });
+    cacheHits.set(tokenHash, { at: Date.now(), yes });
     return yes;
   } catch {
     return false;
@@ -92,7 +100,7 @@ export async function activateSandbox(userIds: string[], roles: string[]) {
   }
   const meta: SandboxMeta = { active: true, userIds, roles };
   writeFileSync(metaPath(), JSON.stringify(meta));
-  cache.clear();
+  cacheHits.clear();
 }
 
 export async function finishSandbox() {
@@ -103,7 +111,7 @@ export async function finishSandbox() {
   writeFileSync(metaPath(), JSON.stringify({ active: false, userIds: [], roles: [] }));
   const target = sandboxDatabasePath();
   if (existsSync(target)) unlinkSync(target);
-  cache.clear();
+  cacheHits.clear();
 }
 
 function wrapDelegate(prop: PropertyKey, delegate: object) {
