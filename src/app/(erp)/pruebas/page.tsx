@@ -13,6 +13,18 @@ export default async function PruebasPage() {
   return (
     <>
       <PageHeader title="Modo de pruebas" subtitle="Un solo escenario. Al activarlo se copia el estado real. Al finalizar, esa copia se borra y no pasa a producción." />
+      <section className="mb-4 max-w-xl rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
+        <h2 className="font-medium">Cómo recorrer el sistema con varios perfiles</h2>
+        <ul className="mt-2 list-disc space-y-2 pl-5">
+          <li>Quien esté marcado, por usuario o por rol, lee y escribe la misma copia. Así Ventas, Técnico, Almacén, nómina y los demás se ven entre sí.</li>
+          <li>Quien no esté marcado sigue en la operación real y no ve lo de la prueba.</li>
+          <li>Para un recorrido de punta a punta marca cada perfil que va a intervenir, no solo uno.</li>
+          <li>Si marcas un rol completo, cualquier persona real con ese rol que entre durante la prueba también cae en la copia y lo que haga se descarta. Si el personal está operando, marca solo las cuentas de la prueba.</li>
+          <li>El administrador, cuando no usa «Ver como», sigue en la base real.</li>
+          <li>Facturapi no timbra: el documento queda como SIMULADA, con «PRUEBA / SIN VALIDEZ». El correo no sale y WhatsApp no se vincula.</li>
+          <li>El resto del flujo sí corre dentro de la copia: prospecto, servicio, cotización, documento, cobro, inventario, asistencia y nómina.</li>
+        </ul>
+      </section>
       {meta.active ? (
         <form action={finishSandboxAction} className="max-w-xl rounded-lg border border-[#efd0d0] bg-white p-4 text-sm">
           <p className="font-medium">Hay una prueba activa.</p>
