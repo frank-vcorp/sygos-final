@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createMotAction } from "@/app/(erp)/equipos/actions";
 import { EquipmentCatalogFields } from "@/components/equipment-catalog-fields";
 import { ServiceTypePriority } from "@/components/service-type-priority";
-import { Button, controlClass, Field, PageHeader } from "@/components/ui";
+import { Button, controlClass, Field, FormActions, FormPanel, FormSection, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { ATTENTION_LABEL, ATTENTION_TYPES, prioritySummary } from "@/lib/priorities";
@@ -36,29 +36,22 @@ export default async function NuevoMotPage() {
           ? "La identidad es global. El trabajo físico queda pendiente de ingreso en Servomotores y no entra al almacén SYSTRON."
           : "Cliente directo de Servomotores. Después se confirma el ingreso físico."}
       />
-      <form action={createMotAction} className="grid max-w-xl gap-4 rounded-lg border border-[var(--line)] bg-white p-4">
-        <Field label={session.activeCompanyCode === "SYSTRON" ? "Cliente final" : "Cliente"}>
-          <select name="clientId" required className={controlClass}>
-            <option value="">Selecciona</option>
-            {clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}
-          </select>
-        </Field>
-        <EquipmentCatalogFields
-          types={types.map((type) => type.name)}
-          brands={brands.map((brand) => brand.name)}
-          models={models.map((row) => ({ type: row.type.name, brand: row.brand.name, model: row.name }))}
-        />
-        <Field label="Descripción"><textarea name="description" rows={2} className={controlClass} /></Field>
-        <Field label="Serie"><input name="serial" className={controlClass} /></Field>
-        <ServiceTypePriority
-          hint="La garantía se abre desde Servicios, sobre un equipo que ya tuvo una reparación pagada."
-          types={ATTENTION_TYPES.filter((type) => type !== "DIAGNOSTICO_GARANTIA").map((type) => ({ value: type, label: ATTENTION_LABEL[type] }))}
-          priorities={priorities.filter((row) => row.attentionType !== "DIAGNOSTICO_GARANTIA").map((row) => ({ id: row.id, attentionType: row.attentionType, label: prioritySummary(row) }))}
-        />
-        <Field label="Falla reportada"><textarea name="reportedFault" required rows={3} className={controlClass} /></Field>
-        <Field label="Instrucciones de entrega"><textarea name="deliveryInstructions" rows={2} className={controlClass} /></Field>
-        <Button type="submit">Crear folio MOT</Button>
-      </form>
+      <FormPanel action={createMotAction}>
+        <FormSection title="Cliente e identificación" description="Define a quién pertenece el motor y su identidad técnica.">
+          <Field label={session.activeCompanyCode === "SYSTRON" ? "Cliente final" : "Cliente"}>
+            <select name="clientId" required className={controlClass}><option value="">Selecciona</option>{clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select>
+          </Field>
+          <div className="md:col-span-2"><EquipmentCatalogFields types={types.map((type) => type.name)} brands={brands.map((brand) => brand.name)} models={models.map((row) => ({ type: row.type.name, brand: row.brand.name, model: row.name }))} /></div>
+          <Field label="Serie"><input name="serial" className={controlClass} /></Field>
+          <Field label="Descripción"><textarea name="description" rows={3} className={controlClass} /></Field>
+        </FormSection>
+        <FormSection title="Servicio solicitado" description="La prioridad y la falla quedan fotografiadas al crear la atención.">
+          <div className="md:col-span-2"><ServiceTypePriority hint="La garantía se abre desde Servicios, sobre un equipo que ya tuvo una reparación pagada." types={ATTENTION_TYPES.filter((type) => type !== "DIAGNOSTICO_GARANTIA").map((type) => ({ value: type, label: ATTENTION_LABEL[type] }))} priorities={priorities.filter((row) => row.attentionType !== "DIAGNOSTICO_GARANTIA").map((row) => ({ id: row.id, attentionType: row.attentionType, label: prioritySummary(row) }))} /></div>
+          <Field label="Falla reportada"><textarea name="reportedFault" required rows={4} className={controlClass} /></Field>
+          <Field label="Instrucciones de entrega"><textarea name="deliveryInstructions" rows={4} className={controlClass} /></Field>
+        </FormSection>
+        <FormActions note="El folio MOT es global y no se reutiliza."><Button type="submit">Crear folio MOT</Button></FormActions>
+      </FormPanel>
     </>
   );
 }

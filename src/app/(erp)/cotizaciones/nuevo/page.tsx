@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { createQuoteAction } from "../actions";
 import { QuoteDraft } from "@/components/quote-draft";
-import { controlClass, Field, PageHeader } from "@/components/ui";
+import { controlClass, Field, FormPanel, FormSection, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { QUOTE_TYPE_LABEL, QUOTE_TYPES } from "@/lib/quotes";
@@ -31,18 +31,12 @@ export default async function NuevaCotizacionPage({ searchParams }: { searchPara
         subtitle="Se guarda sin precio. El precio lo asigna CEO o Administrador."
         back={{ href: "/cotizaciones", label: "Cotizaciones" }}
       />
-      <form action={createQuoteAction} className="grid max-w-2xl gap-4 rounded-lg border border-[var(--line)] bg-white p-4">
-        <Field label="Tipo">
-          <select name="quoteType" required className={controlClass}>
-            {QUOTE_TYPES.map((type) => <option key={type} value={type}>{QUOTE_TYPE_LABEL[type]}</option>)}
-          </select>
-        </Field>
-        <QuoteDraft
-          defaultClientId={clients.some((client) => client.id === clientId) ? clientId : ""}
-          clients={clients.map((client) => ({ id: client.id, name: client.name, contacts: client.contacts.map((contact) => ({ id: contact.id, name: contact.name, isPrimary: contact.isPrimary })) }))}
-          equipment={equipment.map((item) => ({ id: item.id, folio: item.folio, model: item.model, clientId: item.clientId }))}
-        />
-      </form>
+      <FormPanel action={createQuoteAction}>
+        <FormSection title="Propuesta comercial" description="Relaciona cliente, equipo y conceptos. El precio se asigna en el siguiente paso.">
+          <Field label="Tipo"><select name="quoteType" required className={controlClass}>{QUOTE_TYPES.map((type) => <option key={type} value={type}>{QUOTE_TYPE_LABEL[type]}</option>)}</select></Field>
+          <QuoteDraft defaultClientId={clients.some((client) => client.id === clientId) ? clientId : ""} clients={clients.map((client) => ({ id: client.id, name: client.name, contacts: client.contacts.map((contact) => ({ id: contact.id, name: contact.name, isPrimary: contact.isPrimary })) }))} equipment={equipment.map((item) => ({ id: item.id, folio: item.folio, model: item.model, clientId: item.clientId }))} />
+        </FormSection>
+      </FormPanel>
     </>
   );
 }

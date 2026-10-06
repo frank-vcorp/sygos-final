@@ -187,6 +187,46 @@ export function DetailGrid({ children }: { children: React.ReactNode }) {
   return <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">{children}</div>;
 }
 
+export function FormPanel({ children, className = "", ...props }: React.ComponentProps<"form">) {
+  return (
+    <form {...props} className={`max-w-5xl overflow-hidden rounded-xl border border-[var(--line)] bg-white shadow-[0_8px_30px_rgba(7,59,120,0.06)] ${className}`}>
+      {children}
+    </form>
+  );
+}
+
+export function FormSection({
+  title,
+  description,
+  children,
+  columns = 2,
+}: {
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+  columns?: 1 | 2 | 3;
+}) {
+  const grids = { 1: "", 2: "md:grid-cols-2", 3: "md:grid-cols-2 xl:grid-cols-3" };
+  return (
+    <section className="border-b border-[var(--line)] p-5 md:p-7">
+      <div className="mb-5">
+        <h2 className="text-lg font-semibold text-[#0b1f3a]">{title}</h2>
+        {description ? <p className="mt-1 max-w-2xl text-sm leading-6 text-[var(--muted)]">{description}</p> : null}
+      </div>
+      <div className={`grid gap-4 ${grids[columns]}`}>{children}</div>
+    </section>
+  );
+}
+
+export function FormActions({ children, note }: { children: React.ReactNode; note?: string }) {
+  return (
+    <footer className="flex flex-col-reverse gap-3 bg-[#f7fafc] px-5 py-4 sm:flex-row sm:items-center sm:justify-between md:px-7">
+      {note ? <p className="text-xs text-[var(--muted)]">{note}</p> : <span />}
+      <div className="flex flex-col gap-2 sm:flex-row">{children}</div>
+    </footer>
+  );
+}
+
 export function Th({ children }: { children: React.ReactNode }) {
   return <th className="border-b border-[var(--line)] px-3 py-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">{children}</th>;
 }
