@@ -101,10 +101,12 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
 
   const sidebar = (
     <>
-        <div className="px-4 py-4">
+        <div className="mb-3 border-b border-[#e1e6e3] px-5 pb-5 pt-6">
           <SygosLogo />
-          <p className="mt-3 text-sm font-medium">{session.name}</p>
-          <p className="text-xs text-[var(--muted)]">{ROLE_LABEL[session.role]}</p>
+          <div className="mt-5 rounded-lg bg-white px-3 py-2.5 ring-1 ring-[#e1e6e3]">
+            <p className="text-sm font-semibold">{session.name}</p>
+            <p className="mt-0.5 text-xs text-[var(--muted)]">{ROLE_LABEL[session.role]}</p>
+          </div>
         </div>
         <SideNav
           groups={[
@@ -124,11 +126,11 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
     </>
   );
   const toolbar = (
-    <header className="border-b border-[var(--line)] bg-white px-4 py-3 md:px-6">
-      <div className="mx-auto flex max-w-[1600px] flex-wrap items-center justify-between gap-3">
-          <div className="flex min-w-0 flex-1 items-center gap-3">
+    <header className="border-b border-[var(--line)] bg-white px-4 py-3 md:px-8 md:py-4">
+      <div className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-4">
+          <div className="flex min-w-0 flex-1 items-center gap-4">
             <CompanyLogo code={session.activeCompanyCode} className="hidden lg:inline-flex" />
-            <span className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Empresa activa</span>
+            <span className="hidden text-xs font-semibold uppercase tracking-wide text-[var(--muted)] xl:inline">Empresa activa</span>
             {companies.length > 1 ? (
               <form action={switchCompanyAction} className="flex min-w-0 items-center">
                 <select
@@ -168,7 +170,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
               <form action={logoutAction}><button className="min-h-11 w-full rounded-md border border-[var(--line)] text-sm">Salir</button></form>
             </div>
           </details>
-          <div className="hidden items-center gap-3 md:flex">
+          <div className="hidden items-center gap-4 md:flex">
             {session.realRole === "ADMINISTRADOR" ? (
               <form action={viewAsAction} className="flex items-center gap-2">
                 <label className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]" htmlFor="view-as">Ver como</label>
@@ -204,7 +206,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
 
   return (
     <ErpShell sidebar={sidebar} toolbar={toolbar}>
-        <main className="mx-auto max-w-[1600px] px-4 py-5 sm:px-6 md:px-8 md:py-7 print:max-w-none print:p-0">
+        <main className="mx-auto max-w-[1440px] px-4 py-5 sm:px-6 md:px-8 md:py-9 lg:px-10 print:max-w-none print:p-0">
           {session.impersonating ? (
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-[#ead9a8] bg-[var(--warn-soft)] px-3 py-2 text-sm print:hidden">
               <p>Viendo como <strong>{session.name}</strong> · {ROLE_LABEL[session.role]}. Lo que guardes queda a nombre de esta cuenta.</p>

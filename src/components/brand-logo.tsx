@@ -8,7 +8,7 @@ export function SygosLogo({ compact = false }: { compact?: boolean }) {
       width={1983}
       height={793}
       priority
-      className={compact ? "h-8 w-auto object-contain" : "h-12 w-auto object-contain"}
+      className={compact ? "h-8 w-auto object-contain" : "h-16 w-auto object-contain"}
     />
   );
 }
@@ -28,7 +28,7 @@ export function CompanyLogo({
         alt={systron ? "SYSTRON Industria" : "SYSTRON Servomotores"}
         width={systron ? 200 : 240}
         height={systron ? 49 : 55}
-        className="h-9 w-auto object-contain"
+        className="h-10 w-auto object-contain"
       />
     </span>
   );

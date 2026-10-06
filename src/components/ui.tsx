@@ -12,15 +12,15 @@ export function PageHeader({
   back?: { href: string; label: string };
 }) {
   return (
-    <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+    <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
       <div>
         {back ? (
           <Link href={back.href} className="mb-1 inline-flex text-sm text-[var(--muted)] hover:text-[var(--accent)]">
             ← {back.label}
           </Link>
         ) : null}
-        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-        {subtitle ? <p className="mt-1 text-sm text-[var(--muted)]">{subtitle}</p> : null}
+        <h1 className="text-2xl font-semibold tracking-tight text-[#14251e] md:text-[30px] md:leading-tight">{title}</h1>
+        {subtitle ? <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted)]">{subtitle}</p> : null}
       </div>
       {action}
     </div>
@@ -108,7 +108,7 @@ export function SegmentedNav({ items }: { items: Array<{ href: string; label: st
 }
 
 export function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <section className={`rounded-lg border border-[var(--line)] bg-white ${className}`}>{children}</section>;
+  return <section className={`rounded-xl border border-[var(--line)] bg-white shadow-[0_1px_2px_rgba(20,37,30,0.05)] ${className}`}>{children}</section>;
 }
 
 export function Empty({ title, body, action }: { title: string; body: string; action?: React.ReactNode }) {

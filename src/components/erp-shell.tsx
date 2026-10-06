@@ -31,7 +31,7 @@ export function ErpShell({
   }, [open]);
 
   return (
-    <div data-erp-shell className="min-h-screen md:grid md:grid-cols-[240px_minmax(0,1fr)]">
+    <div data-erp-shell className="min-h-screen md:grid md:grid-cols-[280px_minmax(0,1fr)]">
       <div data-erp-chrome className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-[var(--line)] bg-white px-4 md:hidden print:hidden">
         <button
           type="button"
@@ -57,7 +57,7 @@ export function ErpShell({
 
       <aside
         data-erp-chrome
-        className={`fixed inset-y-0 left-0 z-50 w-[min(86vw,320px)] overflow-y-auto border-r border-[var(--line)] bg-white transition-transform md:sticky md:top-0 md:z-20 md:h-screen md:w-auto md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 w-[min(86vw,320px)] overflow-y-auto border-r border-[#d9e0dc] bg-[#fbfcfb] transition-transform md:sticky md:top-0 md:z-20 md:h-screen md:w-auto md:translate-x-0 ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
         aria-label="Navegación principal"
