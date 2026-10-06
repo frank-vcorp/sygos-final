@@ -39,9 +39,11 @@ export default async function InicioPage() {
         </div>
       ) : (
         <Card className="p-4 text-sm">
-          {session.role === "KIOSCO_ASISTENCIA"
-            ? "El marcaje de asistencia se habilita con el módulo de Personal. Esta cuenta no abre otros módulos."
-            : "El Ayudante General tiene usuario para Personal, Nómina y Asistencia. No tiene acceso operativo a módulos de negocio."}
+          {session.role === "KIOSCO_ASISTENCIA" ? (
+            <p>El kiosco solo marca entrada y salida. <Link href="/kiosco" className="font-medium text-[var(--accent)]">Abrir marcaje</Link></p>
+          ) : (
+            <p>El Ayudante General tiene usuario para Personal, Nómina y Asistencia. No tiene acceso operativo a módulos de negocio. Sus horas extra las registra el gerente.</p>
+          )}
         </Card>
       )}
     </>

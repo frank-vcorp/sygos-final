@@ -37,6 +37,17 @@ const GROUPS: Array<{ title: string | null; links: NavLink[] }> = [
     ],
   },
   {
+    title: "Personal",
+    links: [
+      { href: "/personal", label: "Colaboradores", show: (role) => can(role, "personnel.manage"), createHref: "/personal/nuevo", showCreate: (role) => can(role, "personnel.manage") },
+      { href: "/personal/asistencia", label: "Asistencia", show: (role) => can(role, "personnel.manage") },
+      { href: "/personal/horas", label: "Horas extra", show: (role, code) => can(role, "overtime.capture", code) || can(role, "personnel.authorize") },
+      { href: "/nomina", label: "Nómina", show: (role) => can(role, "personnel.manage") },
+      { href: "/comisiones", label: "Comisiones", show: (role) => can(role, "personnel.manage") },
+      { href: "/kiosco", label: "Kiosco", show: (role) => role === "KIOSCO_ASISTENCIA" },
+    ],
+  },
+  {
     title: "Servicios",
     links: [
       { href: "/servicios/diagnostico", label: "Diagnóstico", show: seesService, createHref: "/servicios/diagnostico/nuevo", showCreate: (role, code) => can(role, "attention.create", code) },

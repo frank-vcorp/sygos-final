@@ -52,6 +52,9 @@ model Company {
   financeAccounts  FinanceAccount[]
   financeMovements FinanceMovement[]
   purchases        Purchase[]
+  collaborators    Collaborator[]
+  payrollPeriods   PayrollPeriod[]
+  commissionRuns   CommissionRun[]
 }
 
 model User {
@@ -74,6 +77,8 @@ model User {
   impersonations Session[] @relation("SessionImpersonation")
   history        FunctionalHistory[]
   technicalCases TechnicalCase[]
+  collaborator   Collaborator?
+  directed       Collaborator[] @relation("CollaboratorBoss")
 }
 
 model Session {
@@ -800,6 +805,204 @@ model Purchase {
 
   @@unique([companyId, folio])
   @@index([companyId, status])
+}
+
+model Collaborator {
+  id                  String   @id @default(cuid())
+  companyId           String
+  company             Company  @relation(fields: [companyId], references: [id])
+  userId              String   @unique
+  user                User     @relation(fields: [userId], references: [id])
+  bossUserId          String?
+  boss                User?    @relation("CollaboratorBoss", fields: [bossUserId], references: [id])
+  hireKind            String
+  status              String
+  hiredAt             DateTime
+  vacationBalance     Float    @default(0)
+  dailyStamped        Float    @default(0)
+  dailyCash           Float    @default(0)
+  overtimeRate        Float    @default(0)
+  rfc                 String?
+  punctualityBonus    Float    @default(0)
+  productivityBonus   Float    @default(0)
+  productivityGoal    Float    @default(0)
+  scheduleStart       String   @default("09:00")
+  toleranceMinutes    Int      @default(10)
+  scheduleEffectiveAt DateTime @default(now())
+  fingerprintNote     String?
+  fingerprintAt       DateTime?
+  exemptBenefits      Boolean  @default(false)
+  version             Int      @default(1)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  vacations   VacationRequest[]
+  attendance  AttendanceDay[]
+  overtime    OvertimeRequest[]
+  documents   LaborDocument[]
+  payrollLines PayrollLine[]
+
+  @@index([companyId, status])
+}
+
+model VacationRequest {
+  id                String       @id @default(cuid())
+  collaboratorId    String
+  collaborator      Collaborator @relation(fields: [collaboratorId], references: [id])
+  startDate         String
+  endDate           String
+  status            String
+  requestedByUserId String
+  version           Int          @default(1)
+  createdAt         DateTime     @default(now())
+
+  primas VacationPrima[]
+}
+
+model VacationPrima {
+  id         String          @id @default(cuid())
+  vacationId String
+  vacation   VacationRequest @relation(fields: [vacationId], references: [id])
+  weekStart  String
+  days       Int
+  stamped    Float
+  cash       Float
+}
+
+model AttendanceDay {
+  id             String       @id @default(cuid())
+  collaboratorId String
+  collaborator   Collaborator @relation(fields: [collaboratorId], references: [id])
+  workDate       String
+  entryAt        DateTime?
+  exitAt         DateTime?
+  status         String
+  justified      Boolean      @default(false)
+  paidLeave      Boolean      @default(false)
+  note           String?
+  version        Int          @default(1)
+
+  @@unique([collaboratorId, workDate])
+}
+
+model OvertimeRequest {
+  id                String       @id @default(cuid())
+  collaboratorId    String
+  collaborator      Collaborator @relation(fields: [collaboratorId], references: [id])
+  workDate          String
+  startedAt         String
+  endedAt           String
+  hours             Float
+  reason            String
+  status            String
+  requestedByUserId String
+  frozenRate        Float?
+  doubleHours       Float        @default(0)
+  tripleHours       Float        @default(0)
+  amountStamped     Float        @default(0)
+  amountCash        Float        @default(0)
+  payrollPeriodId   String?
+  version           Int          @default(1)
+  createdAt         DateTime     @default(now())
+}
+
+model LaborDocument {
+  id             String       @id @default(cuid())
+  collaboratorId String
+  collaborator   Collaborator @relation(fields: [collaboratorId], references: [id])
+  kind           String
+  title          String
+  note           String
+  occurredOn     String?
+  createdAt      DateTime     @default(now())
+}
+
+model PayrollPeriod {
+  id           String   @id @default(cuid())
+  folio        String
+  companyId    String
+  company      Company  @relation(fields: [companyId], references: [id])
+  kind         String
+  periodStart  String
+  periodEnd    String
+  status       String
+  fiscalStatus String   @default("PENDIENTE")
+  fiscalError  String?
+  version      Int      @default(1)
+  createdAt    DateTime @default(now())
+
+  lines       PayrollLine[]
+  adjustments PayrollAdjustment[]
+
+  @@unique([companyId, folio])
+  @@index([companyId, status])
+}
+
+model PayrollLine {
+  id               String         @id @default(cuid())
+  periodId         String
+  period           PayrollPeriod  @relation(fields: [periodId], references: [id])
+  collaboratorId   String
+  collaborator     Collaborator   @relation(fields: [collaboratorId], references: [id])
+  stampedBase      Float          @default(0)
+  cashBase         Float          @default(0)
+  discountStamped  Float          @default(0)
+  discountCash     Float          @default(0)
+  overtimeStamped  Float          @default(0)
+  overtimeCash     Float          @default(0)
+  primaStamped     Float          @default(0)
+  primaCash        Float          @default(0)
+  bonus            Float          @default(0)
+  extraStamped     Float          @default(0)
+  extraCash        Float          @default(0)
+  aguinaldoStamped Float          @default(0)
+  aguinaldoCash    Float          @default(0)
+  transferTotal    Float          @default(0)
+  cashTotal        Float          @default(0)
+  missing          String?
+
+  @@unique([periodId, collaboratorId])
+}
+
+model PayrollAdjustment {
+  id             String        @id @default(cuid())
+  periodId       String
+  period         PayrollPeriod @relation(fields: [periodId], references: [id])
+  collaboratorId String
+  kind           String
+  component      String
+  amount         Float
+  note           String
+  authorUserId   String
+}
+
+model CommissionRun {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id])
+  month     String
+  status    String
+  version   Int      @default(1)
+  createdAt DateTime @default(now())
+
+  lines CommissionLine[]
+
+  @@unique([companyId, month])
+}
+
+model CommissionLine {
+  id           String        @id @default(cuid())
+  runId        String
+  run          CommissionRun @relation(fields: [runId], references: [id])
+  userId       String
+  label        String
+  sourceAmount Float
+  rate         Float
+  original     Float
+  adjustment   Float         @default(0)
+  finalAmount  Float
+  parameters   String
+  negativeFrom String?
 }
 
 model FunctionalHistory {
