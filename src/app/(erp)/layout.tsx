@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { logoutAction, switchCompanyAction, viewAsAction } from "@/app/auth-actions";
 import { FlashBanner } from "@/components/flash-banner";
+import { ErpShell } from "@/components/erp-shell";
 import { SideNav } from "@/components/side-nav";
 import { prisma, sandboxFor } from "@/lib/db";
 import { takeFlash } from "@/lib/flash";
@@ -97,9 +98,8 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
       })
     : [];
 
-  return (
-    <div className="min-h-screen md:grid md:grid-cols-[240px_1fr]">
-      <aside className="border-b border-[var(--line)] bg-white md:border-b-0 md:border-r">
+  const sidebar = (
+    <>
         <div className="px-4 py-4">
           <p className="text-xs font-semibold tracking-wide text-[var(--muted)]">SYGOS 3.0</p>
           <p className="mt-1 text-sm font-medium">{session.name}</p>
@@ -120,18 +120,20 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
             { title: null, links: [{ href: "/cuenta", label: "Cuenta" }] },
           ]}
         />
-      </aside>
-      <div>
-        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--line)] bg-white px-4 py-3">
-          <div className="flex items-center gap-3">
+    </>
+  );
+  const toolbar = (
+    <header className="border-b border-[var(--line)] bg-white px-4 py-3 md:px-6">
+      <div className="mx-auto flex max-w-[1600px] flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
             <span className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Empresa activa</span>
             {companies.length > 1 ? (
-              <form action={switchCompanyAction}>
+              <form action={switchCompanyAction} className="flex min-w-0 items-center">
                 <select
                   key={session.activeCompanyId ?? "none"}
                   name="companyId"
                   defaultValue={session.activeCompanyId ?? ""}
-                  className="rounded-md border border-[var(--line)] bg-white px-2 py-1 text-sm font-semibold"
+                  className="min-h-10 min-w-0 max-w-44 rounded-md border border-[var(--line)] bg-white px-2 text-sm font-semibold"
                   aria-label="Empresa activa"
                 >
                   <option value="" disabled>Selecciona empresa</option>
@@ -139,13 +141,32 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
                     <option key={company.id} value={company.id}>{company.name}</option>
                   ))}
                 </select>
-                <button className="ml-2 text-sm font-medium text-[var(--accent)]" type="submit">Cambiar</button>
+                <button className="ml-1 min-h-10 rounded-md px-2 text-sm font-medium text-[var(--accent)]" type="submit">Cambiar</button>
               </form>
             ) : (
               <strong className="text-sm">{session.activeCompanyName ?? "Sin empresa"}</strong>
             )}
           </div>
-          <div className="flex items-center gap-3">
+          <details className="relative md:hidden">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center rounded-md border border-[var(--line)] px-3 text-sm font-medium">Opciones</summary>
+            <div className="absolute right-0 top-12 z-30 grid w-[min(88vw,340px)] gap-3 rounded-lg border border-[var(--line)] bg-white p-3">
+              {session.realRole === "ADMINISTRADOR" ? (
+                <form action={viewAsAction} className="grid gap-2">
+                  <label className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]" htmlFor="view-as-mobile">Ver como</label>
+                  <select id="view-as-mobile" name="userId" defaultValue={session.impersonating ? session.userId : ""} className="min-h-11 w-full rounded-md border border-[var(--line)] bg-white px-2 text-sm">
+                    <option value="">Administrador</option>
+                    {viewAsUsers.filter((user) => isRole(user.role)).map((user) => <option key={user.id} value={user.id}>{user.name}{user.company ? ` · ${user.company.name}` : ""}</option>)}
+                  </select>
+                  <button className="min-h-11 rounded-md bg-[var(--accent)] px-3 text-sm font-medium text-white">Aplicar</button>
+                </form>
+              ) : null}
+              {can(session.role, "search.global") && session.activeCompanyId ? (
+                <form action="/buscar"><input name="q" placeholder="Buscar en esta empresa" className="min-h-11 w-full rounded-md border border-[var(--line)] px-3 text-sm" /></form>
+              ) : null}
+              <form action={logoutAction}><button className="min-h-11 w-full rounded-md border border-[var(--line)] text-sm">Salir</button></form>
+            </div>
+          </details>
+          <div className="hidden items-center gap-3 md:flex">
             {session.realRole === "ADMINISTRADOR" ? (
               <form action={viewAsAction} className="flex items-center gap-2">
                 <label className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]" htmlFor="view-as">Ver como</label>
@@ -175,10 +196,15 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
               <button className="text-sm text-[var(--muted)]" type="submit">Salir</button>
             </form>
           </div>
-        </header>
-        <div className="px-4 py-6 md:px-8">
+      </div>
+    </header>
+  );
+
+  return (
+    <ErpShell sidebar={sidebar} toolbar={toolbar}>
+        <main className="mx-auto max-w-[1600px] px-4 py-5 sm:px-6 md:px-8 md:py-7 print:max-w-none print:p-0">
           {session.impersonating ? (
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-[#ead9a8] bg-[var(--warn-soft)] px-3 py-2 text-sm">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-[#ead9a8] bg-[var(--warn-soft)] px-3 py-2 text-sm print:hidden">
               <p>Viendo como <strong>{session.name}</strong> · {ROLE_LABEL[session.role]}. Lo que guardes queda a nombre de esta cuenta.</p>
               <form action={viewAsAction}>
                 <input type="hidden" name="userId" value="" />
@@ -187,7 +213,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
             </div>
           ) : null}
           {sandboxFor(session.userId, session.role) ? (
-            <p className="mb-4 rounded-md border border-[#efd0d0] bg-[var(--danger-soft)] px-3 py-2 text-sm font-medium">MODO DE PRUEBAS — Los cambios realizados en este contexto serán descartados y no afectan la operación real.</p>
+            <p className="mb-4 rounded-md border border-[#efd0d0] bg-[var(--danger-soft)] px-3 py-2 text-sm font-medium print:hidden">MODO DE PRUEBAS — Los cambios realizados en este contexto serán descartados y no afectan la operación real.</p>
           ) : null}
           {!business ? (
             <p className="mb-4 rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm">
@@ -196,8 +222,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
           ) : null}
           {flash ? <FlashBanner flash={flash} /> : null}
           {children}
-        </div>
-      </div>
-    </div>
+        </main>
+    </ErpShell>
   );
 }

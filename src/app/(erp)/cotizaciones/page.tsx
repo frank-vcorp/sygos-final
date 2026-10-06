@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Badge, Button, Empty, ListCap, PageHeader, Table, Td, Th, TextLink } from "@/components/ui";
+import { ActionLink, Badge, Button, controlClass, Empty, FilterBar, ListCap, MobileCard, PageHeader, ResponsiveData, SegmentedNav, Table, Td, Th, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { linesForTotal, money, quoteTotals } from "@/lib/money";
 import { can } from "@/lib/permissions";
@@ -55,21 +55,18 @@ export default async function CotizacionesPage({ searchParams }: { searchParams:
       <PageHeader
         title={pending ? "Pendientes de cotizar" : "Cotizaciones"}
         subtitle="Una sola bandeja para lo que necesita precio. El vendedor no fija el precio."
-        action={can(session.role, "quote.create", session.activeCompanyCode) ? <Link href="/cotizaciones/nuevo" className="rounded-md bg-[var(--accent)] px-3 py-2 text-sm font-medium text-white">Nueva cotización</Link> : null}
+        action={can(session.role, "quote.create", session.activeCompanyCode) ? <ActionLink href="/cotizaciones/nuevo">Nueva cotización</ActionLink> : null}
       />
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <Link href="/cotizaciones" className={`rounded-md px-3 py-2 text-sm ${pending ? "border border-[var(--line)] bg-white" : "bg-[var(--accent)] text-white"}`}>Todas</Link>
-        <Link href="/cotizaciones?vista=pendientes" className={`rounded-md px-3 py-2 text-sm ${pending ? "bg-[var(--accent)] text-white" : "border border-[var(--line)] bg-white"}`}>Pendientes de cotizar</Link>
-        <form className="flex gap-2" action="/cotizaciones">
+      <SegmentedNav items={[{ href: "/cotizaciones", label: "Todas", active: !pending }, { href: "/cotizaciones?vista=pendientes", label: "Pendientes de cotizar", active: pending }]} />
+        <FilterBar action="/cotizaciones">
           {pending ? <input type="hidden" name="vista" value="pendientes" /> : null}
-          <input name="q" defaultValue={query} placeholder="Folio o cliente" className="rounded-md border border-[var(--line)] px-3 py-2 text-sm" />
+          <input name="q" defaultValue={query} placeholder="Folio o cliente" className={`${controlClass} sm:flex-1`} />
           <Button type="submit" tone="ghost">Buscar</Button>
-        </form>
-      </div>
+        </FilterBar>
       {cases.length > 0 ? (
         <ul className="mb-4 divide-y divide-[var(--line)] rounded-lg border border-[var(--line)] bg-white">
           {cases.map((row) => (
-            <li key={row.id} className="flex items-center justify-between px-4 py-3 text-sm">
+            <li key={row.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
               <span>{row.folio} · {row.equipment.folio} aún no tiene cotización</span>
               <Link href={`/operacion/${row.id}`} className="text-[var(--accent)]">Abrir operación</Link>
             </li>
@@ -83,7 +80,7 @@ export default async function CotizacionesPage({ searchParams }: { searchParams:
           action={query ? <TextLink href={pending ? "/cotizaciones?vista=pendientes" : "/cotizaciones"}>Quitar búsqueda</TextLink> : can(session.role, "quote.create", session.activeCompanyCode) ? <TextLink href="/cotizaciones/nuevo">Nueva cotización</TextLink> : undefined}
         />
       ) : (
-        <Table>
+        <ResponsiveData table={<Table>
           <thead><tr><Th>Folio</Th><Th>Cliente</Th><Th>Tipo</Th><Th>Estado</Th><Th>Total</Th></tr></thead>
           <tbody>
             {quotes.map((quote) => {
@@ -100,7 +97,11 @@ export default async function CotizacionesPage({ searchParams }: { searchParams:
               );
             })}
           </tbody>
-        </Table>
+        </Table>} cards={quotes.map((quote) => {
+          const hidePrice = session.role === "VENTAS" && quote.status === "PENDIENTE_COTIZAR";
+          const totals = hidePrice ? null : quoteTotals(linesForTotal(quote.lines, quote.quoteType, quote.status), quote.discountPct);
+          return <MobileCard key={quote.id} href={`/cotizaciones/${quote.id}`} title={quote.folio} meta={<Badge>{QUOTE_STATUS_LABEL[quote.status] ?? quote.status}</Badge>}><p>{quote.client.isSystem ? "SYSTRON · intercompañía" : quote.client.name}</p><p>{QUOTE_TYPE_LABEL[quote.quoteType as QuoteType] ?? quote.quoteType} · {hidePrice ? "Sin precio" : money(totals?.total)}</p></MobileCard>;
+        })} />
       )}
       <ListCap shown={quotes.length} />
     </>

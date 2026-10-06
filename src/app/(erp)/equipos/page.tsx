@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Badge, Button, Empty, ListCap, PageHeader, Table, Td, Th, TextLink } from "@/components/ui";
+import { ActionLink, Badge, Button, controlClass, Empty, FilterBar, ListCap, MobileCard, PageHeader, ResponsiveData, Table, Td, Th, TextLink } from "@/components/ui";
 import { CUSTODY_LABEL, type Custody } from "@/lib/custody";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
@@ -29,12 +29,12 @@ export default async function EquiposPage({ searchParams }: { searchParams: Prom
       <PageHeader
         title="Equipos"
         subtitle="Identidad EQUI de SYSTRON. El folio no se reutiliza."
-        action={can(session.role, "equi.create", session.activeCompanyCode) ? <Link href="/equipos/nuevo" className="rounded-md bg-[var(--accent)] px-3 py-2 text-sm font-medium text-white">Nuevo EQUI</Link> : null}
+        action={can(session.role, "equi.create", session.activeCompanyCode) ? <ActionLink href="/equipos/nuevo">Nuevo EQUI</ActionLink> : null}
       />
-      <form className="mb-4 flex gap-2" action="/equipos">
-        <input name="q" defaultValue={query} placeholder="Folio, modelo, serie o cliente" className="rounded-md border border-[var(--line)] px-3 py-2 text-sm" />
+      <FilterBar action="/equipos">
+        <input name="q" defaultValue={query} placeholder="Folio, modelo, serie o cliente" className={`${controlClass} sm:flex-1`} />
         <Button type="submit" tone="ghost">Buscar</Button>
-      </form>
+      </FilterBar>
       {rows.length === 0 ? (
         <Empty
           title={query ? "Sin coincidencias" : "No hay equipos"}
@@ -42,19 +42,10 @@ export default async function EquiposPage({ searchParams }: { searchParams: Prom
           action={query ? <TextLink href="/equipos">Quitar búsqueda</TextLink> : can(session.role, "equi.create", session.activeCompanyCode) ? <TextLink href="/equipos/nuevo">Nuevo EQUI</TextLink> : undefined}
         />
       ) : (
-        <Table>
-          <thead><tr><Th>Folio</Th><Th>Cliente</Th><Th>Identificación</Th><Th>Custodia</Th></tr></thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.id}>
-                <Td><Link href={`/equipos/${row.id}`} className="font-medium text-[var(--accent)]">{row.folio}</Link></Td>
-                <Td>{row.client.name}</Td>
-                <Td>{[row.brandName, row.model, row.serial].filter(Boolean).join(" · ")}</Td>
-                <Td><Badge>{CUSTODY_LABEL[row.custody as Custody] ?? row.custody}</Badge></Td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
+        <ResponsiveData
+          table={<Table><thead><tr><Th>Folio</Th><Th>Cliente</Th><Th>Identificación</Th><Th>Custodia</Th></tr></thead><tbody>{rows.map((row) => <tr key={row.id}><Td><Link href={`/equipos/${row.id}`} className="font-medium text-[var(--accent)]">{row.folio}</Link></Td><Td>{row.client.name}</Td><Td>{[row.brandName, row.model, row.serial].filter(Boolean).join(" · ")}</Td><Td><Badge>{CUSTODY_LABEL[row.custody as Custody] ?? row.custody}</Badge></Td></tr>)}</tbody></Table>}
+          cards={rows.map((row) => <MobileCard key={row.id} href={`/equipos/${row.id}`} title={row.folio} meta={<Badge>{CUSTODY_LABEL[row.custody as Custody] ?? row.custody}</Badge>}><p>{row.client.name}</p><p>{[row.brandName, row.model, row.serial].filter(Boolean).join(" · ") || "Sin identificación adicional"}</p></MobileCard>)}
+        />
       )}
       <ListCap shown={rows.length} />
     </>

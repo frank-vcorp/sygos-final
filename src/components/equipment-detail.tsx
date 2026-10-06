@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AttentionForm, CancelMovementForm, MovementForm } from "@/components/custody-forms";
-import { Badge, PageHeader, Table, Td, Th } from "@/components/ui";
+import { Badge, DetailGrid, PageHeader, Table, Td, Th } from "@/components/ui";
 import { CUSTODY_LABEL, MOVEMENT_LABEL, type Custody, type MovementKind } from "@/lib/custody";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
@@ -74,7 +74,7 @@ export async function EquipmentDetail({ id, expectedKind }: { id: string; expect
         subtitle={expectedKind === "EQUI" ? "Identidad física EQUI" : "Identidad física MOT"}
         action={<Badge>{CUSTODY_LABEL[equipment.custody as Custody] ?? equipment.custody}</Badge>}
       />
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
+      <DetailGrid>
         <div className="space-y-4">
           <section className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
             <p>Origen: {equipment.originCompany.name}</p>
@@ -161,7 +161,7 @@ export async function EquipmentDetail({ id, expectedKind }: { id: string; expect
             </ul>
           </section>
         </div>
-      </div>
+      </DetailGrid>
     </>
   );
 }

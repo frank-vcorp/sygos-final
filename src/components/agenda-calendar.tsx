@@ -19,7 +19,8 @@ export function AgendaCalendar({
   if (view === "mes") {
     const { blanks, month } = monthGrid(anchorDate);
     return (
-      <div className="grid grid-cols-7 gap-px overflow-hidden rounded-lg border border-[var(--line)] bg-[var(--line)]">
+      <div className="overflow-x-auto rounded-lg border border-[var(--line)]">
+      <div className="grid min-w-[700px] grid-cols-7 gap-px overflow-hidden bg-[var(--line)]">
         {WEEKDAYS.map((label) => <div key={label} className="bg-[#f7f8f9] px-2 py-2 text-xs font-medium">{label}</div>)}
         {Array.from({ length: blanks }, (_, index) => <div key={`blank-${index}`} className="min-h-20 bg-[#f7f8f9]" />)}
         {month.map((day) => {
@@ -32,12 +33,14 @@ export function AgendaCalendar({
             </Link>
           );
         })}
-      </div>
+      </div></div>
     );
   }
   return (
+    <div>
+      {view === "semana" ? <p className="mb-2 text-xs text-[var(--muted)] md:hidden">Desliza horizontalmente para recorrer la semana.</p> : null}
     <div className="overflow-x-auto rounded-lg border border-[var(--line)] bg-white">
-      <div className="grid min-w-[640px]" style={{ gridTemplateColumns: `64px repeat(${days.length}, minmax(88px, 1fr))` }}>
+      <div className={`grid ${view === "semana" ? "min-w-[700px]" : "min-w-0"}`} style={{ gridTemplateColumns: `64px repeat(${days.length}, minmax(0, 1fr))` }}>
         <div />
         {days.map((day) => (
           <div key={mexicoDate(day)} className="border-b border-l border-[var(--line)] px-2 py-2 text-xs font-medium">
@@ -63,6 +66,7 @@ export function AgendaCalendar({
           </div>
         ))}
       </div>
+    </div>
     </div>
   );
 }

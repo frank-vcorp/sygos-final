@@ -16,7 +16,7 @@ import {
   startCaseAction,
   validateAction,
 } from "../actions";
-import { Badge, Button, controlClass, Field, PageHeader } from "@/components/ui";
+import { Badge, Button, controlClass, DetailGrid, Field, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
 import { historyFor } from "@/lib/history";
@@ -86,7 +86,7 @@ export default async function OperacionDetallePage({ params }: { params: Promise
         action={<Badge tone={row.quotePending ? "warn" : "neutral"}>{CASE_STATUS_LABEL[row.status] ?? row.status}</Badge>}
       />
       {readOnly ? <p className="mb-4 text-sm text-[var(--muted)]">Consulta de solo lectura. SYSTRON no modifica el estado ni la bitácora de Servomotores.</p> : null}
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
+      <DetailGrid>
         <div className="space-y-4">
           <section className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
             <p>Equipo: <Link href={equipmentHref} className="text-[var(--accent)]">{row.equipment.folio}</Link> · {row.equipment.model}</p>
@@ -294,7 +294,7 @@ export default async function OperacionDetallePage({ params }: { params: Promise
             </ul>
           </section>
         )}
-      </div>
+      </DetailGrid>
     </>
   );
 }

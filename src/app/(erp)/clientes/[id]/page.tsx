@@ -9,7 +9,7 @@ import {
 } from "../actions";
 import { ClientInvoiceFields } from "@/components/client-invoice-fields";
 import { ConfirmSubmit, SubmitButton } from "@/components/submit-button";
-import { Badge, Button, controlClass, Field, PageHeader, TextLink } from "@/components/ui";
+import { Badge, Button, controlClass, DetailGrid, Field, PageHeader, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
 import { historyFor } from "@/lib/history";
@@ -83,7 +83,7 @@ export default async function ClienteDetallePage({ params }: { params: Promise<{
         subtitle={client.active ? "Cliente activo" : "Cliente inactivo"}
         action={client.active ? <Badge tone="ok">Activo</Badge> : <Badge tone="danger">Inactivo</Badge>}
       />
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
+      <DetailGrid>
         <form action={updateClientAction} className="grid gap-4 rounded-lg border border-[var(--line)] bg-white p-4">
           <input type="hidden" name="id" value={client.id} />
           <input type="hidden" name="version" value={client.version} />
@@ -145,15 +145,19 @@ export default async function ClienteDetallePage({ params }: { params: Promise<{
             {can(session.role, "quote.create", session.activeCompanyCode) ? <p className="mt-2"><TextLink href={`/cotizaciones/nuevo?clientId=${client.id}`}>Nueva cotización</TextLink></p> : null}
           </section>
         </div>
-      </div>
+      </DetailGrid>
 
       <section className="mt-6 rounded-lg border border-[var(--line)] bg-white p-4">
         <h2 className="font-medium">Contactos</h2>
         <ul className="mt-3 divide-y divide-[var(--line)]">
           {client.contacts.filter((contact) => contact.active).length === 0 ? <li className="py-2 text-sm text-[var(--danger)]">Falta el contacto obligatorio.</li> : null}
           {client.contacts.filter((contact) => contact.active).map((contact) => (
-            <li key={contact.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
-              <span>{contact.name}{contact.isPrimary ? " · principal" : ""}{contact.roleTitle ? ` · ${contact.roleTitle}` : ""}{contact.phone ? ` · ${contact.phone}` : ""}{contact.email ? ` · ${contact.email}` : ""}</span>
+            <li key={contact.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
+              <div className="min-w-0">
+                <p className="font-medium">{contact.name}{contact.isPrimary ? " · principal" : ""}</p>
+                {contact.roleTitle ? <p className="text-[var(--muted)]">{contact.roleTitle}</p> : null}
+                <p className="break-words text-[var(--muted)]">{[contact.phone, contact.email].filter(Boolean).join(" · ") || "Sin teléfono ni correo"}</p>
+              </div>
               <form action={inactivateContactAction}>
                 <input type="hidden" name="contactId" value={contact.id} />
                 <ConfirmSubmit message="El contacto quedará inactivo. Debe quedar al menos un contacto activo.">Inactivar</ConfirmSubmit>

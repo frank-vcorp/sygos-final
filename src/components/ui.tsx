@@ -40,11 +40,28 @@ export function Button({
   return (
     <button
       {...props}
-      className={`inline-flex items-center justify-center rounded-md px-3 py-2 text-sm font-medium disabled:opacity-50 ${tones[tone]} ${props.className ?? ""}`}
+      className={`inline-flex min-h-11 items-center justify-center rounded-md px-3 py-2 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 disabled:opacity-50 ${tones[tone]} ${props.className ?? ""}`}
     >
       {children}
     </button>
   );
+}
+
+export function ActionLink({
+  href,
+  children,
+  tone = "primary",
+  className = "",
+}: {
+  href: string;
+  children: React.ReactNode;
+  tone?: "primary" | "ghost";
+  className?: string;
+}) {
+  const styles = tone === "primary"
+    ? "bg-[var(--accent)] text-white"
+    : "border border-[var(--line)] bg-white hover:bg-[#f7f8f9]";
+  return <Link href={href} className={`inline-flex min-h-11 items-center justify-center rounded-md px-3 py-2 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 ${styles} ${className}`}>{children}</Link>;
 }
 
 export function TextLink({ href, children }: { href: string; children: React.ReactNode }) {
@@ -74,7 +91,21 @@ export function Field({
 }
 
 export const controlClass =
-  "w-full rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--accent)]";
+  "min-h-11 w-full rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--accent)] focus-visible:ring-2 focus-visible:ring-[var(--accent-soft)]";
+
+export function FilterBar({ children, action, className = "" }: { children: React.ReactNode; action: string; className?: string }) {
+  return <form className={`mb-4 flex flex-col gap-2 rounded-lg border border-[var(--line)] bg-white p-3 sm:flex-row sm:flex-wrap sm:items-center ${className}`} action={action}>{children}</form>;
+}
+
+export function SegmentedNav({ items }: { items: Array<{ href: string; label: string; active: boolean }> }) {
+  return (
+    <nav className="mb-4 flex gap-2 overflow-x-auto pb-1" aria-label="Vistas">
+      {items.map((item) => (
+        <Link key={item.href} href={item.href} aria-current={item.active ? "page" : undefined} className={`inline-flex min-h-11 shrink-0 items-center rounded-md px-3 py-2 text-sm font-medium ${item.active ? "bg-[var(--accent)] text-white" : "border border-[var(--line)] bg-white"}`}>{item.label}</Link>
+      ))}
+    </nav>
+  );
+}
 
 export function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
   return <section className={`rounded-lg border border-[var(--line)] bg-white ${className}`}>{children}</section>;
@@ -119,6 +150,41 @@ export function Table({ children }: { children: React.ReactNode }) {
       <table className="min-w-full text-left text-sm">{children}</table>
     </div>
   );
+}
+
+export function ResponsiveData({ table, cards }: { table: React.ReactNode; cards: React.ReactNode }) {
+  return (
+    <>
+      <div className="hidden md:block">{table}</div>
+      <div className="grid gap-3 md:hidden">{cards}</div>
+    </>
+  );
+}
+
+export function MobileCard({
+  href,
+  title,
+  meta,
+  children,
+}: {
+  href: string;
+  title: React.ReactNode;
+  meta?: React.ReactNode;
+  children?: React.ReactNode;
+}) {
+  return (
+    <Link href={href} className="block rounded-lg border border-[var(--line)] bg-white p-4 outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]">
+      <div className="flex min-h-6 items-start justify-between gap-3">
+        <p className="font-semibold text-[var(--accent)]">{title}</p>
+        {meta}
+      </div>
+      {children ? <div className="mt-2 space-y-1 text-sm text-[var(--muted)]">{children}</div> : null}
+    </Link>
+  );
+}
+
+export function DetailGrid({ children }: { children: React.ReactNode }) {
+  return <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">{children}</div>;
 }
 
 export function Th({ children }: { children: React.ReactNode }) {

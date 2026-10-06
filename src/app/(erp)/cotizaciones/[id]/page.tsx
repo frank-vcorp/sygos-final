@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { requestDocumentAction, requestIntercompanyAction } from "@/app/(erp)/facturacion/actions";
 import { decideAction, discountAction, linkBaseAction, relateEquipmentAction, sendQuoteMailAction, setPricesAction } from "../actions";
 import { ConfirmSubmit, SubmitButton } from "@/components/submit-button";
-import { Badge, controlClass, Field, PageHeader } from "@/components/ui";
+import { Badge, controlClass, DetailGrid, Field, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
 import { historyFor } from "@/lib/history";
@@ -63,7 +63,7 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
         <input type="hidden" name="quoteId" value={quote.id} />
         <button className="text-[var(--accent)]">Enviar por correo{quote.client.contacts.find((contact) => contact.email)?.email ? ` a ${quote.client.contacts.find((contact) => contact.email)?.email}` : ""}</button>
       </form>
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
+      <DetailGrid>
         <section className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
           <p>Cliente: <Link href={`/clientes/${quote.client.id}`} className="text-[var(--accent)]">{quote.client.isSystem ? "SYSTRON · intercompañía" : quote.client.name}</Link></p>
           <p className="mt-1">Equipo: {quote.equipment ? <Link href={quote.equipment.kind === "MOT" ? `/motores/${quote.equipment.id}` : `/equipos/${quote.equipment.id}`} className="text-[var(--accent)]">{quote.equipment.folio}</Link> : [quote.preliminaryType, quote.preliminaryBrand, quote.preliminaryModel, quote.preliminarySerial].filter(Boolean).join(" · ") || "Sin equipo físico"}</p>
@@ -196,7 +196,7 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
             {history.map((item) => <li key={item.id}><span className="text-[var(--muted)]">{formatWhen(item.createdAt)}</span> · {item.summary}</li>)}
           </ul>
         </div>
-      </div>
+      </DetailGrid>
     </>
   );
 }

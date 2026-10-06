@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Badge, Empty, PageHeader, Table, Td, Th } from "@/components/ui";
+import { Badge, Empty, MobileCard, PageHeader, ResponsiveData, SegmentedNav, Table, Td, Th } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { compareBySla } from "@/lib/sla";
@@ -48,15 +48,11 @@ export default async function OperacionPage({ searchParams }: { searchParams: Pr
   return (
     <>
       <PageHeader title="Operación técnica" subtitle="Diagnósticos, garantías y órdenes de servicio. El orden sigue el SLA: vencidos primero." />
-      <div className="mb-4 flex gap-2">
-        {tabs.map(([key, label]) => (
-          <Link key={key} href={`/operacion?vista=${key}`} className={`rounded-md px-3 py-2 text-sm ${view === key ? "bg-[var(--accent)] text-white" : "border border-[var(--line)] bg-white"}`}>{label}</Link>
-        ))}
-      </div>
+      <SegmentedNav items={tabs.map(([key, label]) => ({ href: `/operacion?vista=${key}`, label, active: view === key }))} />
       {ordered.length === 0 ? (
         <Empty title="Sin operaciones en esta vista" body="El trabajo técnico aparece cuando el equipo ya tuvo entrada o ingreso físico." />
       ) : (
-        <Table>
+        <ResponsiveData table={<Table>
           <thead><tr><Th>Folio</Th><Th>Equipo</Th><Th>Estado</Th><Th>Prioridad</Th><Th>Responsable</Th><Th>SLA</Th></tr></thead>
           <tbody>
             {ordered.map((row) => {
@@ -74,7 +70,11 @@ export default async function OperacionPage({ searchParams }: { searchParams: Pr
               );
             })}
           </tbody>
-        </Table>
+        </Table>} cards={ordered.map((row) => {
+          const readOnly = row.serviceCompanyId !== session.activeCompanyId;
+          const overdue = row.slaDueAt != null && row.slaDueAt.getTime() < Date.now();
+          return <MobileCard key={row.id} href={`/operacion/${row.id}`} title={`${row.folio}${readOnly ? " · lectura" : ""}`} meta={<Badge tone={overdue ? "warn" : "neutral"}>{CASE_STATUS_LABEL[row.status] ?? row.status}</Badge>}><p>{row.equipment.folio} · {row.equipment.model}</p><p>{row.attention.priorityName} · {row.externalSupplierId ? "Servicio externo" : row.assignee?.name ?? "Sin asignar"}</p><p>SLA: {row.slaDueAt ? row.slaDueAt.toLocaleString("es-MX", { timeZone: "America/Mexico_City", dateStyle: "medium", timeStyle: "short" }) : "—"}</p></MobileCard>;
+        })} />
       )}
     </>
   );

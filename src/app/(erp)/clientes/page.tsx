@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Button, Empty, ListCap, PageHeader, Table, Td, Th, TextLink } from "@/components/ui";
+import { ActionLink, Button, controlClass, Empty, FilterBar, ListCap, MobileCard, PageHeader, ResponsiveData, Table, Td, Th, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
@@ -32,16 +32,16 @@ export default async function ClientesPage({ searchParams }: { searchParams: Pro
       <PageHeader
         title="Clientes"
         subtitle={session.activeCompanyName ?? ""}
-        action={can(session.role, "client.create", session.activeCompanyCode) ? <Link href="/clientes/nuevo" className="rounded-md bg-[var(--accent)] px-3 py-2 text-sm font-medium text-white">Nuevo cliente</Link> : null}
+        action={can(session.role, "client.create", session.activeCompanyCode) ? <ActionLink href="/clientes/nuevo">Nuevo cliente</ActionLink> : null}
       />
-      <form className="mb-4 flex flex-wrap gap-2" action="/clientes">
-        <input name="q" defaultValue={query} placeholder="Nombre o razón social" className="rounded-md border border-[var(--line)] px-3 py-2 text-sm" />
-        <select name="estado" defaultValue={estado ?? "activos"} className="rounded-md border border-[var(--line)] px-3 py-2 text-sm">
+      <FilterBar action="/clientes">
+        <input name="q" defaultValue={query} placeholder="Nombre o razón social" className={`${controlClass} sm:flex-1`} />
+        <select name="estado" defaultValue={estado ?? "activos"} className={`${controlClass} sm:w-auto`}>
           <option value="activos">Activos</option>
           <option value="inactivos">Inactivos</option>
         </select>
         <Button type="submit" tone="ghost">Filtrar</Button>
-      </form>
+      </FilterBar>
       {clients.length === 0 ? (
         <Empty
           title={query || estado === "inactivos" ? "Sin coincidencias" : "No hay clientes"}
@@ -49,19 +49,10 @@ export default async function ClientesPage({ searchParams }: { searchParams: Pro
           action={query || estado === "inactivos" ? <TextLink href="/clientes">Quitar filtro</TextLink> : can(session.role, "client.create", session.activeCompanyCode) ? <TextLink href="/clientes/nuevo">Nuevo cliente</TextLink> : undefined}
         />
       ) : (
-        <Table>
-          <thead><tr><Th>Cliente</Th><Th>Responsable</Th><Th>Crédito</Th><Th>Factura</Th></tr></thead>
-          <tbody>
-            {clients.map((client) => (
-              <tr key={client.id}>
-                <Td><Link href={`/clientes/${client.id}`} className="font-medium text-[var(--accent)]">{client.name}</Link>{client.isSystem ? " · intercompañía" : ""}</Td>
-                <Td>{client.ownerUserId ? ownerName.get(client.ownerUserId) ?? "—" : "—"}</Td>
-                <Td>{client.creditDays != null ? `${client.creditDays} días` : "—"}</Td>
-                <Td>{client.requiresInvoice == null ? "Sin definir" : client.requiresInvoice ? "Sí" : "No"}</Td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
+        <ResponsiveData
+          table={<Table><thead><tr><Th>Cliente</Th><Th>Responsable</Th><Th>Crédito</Th><Th>Factura</Th></tr></thead><tbody>{clients.map((client) => <tr key={client.id}><Td><Link href={`/clientes/${client.id}`} className="font-medium text-[var(--accent)]">{client.name}</Link>{client.isSystem ? " · intercompañía" : ""}</Td><Td>{client.ownerUserId ? ownerName.get(client.ownerUserId) ?? "—" : "—"}</Td><Td>{client.creditDays != null ? `${client.creditDays} días` : "—"}</Td><Td>{client.requiresInvoice == null ? "Sin definir" : client.requiresInvoice ? "Sí" : "No"}</Td></tr>)}</tbody></Table>}
+          cards={clients.map((client) => <MobileCard key={client.id} href={`/clientes/${client.id}`} title={client.name} meta={client.isSystem ? "Intercompañía" : undefined}><p>Responsable: {client.ownerUserId ? ownerName.get(client.ownerUserId) ?? "—" : "—"}</p><p>Crédito: {client.creditDays != null ? `${client.creditDays} días` : "—"} · Factura: {client.requiresInvoice == null ? "Sin definir" : client.requiresInvoice ? "Sí" : "No"}</p></MobileCard>)}
+        />
       )}
       <ListCap shown={clients.length} />
     </>

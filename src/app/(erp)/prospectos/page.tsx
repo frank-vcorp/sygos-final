@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Button, Empty, PageHeader, Table, Td, Th } from "@/components/ui";
+import Link from "next/link";
+import { ActionLink, Button, controlClass, Empty, FilterBar, MobileCard, PageHeader, ResponsiveData, Table, Td, Th } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
@@ -30,28 +30,20 @@ export default async function ProspectosPage({ searchParams }: { searchParams: P
   });
   return (
     <>
-      <PageHeader title="Prospectos" subtitle={session.activeCompanyName ?? ""} action={<Link href="/prospectos/nuevo" className="rounded-md bg-[var(--accent)] px-3 py-2 text-sm font-medium text-white">Nuevo prospecto</Link>} />
-      <form className="mb-4 flex flex-wrap gap-2" action="/prospectos">
-        <input name="q" defaultValue={query} placeholder="Empresa o nombre" className="rounded-md border border-[var(--line)] px-3 py-2 text-sm" />
-        <select name="estado" defaultValue={status} className="rounded-md border border-[var(--line)] px-3 py-2 text-sm">
+      <PageHeader title="Prospectos" subtitle={session.activeCompanyName ?? ""} action={<ActionLink href="/prospectos/nuevo">Nuevo prospecto</ActionLink>} />
+      <FilterBar action="/prospectos">
+        <input name="q" defaultValue={query} placeholder="Empresa o nombre" className={`${controlClass} sm:flex-1`} />
+        <select name="estado" defaultValue={status} className={`${controlClass} sm:w-auto`}>
           <option value="ABIERTOS">Abiertos</option>
           {Object.entries(LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select>
         <Button type="submit" tone="ghost">Filtrar</Button>
-      </form>
+      </FilterBar>
       {prospects.length === 0 ? <Empty title="No hay prospectos" body="Nada coincide con el filtro en esta empresa." /> : (
-        <Table>
-          <thead><tr><Th>Prospecto</Th><Th>Estado</Th><Th>Fuente</Th></tr></thead>
-          <tbody>
-            {prospects.map((prospect) => (
-              <tr key={prospect.id}>
-                <Td><Link className="font-medium text-[var(--accent)]" href={`/prospectos/${prospect.id}`}>{prospect.name}</Link></Td>
-                <Td>{LABEL[prospect.status] ?? prospect.status}</Td>
-                <Td>{prospect.source ?? "—"}</Td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
+        <ResponsiveData
+          table={<Table><thead><tr><Th>Prospecto</Th><Th>Estado</Th><Th>Fuente</Th></tr></thead><tbody>{prospects.map((prospect) => <tr key={prospect.id}><Td><Link className="font-medium text-[var(--accent)]" href={`/prospectos/${prospect.id}`}>{prospect.name}</Link></Td><Td>{LABEL[prospect.status] ?? prospect.status}</Td><Td>{prospect.source ?? "—"}</Td></tr>)}</tbody></Table>}
+          cards={prospects.map((prospect) => <MobileCard key={prospect.id} href={`/prospectos/${prospect.id}`} title={prospect.name} meta={LABEL[prospect.status] ?? prospect.status}><p>Fuente: {prospect.source ?? "—"}</p></MobileCard>)}
+        />
       )}
     </>
   );

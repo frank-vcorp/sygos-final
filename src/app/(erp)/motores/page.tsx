@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Badge, Button, Empty, ListCap, PageHeader, Table, Td, Th, TextLink } from "@/components/ui";
+import { ActionLink, Badge, Button, controlClass, Empty, FilterBar, ListCap, MobileCard, PageHeader, ResponsiveData, Table, Td, Th, TextLink } from "@/components/ui";
 import { CUSTODY_LABEL, type Custody } from "@/lib/custody";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
@@ -34,12 +34,12 @@ export default async function MotoresPage({ searchParams }: { searchParams: Prom
       <PageHeader
         title="Motores"
         subtitle="Folio MOT global. SYSTRON ve los que originó. Servomotores ve los suyos y los que llegan de SYSTRON."
-        action={can(session.role, "mot.create", session.activeCompanyCode) ? <Link href="/motores/nuevo" className="rounded-md bg-[var(--accent)] px-3 py-2 text-sm font-medium text-white">Nuevo MOT</Link> : null}
+        action={can(session.role, "mot.create", session.activeCompanyCode) ? <ActionLink href="/motores/nuevo">Nuevo MOT</ActionLink> : null}
       />
-      <form className="mb-4 flex gap-2" action="/motores">
-        <input name="q" defaultValue={query} placeholder="Folio, modelo o serie" className="rounded-md border border-[var(--line)] px-3 py-2 text-sm" />
+      <FilterBar action="/motores">
+        <input name="q" defaultValue={query} placeholder="Folio, modelo o serie" className={`${controlClass} sm:flex-1`} />
         <Button type="submit" tone="ghost">Buscar</Button>
-      </form>
+      </FilterBar>
       {rows.length === 0 ? (
         <Empty
           title={query ? "Sin coincidencias" : "No hay motores"}
@@ -47,7 +47,7 @@ export default async function MotoresPage({ searchParams }: { searchParams: Prom
           action={query ? <TextLink href="/motores">Quitar búsqueda</TextLink> : can(session.role, "mot.create", session.activeCompanyCode) ? <TextLink href="/motores/nuevo">Nuevo MOT</TextLink> : undefined}
         />
       ) : (
-        <Table>
+        <ResponsiveData table={<Table>
           <thead><tr><Th>Folio</Th><Th>Origen</Th><Th>Cliente visible</Th><Th>Identificación</Th><Th>Custodia</Th></tr></thead>
           <tbody>
             {rows.map((row) => {
@@ -63,7 +63,10 @@ export default async function MotoresPage({ searchParams }: { searchParams: Prom
               );
             })}
           </tbody>
-        </Table>
+        </Table>} cards={rows.map((row) => {
+          const intercompany = session.activeCompanyCode === "SERVOMOTORES" && row.originCompany.code === "SYSTRON";
+          return <MobileCard key={row.id} href={`/motores/${row.id}`} title={row.folio} meta={<Badge>{CUSTODY_LABEL[row.custody as Custody] ?? row.custody}</Badge>}><p>{intercompany ? "SYSTRON · intercompañía" : row.client.name}</p><p>{row.originCompany.name} · {[row.brandName, row.model, row.serial].filter(Boolean).join(" · ") || "Sin identificación adicional"}</p></MobileCard>;
+        })} />
       )}
       <ListCap shown={rows.length} />
     </>

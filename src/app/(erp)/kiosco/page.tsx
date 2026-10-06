@@ -18,16 +18,16 @@ export default async function KioscoPage() {
   return (
     <>
       <PageHeader title="Kiosco" subtitle={`${day}. Solo entrada y salida de quien sí marca asistencia.`} />
-      <ul className="space-y-3">
+      <ul className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {people.map((person) => {
           const mark = person.attendance[0];
           const open = Boolean(mark?.entryAt && !mark.exitAt);
           return (
-            <li key={person.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--line)] bg-white px-3 py-3">
-              <span>{person.user.name} · {mark?.status ?? "Sin marca"}</span>
-              <form action={punchAction}>
+            <li key={person.id} className="flex min-h-36 flex-col justify-between gap-4 rounded-lg border border-[var(--line)] bg-white p-4">
+              <div><p className="text-lg font-semibold">{person.user.name}</p><p className="text-sm text-[var(--muted)]">{mark?.status ?? "Sin marca"}</p></div>
+              <form action={punchAction} className="w-full">
                 <input type="hidden" name="collaboratorId" value={person.id} />
-                <button name="kind" value={open ? "SALIDA" : "ENTRADA"} className="rounded-md bg-[var(--accent)] px-3 py-2 text-sm font-medium text-white">{open ? "Salida" : "Entrada"}</button>
+                <button name="kind" value={open ? "SALIDA" : "ENTRADA"} className="min-h-12 w-full rounded-md bg-[var(--accent)] px-4 text-base font-semibold text-white">{open ? "Registrar salida" : "Registrar entrada"}</button>
               </form>
             </li>
           );

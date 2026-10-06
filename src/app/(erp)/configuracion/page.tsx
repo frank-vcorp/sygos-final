@@ -22,24 +22,30 @@ export default async function ConfiguracionPage() {
   return (
     <>
       <PageHeader title="Configuración" subtitle={`Cambios de ${company.name}. No alteran la otra empresa.`} />
+      <nav className="sticky top-14 z-10 mb-4 flex gap-2 overflow-x-auto border-y border-[var(--line)] bg-[var(--bg)] py-2 md:top-0" aria-label="Secciones de configuración">
+        {can(session.role, "config.company") ? <a href="#identidad" className="inline-flex min-h-11 shrink-0 items-center rounded-md border border-[var(--line)] bg-white px-3 text-sm font-medium">Identidad</a> : null}
+        {can(session.role, "config.company") ? <a href="#prioridades" className="inline-flex min-h-11 shrink-0 items-center rounded-md border border-[var(--line)] bg-white px-3 text-sm font-medium">Prioridades</a> : null}
+        {can(session.role, "config.integrations") ? <a href="#integraciones" className="inline-flex min-h-11 shrink-0 items-center rounded-md border border-[var(--line)] bg-white px-3 text-sm font-medium">Integraciones</a> : null}
+      </nav>
       {can(session.role, "config.company") ? (
-        <form action={updateCompanyAction} className="grid max-w-xl gap-4 rounded-lg border border-[var(--line)] bg-white p-4">
+        <form id="identidad" action={updateCompanyAction} className="grid max-w-3xl scroll-mt-28 gap-4 rounded-lg border border-[var(--line)] bg-white p-4 sm:grid-cols-2">
           <h2 className="font-medium">Identidad</h2>
+          <span className="hidden sm:block" />
           <input type="hidden" name="version" value={company.version} />
           <Field label="Razón social"><input name="legalName" defaultValue={company.legalName ?? ""} className={controlClass} /></Field>
           <Field label="RFC"><input name="rfc" defaultValue={company.rfc ?? ""} className={controlClass} /></Field>
           <Field label="Régimen fiscal" hint="Catálogo c_RegimenFiscal del SAT."><RegimenSelect name="taxRegime" defaultValue={company.taxRegime} /></Field>
           <Field label="Código postal"><input name="postalCode" defaultValue={company.postalCode ?? ""} className={controlClass} /></Field>
-          <Field label="Domicilio fiscal"><textarea name="fiscalAddress" defaultValue={company.fiscalAddress ?? ""} rows={2} className={controlClass} /></Field>
+          <div className="sm:col-span-2"><Field label="Domicilio fiscal"><textarea name="fiscalAddress" defaultValue={company.fiscalAddress ?? ""} rows={2} className={controlClass} /></Field></div>
           <Field label="Teléfono"><input name="phone" defaultValue={company.phone ?? ""} className={controlClass} /></Field>
           <Field label="Correo"><input name="email" defaultValue={company.email ?? ""} className={controlClass} /></Field>
           <Field label="Días de crédito sugeridos"><input name="defaultCreditDays" defaultValue={company.defaultCreditDays ?? ""} className={controlClass} /></Field>
-          <Button type="submit">Guardar empresa</Button>
+          <Button type="submit" className="sm:col-span-2 sm:w-fit">Guardar empresa</Button>
         </form>
       ) : null}
 
       {can(session.role, "config.company") ? (
-        <section className="mt-4 max-w-3xl space-y-3">
+        <section id="prioridades" className="mt-6 max-w-5xl scroll-mt-28 space-y-3">
           <h2 className="font-medium">Prioridades y SLA</h2>
           <p className="text-sm text-[var(--muted)]">Cada empresa tiene su catálogo. Un cambio no altera atenciones ya creadas ni a la otra empresa.</p>
           {(await prisma.priority.findMany({ where: { companyId: company.id }, orderBy: [{ attentionType: "asc" }, { sortOrder: "asc" }] })).map((priority) => (
@@ -69,7 +75,7 @@ export default async function ConfiguracionPage() {
       ) : null}
 
       {can(session.role, "config.integrations") ? (
-        <section className="mt-4 max-w-xl space-y-4">
+        <section id="integraciones" className="mt-6 grid max-w-5xl scroll-mt-28 gap-4 lg:grid-cols-2">
           <form action={saveFacturapiAction} className="grid gap-3 rounded-lg border border-[var(--line)] bg-white p-4">
             <h2 className="font-medium">Facturapi · {company.name}</h2>
             <p className="text-sm text-[var(--muted)]">{hint("FACTURAPI", true)?.secretHint ? `Llave ${hint("FACTURAPI", true)?.secretHint}. ` : "Sin llave. "}La llave es sk_test_ o sk_live_ de la organización de esta razón social. El certificado de sello se carga en Facturapi.</p>
@@ -92,7 +98,7 @@ export default async function ConfiguracionPage() {
               <button formAction={verifySendgridAction} className="rounded-md border border-[var(--line)] px-3 py-2 text-sm">Verificar llave</button>
             </div>
           </form>
-          <WhatsAppPanel />
+          <div className="lg:col-span-2"><WhatsAppPanel /></div>
         </section>
       ) : null}
     </>
