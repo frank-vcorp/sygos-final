@@ -95,7 +95,7 @@ export async function activateSandbox(userIds: string[], roles: string[]) {
   const target = sandboxDatabasePath();
   if (target === productionDatabasePath()) throw new Error("La copia de pruebas no puede ser la base real.");
   if (existsSync(target)) unlinkSync(target);
-  await prismaProd.$executeRawUnsafe("PRAGMA wal_checkpoint(TRUNCATE)");
+  await prismaProd.$queryRawUnsafe("PRAGMA wal_checkpoint(TRUNCATE)");
   await prismaProd.$executeRawUnsafe(`VACUUM INTO '${target.replaceAll("'", "''")}'`);
   if (!existsSync(target)) throw new Error("No se pudo crear la copia de pruebas.");
   if (globalForPrisma.prismaTest) {
