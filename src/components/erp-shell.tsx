@@ -31,7 +31,7 @@ export function ErpShell({
   }, [open]);
 
   return (
-    <div className="min-h-screen md:grid md:grid-cols-[240px_minmax(0,1fr)]">
+    <div data-erp-shell className="min-h-screen md:grid md:grid-cols-[240px_minmax(0,1fr)]">
       <div data-erp-chrome className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-[var(--line)] bg-white px-4 md:hidden print:hidden">
         <button
           type="button"

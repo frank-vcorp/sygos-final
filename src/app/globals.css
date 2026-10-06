@@ -67,7 +67,12 @@ summary {
     display: none !important;
   }
 
+  [data-erp-shell] {
+    display: block !important;
+  }
+
   .quote-document {
+    width: 100%;
     color: #111827;
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
