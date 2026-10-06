@@ -58,6 +58,7 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
   return (
     <>
       <PageHeader back={{ href: "/cotizaciones", label: "Cotizaciones" }} title={quote.folio} subtitle={QUOTE_TYPE_LABEL[quote.quoteType as QuoteType] ?? quote.quoteType} action={<Badge>{QUOTE_STATUS_LABEL[quote.status] ?? quote.status}</Badge>} />
+      <p className="mb-4 text-sm"><a href={`/documentos/cotizacion/${quote.id}`} className="text-[var(--accent)]">Documento para imprimir</a></p>
       <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
         <section className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
           <p>Cliente: <Link href={`/clientes/${quote.client.id}`} className="text-[var(--accent)]">{quote.client.isSystem ? "SYSTRON · intercompañía" : quote.client.name}</Link></p>

@@ -72,7 +72,7 @@ export default async function ConfiguracionPage() {
           <IntegrationForm provider="FACTURAPI" title="Facturapi de esta empresa" setting={hint("FACTURAPI", true)} />
           <IntegrationForm provider="SENDGRID" title="SendGrid" setting={hint("SENDGRID", false)} />
           <IntegrationForm provider="WHATSAPP" title="WhatsApp" setting={hint("WHATSAPP", false)} />
-          <p className="text-sm text-[var(--muted)]">Si una credencial falta, la acción que depende de ella se deshabilita. El sistema no simula un timbrado, un correo ni un mensaje exitoso.</p>
+          <p className="text-sm text-[var(--muted)]">Si una credencial falta, la acción que depende de ella se deshabilita. El sistema no simula un timbrado, un correo ni un mensaje exitoso. WhatsApp permanece desconectado hasta que el canal exista; no se marca como vinculado.</p>
         </section>
       ) : null}
     </>

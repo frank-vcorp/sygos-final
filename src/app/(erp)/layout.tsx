@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { logoutAction, switchCompanyAction, viewAsAction } from "@/app/auth-actions";
 import { FlashBanner } from "@/components/flash-banner";
 import { SideNav } from "@/components/side-nav";
-import { prisma } from "@/lib/db";
+import { prisma, sandboxFor } from "@/lib/db";
 import { takeFlash } from "@/lib/flash";
 import { can } from "@/lib/permissions";
 import { ROLE_LABEL, isRole } from "@/lib/roles";
@@ -76,6 +76,7 @@ const GROUPS: Array<{ title: string | null; links: NavLink[] }> = [
       { href: "/proveedores", label: "Proveedores", show: (role, code) => can(role, "supplier.operate", code), createHref: "/proveedores/nuevo", showCreate: (role, code) => can(role, "supplier.operate", code) },
       { href: "/usuarios", label: "Usuarios", show: (role) => can(role, "user.manage") },
       { href: "/configuracion", label: "Configuración", show: (role) => can(role, "config.company") || can(role, "config.integrations") },
+      { href: "/pruebas", label: "Modo de pruebas", show: (role) => role === "ADMINISTRADOR" },
     ],
   },
 ];
@@ -184,6 +185,9 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
                 <button className="font-medium text-[var(--accent)]" type="submit">Volver a Administrador</button>
               </form>
             </div>
+          ) : null}
+          {sandboxFor(session.userId, session.role) ? (
+            <p className="mb-4 rounded-md border border-[#efd0d0] bg-[var(--danger-soft)] px-3 py-2 text-sm font-medium">MODO DE PRUEBAS — Los cambios realizados en este contexto serán descartados y no afectan la operación real.</p>
           ) : null}
           {!business ? (
             <p className="mb-4 rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm">

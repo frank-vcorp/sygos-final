@@ -2,6 +2,7 @@ import { prisma } from "./db";
 import { allocateFolio } from "./folios";
 import { ConcurrencyError } from "./form";
 import { recordHistory } from "./history";
+import { fiscalFailure } from "./fiscal";
 import { roundMoney } from "./money";
 import type { Role } from "./roles";
 
@@ -502,7 +503,8 @@ export async function authorizePayroll(actor: Actor, periodId: string, version: 
   if (!period) throw new Error("Esa nómina no está en preliminar.");
   const blocked = period.lines.filter((line) => line.missing && line.transferTotal > 0);
   if (blocked.length > 0) throw new Error(`Falta ${blocked[0].missing} de ${blocked[0].collaborator.user.name}.`);
-  const updated = await prisma.payrollPeriod.updateMany({ where: { id: period.id, version }, data: { status: "AUTORIZADA", fiscalStatus: "ERROR", fiscalError: "Facturapi no está configurado.", version: { increment: 1 } } });
+  const fiscal = await fiscalFailure(actor.activeCompanyId);
+  const updated = await prisma.payrollPeriod.updateMany({ where: { id: period.id, version }, data: { status: "AUTORIZADA", fiscalStatus: fiscal.fiscalStatus, fiscalError: fiscal.fiscalError, version: { increment: 1 } } });
   if (updated.count === 0) throw new ConcurrencyError();
   const transfer = roundMoney(period.lines.reduce((sum, line) => sum + line.transferTotal, 0));
   const cash = roundMoney(period.lines.reduce((sum, line) => sum + line.cashTotal, 0));
@@ -530,7 +532,8 @@ export async function retryPayrollFiscal(actor: Actor, periodId: string) {
   assertHr(actor);
   const period = await prisma.payrollPeriod.findFirst({ where: { id: periodId, companyId: actor.activeCompanyId, status: "AUTORIZADA" } });
   if (!period) throw new Error("Solo se reintenta una nómina ya autorizada.");
-  await prisma.payrollPeriod.update({ where: { id: period.id }, data: { fiscalStatus: "ERROR", fiscalError: "Facturapi no está configurado." } });
+  const fiscal = await fiscalFailure(period.companyId);
+  await prisma.payrollPeriod.update({ where: { id: period.id }, data: { fiscalStatus: fiscal.fiscalStatus, fiscalError: fiscal.fiscalError } });
   return period;
 }
 

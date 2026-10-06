@@ -2,10 +2,10 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "./db";
 import { hashToken, newSessionToken, verifyPassword } from "./crypto";
+import { SESSION_COOKIE } from "./session-cookie";
 import { isRole, type Role } from "./roles";
 import { needsExplicitCompany } from "./permissions";
 
-export const SESSION_COOKIE = "sygos_session";
 const SESSION_DAYS = 14;
 
 export type AppSession = {

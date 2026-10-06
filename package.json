@@ -9,7 +9,7 @@
     "postinstall": "prisma generate",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
-    "test": "tsx --test src/lib/permissions.test.ts src/lib/folios.test.ts src/lib/custody.test.ts src/lib/sla.test.ts src/lib/money.test.ts src/lib/catalog-key.test.ts src/lib/billing.test.ts src/lib/purchases.test.ts src/lib/personnel.test.ts src/lib/panels.test.ts"
+    "test": "tsx --test src/lib/permissions.test.ts src/lib/folios.test.ts src/lib/custody.test.ts src/lib/sla.test.ts src/lib/money.test.ts src/lib/catalog-key.test.ts src/lib/billing.test.ts src/lib/purchases.test.ts src/lib/personnel.test.ts src/lib/panels.test.ts src/lib/sandbox.test.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"

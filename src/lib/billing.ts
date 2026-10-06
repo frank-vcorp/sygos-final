@@ -1,6 +1,7 @@
 import { prisma } from "./db";
 import { allocateFolio } from "./folios";
 import { recordCompanyCash } from "./purchases";
+import { fiscalFailure } from "./fiscal";
 import { ConcurrencyError } from "./form";
 import { recordHistory } from "./history";
 import { linesForTotal, quoteTotals, roundMoney } from "./money";
@@ -96,7 +97,7 @@ export async function issueDocument(actor: Actor, documentId: string) {
   const dueAt = addDays(issuedAt, document.creditDays);
   const fiscal = document.kind === "REMISION"
     ? { fiscalStatus: "NO_APLICA", fiscalError: null as string | null, status: "EMITIDA" }
-    : { fiscalStatus: "ERROR", fiscalError: "Facturapi no está configurado. El reintento usa este mismo documento.", status: "EMITIDA" };
+    : { ...(await fiscalFailure(document.companyId)), status: "EMITIDA" };
   await prisma.billingDocument.update({
     where: { id: document.id },
     data: { ...fiscal, issuedAt, dueAt, issuedByUserId: actor.userId, version: { increment: 1 } },
@@ -146,10 +147,11 @@ export async function issueDocument(actor: Actor, documentId: string) {
 
 export async function retryFiscal(actor: Actor, documentId: string) {
   const document = await prisma.billingDocument.findFirst({ where: { id: documentId, companyId: actor.activeCompanyId } });
-  if (!document || document.fiscalStatus !== "ERROR") throw new Error("Ese documento no tiene un timbrado por reintentar.");
+  if (!document || (document.fiscalStatus !== "ERROR" && document.fiscalStatus !== "SIMULADA")) throw new Error("Ese documento no tiene un timbrado por reintentar.");
+  const fiscal = await fiscalFailure(document.companyId);
   await prisma.billingDocument.update({
     where: { id: document.id },
-    data: { fiscalError: "Facturapi no está configurado. El reintento no creó otro documento.", version: { increment: 1 } },
+    data: { fiscalStatus: fiscal.fiscalStatus, fiscalError: fiscal.fiscalError, version: { increment: 1 } },
   });
   await recordHistory({
     companyId: actor.activeCompanyId,
@@ -175,6 +177,7 @@ export async function issueFreeInvoice(
   const issuedAt = new Date();
   const creditDays = input.creditDays ?? client.creditDays ?? 0;
   const dueAt = addDays(issuedAt, creditDays);
+  const fiscal = await fiscalFailure(actor.activeCompanyId);
   const document = await prisma.billingDocument.create({
     data: {
       folio,
@@ -190,8 +193,8 @@ export async function issueFreeInvoice(
       rfcSnapshot: client.rfc,
       issuedAt,
       dueAt,
-      fiscalStatus: "ERROR",
-      fiscalError: "Facturapi no está configurado. El reintento usa este mismo documento.",
+      fiscalStatus: fiscal.fiscalStatus,
+      fiscalError: fiscal.fiscalError,
       issuedByUserId: actor.userId,
       lines: { create: [{ concept: input.concept, quantity: 1, unitPrice: total, amount: total }] },
     },
