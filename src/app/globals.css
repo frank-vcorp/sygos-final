@@ -45,6 +45,10 @@ summary {
   -webkit-tap-highlight-color: transparent;
 }
 
+[class*="bg-[var(--accent)]"] {
+  color: #ffffff !important;
+}
+
 @media (max-width: 767px) {
   input,
   select,
