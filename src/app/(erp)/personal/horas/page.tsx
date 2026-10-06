@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { overtimeAction, overtimeReviewAction } from "../actions";
+import { overtimeAction, overtimeReviewAction, vacationRequestAction } from "../actions";
 import { controlClass, Field, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
@@ -21,6 +21,16 @@ export default async function HorasPage() {
   return (
     <>
       <PageHeader title="Horas extra" subtitle="El empleado no elige doble o triple. De la 1 a la 9 de la semana son dobles; de la 10 en adelante, triples." />
+      {mine.some((row) => row.bossUserId === session.userId) ? (
+      <form action={vacationRequestAction} className="mb-4 grid max-w-xl gap-2 rounded-lg border border-[var(--line)] bg-white p-4">
+        <h2 className="font-medium">Vacaciones de un subordinado</h2>
+        <p className="text-sm text-[var(--muted)]">Las pide el jefe, no el empleado. Solo lunes a viernes consumen saldo.</p>
+        <Field label="Colaborador"><select name="collaboratorId" className={controlClass}>{mine.filter((row) => row.bossUserId === session.userId).map((row) => <option key={row.id} value={row.id}>{row.user.name}</option>)}</select></Field>
+        <Field label="Del"><input name="startDate" type="date" required className={controlClass} /></Field>
+        <Field label="Al"><input name="endDate" type="date" required className={controlClass} /></Field>
+        <button className="w-fit rounded-md border border-[var(--line)] px-3 py-2 text-sm">Solicitar vacaciones</button>
+      </form>
+      ) : null}
       <form action={overtimeAction} className="grid max-w-xl gap-2 rounded-lg border border-[var(--line)] bg-white p-4">
         <Field label="Colaborador">
           <select name="collaboratorId" className={controlClass}>
