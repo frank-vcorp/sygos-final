@@ -3,6 +3,7 @@ import { logoutAction, switchCompanyAction, viewAsAction } from "@/app/auth-acti
 import { FlashBanner } from "@/components/flash-banner";
 import { SideNav } from "@/components/side-nav";
 import { prisma, sandboxFor } from "@/lib/db";
+import { cookies } from "next/headers";
 import { takeFlash } from "@/lib/flash";
 import { can } from "@/lib/permissions";
 import { ROLE_LABEL, isRole } from "@/lib/roles";
@@ -84,6 +85,12 @@ const GROUPS: Array<{ title: string | null; links: NavLink[] }> = [
 export default async function ErpLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
   if (!session) redirect("/login");
+  const jar = await cookies();
+  if (sandboxFor(session.userId, session.role)) {
+    jar.set("sygos_sandbox", "1", { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/" });
+  } else {
+    jar.set("sygos_sandbox", "", { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: "/", maxAge: 0 });
+  }
   const flash = await takeFlash();
   const companies = session.homeCompanyId
     ? await prisma.company.findMany({ where: { id: session.homeCompanyId } })

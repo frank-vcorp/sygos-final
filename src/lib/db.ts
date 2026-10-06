@@ -50,7 +50,7 @@ if (process.env.NODE_ENV !== "production") globalForPrisma.prismaProd = prismaPr
 
 function testClient() {
   if (!globalForPrisma.prismaTest) {
-    globalForPrisma.prismaTest = new PrismaClient({ datasources: { db: { url: `file:${sandboxDatabasePath()}` } } });
+    globalForPrisma.prismaTest = new PrismaClient({ datasourceUrl: `file:${sandboxDatabasePath()}` });
   }
   return globalForPrisma.prismaTest;
 }
@@ -62,7 +62,9 @@ export async function inSandbox() {
   if (!meta.active) return false;
   try {
     const token = (await cookies()).get(SESSION_COOKIE)?.value;
+    const marked = (await cookies()).get("sygos_sandbox")?.value === "1";
     if (!token) return false;
+    if (marked) return true;
     const tokenHash = hashToken(token);
     const hit = cache.get(tokenHash);
     if (hit && Date.now() - hit.at < 3000) return hit.yes;
