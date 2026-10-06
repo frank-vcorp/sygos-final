@@ -1,7 +1,7 @@
 import { prisma } from "./db";
 import { allocateFolio } from "./folios";
 import { recordCompanyCash } from "./purchases";
-import { fiscalFailure } from "./fiscal";
+import { stampBillingDocument } from "./facturapi";
 import { ConcurrencyError } from "./form";
 import { recordHistory } from "./history";
 import { linesForTotal, quoteTotals, roundMoney } from "./money";
@@ -95,13 +95,19 @@ export async function issueDocument(actor: Actor, documentId: string) {
   if (document.receivable) throw new Error("Ese documento ya generó una cuenta por cobrar.");
   const issuedAt = new Date();
   const dueAt = addDays(issuedAt, document.creditDays);
-  const fiscal = document.kind === "REMISION"
-    ? { fiscalStatus: "NO_APLICA", fiscalError: null as string | null, status: "EMITIDA" }
-    : { ...(await fiscalFailure(document.companyId)), status: "EMITIDA" };
   await prisma.billingDocument.update({
     where: { id: document.id },
-    data: { ...fiscal, issuedAt, dueAt, issuedByUserId: actor.userId, version: { increment: 1 } },
+    data: {
+      status: "EMITIDA",
+      fiscalStatus: document.kind === "REMISION" ? "NO_APLICA" : "PENDIENTE",
+      fiscalError: null,
+      issuedAt,
+      dueAt,
+      issuedByUserId: actor.userId,
+      version: { increment: 1 },
+    },
   });
+  if (document.kind !== "REMISION") await stampBillingDocument(document.id);
   if (document.kind !== "REMISION" && document.total > 0) {
     await prisma.receivable.create({
       data: {
@@ -147,12 +153,8 @@ export async function issueDocument(actor: Actor, documentId: string) {
 
 export async function retryFiscal(actor: Actor, documentId: string) {
   const document = await prisma.billingDocument.findFirst({ where: { id: documentId, companyId: actor.activeCompanyId } });
-  if (!document || (document.fiscalStatus !== "ERROR" && document.fiscalStatus !== "SIMULADA")) throw new Error("Ese documento no tiene un timbrado por reintentar.");
-  const fiscal = await fiscalFailure(document.companyId);
-  await prisma.billingDocument.update({
-    where: { id: document.id },
-    data: { fiscalStatus: fiscal.fiscalStatus, fiscalError: fiscal.fiscalError, version: { increment: 1 } },
-  });
+  if (!document || document.fiscalStatus === "TIMBRADA" || document.fiscalStatus === "NO_APLICA") throw new Error("Ese documento no tiene un timbrado por reintentar.");
+  await stampBillingDocument(document.id);
   await recordHistory({
     companyId: actor.activeCompanyId,
     entityType: "DOCUMENTO",
@@ -177,7 +179,6 @@ export async function issueFreeInvoice(
   const issuedAt = new Date();
   const creditDays = input.creditDays ?? client.creditDays ?? 0;
   const dueAt = addDays(issuedAt, creditDays);
-  const fiscal = await fiscalFailure(actor.activeCompanyId);
   const document = await prisma.billingDocument.create({
     data: {
       folio,
@@ -193,10 +194,10 @@ export async function issueFreeInvoice(
       rfcSnapshot: client.rfc,
       issuedAt,
       dueAt,
-      fiscalStatus: fiscal.fiscalStatus,
-      fiscalError: fiscal.fiscalError,
+      fiscalStatus: "PENDIENTE",
+      fiscalError: null,
       issuedByUserId: actor.userId,
-      lines: { create: [{ concept: input.concept, quantity: 1, unitPrice: total, amount: total }] },
+      lines: { create: [{ concept: input.concept, quantity: 1, unitPrice: subtotal, amount: subtotal }] },
     },
   });
   await prisma.receivable.create({
@@ -211,6 +212,7 @@ export async function issueFreeInvoice(
       status: "ABIERTA",
     },
   });
+  await stampBillingDocument(document.id);
   await recordHistory({
     companyId: actor.activeCompanyId,
     entityType: "DOCUMENTO",

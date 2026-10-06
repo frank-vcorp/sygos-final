@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { bajaAction, bossAction, documentAction, salaryAction, scheduleAction, vacationBalanceAction, vacationDecisionAction, vacationRequestAction } from "../actions";
+import { bajaAction, bossAction, documentAction, laborIdAction, salaryAction, scheduleAction, vacationBalanceAction, vacationDecisionAction, vacationRequestAction } from "../actions";
 import { Badge, controlClass, Field, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { historyFor } from "@/lib/history";
@@ -28,6 +28,14 @@ export default async function ColaboradorPage({ params }: { params: Promise<{ id
         <p>Ingreso: {formatWhen(row.hiredAt)} · {row.hireKind === "MIGRADO" ? "Migrado" : "Nuevo"}</p>
         <p className="mt-1">Jefe: {row.boss?.name ?? "Sin jefe"}</p>
         <p className="mt-1">Timbrado {money(row.dailyStamped)} · Efectivo {money(row.dailyCash)} · Hora extra {money(row.overtimeRate)}</p>
+        <form action={laborIdAction} className="mt-3 grid gap-2 sm:grid-cols-2">
+          <input type="hidden" name="collaboratorId" value={row.id} />
+          <Field label="RFC"><input name="rfc" defaultValue={row.rfc ?? ""} className={controlClass} /></Field>
+          <Field label="CURP"><input name="curp" defaultValue={row.curp ?? ""} className={controlClass} /></Field>
+          <Field label="NSS"><input name="nss" defaultValue={row.nss ?? ""} className={controlClass} /></Field>
+          <Field label="Código postal"><input name="fiscalZip" defaultValue={row.fiscalZip ?? ""} className={controlClass} /></Field>
+          <button className="w-fit rounded-md border border-[var(--line)] px-3 py-2 text-sm">Guardar datos fiscales</button>
+        </form>
         {row.exemptBenefits ? null : <p className="mt-1">Vacaciones disponibles: {row.vacationBalance} días hábiles</p>}
         <p className="mt-1">Horario vigente {row.scheduleStart}, tolerancia {row.toleranceMinutes} min. Un cambio no recalcula días anteriores.</p>
         <p className="mt-1">Huella: {row.fingerprintNote || "Sin enrolar"}</p>

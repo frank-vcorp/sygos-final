@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { requestDocumentAction, requestIntercompanyAction } from "@/app/(erp)/facturacion/actions";
-import { decideAction, discountAction, linkBaseAction, relateEquipmentAction, setPricesAction } from "../actions";
+import { decideAction, discountAction, linkBaseAction, relateEquipmentAction, sendQuoteMailAction, setPricesAction } from "../actions";
 import { ConfirmSubmit, SubmitButton } from "@/components/submit-button";
 import { Badge, controlClass, Field, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
@@ -59,6 +59,10 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
     <>
       <PageHeader back={{ href: "/cotizaciones", label: "Cotizaciones" }} title={quote.folio} subtitle={QUOTE_TYPE_LABEL[quote.quoteType as QuoteType] ?? quote.quoteType} action={<Badge>{QUOTE_STATUS_LABEL[quote.status] ?? quote.status}</Badge>} />
       <p className="mb-4 text-sm"><a href={`/documentos/cotizacion/${quote.id}`} className="text-[var(--accent)]">Documento para imprimir</a></p>
+      <form action={sendQuoteMailAction} className="mb-4 text-sm">
+        <input type="hidden" name="quoteId" value={quote.id} />
+        <button className="text-[var(--accent)]">Enviar por correo{quote.client.contacts.find((contact) => contact.email)?.email ? ` a ${quote.client.contacts.find((contact) => contact.email)?.email}` : ""}</button>
+      </form>
       <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
         <section className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
           <p>Cliente: <Link href={`/clientes/${quote.client.id}`} className="text-[var(--accent)]">{quote.client.isSystem ? "SYSTRON · intercompañía" : quote.client.name}</Link></p>

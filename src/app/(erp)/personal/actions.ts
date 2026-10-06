@@ -6,6 +6,7 @@ import { optionalText, parseVersion, requiredText } from "@/lib/form";
 import { can, type Action } from "@/lib/permissions";
 import { addLaborDocument, adjustVacationBalance, changeBoss, changeSalary, deactivateCollaborator, decideVacation, enrollFingerprint, manualAttendance, registerCollaborator, requestOvertime, requestVacation, reviewOvertime, updateSchedule } from "@/lib/personnel";
 import { requireCompany } from "@/lib/session";
+import { prisma } from "@/lib/db";
 
 async function guard(action: Action) {
   const session = await requireCompany();
@@ -40,6 +41,22 @@ export async function hireAction(formData: FormData) {
     await setFlash({ tone: "error", message: bubble(error) });
     redirect("/personal/nuevo");
   }
+}
+
+export async function laborIdAction(formData: FormData) {
+  "use server";
+  const id = requiredText(formData.get("collaboratorId"), "Colaborador");
+  try {
+    const session = await guard("personnel.manage");
+    await prisma.collaborator.updateMany({
+      where: { id, companyId: session.activeCompanyId },
+      data: { rfc: optionalText(formData.get("rfc")), curp: optionalText(formData.get("curp")), nss: optionalText(formData.get("nss")), fiscalZip: optionalText(formData.get("fiscalZip")) },
+    });
+    await setFlash({ tone: "ok", message: "Datos fiscales del colaborador guardados." });
+  } catch (error) {
+    await setFlash({ tone: "error", message: bubble(error) });
+  }
+  redirect(`/personal/${id}`);
 }
 
 export async function bossAction(formData: FormData) {

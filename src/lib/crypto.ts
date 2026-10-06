@@ -40,6 +40,14 @@ export function encryptSecret(plain: string): string {
   return `${iv.toString("hex")}:${tag.toString("hex")}:${enc.toString("hex")}`;
 }
 
+export function decryptSecret(stored: string): string {
+  const [ivHex, tagHex, dataHex] = stored.split(":");
+  if (!ivHex || !tagHex || !dataHex) throw new Error("La credencial guardada no se puede leer.");
+  const decipher = createDecipheriv("aes-256-gcm", secretKey(), Buffer.from(ivHex, "hex"));
+  decipher.setAuthTag(Buffer.from(tagHex, "hex"));
+  return Buffer.concat([decipher.update(Buffer.from(dataHex, "hex")), decipher.final()]).toString("utf8");
+}
+
 export function secretHint(plain: string): string {
   const tail = plain.slice(-4);
   return tail ? `••••${tail}` : "••••";

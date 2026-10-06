@@ -9,15 +9,17 @@
     "postinstall": "prisma generate",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
-    "test": "tsx --test src/lib/permissions.test.ts src/lib/folios.test.ts src/lib/custody.test.ts src/lib/sla.test.ts src/lib/money.test.ts src/lib/catalog-key.test.ts src/lib/billing.test.ts src/lib/purchases.test.ts src/lib/personnel.test.ts src/lib/panels.test.ts src/lib/sandbox.test.ts"
+    "test": "tsx --test src/lib/permissions.test.ts src/lib/folios.test.ts src/lib/custody.test.ts src/lib/sla.test.ts src/lib/money.test.ts src/lib/catalog-key.test.ts src/lib/billing.test.ts src/lib/purchases.test.ts src/lib/personnel.test.ts src/lib/panels.test.ts src/lib/sandbox.test.ts src/lib/integrations.test.ts"
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",
+    "@whiskeysockets/baileys": "^7.0.0-rc14",
     "next": "^15.5.27",
     "prisma": "^6.19.3",
+    "qrcode": "^1.5.4",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "tsx": "^4.23.15",

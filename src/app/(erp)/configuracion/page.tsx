@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { saveIntegrationAction, toggleInventoryAction, updateCompanyAction, updatePriorityAction } from "./actions";
+import { saveFacturapiAction, saveSendgridAction, toggleInventoryAction, updateCompanyAction, updatePriorityAction, verifyFacturapiAction, verifySendgridAction } from "./actions";
+import { WhatsAppPanel } from "@/components/whatsapp-panel";
 import { RegimenSelect } from "@/components/regimen-select";
 import { Button, controlClass, Field, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
@@ -69,34 +70,40 @@ export default async function ConfiguracionPage() {
 
       {can(session.role, "config.integrations") ? (
         <section className="mt-4 max-w-xl space-y-4">
-          <IntegrationForm provider="FACTURAPI" title="Facturapi de esta empresa" setting={hint("FACTURAPI", true)} />
-          <IntegrationForm provider="SENDGRID" title="SendGrid" setting={hint("SENDGRID", false)} />
-          <IntegrationForm provider="WHATSAPP" title="WhatsApp" setting={hint("WHATSAPP", false)} />
-          <p className="text-sm text-[var(--muted)]">Si una credencial falta, la acción que depende de ella se deshabilita. El sistema no simula un timbrado, un correo ni un mensaje exitoso. WhatsApp permanece desconectado hasta que el canal exista; no se marca como vinculado.</p>
+          <form action={saveFacturapiAction} className="grid gap-3 rounded-lg border border-[var(--line)] bg-white p-4">
+            <h2 className="font-medium">Facturapi · {company.name}</h2>
+            <p className="text-sm text-[var(--muted)]">{hint("FACTURAPI", true)?.secretHint ? `Llave ${hint("FACTURAPI", true)?.secretHint}. ` : "Sin llave. "}La llave es sk_test_ o sk_live_ de la organización de esta razón social. El certificado de sello se carga en Facturapi.</p>
+            <Field label="Llave secreta"><input name="secret" type="password" autoComplete="off" className={controlClass} placeholder="sk_test_… o sk_live_…" /></Field>
+            <Field label="Registro patronal"><input name="registroPatronal" defaultValue={company.registroPatronal ?? ""} className={controlClass} /></Field>
+            <Field label="CURP del patrón"><input name="employerCurp" defaultValue={company.employerCurp ?? ""} className={controlClass} /></Field>
+            <Field label="Entidad federativa"><input name="employerState" defaultValue={company.employerState ?? ""} className={controlClass} placeholder="MEX" /></Field>
+            <div className="flex gap-2">
+              <Button type="submit" tone="ghost">Guardar Facturapi</Button>
+              <button formAction={verifyFacturapiAction} className="rounded-md border border-[var(--line)] px-3 py-2 text-sm">Verificar llave</button>
+            </div>
+          </form>
+          <form action={saveSendgridAction} className="grid gap-3 rounded-lg border border-[var(--line)] bg-white p-4">
+            <h2 className="font-medium">SendGrid</h2>
+            <p className="text-sm text-[var(--muted)]">{hint("SENDGRID", false)?.secretHint ? `Llave ${hint("SENDGRID", false)?.secretHint}. ` : "Sin llave. "}Hace falta la llave SG.… y el correo remitente ya verificado en SendGrid.</p>
+            <Field label="Llave de API"><input name="secret" type="password" autoComplete="off" className={controlClass} placeholder="SG.…" /></Field>
+            <Field label="Correo remitente"><input name="fromEmail" type="email" defaultValue={sendgridFrom(hint("SENDGRID", false)?.extra)} className={controlClass} /></Field>
+            <div className="flex gap-2">
+              <Button type="submit" tone="ghost">Guardar SendGrid</Button>
+              <button formAction={verifySendgridAction} className="rounded-md border border-[var(--line)] px-3 py-2 text-sm">Verificar llave</button>
+            </div>
+          </form>
+          <WhatsAppPanel />
         </section>
       ) : null}
     </>
   );
 }
 
-function IntegrationForm({
-  provider,
-  title,
-  setting,
-}: {
-  provider: string;
-  title: string;
-  setting?: { secretHint: string | null } | null;
-}) {
-  return (
-    <form action={saveIntegrationAction} className="rounded-lg border border-[var(--line)] bg-white p-4">
-      <h2 className="font-medium">{title}</h2>
-      <p className="mt-1 text-sm text-[var(--muted)]">{setting?.secretHint ? `Configurada ${setting.secretHint}` : "No configurada."}</p>
-      <input type="hidden" name="provider" value={provider} />
-      <Field label="Credencial nueva">
-        <input name="secret" type="password" autoComplete="off" className={`${controlClass} mt-2`} />
-      </Field>
-      <Button type="submit" tone="ghost" className="mt-3">Guardar credencial</Button>
-    </form>
-  );
+function sendgridFrom(extra?: string | null) {
+  if (!extra) return "";
+  try {
+    return (JSON.parse(extra) as { fromEmail?: string }).fromEmail ?? "";
+  } catch {
+    return "";
+  }
 }

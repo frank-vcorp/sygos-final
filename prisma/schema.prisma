@@ -20,6 +20,9 @@ model Company {
   email           String?
   defaultCreditDays Int?
   inventoryEnabled Boolean @default(false)
+  registroPatronal String?
+  employerCurp     String?
+  employerState    String?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   version         Int      @default(1)
@@ -213,6 +216,7 @@ model IntegrationSetting {
   provider   String
   secretEnc  String?
   secretHint String?
+  extra      String?
   updatedAt  DateTime @updatedAt
 
   @@unique([companyId, provider])
@@ -634,6 +638,8 @@ model BillingDocument {
   dueAt             DateTime?
   fiscalStatus      String    @default("NO_APLICA")
   fiscalError       String?
+  fiscalExternalId  String?
+  fiscalUuid        String?
   requestedByUserId String?
   issuedByUserId    String?
   createdAt         DateTime  @default(now())
@@ -823,6 +829,9 @@ model Collaborator {
   dailyCash           Float    @default(0)
   overtimeRate        Float    @default(0)
   rfc                 String?
+  curp                String?
+  nss                 String?
+  fiscalZip           String?
   punctualityBonus    Float    @default(0)
   productivityBonus   Float    @default(0)
   productivityGoal    Float    @default(0)
@@ -928,6 +937,7 @@ model PayrollPeriod {
   status       String
   fiscalStatus String   @default("PENDIENTE")
   fiscalError  String?
+  fiscalExternalId String?
   version      Int      @default(1)
   createdAt    DateTime @default(now())
 
@@ -960,6 +970,9 @@ model PayrollLine {
   transferTotal    Float          @default(0)
   cashTotal        Float          @default(0)
   missing          String?
+  fiscalStatus     String?
+  fiscalExternalId String?
+  fiscalUuid       String?
 
   @@unique([periodId, collaboratorId])
 }

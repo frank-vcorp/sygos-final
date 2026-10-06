@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { encryptSecret, secretHint } from "@/lib/crypto";
+import { verifyFacturapi } from "@/lib/facturapi";
+import { verifySendGrid } from "@/lib/sendgrid";
 import { setFlash } from "@/lib/flash";
 import { ConcurrencyError, optionalInt, optionalText, parseVersion, requiredText } from "@/lib/form";
 import { recordHistory } from "@/lib/history";
@@ -47,43 +49,91 @@ export async function updateCompanyAction(formData: FormData) {
   redirect("/configuracion");
 }
 
-export async function saveIntegrationAction(formData: FormData) {
-  "use server";
+async function requireIntegrations() {
   const session = await requireCompany();
   if (!can(session.role, "config.integrations")) {
     await setFlash({ tone: "error", message: "Solo el Administrador configura integraciones." });
     redirect("/configuracion");
   }
-  const provider = requiredText(formData.get("provider"), "Integración");
-  if (!["FACTURAPI", "SENDGRID", "WHATSAPP"].includes(provider)) {
-    await setFlash({ tone: "error", message: "Integración no reconocida." });
-    redirect("/configuracion");
-  }
+  return session;
+}
+
+export async function saveFacturapiAction(formData: FormData) {
+  "use server";
+  const session = await requireIntegrations();
   const secret = optionalText(formData.get("secret"));
-  if (!secret) {
-    await setFlash({ tone: "error", message: "Falta la credencial. La integración sigue desconectada." });
+  const extra = JSON.stringify({
+    registroPatronal: optionalText(formData.get("registroPatronal")),
+    employerCurp: optionalText(formData.get("employerCurp")),
+    employerState: optionalText(formData.get("employerState")),
+  });
+  await prisma.company.update({
+    where: { id: session.activeCompanyId },
+    data: {
+      registroPatronal: optionalText(formData.get("registroPatronal")),
+      employerCurp: optionalText(formData.get("employerCurp")),
+      employerState: optionalText(formData.get("employerState")),
+    },
+  });
+  const existing = await prisma.integrationSetting.findFirst({ where: { provider: "FACTURAPI", companyId: session.activeCompanyId } });
+  if (secret) {
+    const data = { secretEnc: encryptSecret(secret), secretHint: secretHint(secret), extra };
+    if (existing) await prisma.integrationSetting.update({ where: { id: existing.id }, data });
+    else await prisma.integrationSetting.create({ data: { provider: "FACTURAPI", companyId: session.activeCompanyId, ...data } });
+  } else if (existing) {
+    await prisma.integrationSetting.update({ where: { id: existing.id }, data: { extra } });
+  }
+  await setFlash({ tone: "ok", message: secret ? "Llave de Facturapi guardada. El certificado de sello sigue en Facturapi, no aquí." : "Datos de nómina guardados. La llave no cambió." });
+  redirect("/configuracion");
+}
+
+export async function verifyFacturapiAction() {
+  "use server";
+  const session = await requireIntegrations();
+  const row = await prisma.integrationSetting.findFirst({ where: { provider: "FACTURAPI", companyId: session.activeCompanyId } });
+  if (!row?.secretEnc) {
+    await setFlash({ tone: "error", message: "Esta empresa no tiene llave de Facturapi." });
     redirect("/configuracion");
   }
-  const companyId = provider === "FACTURAPI" ? session.activeCompanyId : null;
-  const existing = await prisma.integrationSetting.findFirst({ where: { provider, companyId } });
-  const data = { secretEnc: encryptSecret(secret), secretHint: secretHint(secret) };
-  if (existing) {
-    await prisma.integrationSetting.update({ where: { id: existing.id }, data });
-  } else {
-    await prisma.integrationSetting.create({ data: { provider, companyId, ...data } });
+  const { decryptSecret } = await import("@/lib/crypto");
+  const result = await verifyFacturapi(decryptSecret(row.secretEnc));
+  await setFlash({ tone: result.ok ? "ok" : "error", message: result.message });
+  redirect("/configuracion");
+}
+
+export async function saveSendgridAction(formData: FormData) {
+  "use server";
+  await requireIntegrations();
+  const secret = optionalText(formData.get("secret"));
+  const fromEmail = optionalText(formData.get("fromEmail"));
+  if (!fromEmail) {
+    await setFlash({ tone: "error", message: "SendGrid necesita el correo remitente verificado, además de la llave." });
+    redirect("/configuracion");
   }
-  await recordHistory({
-    companyId,
-    entityType: "INTEGRACION",
-    entityId: existing?.id ?? provider,
-    action: "CREDENCIAL",
-    summary: `${provider} quedó configurada. La credencial no se vuelve a mostrar.`,
-    authorUserId: session.userId,
-  });
-  await setFlash({
-    tone: "ok",
-    message: "Credencial guardada. No se ejecutó ninguna prueba externa ni se simuló un envío exitoso.",
-  });
+  const existing = await prisma.integrationSetting.findFirst({ where: { provider: "SENDGRID", companyId: null } });
+  const extra = JSON.stringify({ fromEmail });
+  if (!secret && !existing?.secretEnc) {
+    await setFlash({ tone: "error", message: "Falta la llave de SendGrid. Empieza con SG." });
+    redirect("/configuracion");
+  }
+  const data = { extra, ...(secret ? { secretEnc: encryptSecret(secret), secretHint: secretHint(secret) } : {}) };
+  if (existing) await prisma.integrationSetting.update({ where: { id: existing.id }, data });
+  else await prisma.integrationSetting.create({ data: { provider: "SENDGRID", companyId: null, secretEnc: encryptSecret(secret!), secretHint: secretHint(secret!), extra } });
+  await setFlash({ tone: "ok", message: "SendGrid guardado. No se envió un correo de prueba." });
+  redirect("/configuracion");
+}
+
+export async function verifySendgridAction() {
+  "use server";
+  await requireIntegrations();
+  const row = await prisma.integrationSetting.findFirst({ where: { provider: "SENDGRID", companyId: null } });
+  if (!row?.secretEnc) {
+    await setFlash({ tone: "error", message: "SendGrid no tiene llave." });
+    redirect("/configuracion");
+  }
+  const { decryptSecret } = await import("@/lib/crypto");
+  const result = await verifySendGrid(decryptSecret(row.secretEnc));
+  await setFlash({ tone: result.ok ? "ok" : "error", message: result.message });
   redirect("/configuracion");
 }
 
