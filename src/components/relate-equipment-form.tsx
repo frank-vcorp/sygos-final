@@ -3,8 +3,10 @@
 import { useState } from "react";
 import { EquipmentQuickFieldsModal } from "@/components/equipment-quick-fields";
 import { QuickCreateButton } from "@/components/form-quick-modal";
+import { QuickFormDraftNotice, QuickFormHiddenFields } from "@/components/quick-form-hidden";
 import { SubmitButton } from "@/components/submit-button";
 import { controlClass, Field } from "@/components/ui";
+import { validateQuickEquipmentDraft, type QuickFormFieldMap } from "@/lib/quick-form-persist";
 
 type Gear = { id: string; folio: string; model: string };
 type ModelRow = { type: string; brand: string; model: string };
@@ -34,6 +36,7 @@ export function RelateEquipmentForm({
 }) {
   const [equipmentId, setEquipmentId] = useState("");
   const [showNew, setShowNew] = useState(false);
+  const [equipmentDraft, setEquipmentDraft] = useState<QuickFormFieldMap | null>(null);
 
   return (
     <form action={relateAction} className="grid gap-2 rounded-lg border border-[var(--line)] bg-white p-4">
@@ -46,23 +49,41 @@ export function RelateEquipmentForm({
           name="equipmentId"
           className={controlClass}
           value={equipmentId}
-          disabled={showNew}
+          disabled={showNew || Boolean(equipmentDraft)}
           onChange={(event) => {
             setEquipmentId(event.target.value);
-            if (event.target.value) setShowNew(false);
+            if (event.target.value) {
+              setShowNew(false);
+              setEquipmentDraft(null);
+            }
           }}
-          required={!allowQuickEquipment}
+          required={!allowQuickEquipment && !equipmentDraft}
         >
           <option value="">Selecciona</option>
           {gear.map((item) => <option key={item.id} value={item.id}>{item.folio} · {item.model}</option>)}
         </select>
       </Field>
+      <QuickFormHiddenFields values={!equipmentId ? equipmentDraft : null} />
       {allowQuickEquipment ? (
         <>
-          <QuickCreateButton label="+ Alta de equipo" onClick={() => { setEquipmentId(""); setShowNew(true); }} />
+          {equipmentDraft?.model ? (
+            <QuickFormDraftNotice
+              label={`Alta de equipo lista: ${equipmentDraft.model} (${equipmentDraft.equipmentKind ?? "?"})`}
+              onEdit={() => setShowNew(true)}
+            />
+          ) : null}
+          <QuickCreateButton
+            label="+ Alta de equipo"
+            onClick={() => {
+              setEquipmentId("");
+              setEquipmentDraft(null);
+              setShowNew(true);
+            }}
+          />
           <EquipmentQuickFieldsModal
             open={showNew}
             onClose={() => setShowNew(false)}
+            onCommit={(fields) => validateQuickEquipmentDraft(fields) ?? (setEquipmentDraft(fields), null)}
             companyCode={companyCode}
             types={types}
             brands={brands}

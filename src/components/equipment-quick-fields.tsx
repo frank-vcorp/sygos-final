@@ -3,10 +3,12 @@
 import { EquipmentCatalogFields } from "@/components/equipment-catalog-fields";
 import { FormQuickModal } from "@/components/form-quick-modal";
 import { controlClass, Field } from "@/components/ui";
+import type { QuickFormFieldMap } from "@/lib/quick-form-persist";
 
 export function EquipmentQuickFieldsModal({
   open,
   onClose,
+  onCommit,
   companyCode,
   types,
   brands,
@@ -16,6 +18,7 @@ export function EquipmentQuickFieldsModal({
 }: {
   open: boolean;
   onClose: () => void;
+  onCommit?: (fields: QuickFormFieldMap) => string | null | void;
   companyCode: string;
   types: string[];
   brands: string[];
@@ -24,7 +27,14 @@ export function EquipmentQuickFieldsModal({
   doneLabel?: string;
 }) {
   return (
-    <FormQuickModal open={open} title={title} titleId="equipment-quick-modal-title" onClose={onClose} doneLabel={doneLabel}>
+    <FormQuickModal
+      open={open}
+      title={title}
+      titleId="equipment-quick-modal-title"
+      onClose={onClose}
+      onCommit={onCommit}
+      doneLabel={doneLabel}
+    >
       <Field label="EQUI o MOT">
         <select name="equipmentKind" className={controlClass} defaultValue={companyCode === "SERVOMOTORES" ? "MOT" : "EQUI"}>
           {companyCode === "SYSTRON" ? <option value="EQUI">EQUI</option> : null}

@@ -1,12 +1,15 @@
 "use client";
 
+import { useRef, useState } from "react";
 import { Button } from "@/components/ui";
+import { readNamedFormFields, type QuickFormFieldMap } from "@/lib/quick-form-persist";
 
 export function FormQuickModal({
   open,
   title,
   titleId,
   onClose,
+  onCommit,
   doneLabel = "Listo",
   children,
 }: {
@@ -14,10 +17,27 @@ export function FormQuickModal({
   title: string;
   titleId: string;
   onClose: () => void;
+  /** Lee los campos con `name` del modal; si devuelve texto, no se cierra. */
+  onCommit?: (fields: QuickFormFieldMap) => string | null | void;
   doneLabel?: string;
   children: React.ReactNode;
 }) {
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const [commitError, setCommitError] = useState<string | null>(null);
   if (!open) return null;
+
+  const handleDone = () => {
+    if (onCommit && bodyRef.current) {
+      const message = onCommit(readNamedFormFields(bodyRef.current));
+      if (message) {
+        setCommitError(message);
+        return;
+      }
+    }
+    setCommitError(null);
+    onClose();
+  };
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 p-4 sm:items-center"
@@ -32,9 +52,10 @@ export function FormQuickModal({
             Cerrar
           </Button>
         </div>
-        <div className="grid gap-3 p-4">
+        <div ref={bodyRef} className="grid gap-3 p-4">
           {children}
-          <Button type="button" className="w-full sm:w-auto" onClick={onClose}>{doneLabel}</Button>
+          {commitError ? <p className="text-sm text-[var(--danger)]">{commitError}</p> : null}
+          <Button type="button" className="w-full sm:w-auto" onClick={handleDone}>{doneLabel}</Button>
         </div>
       </div>
     </div>

@@ -2,8 +2,10 @@
 
 import { useState } from "react";
 import { FormQuickModal, QuickCreateButton } from "@/components/form-quick-modal";
+import { QuickFormDraftNotice, QuickFormHiddenFields } from "@/components/quick-form-hidden";
 import { QuickClientFields } from "@/components/quick-client-fields";
 import { controlClass, Field } from "@/components/ui";
+import { validateQuickClientDraft, type QuickFormFieldMap } from "@/lib/quick-form-persist";
 
 type ClientOption = { id: string; name: string };
 
@@ -26,7 +28,8 @@ export function ClientPicker({
 }) {
   const [clientId, setClientId] = useState(defaultClientId);
   const [showNew, setShowNew] = useState(false);
-  const quick = allowQuickClient && !clientId;
+  const [quickDraft, setQuickDraft] = useState<QuickFormFieldMap | null>(null);
+  const quick = allowQuickClient && !clientId && !quickDraft;
 
   return (
     <>
@@ -49,21 +52,32 @@ export function ClientPicker({
             const next = event.target.value;
             setClientId(next);
             onClientChange?.(next);
-            if (next) setShowNew(false);
+            if (next) {
+              setShowNew(false);
+              setQuickDraft(null);
+            }
           }}
         >
           <option value="">Selecciona</option>
           {clients.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}
         </select>
       </Field>
+      <QuickFormHiddenFields values={!clientId ? quickDraft : null} />
       {allowQuickClient && !clientId ? (
         <>
+          {quickDraft ? (
+            <QuickFormDraftNotice
+              label={`Alta de cliente lista: ${quickDraft.newClientName} · ${quickDraft.contactName}`}
+              onEdit={() => setShowNew(true)}
+            />
+          ) : null}
           <QuickCreateButton label="+ Alta de cliente" onClick={() => setShowNew(true)} />
           <FormQuickModal
             open={showNew}
             title="Alta de cliente"
             titleId="client-quick-modal-title"
             onClose={() => setShowNew(false)}
+            onCommit={(fields) => validateQuickClientDraft(fields) ?? (setQuickDraft(fields), null)}
             doneLabel="Listo — continuar"
           >
             <QuickClientFields required={quick} extended={extendedContact} />

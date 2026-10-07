@@ -3,7 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import { EquipmentQuickFieldsModal } from "@/components/equipment-quick-fields";
 import { QuickCreateButton } from "@/components/form-quick-modal";
+import { QuickFormDraftNotice, QuickFormHiddenFields } from "@/components/quick-form-hidden";
 import { controlClass, Field } from "@/components/ui";
+import { validateQuickEquipmentDraft, type QuickFormFieldMap } from "@/lib/quick-form-persist";
 
 export type ServiceEquipmentOption = {
   id: string;
@@ -34,6 +36,7 @@ export function ServiceEquipmentPicker({
 }) {
   const [equipmentId, setEquipmentId] = useState("");
   const [showNew, setShowNew] = useState(false);
+  const [equipmentDraft, setEquipmentDraft] = useState<QuickFormFieldMap | null>(null);
 
   const filtered = useMemo(() => {
     if (!clientId) return [];
@@ -43,6 +46,7 @@ export function ServiceEquipmentPicker({
   useEffect(() => {
     setEquipmentId("");
     setShowNew(false);
+    setEquipmentDraft(null);
   }, [clientId]);
 
   if (warranty) {
@@ -80,10 +84,13 @@ export function ServiceEquipmentPicker({
           name="equipmentId"
           className={controlClass}
           value={equipmentId}
-          disabled={!clientId || showNew}
+          disabled={!clientId || showNew || Boolean(equipmentDraft)}
           onChange={(event) => {
             setEquipmentId(event.target.value);
-            if (event.target.value) setShowNew(false);
+            if (event.target.value) {
+              setShowNew(false);
+              setEquipmentDraft(null);
+            }
           }}
         >
           <option value="">{emptyOptionLabel}</option>
@@ -95,12 +102,22 @@ export function ServiceEquipmentPicker({
         </select>
       </Field>
 
+      <QuickFormHiddenFields values={!equipmentId ? equipmentDraft : null} />
+
+      {equipmentDraft?.model ? (
+        <QuickFormDraftNotice
+          label={`Alta de equipo lista: ${equipmentDraft.model} (${equipmentDraft.equipmentKind ?? "?"})`}
+          onEdit={() => setShowNew(true)}
+        />
+      ) : null}
+
       <QuickCreateButton
         label="+ Alta de equipo"
         disabled={!clientId}
         disabledHint="Primero elige el cliente."
         onClick={() => {
           setEquipmentId("");
+          setEquipmentDraft(null);
           setShowNew(true);
         }}
       />
@@ -108,6 +125,7 @@ export function ServiceEquipmentPicker({
       <EquipmentQuickFieldsModal
         open={showNew}
         onClose={() => setShowNew(false)}
+        onCommit={(fields) => validateQuickEquipmentDraft(fields) ?? (setEquipmentDraft(fields), null)}
         companyCode={companyCode}
         types={types}
         brands={brands}
