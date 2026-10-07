@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
 import { FormQuickModal, QuickCreateButton } from "@/components/form-quick-modal";
-import { QuickFormDraftNotice, QuickFormHiddenFields } from "@/components/quick-form-hidden";
 import { QuickSupplierFields } from "@/components/quick-supplier-fields";
 import { controlClass, Field } from "@/components/ui";
+import { quickCreateSupplierAction } from "@/lib/quick-create-actions";
 import { validateQuickSupplierDraft, type QuickFormFieldMap } from "@/lib/quick-form-persist";
 
 type SupplierOption = { id: string; name: string };
@@ -30,8 +31,25 @@ export function SupplierPicker({
 }) {
   const [supplierId, setSupplierId] = useState(defaultSupplierId);
   const [showNew, setShowNew] = useState(false);
-  const [quickDraft, setQuickDraft] = useState<QuickFormFieldMap | null>(null);
-  const quick = allowQuickSupplier && !supplierId && !allowEmpty && !quickDraft;
+  const [extraSuppliers, setExtraSuppliers] = useState<SupplierOption[]>([]);
+  const options = useMemo(() => {
+    const seen = new Set(suppliers.map((row) => row.id));
+    return [...suppliers, ...extraSuppliers.filter((row) => !seen.has(row.id))];
+  }, [suppliers, extraSuppliers]);
+
+  const selectSupplier = (id: string) => {
+    setSupplierId(id);
+    if (id) setShowNew(false);
+  };
+
+  const commitQuickSupplier = async (fields: QuickFormFieldMap) => {
+    const validation = validateQuickSupplierDraft(fields);
+    if (validation) return validation;
+    const created = await quickCreateSupplierAction(fields);
+    setExtraSuppliers((current) => [...current, { id: created.supplierId, name: created.name }]);
+    selectSupplier(created.supplierId);
+    return null;
+  };
 
   return (
     <>
@@ -52,38 +70,24 @@ export function SupplierPicker({
           className={controlClass}
           value={supplierId}
           disabled={showNew}
-          onChange={(event) => {
-            const next = event.target.value;
-            setSupplierId(next);
-            if (next) {
-              setShowNew(false);
-              setQuickDraft(null);
-            }
-          }}
+          onChange={(event) => selectSupplier(event.target.value)}
         >
           {allowEmpty ? <option value="">{emptyLabel}</option> : <option value="">Selecciona</option>}
-          {suppliers.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}
+          {options.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}
         </select>
       </Field>
-      <QuickFormHiddenFields values={!supplierId ? quickDraft : null} />
       {allowQuickSupplier && !supplierId ? (
         <>
-          {quickDraft?.newSupplierName ? (
-            <QuickFormDraftNotice
-              label={`Alta de proveedor lista: ${quickDraft.newSupplierName}`}
-              onEdit={() => setShowNew(true)}
-            />
-          ) : null}
           <QuickCreateButton label="+ Alta de proveedor" onClick={() => setShowNew(true)} />
           <FormQuickModal
             open={showNew}
             title="Alta de proveedor"
             titleId="supplier-quick-modal-title"
             onClose={() => setShowNew(false)}
-            onCommit={(fields) => validateQuickSupplierDraft(fields) ?? (setQuickDraft(fields), null)}
-            doneLabel="Listo — continuar"
+            onCommit={commitQuickSupplier}
+            doneLabel="Guardar y continuar"
           >
-            <QuickSupplierFields required={quick} />
+            <QuickSupplierFields required />
           </FormQuickModal>
         </>
       ) : null}

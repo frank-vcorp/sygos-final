@@ -18,7 +18,7 @@ export function EquipmentQuickFieldsModal({
 }: {
   open: boolean;
   onClose: () => void;
-  onCommit?: (fields: QuickFormFieldMap) => string | null | void;
+  onCommit?: (fields: QuickFormFieldMap) => string | null | void | Promise<string | null | void>;
   companyCode: string;
   types: string[];
   brands: string[];

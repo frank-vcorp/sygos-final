@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
 import { FormQuickModal, QuickCreateButton } from "@/components/form-quick-modal";
-import { QuickFormDraftNotice, QuickFormHiddenFields } from "@/components/quick-form-hidden";
 import { QuickClientFields } from "@/components/quick-client-fields";
 import { controlClass, Field } from "@/components/ui";
+import { quickCreateClientAction } from "@/lib/quick-create-actions";
 import { validateQuickClientDraft, type QuickFormFieldMap } from "@/lib/quick-form-persist";
 
 type ClientOption = { id: string; name: string };
@@ -26,10 +27,29 @@ export function ClientPicker({
   onClientChange?: (clientId: string) => void;
   extendedContact?: boolean;
 }) {
+  const router = useRouter();
   const [clientId, setClientId] = useState(defaultClientId);
   const [showNew, setShowNew] = useState(false);
-  const [quickDraft, setQuickDraft] = useState<QuickFormFieldMap | null>(null);
-  const quick = allowQuickClient && !clientId && !quickDraft;
+  const [extraClients, setExtraClients] = useState<ClientOption[]>([]);
+  const options = useMemo(() => {
+    const seen = new Set(clients.map((row) => row.id));
+    return [...clients, ...extraClients.filter((row) => !seen.has(row.id))];
+  }, [clients, extraClients]);
+
+  const selectClient = (id: string) => {
+    setClientId(id);
+    onClientChange?.(id);
+    if (id) setShowNew(false);
+  };
+
+  const commitQuickClient = async (fields: QuickFormFieldMap) => {
+    const validation = validateQuickClientDraft(fields);
+    if (validation) return validation;
+    const created = await quickCreateClientAction(fields);
+    setExtraClients((current) => [...current, { id: created.clientId, name: created.name }]);
+    selectClient(created.clientId);
+    return null;
+  };
 
   return (
     <>
@@ -48,39 +68,24 @@ export function ClientPicker({
           className={controlClass}
           value={clientId}
           disabled={showNew}
-          onChange={(event) => {
-            const next = event.target.value;
-            setClientId(next);
-            onClientChange?.(next);
-            if (next) {
-              setShowNew(false);
-              setQuickDraft(null);
-            }
-          }}
+          onChange={(event) => selectClient(event.target.value)}
         >
           <option value="">Selecciona</option>
-          {clients.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}
+          {options.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}
         </select>
       </Field>
-      <QuickFormHiddenFields values={!clientId ? quickDraft : null} />
       {allowQuickClient && !clientId ? (
         <>
-          {quickDraft ? (
-            <QuickFormDraftNotice
-              label={`Alta de cliente lista: ${quickDraft.newClientName} · ${quickDraft.contactName}`}
-              onEdit={() => setShowNew(true)}
-            />
-          ) : null}
           <QuickCreateButton label="+ Alta de cliente" onClick={() => setShowNew(true)} />
           <FormQuickModal
             open={showNew}
             title="Alta de cliente"
             titleId="client-quick-modal-title"
             onClose={() => setShowNew(false)}
-            onCommit={(fields) => validateQuickClientDraft(fields) ?? (setQuickDraft(fields), null)}
-            doneLabel="Listo — continuar"
+            onCommit={commitQuickClient}
+            doneLabel="Guardar y continuar"
           >
-            <QuickClientFields required={quick} extended={extendedContact} />
+            <QuickClientFields required extended={extendedContact} />
           </FormQuickModal>
         </>
       ) : null}

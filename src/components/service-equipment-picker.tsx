@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { EquipmentQuickFieldsModal } from "@/components/equipment-quick-fields";
 import { QuickCreateButton } from "@/components/form-quick-modal";
-import { QuickFormDraftNotice, QuickFormHiddenFields } from "@/components/quick-form-hidden";
 import { controlClass, Field } from "@/components/ui";
+import { quickCreateEquipmentAction } from "@/lib/quick-create-actions";
 import { validateQuickEquipmentDraft, type QuickFormFieldMap } from "@/lib/quick-form-persist";
 
 export type ServiceEquipmentOption = {
@@ -36,18 +36,39 @@ export function ServiceEquipmentPicker({
 }) {
   const [equipmentId, setEquipmentId] = useState("");
   const [showNew, setShowNew] = useState(false);
-  const [equipmentDraft, setEquipmentDraft] = useState<QuickFormFieldMap | null>(null);
+  const [extraEquipment, setExtraEquipment] = useState<ServiceEquipmentOption[]>([]);
+
+  const allEquipment = useMemo(
+    () => [...equipment, ...extraEquipment],
+    [equipment, extraEquipment],
+  );
 
   const filtered = useMemo(() => {
     if (!clientId) return [];
-    return equipment.filter((row) => row.clientId === clientId);
-  }, [equipment, clientId]);
+    return allEquipment.filter((row) => row.clientId === clientId);
+  }, [allEquipment, clientId]);
 
   useEffect(() => {
     setEquipmentId("");
     setShowNew(false);
-    setEquipmentDraft(null);
+    setExtraEquipment([]);
   }, [clientId]);
+
+  const commitQuickEquipment = async (fields: QuickFormFieldMap) => {
+    const validation = validateQuickEquipmentDraft(fields);
+    if (validation) return validation;
+    const created = await quickCreateEquipmentAction(clientId, fields);
+    const row: ServiceEquipmentOption = {
+      id: created.equipmentId,
+      folio: created.folio,
+      model: created.model,
+      clientId: created.clientId,
+      kind: created.kind,
+    };
+    setExtraEquipment((current) => [...current, row]);
+    setEquipmentId(created.equipmentId);
+    return null;
+  };
 
   if (warranty) {
     return (
@@ -84,13 +105,10 @@ export function ServiceEquipmentPicker({
           name="equipmentId"
           className={controlClass}
           value={equipmentId}
-          disabled={!clientId || showNew || Boolean(equipmentDraft)}
+          disabled={!clientId || showNew}
           onChange={(event) => {
             setEquipmentId(event.target.value);
-            if (event.target.value) {
-              setShowNew(false);
-              setEquipmentDraft(null);
-            }
+            if (event.target.value) setShowNew(false);
           }}
         >
           <option value="">{emptyOptionLabel}</option>
@@ -102,22 +120,12 @@ export function ServiceEquipmentPicker({
         </select>
       </Field>
 
-      <QuickFormHiddenFields values={!equipmentId ? equipmentDraft : null} />
-
-      {equipmentDraft?.model ? (
-        <QuickFormDraftNotice
-          label={`Alta de equipo lista: ${equipmentDraft.model} (${equipmentDraft.equipmentKind ?? "?"})`}
-          onEdit={() => setShowNew(true)}
-        />
-      ) : null}
-
       <QuickCreateButton
         label="+ Alta de equipo"
         disabled={!clientId}
         disabledHint="Primero elige el cliente."
         onClick={() => {
           setEquipmentId("");
-          setEquipmentDraft(null);
           setShowNew(true);
         }}
       />
@@ -125,11 +133,12 @@ export function ServiceEquipmentPicker({
       <EquipmentQuickFieldsModal
         open={showNew}
         onClose={() => setShowNew(false)}
-        onCommit={(fields) => validateQuickEquipmentDraft(fields) ?? (setEquipmentDraft(fields), null)}
+        onCommit={commitQuickEquipment}
         companyCode={companyCode}
         types={types}
         brands={brands}
         models={models}
+        doneLabel="Guardar y continuar"
       />
     </>
   );

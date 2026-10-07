@@ -171,6 +171,7 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
             <RelateEquipmentForm
               quoteId={quote.id}
               version={quote.version}
+              clientId={quote.clientId}
               gear={gear.map((item) => ({ id: item.id, folio: item.folio, model: item.model }))}
               priorities={priorities.map((item) => ({ id: item.id, name: item.name }))}
               companyCode={session.activeCompanyCode}

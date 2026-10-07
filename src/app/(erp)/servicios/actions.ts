@@ -28,8 +28,7 @@ export async function startServiceAction(formData: FormData) {
     const kind = optionalText(formData.get("equipmentKind"));
     const equipmentId = optionalText(formData.get("equipmentId"));
     let clientId = optionalText(formData.get("clientId"));
-    const quickClientName = optionalText(formData.get("newClientName"));
-    if (!clientId && (!equipmentId || quickClientName)) {
+    if (!clientId && !equipmentId) {
       ({ clientId } = await clientIdFromForm(session, formData));
     }
     const attention = await startService(session, {

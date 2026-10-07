@@ -18,17 +18,27 @@ export function FormQuickModal({
   titleId: string;
   onClose: () => void;
   /** Lee los campos con `name` del modal; si devuelve texto, no se cierra. */
-  onCommit?: (fields: QuickFormFieldMap) => string | null | void;
+  onCommit?: (fields: QuickFormFieldMap) => string | null | void | Promise<string | null | void>;
   doneLabel?: string;
   children: React.ReactNode;
 }) {
   const bodyRef = useRef<HTMLDivElement>(null);
   const [commitError, setCommitError] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
   if (!open) return null;
 
-  const handleDone = () => {
+  const handleDone = async () => {
+    if (saving) return;
     if (onCommit && bodyRef.current) {
-      const message = onCommit(readNamedFormFields(bodyRef.current));
+      setSaving(true);
+      let message: string | null | void;
+      try {
+        message = await onCommit(readNamedFormFields(bodyRef.current));
+      } catch (error) {
+        message = error instanceof Error ? error.message : "No se pudo guardar.";
+      } finally {
+        setSaving(false);
+      }
       if (message) {
         setCommitError(message);
         return;
@@ -55,7 +65,9 @@ export function FormQuickModal({
         <div ref={bodyRef} className="grid gap-3 p-4">
           {children}
           {commitError ? <p className="text-sm text-[var(--danger)]">{commitError}</p> : null}
-          <Button type="button" className="w-full sm:w-auto" onClick={handleDone}>{doneLabel}</Button>
+          <Button type="button" className="w-full sm:w-auto" disabled={saving} onClick={handleDone}>
+            {saving ? "Guardando…" : doneLabel}
+          </Button>
         </div>
       </div>
     </div>

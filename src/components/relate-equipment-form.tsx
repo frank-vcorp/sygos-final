@@ -1,11 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { EquipmentQuickFieldsModal } from "@/components/equipment-quick-fields";
 import { QuickCreateButton } from "@/components/form-quick-modal";
-import { QuickFormDraftNotice, QuickFormHiddenFields } from "@/components/quick-form-hidden";
 import { SubmitButton } from "@/components/submit-button";
 import { controlClass, Field } from "@/components/ui";
+import { quickCreateEquipmentAction } from "@/lib/quick-create-actions";
 import { validateQuickEquipmentDraft, type QuickFormFieldMap } from "@/lib/quick-form-persist";
 
 type Gear = { id: string; folio: string; model: string };
@@ -14,6 +14,7 @@ type ModelRow = { type: string; brand: string; model: string };
 export function RelateEquipmentForm({
   quoteId,
   version,
+  clientId,
   gear,
   priorities,
   companyCode,
@@ -25,6 +26,7 @@ export function RelateEquipmentForm({
 }: {
   quoteId: string;
   version: number;
+  clientId: string;
   gear: Gear[];
   priorities: Array<{ id: string; name: string }>;
   companyCode: string;
@@ -36,7 +38,17 @@ export function RelateEquipmentForm({
 }) {
   const [equipmentId, setEquipmentId] = useState("");
   const [showNew, setShowNew] = useState(false);
-  const [equipmentDraft, setEquipmentDraft] = useState<QuickFormFieldMap | null>(null);
+  const [extraGear, setExtraGear] = useState<Gear[]>([]);
+  const options = useMemo(() => [...gear, ...extraGear], [gear, extraGear]);
+
+  const commitQuickEquipment = async (fields: QuickFormFieldMap) => {
+    const validation = validateQuickEquipmentDraft(fields);
+    if (validation) return validation;
+    const created = await quickCreateEquipmentAction(clientId, fields);
+    setExtraGear((current) => [...current, { id: created.equipmentId, folio: created.folio, model: created.model }]);
+    setEquipmentId(created.equipmentId);
+    return null;
+  };
 
   return (
     <form action={relateAction} className="grid gap-2 rounded-lg border border-[var(--line)] bg-white p-4">
@@ -49,46 +61,35 @@ export function RelateEquipmentForm({
           name="equipmentId"
           className={controlClass}
           value={equipmentId}
-          disabled={showNew || Boolean(equipmentDraft)}
+          disabled={showNew}
           onChange={(event) => {
             setEquipmentId(event.target.value);
-            if (event.target.value) {
-              setShowNew(false);
-              setEquipmentDraft(null);
-            }
+            if (event.target.value) setShowNew(false);
           }}
-          required={!allowQuickEquipment && !equipmentDraft}
+          required={!allowQuickEquipment}
         >
           <option value="">Selecciona</option>
-          {gear.map((item) => <option key={item.id} value={item.id}>{item.folio} · {item.model}</option>)}
+          {options.map((item) => <option key={item.id} value={item.id}>{item.folio} · {item.model}</option>)}
         </select>
       </Field>
-      <QuickFormHiddenFields values={!equipmentId ? equipmentDraft : null} />
       {allowQuickEquipment ? (
         <>
-          {equipmentDraft?.model ? (
-            <QuickFormDraftNotice
-              label={`Alta de equipo lista: ${equipmentDraft.model} (${equipmentDraft.equipmentKind ?? "?"})`}
-              onEdit={() => setShowNew(true)}
-            />
-          ) : null}
           <QuickCreateButton
             label="+ Alta de equipo"
             onClick={() => {
               setEquipmentId("");
-              setEquipmentDraft(null);
               setShowNew(true);
             }}
           />
           <EquipmentQuickFieldsModal
             open={showNew}
             onClose={() => setShowNew(false)}
-            onCommit={(fields) => validateQuickEquipmentDraft(fields) ?? (setEquipmentDraft(fields), null)}
+            onCommit={commitQuickEquipment}
             companyCode={companyCode}
             types={types}
             brands={brands}
             models={models}
-            doneLabel="Listo — relacionar equipo"
+            doneLabel="Guardar y relacionar"
           />
         </>
       ) : null}
