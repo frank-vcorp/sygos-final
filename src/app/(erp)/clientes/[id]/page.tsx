@@ -7,10 +7,14 @@ import {
   reassignClientAction,
   updateClientAction,
 } from "../actions";
-import { ClientInvoiceFields } from "@/components/client-invoice-fields";
+import {
+  ClientAdminAside,
+  ClientContactsPanel,
+  ClientProfileSection,
+  ClientRelationsHub,
+} from "@/components/client-detail-panels";
 import { HistoryTimeline } from "@/components/history-timeline";
-import { ConfirmSubmit, SubmitButton } from "@/components/submit-button";
-import { Badge, Button, controlClass, DetailGrid, Field, PageHeader, TextLink } from "@/components/ui";
+import { Badge, DetailGrid, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { historyFor } from "@/lib/history";
 import { can } from "@/lib/permissions";
@@ -23,9 +27,13 @@ export default async function ClienteDetallePage({ params }: { params: Promise<{
   const client = await prisma.client.findFirst({
     where: { id, companyId: session.activeCompanyId },
     include: {
-      contacts: { orderBy: [{ isPrimary: "desc" }, { name: "asc" }] },
+      contacts: { where: { active: true }, orderBy: [{ isPrimary: "desc" }, { name: "asc" }] },
       prospects: true,
-      equipments: { where: { originCompanyId: session.activeCompanyId }, orderBy: { createdAt: "desc" }, take: 20 },
+      equipments: {
+        where: { originCompanyId: session.activeCompanyId },
+        orderBy: { createdAt: "desc" },
+        take: 100,
+      },
     },
   });
   if (!client) notFound();
@@ -56,15 +64,31 @@ export default async function ClienteDetallePage({ params }: { params: Promise<{
   }
   if (session.role === "VENTAS" && client.ownerUserId !== session.userId) notFound();
   if (!can(session.role, "client.edit", session.activeCompanyCode)) redirect("/inicio");
-  const [owner, quotes] = await Promise.all([
+
+  const equipmentFilter = {
+    clientId: client.id,
+    ...(session.role === "VENTAS" ? { client: { ownerUserId: session.userId } } : {}),
+  };
+
+  const [owner, quotes, attentions, history] = await Promise.all([
     client.ownerUserId ? prisma.user.findUnique({ where: { id: client.ownerUserId } }) : Promise.resolve(null),
     prisma.quote.findMany({
       where: { clientId: client.id, companyId: session.activeCompanyId, ...(session.role === "VENTAS" ? { sellerUserId: session.userId } : {}) },
-      orderBy: { createdAt: "desc" },
-      take: 20,
+      orderBy: { updatedAt: "desc" },
+      take: 50,
     }),
+    prisma.attention.findMany({
+      where: { originCompanyId: session.activeCompanyId, equipment: equipmentFilter },
+      include: {
+        equipment: { select: { id: true, folio: true, kind: true, model: true } },
+        technicalCases: { select: { id: true, folio: true, kind: true, status: true }, orderBy: { createdAt: "desc" }, take: 3 },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    }),
+    historyFor("CLIENTE", client.id),
   ]);
-  const history = await historyFor("CLIENTE", client.id);
+
   const candidates = can(session.role, "client.reassign")
     ? await prisma.user.findMany({
         where: {
@@ -75,6 +99,21 @@ export default async function ClienteDetallePage({ params }: { params: Promise<{
       })
     : [];
 
+  const clientData = {
+    id: client.id,
+    version: client.version,
+    name: client.name,
+    classification: client.classification,
+    requiresInvoice: client.requiresInvoice,
+    rfc: client.rfc,
+    taxRegime: client.taxRegime,
+    fiscalZip: client.fiscalZip,
+    fiscalAddress: client.fiscalAddress,
+    creditDays: client.creditDays,
+    deliveryAddress: client.deliveryAddress,
+    active: client.active,
+  };
+
   return (
     <>
       <PageHeader
@@ -84,118 +123,73 @@ export default async function ClienteDetallePage({ params }: { params: Promise<{
         action={client.active ? <Badge tone="ok">Activo</Badge> : <Badge tone="danger">Inactivo</Badge>}
       />
       <DetailGrid>
-        <form action={updateClientAction} className="grid gap-4 rounded-lg border border-[var(--line)] bg-white p-4">
-          <input type="hidden" name="id" value={client.id} />
-          <input type="hidden" name="version" value={client.version} />
-          <Field label="Nombre o razón social"><input name="name" defaultValue={client.name} className={controlClass} /></Field>
-          <Field label="Clasificación">
-            <select name="classification" defaultValue={client.classification ?? ""} className={controlClass}>
-              <option value="">Sin clasificación</option>
-              <option value="NORMAL">Normal</option>
-              <option value="PREMIUM">Premium</option>
-            </select>
-          </Field>
-          <ClientInvoiceFields
-            defaultRequires={client.requiresInvoice == null ? "" : client.requiresInvoice ? "si" : "no"}
-            rfc={client.rfc ?? ""}
-            taxRegime={client.taxRegime ?? ""}
-            fiscalZip={client.fiscalZip ?? ""}
-            fiscalAddress={client.fiscalAddress ?? ""}
+        <div className="space-y-8">
+          <ClientProfileSection client={clientData} ownerName={owner?.name ?? null} updateAction={updateClientAction} />
+          <ClientContactsPanel
+            clientId={client.id}
+            contacts={client.contacts.map((contact) => ({
+              id: contact.id,
+              name: contact.name,
+              roleTitle: contact.roleTitle,
+              phone: contact.phone,
+              email: contact.email,
+              isPrimary: contact.isPrimary,
+            }))}
+            addAction={addContactAction}
+            inactivateAction={inactivateContactAction}
           />
-          <Field label="Días de crédito"><input name="creditDays" defaultValue={client.creditDays ?? ""} className={controlClass} /></Field>
-          <Field label="Dirección de entrega"><textarea name="deliveryAddress" defaultValue={client.deliveryAddress ?? ""} className={controlClass} rows={2} /></Field>
-          <p className="text-sm text-[var(--muted)]">Responsable comercial: {owner?.name ?? "Sin asignar"}</p>
-          <Button type="submit">Guardar</Button>
-        </form>
-        <div className="space-y-4">
-          {can(session.role, "client.reassign") ? (
-            <form action={reassignClientAction} className="space-y-3 rounded-lg border border-[var(--line)] bg-white p-4">
-              <input type="hidden" name="id" value={client.id} />
-              <input type="hidden" name="version" value={client.version} />
-              <Field label="Reasignar responsable">
-                <select name="ownerUserId" className={controlClass} defaultValue={client.ownerUserId ?? ""}>
-                  <option value="" disabled>Selecciona</option>
-                  {candidates.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
-                </select>
-              </Field>
-              <Button type="submit" tone="ghost">Reasignar</Button>
-            </form>
-          ) : null}
-          {can(session.role, "client.inactivate") && client.active ? (
-            <form action={inactivateClientAction} className="rounded-lg border border-[var(--line)] bg-white p-4">
-              <input type="hidden" name="id" value={client.id} />
-              <input type="hidden" name="version" value={client.version} />
-              <p className="mb-3 text-sm">Inactivar conserva el historial y lo saca de los listados activos.</p>
-              <ConfirmSubmit message="El cliente quedará inactivo. El historial se conserva.">Inactivar cliente</ConfirmSubmit>
-            </form>
-          ) : null}
-          <section className="rounded-lg border border-[var(--line)] bg-white p-4">
-            <h2 className="font-medium">Relaciones</h2>
-            <ul className="mt-2 space-y-1 text-sm">
-              {client.prospects.length === 0 ? <li className="text-[var(--muted)]">Sin prospecto de origen.</li> : client.prospects.map((prospect) => (
-                <li key={prospect.id}><a className="text-[var(--accent)]" href={`/prospectos/${prospect.id}`}>{prospect.name}</a></li>
-              ))}
-            </ul>
-            <h3 className="mt-4 font-medium">Cotizaciones</h3>
-            {quotes.length === 0 ? <p className="mt-1 text-sm text-[var(--muted)]">Todavía no hay cotizaciones de este cliente.</p> : (
-              <ul className="mt-1 space-y-1 text-sm">
-                {quotes.map((quote) => <li key={quote.id}><Link className="text-[var(--accent)]" href={`/cotizaciones/${quote.id}`}>{quote.folio}</Link> · {quote.status}</li>)}
-              </ul>
-            )}
-            {can(session.role, "quote.create", session.activeCompanyCode) ? <p className="mt-2"><TextLink href={`/cotizaciones/nuevo?clientId=${client.id}`}>Nueva cotización</TextLink></p> : null}
-          </section>
         </div>
+        <ClientAdminAside
+          clientId={client.id}
+          version={client.version}
+          ownerUserId={client.ownerUserId}
+          canReassign={can(session.role, "client.reassign")}
+          canInactivate={can(session.role, "client.inactivate") && client.active}
+          candidates={candidates.map((user) => ({ id: user.id, name: user.name }))}
+          reassignAction={reassignClientAction}
+          inactivateAction={inactivateClientAction}
+        />
       </DetailGrid>
 
-      <section className="mt-6 rounded-lg border border-[var(--line)] bg-white p-4">
-        <h2 className="font-medium">Contactos</h2>
-        <ul className="mt-3 divide-y divide-[var(--line)]">
-          {client.contacts.filter((contact) => contact.active).length === 0 ? <li className="py-2 text-sm text-[var(--danger)]">Falta el contacto obligatorio.</li> : null}
-          {client.contacts.filter((contact) => contact.active).map((contact) => (
-            <li key={contact.id} className="flex flex-wrap items-center justify-between gap-3 py-3 text-sm">
-              <div className="min-w-0">
-                <p className="font-medium">{contact.name}{contact.isPrimary ? " · principal" : ""}</p>
-                {contact.roleTitle ? <p className="text-[var(--muted)]">{contact.roleTitle}</p> : null}
-                <p className="break-words text-[var(--muted)]">{[contact.phone, contact.email].filter(Boolean).join(" · ") || "Sin teléfono ni correo"}</p>
-              </div>
-              <form action={inactivateContactAction}>
-                <input type="hidden" name="contactId" value={contact.id} />
-                <ConfirmSubmit message="El contacto quedará inactivo. Debe quedar al menos un contacto activo.">Inactivar</ConfirmSubmit>
-              </form>
-            </li>
-          ))}
-        </ul>
-        <form action={addContactAction} className="mt-4 grid gap-3 md:grid-cols-2">
-          <input type="hidden" name="clientId" value={client.id} />
-          <Field label="Nombre"><input name="name" required className={controlClass} /></Field>
-          <Field label="Puesto"><input name="roleTitle" className={controlClass} /></Field>
-          <Field label="Teléfono"><input name="phone" className={controlClass} /></Field>
-          <Field label="Correo"><input name="email" className={controlClass} /></Field>
-          <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="isPrimary" value="si" /> Contacto principal</label>
-          <Button type="submit" tone="ghost">Agregar contacto</Button>
-        </form>
-      </section>
+      <div className="mt-8">
+        <ClientRelationsHub
+          clientId={client.id}
+          prospects={client.prospects.map((prospect) => ({ id: prospect.id, name: prospect.name }))}
+          quotes={quotes.map((quote) => ({
+            id: quote.id,
+            folio: quote.folio,
+            status: quote.status,
+            quoteType: quote.quoteType,
+            updatedAt: quote.updatedAt.toISOString(),
+          }))}
+          attentions={attentions.map((row) => ({
+            id: row.id,
+            attentionType: row.attentionType,
+            priorityName: row.priorityName,
+            status: row.status,
+            reportedFault: row.reportedFault,
+            createdAt: row.createdAt.toISOString(),
+            equipment: row.equipment,
+            technicalCases: row.technicalCases,
+          }))}
+          equipments={client.equipments.map((equipment) => ({
+            id: equipment.id,
+            folio: equipment.folio,
+            kind: equipment.kind,
+            model: equipment.model,
+            custody: equipment.custody,
+          }))}
+          canQuote={can(session.role, "quote.create", session.activeCompanyCode)}
+          canService={can(session.role, "attention.create", session.activeCompanyCode)}
+        />
+      </div>
 
-      {client.equipments.length > 0 ? (
-        <section className="mt-6">
-          <h2 className="mb-2 font-medium">Equipos</h2>
-          <ul className="space-y-1 text-sm">
-            {client.equipments.map((equipment) => (
-              <li key={equipment.id}>
-                <Link href={equipment.kind === "MOT" ? `/motores/${equipment.id}` : `/equipos/${equipment.id}`} className="text-[var(--accent)]">{equipment.folio}</Link>
-                {" · "}{equipment.model}
-              </li>
-            ))}
-          </ul>
-        </section>
+      {history.length > 0 ? (
+        <HistoryTimeline
+          className="mt-8"
+          items={history.map((item) => ({ id: item.id, createdAt: item.createdAt, summary: item.summary, authorName: item.author?.name }))}
+        />
       ) : null}
-
-      <History items={history} />
     </>
   );
-}
-
-function History({ items }: { items: Awaited<ReturnType<typeof historyFor>> }) {
-  if (items.length === 0) return null;
-  return <HistoryTimeline className="mt-6" items={items.map((item) => ({ id: item.id, createdAt: item.createdAt, summary: item.summary, authorName: item.author?.name }))} />;
 }

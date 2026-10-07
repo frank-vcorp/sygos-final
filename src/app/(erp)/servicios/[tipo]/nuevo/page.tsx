@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { startServiceAction } from "../../actions";
 import { EquipmentCatalogFields } from "@/components/equipment-catalog-fields";
+import { ClientPicker } from "@/components/client-picker";
 import { QuickPanel } from "@/components/quick-panel";
 import { Button, controlClass, Field, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
@@ -14,10 +15,17 @@ const TYPES = {
   garantia: "DIAGNOSTICO_GARANTIA",
 } as const;
 
-export default async function NuevoServicioPage({ params }: { params: Promise<{ tipo: string }> }) {
+export default async function NuevoServicioPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ tipo: string }>;
+  searchParams: Promise<{ clientId?: string }>;
+}) {
   const session = await requireCompany();
   if (!can(session.role, "attention.create", session.activeCompanyCode)) redirect("/inicio");
   const { tipo } = await params;
+  const { clientId: clientIdParam } = await searchParams;
   const attentionType = TYPES[tipo as keyof typeof TYPES];
   if (!attentionType) notFound();
   const warranty = attentionType === "DIAGNOSTICO_GARANTIA";
@@ -43,22 +51,20 @@ export default async function NuevoServicioPage({ params }: { params: Promise<{ 
         })
       : Promise.resolve([]),
   ]);
+  const defaultClientId = clientIdParam && clients.some((row) => row.id === clientIdParam) ? clientIdParam : "";
   return (
     <>
       <PageHeader back={{ href: `/servicios/${tipo}`, label: ATTENTION_LABEL[attentionType as AttentionType] }} title={`Nuevo ${ATTENTION_LABEL[attentionType as AttentionType]}`} subtitle="Si el cliente o el equipo no existen, se dan de alta aquí y el flujo sigue en Taller. El SLA inicia con la entrada física." />
       <form action={startServiceAction} className="grid max-w-2xl gap-4 rounded-lg border border-[var(--line)] bg-white p-4">
         <input type="hidden" name="attentionType" value={attentionType} />
-        <Field label="Cliente existente">
-          <select name="clientId" className={controlClass} defaultValue="">
-            <option value="">Crear cliente en este paso</option>
-            {clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}
-          </select>
-        </Field>
         {warranty ? null : (
-          <QuickPanel label="Alta rápida de cliente" defaultOpen>
-            <Field label="Nombre del cliente"><input name="newClientName" className={controlClass} /></Field>
-            <Field label="Contacto"><input name="contactName" className={controlClass} /></Field>
-          </QuickPanel>
+          <ClientPicker
+            label="Cliente existente"
+            clients={clients}
+            defaultClientId={defaultClientId}
+            allowQuickClient={can(session.role, "client.create", session.activeCompanyCode)}
+            extendedContact={false}
+          />
         )}
         <Field label="Equipo existente" hint={warranty ? "La garantía exige un equipo que ya tuvo una reparación pagada." : "Vacío para dar de alta el equipo ahora."}>
           <select name="equipmentId" className={controlClass} defaultValue="" required={warranty}>

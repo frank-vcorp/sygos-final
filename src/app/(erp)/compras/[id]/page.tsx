@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { cancelOrderAction, changeOrderAction, decideOrderAction, discardDirectAction, editDirectAction, processPurchaseAction } from "../actions";
 import { HistoryTimeline } from "@/components/history-timeline";
+import { SupplierPicker } from "@/components/supplier-picker";
 import { Badge, controlClass, Field, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { historyFor } from "@/lib/history";
@@ -77,12 +78,13 @@ export default async function CompraPage({ params }: { params: Promise<{ id: str
           <p className="text-sm text-[var(--muted)]">Proveedor, concepto o importe regresan la orden al CEO.</p>
           <input type="hidden" name="purchaseId" value={row.id} />
           <input type="hidden" name="version" value={row.version} />
-          <Field label="Proveedor">
-            <select name="supplierId" className={controlClass} defaultValue={row.supplierId ?? ""}>
-              <option value="">Sin proveedor</option>
-              {suppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}
-            </select>
-          </Field>
+          <SupplierPicker
+            suppliers={suppliers}
+            defaultSupplierId={row.supplierId ?? ""}
+            allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)}
+            allowEmpty
+            emptyLabel="Sin proveedor"
+          />
           <Field label="Concepto"><input name="concept" defaultValue={row.concept} className={controlClass} /></Field>
           <Field label="Importe"><input name="amount" type="number" step="0.01" defaultValue={row.amount} className={controlClass} /></Field>
           <button className="w-fit rounded-md border border-[var(--line)] px-3 py-2 text-sm">Enviar de nuevo al CEO</button>

@@ -17,6 +17,7 @@ import {
   validateDiagnosis,
 } from "@/lib/technical";
 import { setFlash } from "@/lib/flash";
+import { supplierIdFromForm } from "@/lib/form-quick-entities";
 import { optionalText, parseVersion, requiredText } from "@/lib/form";
 import { requireCompany } from "@/lib/session";
 
@@ -41,7 +42,7 @@ async function run(formData: FormData, work: (session: Awaited<ReturnType<typeof
 
 export async function assignCaseAction(formData: FormData) {
   "use server";
-  await run(formData, (session) => assignCase(session, requiredText(formData.get("caseId"), "Operación"), parseVersion(formData.get("version")), optionalText(formData.get("assigneeUserId")), optionalText(formData.get("supplierId"))), "Asignación actualizada.");
+  await run(formData, async (session) => assignCase(session, requiredText(formData.get("caseId"), "Operación"), parseVersion(formData.get("version")), optionalText(formData.get("assigneeUserId")), await supplierIdFromForm(session, formData)), "Asignación actualizada.");
 }
 
 export async function startCaseAction(formData: FormData) {

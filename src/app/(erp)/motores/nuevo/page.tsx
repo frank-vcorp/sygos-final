@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createMotAction } from "@/app/(erp)/equipos/actions";
+import { ClientPicker } from "@/components/client-picker";
 import { EquipmentCatalogFields } from "@/components/equipment-catalog-fields";
 import { ServiceTypePriority } from "@/components/service-type-priority";
 import { Button, controlClass, Field, FormActions, FormPanel, FormSection, PageHeader } from "@/components/ui";
@@ -38,9 +39,13 @@ export default async function NuevoMotPage() {
       />
       <FormPanel action={createMotAction}>
         <FormSection title="Cliente e identificación" description="Define a quién pertenece el motor y su identidad técnica.">
-          <Field label={session.activeCompanyCode === "SYSTRON" ? "Cliente final" : "Cliente"}>
-            <select name="clientId" required className={controlClass}><option value="">Selecciona</option>{clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select>
-          </Field>
+          <div className="md:col-span-2">
+            <ClientPicker
+              label={session.activeCompanyCode === "SYSTRON" ? "Cliente final" : "Cliente"}
+              clients={clients}
+              allowQuickClient={can(session.role, "client.create", session.activeCompanyCode)}
+            />
+          </div>
           <div className="md:col-span-2"><EquipmentCatalogFields types={types.map((type) => type.name)} brands={brands.map((brand) => brand.name)} models={models.map((row) => ({ type: row.type.name, brand: row.brand.name, model: row.name }))} /></div>
           <Field label="Serie"><input name="serial" className={controlClass} /></Field>
           <Field label="Descripción"><textarea name="description" rows={3} className={controlClass} /></Field>

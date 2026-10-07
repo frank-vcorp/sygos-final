@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { MOVEMENTS, type MovementKind } from "@/lib/custody";
 import { cancelMovement, createAttention, createEqui, createMot, registerMovement } from "@/lib/equipment-service";
 import { setFlash } from "@/lib/flash";
+import { clientIdFromForm, supplierIdFromForm } from "@/lib/form-quick-entities";
 import { optionalText, parseVersion, requiredText } from "@/lib/form";
 import { can, type Action } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
@@ -29,8 +30,9 @@ export async function createEquiAction(formData: FormData) {
   "use server";
   try {
     const session = await guard("equi.create");
+    const { clientId } = await clientIdFromForm(session, formData);
     const equipment = await createEqui(session, {
-      clientId: requiredText(formData.get("clientId"), "Cliente"),
+      clientId,
       typeName: optionalText(formData.get("newType")) ?? requiredText(formData.get("typeName"), "Tipo"),
       brandName: optionalText(formData.get("newBrand")) ?? requiredText(formData.get("brandName"), "Marca"),
       model: requiredText(formData.get("model"), "Modelo"),
@@ -50,8 +52,9 @@ export async function createMotAction(formData: FormData) {
   "use server";
   try {
     const session = await guard("mot.create");
+    const { clientId } = await clientIdFromForm(session, formData);
     const equipment = await createMot(session, {
-      clientId: requiredText(formData.get("clientId"), "Cliente"),
+      clientId,
       typeName: optionalText(formData.get("newType")) ?? requiredText(formData.get("typeName"), "Tipo"),
       brand: optionalText(formData.get("newBrand")) ?? requiredText(formData.get("brandName"), "Marca"),
       model: requiredText(formData.get("model"), "Modelo"),
@@ -117,7 +120,7 @@ export async function movementAction(formData: FormData) {
       deliveryMode: optionalText(formData.get("deliveryMode")),
       contact: optionalText(formData.get("contact")),
       enablingDocument: optionalText(formData.get("enablingDocument")),
-      supplierId: optionalText(formData.get("supplierId")),
+      supplierId: await supplierIdFromForm(session, formData),
       notes: optionalText(formData.get("notes")),
     });
     await setFlash({ tone: "ok", message: "Movimiento físico registrado." });

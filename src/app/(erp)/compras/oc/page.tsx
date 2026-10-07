@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { orderAction } from "../actions";
+import { SupplierPicker } from "@/components/supplier-picker";
 import { controlClass, Field, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
@@ -13,12 +14,12 @@ export default async function NuevaOrdenPage() {
     <>
       <PageHeader back={{ href: "/compras", label: "Compras" }} title="Orden de compra" subtitle="Es una solicitud interna. No compromete al proveedor ni mueve dinero hasta que Coordinación la procesa." />
       <form action={orderAction} className="grid max-w-xl gap-3 rounded-lg border border-[var(--line)] bg-white p-4">
-        <Field label="Proveedor">
-          <select name="supplierId" className={controlClass} defaultValue="">
-            <option value="">Todavía no se conoce</option>
-            {suppliers.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}
-          </select>
-        </Field>
+        <SupplierPicker
+          suppliers={suppliers}
+          allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)}
+          allowEmpty
+          emptyLabel="Todavía no se conoce"
+        />
         <Field label="Concepto"><input name="concept" required className={controlClass} /></Field>
         <Field label="Cantidad"><input name="quantity" type="number" min="1" defaultValue="1" className={controlClass} /></Field>
         <Field label="Importe estimado"><input name="amount" required type="number" min="0.01" step="0.01" className={controlClass} /></Field>

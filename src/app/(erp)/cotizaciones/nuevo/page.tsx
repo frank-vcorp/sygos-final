@@ -28,13 +28,18 @@ export default async function NuevaCotizacionPage({ searchParams }: { searchPara
     <>
       <PageHeader
         title="Nueva cotización"
-        subtitle="Se guarda sin precio. El precio lo asigna CEO o Administrador."
+        subtitle="Se guarda sin precio. Puedes dar de alta un cliente nuevo aquí si aún no existe."
         back={{ href: "/cotizaciones", label: "Cotizaciones" }}
       />
       <FormPanel action={createQuoteAction}>
         <FormSection title="Propuesta comercial" description="Relaciona cliente, equipo y conceptos. El precio se asigna en el siguiente paso.">
           <Field label="Tipo"><select name="quoteType" required className={controlClass}>{QUOTE_TYPES.map((type) => <option key={type} value={type}>{QUOTE_TYPE_LABEL[type]}</option>)}</select></Field>
-          <QuoteDraft defaultClientId={clients.some((client) => client.id === clientId) ? clientId : ""} clients={clients.map((client) => ({ id: client.id, name: client.name, contacts: client.contacts.map((contact) => ({ id: contact.id, name: contact.name, isPrimary: contact.isPrimary })) }))} equipment={equipment.map((item) => ({ id: item.id, folio: item.folio, model: item.model, clientId: item.clientId }))} />
+          <QuoteDraft
+            allowQuickClient={can(session.role, "client.create", session.activeCompanyCode)}
+            defaultClientId={clients.some((client) => client.id === clientId) ? clientId : ""}
+            clients={clients.map((client) => ({ id: client.id, name: client.name, contacts: client.contacts.map((contact) => ({ id: contact.id, name: contact.name, isPrimary: contact.isPrimary })) }))}
+            equipment={equipment.map((item) => ({ id: item.id, folio: item.folio, model: item.model, clientId: item.clientId }))}
+          />
         </FormSection>
       </FormPanel>
     </>

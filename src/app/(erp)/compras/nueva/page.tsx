@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { directPurchaseAction } from "../actions";
+import { SupplierPicker } from "@/components/supplier-picker";
 import { controlClass, Field, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
@@ -13,12 +14,11 @@ export default async function NuevaCompraPage() {
     <>
       <PageHeader back={{ href: "/compras", label: "Compras" }} title="Compra directa" subtitle="Solo entra si cabe en el máximo por compra y en el presupuesto del mes." />
       <form action={directPurchaseAction} className="grid max-w-xl gap-3 rounded-lg border border-[var(--line)] bg-white p-4">
-        <Field label="Proveedor">
-          <select name="supplierId" required className={controlClass} defaultValue="">
-            <option value="">Selecciona</option>
-            {suppliers.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}
-          </select>
-        </Field>
+        <SupplierPicker
+          suppliers={suppliers}
+          allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)}
+          required
+        />
         <Field label="Concepto"><input name="concept" required className={controlClass} /></Field>
         <Field label="Cantidad"><input name="quantity" type="number" min="1" defaultValue="1" className={controlClass} /></Field>
         <Field label="Importe"><input name="amount" required type="number" min="0.01" step="0.01" className={controlClass} /></Field>

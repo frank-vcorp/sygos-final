@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createEquiAction } from "../actions";
+import { ClientPicker } from "@/components/client-picker";
 import { EquipmentCatalogFields } from "@/components/equipment-catalog-fields";
 import { Button, controlClass, Field, FormActions, FormPanel, FormSection, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
@@ -29,9 +30,12 @@ export default async function NuevoEquiPage() {
       <PageHeader back={{ href: "/equipos", label: "Equipos" }} title="Nuevo EQUI" subtitle="Crea la identidad física. La entrada de almacén se confirma después." />
       <FormPanel action={createEquiAction}>
         <FormSection title="Propiedad" description="Relaciona la unidad física con el cliente que la entrega.">
-          <Field label="Cliente">
-            <select name="clientId" required className={controlClass}><option value="">Selecciona</option>{clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select>
-          </Field>
+          <div className="md:col-span-2">
+            <ClientPicker
+              clients={clients}
+              allowQuickClient={can(session.role, "client.create", session.activeCompanyCode)}
+            />
+          </div>
         </FormSection>
         <FormSection title="Identificación del equipo" description="Busca un modelo existente o captura uno nuevo con su tipo y marca.">
           <div className="md:col-span-2"><EquipmentCatalogFields types={types.map((type) => type.name)} brands={brands.map((brand) => brand.name)} models={models.map((row) => ({ type: row.type.name, brand: row.brand.name, model: row.name }))} /></div>

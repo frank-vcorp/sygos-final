@@ -1,5 +1,6 @@
 import { cancelMovementAction, createAttentionAction, movementAction } from "@/app/(erp)/equipos/actions";
 import { MovementReasonFields } from "@/components/movement-reason-fields";
+import { SupplierPicker } from "@/components/supplier-picker";
 import { Button, controlClass, Field } from "@/components/ui";
 import { allowedMovements, type Custody, type MovementKind } from "@/lib/custody";
 import { ATTENTION_LABEL, ATTENTION_TYPES, prioritySummary } from "@/lib/priorities";
@@ -79,12 +80,14 @@ export function MovementForm({
   custody,
   version,
   suppliers,
+  allowQuickSupplier = false,
 }: {
   equipmentId: string;
   kind: "EQUI" | "MOT";
   custody: Custody;
   version: number;
   suppliers: Array<{ id: string; name: string }>;
+  allowQuickSupplier?: boolean;
 }) {
   const movements = allowedMovements(kind, custody);
   if (movements.length === 0) return null;
@@ -112,14 +115,14 @@ export function MovementForm({
         <input name="enablingDocument" className={controlClass} />
       </Field>
       {movements.includes("SALIDA_PROVEEDOR" as MovementKind) ? (
-        <Field label="Proveedor">
-          <select name="supplierId" className={controlClass} defaultValue="">
-            <option value="">Sin proveedor</option>
-            {suppliers.map((supplier) => (
-              <option key={supplier.id} value={supplier.id}>{supplier.name}</option>
-            ))}
-          </select>
-        </Field>
+        <SupplierPicker
+          suppliers={suppliers}
+          allowQuickSupplier={allowQuickSupplier}
+          allowEmpty
+          emptyLabel="Sin proveedor"
+          label="Proveedor"
+          hint="Obligatorio al registrar salida a proveedor externo."
+        />
       ) : null}
       <Field label="Observaciones"><textarea name="notes" rows={2} className={controlClass} /></Field>
       <Button type="submit">Confirmar movimiento</Button>

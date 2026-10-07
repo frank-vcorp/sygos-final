@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { freeInvoiceAction } from "../actions";
+import { ClientPicker } from "@/components/client-picker";
 import { controlClass, Field, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
@@ -17,12 +18,10 @@ export default async function FacturaLibrePage() {
     <>
       <PageHeader back={{ href: "/facturacion", label: "Facturación" }} title="Factura libre" subtitle="No crea equipo, diagnóstico ni venta. Sí abre cuenta por cobrar." />
       <form action={freeInvoiceAction} className="grid max-w-xl gap-3 rounded-lg border border-[var(--line)] bg-white p-4">
-        <Field label="Cliente">
-          <select name="clientId" required className={controlClass} defaultValue="">
-            <option value="">Selecciona</option>
-            {clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}
-          </select>
-        </Field>
+        <ClientPicker
+          clients={clients}
+          allowQuickClient={can(session.role, "client.create", session.activeCompanyCode)}
+        />
         <Field label="Concepto"><input name="concept" required className={controlClass} /></Field>
         <Field label="Importe con IVA"><input name="amount" required type="number" min="0.01" step="0.01" className={controlClass} /></Field>
         <Field label="Días de crédito"><input name="creditDays" type="number" min="0" className={controlClass} /></Field>

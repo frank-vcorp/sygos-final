@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { setFlash } from "@/lib/flash";
+import { supplierIdFromForm } from "@/lib/form-quick-entities";
 import { optionalText, parseVersion, requiredText } from "@/lib/form";
 import { can, type Action } from "@/lib/permissions";
 import { cancelOrder, changeAuthorizedOrder, decideOrder, discardDirectPurchase, editDirectPurchase, processPurchase, registerDirectPurchase, registerOrder } from "@/lib/purchases";
@@ -23,8 +24,10 @@ export async function directPurchaseAction(formData: FormData) {
   "use server";
   try {
     const session = await guard("purchase.operate");
+    const supplierId = await supplierIdFromForm(session, formData, { required: true });
+    if (!supplierId) throw new Error("Elige un proveedor.");
     const purchase = await registerDirectPurchase(session, {
-      supplierId: requiredText(formData.get("supplierId"), "Proveedor"),
+      supplierId,
       concept: requiredText(formData.get("concept"), "Concepto"),
       amount: Number(formData.get("amount")),
       destination: requiredText(formData.get("destination"), "Destino"),
@@ -44,7 +47,7 @@ export async function orderAction(formData: FormData) {
   try {
     const session = await guard("purchase.operate");
     const purchase = await registerOrder(session, {
-      supplierId: optionalText(formData.get("supplierId")),
+      supplierId: await supplierIdFromForm(session, formData),
       concept: requiredText(formData.get("concept"), "Concepto"),
       amount: Number(formData.get("amount")),
       destination: requiredText(formData.get("destination"), "Destino"),
@@ -104,7 +107,7 @@ export async function changeOrderAction(formData: FormData) {
   try {
     const session = await guard("finance.manage");
     await changeAuthorizedOrder(session, id, parseVersion(formData.get("version")), {
-      supplierId: optionalText(formData.get("supplierId")),
+      supplierId: await supplierIdFromForm(session, formData),
       concept: requiredText(formData.get("concept"), "Concepto"),
       amount: Number(formData.get("amount")),
     });

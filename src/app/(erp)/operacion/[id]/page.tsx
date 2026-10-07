@@ -17,6 +17,7 @@ import {
   validateAction,
 } from "../actions";
 import { HistoryTimeline } from "@/components/history-timeline";
+import { SupplierPicker } from "@/components/supplier-picker";
 import { Badge, Button, controlClass, DetailGrid, Field, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
@@ -188,13 +189,15 @@ export default async function OperacionDetallePage({ params }: { params: Promise
                     {candidates.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
                   </select>
                 </Field>
-                {suppliers.length > 0 ? (
-                  <Field label="O servicio externo">
-                    <select name="supplierId" className={controlClass} defaultValue={row.externalSupplierId ?? ""}>
-                      <option value="">Sin proveedor</option>
-                      {suppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}
-                    </select>
-                  </Field>
+                {row.serviceCompany.code === "SYSTRON" ? (
+                  <SupplierPicker
+                    label="O servicio externo"
+                    suppliers={suppliers}
+                    defaultSupplierId={row.externalSupplierId ?? ""}
+                    allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)}
+                    allowEmpty
+                    emptyLabel="Sin proveedor"
+                  />
                 ) : null}
                 <Button type="submit" tone="ghost">Guardar asignación</Button>
               </form>

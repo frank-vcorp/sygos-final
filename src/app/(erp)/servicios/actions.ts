@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { setFlash } from "@/lib/flash";
+import { clientIdFromForm } from "@/lib/form-quick-entities";
 import { optionalText, requiredText } from "@/lib/form";
 import { can } from "@/lib/permissions";
 import { isAttentionType } from "@/lib/priorities";
@@ -25,11 +26,16 @@ export async function startServiceAction(formData: FormData) {
     }
     if (!isAttentionType(attentionType)) throw new Error("Ese tipo de servicio no existe.");
     const kind = optionalText(formData.get("equipmentKind"));
+    const equipmentId = optionalText(formData.get("equipmentId"));
+    let clientId = optionalText(formData.get("clientId"));
+    if (!equipmentId && !clientId) {
+      ({ clientId } = await clientIdFromForm(session, formData));
+    }
     const attention = await startService(session, {
       attentionType,
-      clientId: optionalText(formData.get("clientId")),
-      newClientName: optionalText(formData.get("newClientName")),
-      contactName: optionalText(formData.get("contactName")),
+      clientId,
+      newClientName: null,
+      contactName: null,
       equipmentId: optionalText(formData.get("equipmentId")),
       equipmentKind: kind === "EQUI" || kind === "MOT" ? kind : null,
       model: optionalText(formData.get("model")),

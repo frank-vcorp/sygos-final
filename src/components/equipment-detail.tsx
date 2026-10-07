@@ -150,6 +150,7 @@ export async function EquipmentDetail({ id, expectedKind }: { id: string; expect
               custody={equipment.custody as Custody}
               version={equipment.version}
               suppliers={suppliers.map((supplier) => ({ id: supplier.id, name: supplier.name }))}
+              allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)}
             />
           ) : null}
           {canAttend ? <AttentionForm equipmentId={equipment.id} kind={expectedKind} version={equipment.version} priorities={priorities} repairs={repairs} /> : null}

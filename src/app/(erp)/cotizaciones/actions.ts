@@ -2,6 +2,8 @@
 
 import { redirect } from "next/navigation";
 import { setFlash } from "@/lib/flash";
+import { clientIdFromForm } from "@/lib/form-quick-entities";
+import { createEqui, createMotIdentity } from "@/lib/equipment-service";
 import { optionalText, parseVersion, requiredText } from "@/lib/form";
 import { can, type Action } from "@/lib/permissions";
 import { QUOTE_TYPES, type QuoteType, applyDiscount, createSellerQuote, decideQuote, linkIntercompanyQuote, prepareQuoteFromCase, relateQuoteEquipment, setPrices } from "@/lib/quotes";
@@ -39,8 +41,14 @@ export async function createQuoteAction(formData: FormData) {
         if (!concept || !Number.isInteger(quantity) || quantity < 1) throw new Error("Cada concepto usa el formato descripción|cantidad.");
         return { concept, quantity };
       });
+    const resolvedClient = await clientIdFromForm(session, formData);
+    const clientId = resolvedClient.clientId;
+    let contactIds = formData.getAll("contactId").map(String).filter(Boolean);
+    if (resolvedClient.primaryContactId && contactIds.length === 0) {
+      contactIds = [resolvedClient.primaryContactId];
+    }
     const quote = await createSellerQuote(session, {
-      clientId: requiredText(formData.get("clientId"), "Cliente"),
+      clientId,
       quoteType: quoteType as QuoteType,
       equipmentId: optionalText(formData.get("equipmentId")),
       preliminaryType: optionalText(formData.get("preliminaryType")),
@@ -49,7 +57,7 @@ export async function createQuoteAction(formData: FormData) {
       preliminarySerial: optionalText(formData.get("preliminarySerial")),
       reference: optionalText(formData.get("reference")),
       concepts,
-      contactIds: formData.getAll("contactId").map(String).filter(Boolean),
+      contactIds,
     });
     await setFlash({ tone: "ok", message: `${quote.folio} quedó registrada, sin precio.` });
     redirect(`/cotizaciones/${quote.id}`);
@@ -65,11 +73,29 @@ export async function relateEquipmentAction(formData: FormData) {
   const target = back(formData);
   try {
     const session = await guard("quote.follow");
+    const quoteId = requiredText(formData.get("quoteId"), "Cotización");
+    let equipmentId = optionalText(formData.get("equipmentId"));
+    if (!equipmentId) {
+      const quote = await prisma.quote.findFirst({ where: { id: quoteId, companyId: session.activeCompanyId } });
+      if (!quote) throw new Error("Esa cotización no es de esta empresa.");
+      const kind = optionalText(formData.get("equipmentKind"));
+      const typeName = optionalText(formData.get("newType")) ?? requiredText(formData.get("typeName"), "Tipo");
+      const brandName = optionalText(formData.get("newBrand")) ?? requiredText(formData.get("brandName"), "Marca");
+      const model = requiredText(formData.get("model"), "Modelo");
+      const serial = optionalText(formData.get("serial"));
+      if (kind === "MOT") {
+        if (!can(session.role, "mot.create", session.activeCompanyCode)) throw new Error("No puedes dar de alta un MOT.");
+        equipmentId = (await createMotIdentity(session, { clientId: quote.clientId, typeName, brandName, model, description: null, serial })).id;
+      } else {
+        if (!can(session.role, "equi.create", session.activeCompanyCode)) throw new Error("No puedes dar de alta un EQUI.");
+        equipmentId = (await createEqui(session, { clientId: quote.clientId, typeName, brandName, model, description: null, serial })).id;
+      }
+    }
     await relateQuoteEquipment(
       session,
-      requiredText(formData.get("quoteId"), "Cotización"),
+      quoteId,
       parseVersion(formData.get("version")),
-      requiredText(formData.get("equipmentId"), "Equipo"),
+      equipmentId,
       requiredText(formData.get("priorityId"), "Prioridad"),
     );
     await setFlash({ tone: "ok", message: "Equipo relacionado. La operación arranca cuando el equipo está en resguardo." });

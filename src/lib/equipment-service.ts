@@ -1,3 +1,4 @@
+import { resolveClientIdForProcess } from "./client-quick-create";
 import { prisma } from "./db";
 import { nextCustody, isReceipt, reasonsFor, type Custody, type MovementKind } from "./custody";
 import { allocateFolio } from "./folios";
@@ -69,6 +70,46 @@ export async function createEqui(
     entityId: equipment.id,
     action: "ALTA",
     summary: `Alta de ${folio}. Identidad física sin entrada de almacén.`,
+    authorUserId: actor.userId,
+  });
+  return equipment;
+}
+
+export async function createMotIdentity(
+  actor: Actor,
+  input: {
+    clientId: string;
+    typeName: string;
+    brandName: string;
+    model: string;
+    description: string | null;
+    serial: string | null;
+  },
+) {
+  const client = await ownClient(actor, input.clientId);
+  const identity = await rememberCatalog(input.typeName, input.brandName, input.model);
+  const folio = await allocateFolio(actor.activeCompanyId, "MOT");
+  const equipment = await prisma.equipment.create({
+    data: {
+      kind: "MOT",
+      folio,
+      originCompanyId: actor.activeCompanyId,
+      clientId: client.id,
+      typeName: identity.typeName,
+      brandName: identity.brandName,
+      model: identity.modelName,
+      description: input.description,
+      serial: input.serial,
+      custody: "PENDIENTE_INGRESO",
+      createdByUserId: actor.userId,
+    },
+  });
+  await recordHistory({
+    companyId: actor.activeCompanyId,
+    entityType: "EQUIPO",
+    entityId: equipment.id,
+    action: "ALTA",
+    summary: `${folio} registrado desde cotización. Pendiente de ingreso físico.`,
     authorUserId: actor.userId,
   });
   return equipment;
@@ -257,17 +298,12 @@ export async function startService(
 ) {
   let clientId = input.clientId;
   if (!input.equipmentId && !clientId) {
-    if (!input.newClientName || !input.contactName) throw new Error("Para un cliente nuevo indica el nombre y un contacto.");
-    const ownerUserId = await ownerFor(actor);
-    const created = await prisma.client.create({
-      data: {
-        companyId: actor.activeCompanyId,
-        name: input.newClientName,
-        ownerUserId,
-        contacts: { create: { name: input.contactName, isPrimary: true } },
-      },
+    const resolved = await resolveClientIdForProcess(actor, {
+      clientId: null,
+      newClientName: input.newClientName,
+      contactName: input.contactName,
     });
-    clientId = created.id;
+    clientId = resolved.clientId;
   }
   let equipmentId = input.equipmentId;
   let version = 1;
@@ -325,15 +361,6 @@ export async function startService(
     originalCaseId: input.originalCaseId,
     version,
   });
-}
-
-async function ownerFor(actor: Actor) {
-  if (actor.role === "VENTAS" || actor.role === "GERENTE_OPERATIVO_SERVOMOTORES" || actor.role === "CEO") return actor.userId;
-  if (actor.role === "COORDINACION_ADMINISTRACION" || actor.role === "ADMINISTRADOR") {
-    const ceo = await prisma.user.findFirst({ where: { role: "CEO", active: true }, orderBy: { username: "asc" } });
-    return ceo?.id ?? null;
-  }
-  return null;
 }
 
 export async function registerMovement(
