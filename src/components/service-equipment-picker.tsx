@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { EquipmentCatalogFields } from "@/components/equipment-catalog-fields";
-import { Button, controlClass, Field } from "@/components/ui";
+import { EquipmentQuickFieldsModal } from "@/components/equipment-quick-fields";
+import { QuickCreateButton } from "@/components/form-quick-modal";
+import { controlClass, Field } from "@/components/ui";
 
 export type ServiceEquipmentOption = {
   id: string;
@@ -20,6 +21,7 @@ export function ServiceEquipmentPicker({
   brands,
   models,
   warranty = false,
+  emptyOptionLabel = "Selecciona",
 }: {
   equipment: ServiceEquipmentOption[];
   clientId: string;
@@ -28,6 +30,7 @@ export function ServiceEquipmentPicker({
   brands: string[];
   models: Array<{ type: string; brand: string; model: string }>;
   warranty?: boolean;
+  emptyOptionLabel?: string;
 }) {
   const [equipmentId, setEquipmentId] = useState("");
   const [showNew, setShowNew] = useState(false);
@@ -41,13 +44,6 @@ export function ServiceEquipmentPicker({
     setEquipmentId("");
     setShowNew(false);
   }, [clientId]);
-
-  const openNew = () => {
-    setEquipmentId("");
-    setShowNew(true);
-  };
-
-  const closeNew = () => setShowNew(false);
 
   if (warranty) {
     return (
@@ -90,7 +86,7 @@ export function ServiceEquipmentPicker({
             if (event.target.value) setShowNew(false);
           }}
         >
-          <option value="">Selecciona</option>
+          <option value="">{emptyOptionLabel}</option>
           {filtered.map((item) => (
             <option key={item.id} value={item.id}>
               {item.folio} · {item.model} ({item.kind})
@@ -99,56 +95,24 @@ export function ServiceEquipmentPicker({
         </select>
       </Field>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <Button
-          type="button"
-          tone="ghost"
-          className="min-h-10 border border-dashed border-[var(--accent)] text-[var(--accent)]"
-          disabled={!clientId}
-          onClick={openNew}
-        >
-          + Alta de equipo
-        </Button>
-        {equipmentId ? (
-          <span className="text-xs text-[var(--muted)]">Usando equipo existente.</span>
-        ) : null}
-        {!clientId ? (
-          <span className="text-xs text-[var(--muted)]">Primero elige el cliente.</span>
-        ) : null}
-      </div>
+      <QuickCreateButton
+        label="+ Alta de equipo"
+        disabled={!clientId}
+        disabledHint="Primero elige el cliente."
+        onClick={() => {
+          setEquipmentId("");
+          setShowNew(true);
+        }}
+      />
 
-      {showNew ? (
-        <div
-          className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 p-4 sm:items-center"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="service-new-equipment-title"
-        >
-          <div className="max-h-[min(90vh,40rem)] w-full max-w-lg overflow-y-auto rounded-xl border border-[var(--line)] bg-white shadow-xl">
-            <div className="sticky top-0 flex items-center justify-between gap-3 border-b border-[var(--line)] bg-white px-4 py-3">
-              <h3 id="service-new-equipment-title" className="text-sm font-semibold text-[#0b1f3a]">
-                Alta de equipo
-              </h3>
-              <Button type="button" tone="ghost" className="min-h-9 px-2 text-xs" onClick={closeNew}>
-                Cerrar
-              </Button>
-            </div>
-            <div className="grid gap-3 p-4">
-              <Field label="EQUI o MOT">
-                <select name="equipmentKind" className={controlClass} defaultValue={companyCode === "SERVOMOTORES" ? "MOT" : "EQUI"}>
-                  {companyCode === "SYSTRON" ? <option value="EQUI">EQUI</option> : null}
-                  <option value="MOT">MOT</option>
-                </select>
-              </Field>
-              <EquipmentCatalogFields types={types} brands={brands} models={models} />
-              <Field label="Serie"><input name="serial" className={controlClass} /></Field>
-              <Button type="button" className="w-full sm:w-auto" onClick={closeNew}>
-                Listo — continuar con el servicio
-              </Button>
-            </div>
-          </div>
-        </div>
-      ) : null}
+      <EquipmentQuickFieldsModal
+        open={showNew}
+        onClose={() => setShowNew(false)}
+        companyCode={companyCode}
+        types={types}
+        brands={brands}
+        models={models}
+      />
     </>
   );
 }

@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { EquipmentCatalogFields } from "@/components/equipment-catalog-fields";
-import { QuickPanel } from "@/components/quick-panel";
+import { EquipmentQuickFieldsModal } from "@/components/equipment-quick-fields";
+import { QuickCreateButton } from "@/components/form-quick-modal";
 import { SubmitButton } from "@/components/submit-button";
 import { controlClass, Field } from "@/components/ui";
 
@@ -33,7 +33,7 @@ export function RelateEquipmentForm({
   relateAction: (formData: FormData) => void | Promise<void>;
 }) {
   const [equipmentId, setEquipmentId] = useState("");
-  const quick = allowQuickEquipment && !equipmentId;
+  const [showNew, setShowNew] = useState(false);
 
   return (
     <form action={relateAction} className="grid gap-2 rounded-lg border border-[var(--line)] bg-white p-4">
@@ -41,29 +41,35 @@ export function RelateEquipmentForm({
       <p className="text-sm text-[var(--muted)]">La operación no arranca hasta que este equipo tenga entrada o ingreso físico.</p>
       <input type="hidden" name="quoteId" value={quoteId} />
       <input type="hidden" name="version" value={version} />
-      <Field label="Equipo del cliente">
+      <Field label="Equipo del cliente" hint="Elige un equipo existente o regístralo nuevo.">
         <select
           name="equipmentId"
           className={controlClass}
           value={equipmentId}
-          onChange={(event) => setEquipmentId(event.target.value)}
+          disabled={showNew}
+          onChange={(event) => {
+            setEquipmentId(event.target.value);
+            if (event.target.value) setShowNew(false);
+          }}
           required={!allowQuickEquipment}
         >
-          {allowQuickEquipment ? <option value="">Crear equipo en este paso</option> : <option value="">Selecciona</option>}
+          <option value="">Selecciona</option>
           {gear.map((item) => <option key={item.id} value={item.id}>{item.folio} · {item.model}</option>)}
         </select>
       </Field>
       {allowQuickEquipment ? (
-        <QuickPanel label="Alta rápida de equipo" defaultOpen={gear.length === 0 || quick}>
-          <Field label="EQUI o MOT">
-            <select name="equipmentKind" className={controlClass} defaultValue={companyCode === "SERVOMOTORES" ? "MOT" : "EQUI"}>
-              {companyCode === "SYSTRON" ? <option value="EQUI">EQUI</option> : null}
-              <option value="MOT">MOT</option>
-            </select>
-          </Field>
-          <EquipmentCatalogFields types={types} brands={brands} models={models} />
-          <Field label="Serie"><input name="serial" className={controlClass} /></Field>
-        </QuickPanel>
+        <>
+          <QuickCreateButton label="+ Alta de equipo" onClick={() => { setEquipmentId(""); setShowNew(true); }} />
+          <EquipmentQuickFieldsModal
+            open={showNew}
+            onClose={() => setShowNew(false)}
+            companyCode={companyCode}
+            types={types}
+            brands={brands}
+            models={models}
+            doneLabel="Listo — relacionar equipo"
+          />
+        </>
       ) : null}
       <Field label="Prioridad del servicio">
         <select name="priorityId" required className={controlClass} defaultValue="">

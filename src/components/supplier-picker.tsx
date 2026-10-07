@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { QuickPanel } from "@/components/quick-panel";
+import { FormQuickModal, QuickCreateButton } from "@/components/form-quick-modal";
 import { QuickSupplierFields } from "@/components/quick-supplier-fields";
 import { controlClass, Field } from "@/components/ui";
 
@@ -27,8 +27,8 @@ export function SupplierPicker({
   required?: boolean;
 }) {
   const [supplierId, setSupplierId] = useState(defaultSupplierId);
-  const quickCreateOption = allowQuickSupplier && !allowEmpty;
-  const quick = quickCreateOption && !supplierId;
+  const [showNew, setShowNew] = useState(false);
+  const quick = allowQuickSupplier && !supplierId && !allowEmpty;
 
   return (
     <>
@@ -38,8 +38,8 @@ export function SupplierPicker({
           hint
           ?? (allowQuickSupplier
             ? allowEmpty
-              ? "Opcional. Si no está en la lista, usa el alta rápida debajo."
-              : "Elige uno existente o registra uno nuevo aquí."
+              ? "Opcional. Elige uno existente o regístralo nuevo."
+              : "Elige un proveedor de la lista o usa el alta si aún no existe."
             : undefined)
         }
       >
@@ -48,17 +48,30 @@ export function SupplierPicker({
           required={required && !allowQuickSupplier}
           className={controlClass}
           value={supplierId}
-          onChange={(event) => setSupplierId(event.target.value)}
+          disabled={showNew}
+          onChange={(event) => {
+            const next = event.target.value;
+            setSupplierId(next);
+            if (next) setShowNew(false);
+          }}
         >
-          {allowEmpty ? <option value="">{emptyLabel}</option> : null}
-          {quickCreateOption ? <option value="">Crear proveedor en este paso</option> : !allowEmpty ? <option value="">Selecciona</option> : null}
+          {allowEmpty ? <option value="">{emptyLabel}</option> : <option value="">Selecciona</option>}
           {suppliers.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}
         </select>
       </Field>
-      {allowQuickSupplier ? (
-        <QuickPanel label="Alta rápida de proveedor" defaultOpen={suppliers.length === 0 || quick}>
-          <QuickSupplierFields required={quick} />
-        </QuickPanel>
+      {allowQuickSupplier && !supplierId ? (
+        <>
+          <QuickCreateButton label="+ Alta de proveedor" onClick={() => setShowNew(true)} />
+          <FormQuickModal
+            open={showNew}
+            title="Alta de proveedor"
+            titleId="supplier-quick-modal-title"
+            onClose={() => setShowNew(false)}
+            doneLabel="Listo — continuar"
+          >
+            <QuickSupplierFields required={quick} />
+          </FormQuickModal>
+        </>
       ) : null}
     </>
   );

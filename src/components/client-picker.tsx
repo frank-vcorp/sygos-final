@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
+import { FormQuickModal, QuickCreateButton } from "@/components/form-quick-modal";
 import { QuickClientFields } from "@/components/quick-client-fields";
-import { QuickPanel } from "@/components/quick-panel";
 import { controlClass, Field } from "@/components/ui";
 
 type ClientOption = { id: string; name: string };
@@ -25,35 +25,50 @@ export function ClientPicker({
   extendedContact?: boolean;
 }) {
   const [clientId, setClientId] = useState(defaultClientId);
-  const [quickOpen, setQuickOpen] = useState(allowQuickClient && !defaultClientId && clients.length === 0);
+  const [showNew, setShowNew] = useState(false);
   const quick = allowQuickClient && !clientId;
 
   return (
     <>
       <Field
         label={label}
-        hint={hint ?? (allowQuickClient ? "Elige uno existente o da de alta uno nuevo sin salir de este formulario." : undefined)}
+        hint={
+          hint
+          ?? (allowQuickClient
+            ? "Elige un cliente de la lista o usa el alta si aún no existe."
+            : undefined)
+        }
       >
         <select
           name="clientId"
           required={!allowQuickClient}
           className={controlClass}
           value={clientId}
+          disabled={showNew}
           onChange={(event) => {
             const next = event.target.value;
             setClientId(next);
             onClientChange?.(next);
-            if (next) setQuickOpen(false);
+            if (next) setShowNew(false);
           }}
         >
-          {allowQuickClient ? <option value="">Crear cliente en este paso</option> : <option value="">Selecciona</option>}
+          <option value="">Selecciona</option>
           {clients.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}
         </select>
       </Field>
       {allowQuickClient && !clientId ? (
-        <QuickPanel label="Alta rápida de cliente" open={quickOpen} onOpenChange={setQuickOpen}>
-          <QuickClientFields required={quick} extended={extendedContact} />
-        </QuickPanel>
+        <>
+          <QuickCreateButton label="+ Alta de cliente" onClick={() => setShowNew(true)} />
+          <FormQuickModal
+            open={showNew}
+            title="Alta de cliente"
+            titleId="client-quick-modal-title"
+            onClose={() => setShowNew(false)}
+            doneLabel="Listo — continuar"
+          >
+            <QuickClientFields required={quick} extended={extendedContact} />
+          </FormQuickModal>
+        </>
       ) : null}
     </>
   );

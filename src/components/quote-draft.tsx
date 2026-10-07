@@ -33,8 +33,6 @@ export function QuoteDraft({
     .filter((line) => line.concept)
     .map((line) => `${line.concept}|${line.quantity}`)
     .join("\n");
-  const quickClient = allowQuickClient && !clientId;
-
   if (clients.length === 0 && !allowQuickClient) {
     return (
       <p className="rounded-md border border-[#efd0d0] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]">
@@ -51,8 +49,15 @@ export function QuoteDraft({
         defaultClientId={defaultClientId}
         onClientChange={setClientId}
       />
-      <Field label="Equipo existente" hint="Solo aparecen los de este cliente. Vacío si todavía no ingresó, o si es servicio en campo o venta de equipo.">
-        <select name="equipmentId" className={controlClass} defaultValue="" disabled={quickClient}>
+      <Field
+        label="Equipo existente"
+        hint={
+          !clientId
+            ? "Selecciona un cliente para ver sus equipos."
+            : "Vacío si todavía no ingresó, o si es servicio en campo o venta de equipo."
+        }
+      >
+        <select name="equipmentId" className={controlClass} defaultValue="" disabled={!clientId}>
           <option value="">Sin equipo físico</option>
           {gear.map((item) => <option key={item.id} value={item.id}>{item.folio} · {item.model}</option>)}
         </select>
@@ -97,10 +102,7 @@ export function QuoteDraft({
       <Field label="Referencia comercial"><input name="reference" className={controlClass} /></Field>
       <fieldset className="grid gap-2">
         <legend className="text-sm font-medium">Contactos destinatarios</legend>
-        {quickClient ? (
-          <p className="text-xs text-[var(--muted)]">Al guardar se usará el contacto capturado en el alta rápida.</p>
-        ) : null}
-        {!clientId && !quickClient ? <p className="text-xs text-[var(--muted)]">Elige el cliente para ver sus contactos. Hace falta al menos uno.</p> : null}
+        {!clientId ? <p className="text-xs text-[var(--muted)]">Elige el cliente para ver sus contactos. Hace falta al menos uno.</p> : null}
         {clientId && contacts.length === 0 ? <p className="text-sm text-[var(--danger)]">Este cliente no tiene contactos activos.</p> : null}
         {contacts.map((contact) => (
           <label key={contact.id} className="flex items-center gap-2 text-sm">
