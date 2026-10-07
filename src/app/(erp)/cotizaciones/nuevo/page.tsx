@@ -11,7 +11,7 @@ export default async function NuevaCotizacionPage({ searchParams }: { searchPara
   const session = await requireCompany();
   if (!can(session.role, "quote.create", session.activeCompanyCode)) redirect("/cotizaciones");
   const { clientId } = await searchParams;
-  const [clients, equipment] = await Promise.all([
+  const [clients, equipment, types, brands, models] = await Promise.all([
     prisma.client.findMany({
       where: { companyId: session.activeCompanyId, active: true, isSystem: false, ...(session.role === "VENTAS" ? { ownerUserId: session.userId } : {}) },
       include: { contacts: { where: { active: true }, orderBy: [{ isPrimary: "desc" }, { name: "asc" }] } },
@@ -21,9 +21,14 @@ export default async function NuevaCotizacionPage({ searchParams }: { searchPara
     prisma.equipment.findMany({
       where: { originCompanyId: session.activeCompanyId, ...(session.role === "VENTAS" ? { client: { ownerUserId: session.userId } } : {}) },
       orderBy: { createdAt: "desc" },
-      take: 100,
+      take: 300,
+      select: { id: true, folio: true, model: true, clientId: true, kind: true },
     }),
+    prisma.catalogType.findMany({ orderBy: { name: "asc" } }),
+    prisma.catalogBrand.findMany({ orderBy: { name: "asc" } }),
+    prisma.catalogModel.findMany({ include: { type: true, brand: true } }),
   ]);
+  const allowQuickEquipment = can(session.role, "equi.create", session.activeCompanyCode) || can(session.role, "mot.create", session.activeCompanyCode);
   return (
     <>
       <PageHeader
@@ -36,9 +41,14 @@ export default async function NuevaCotizacionPage({ searchParams }: { searchPara
           <Field label="Tipo"><select name="quoteType" required className={controlClass}>{QUOTE_TYPES.map((type) => <option key={type} value={type}>{QUOTE_TYPE_LABEL[type]}</option>)}</select></Field>
           <QuoteDraft
             allowQuickClient={can(session.role, "client.create", session.activeCompanyCode)}
+            allowQuickEquipment={allowQuickEquipment}
+            companyCode={session.activeCompanyCode ?? "SYSTRON"}
             defaultClientId={clients.some((client) => client.id === clientId) ? clientId : ""}
             clients={clients.map((client) => ({ id: client.id, name: client.name, contacts: client.contacts.map((contact) => ({ id: contact.id, name: contact.name, isPrimary: contact.isPrimary })) }))}
-            equipment={equipment.map((item) => ({ id: item.id, folio: item.folio, model: item.model, clientId: item.clientId }))}
+            equipment={equipment}
+            types={types.map((type) => type.name)}
+            brands={brands.map((brand) => brand.name)}
+            models={models.map((row) => ({ type: row.type.name, brand: row.brand.name, model: row.name }))}
           />
         </FormSection>
       </FormPanel>

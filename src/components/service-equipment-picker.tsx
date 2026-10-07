@@ -23,6 +23,7 @@ export function ServiceEquipmentPicker({
   brands,
   models,
   warranty = false,
+  allowQuickEquipment = true,
   emptyOptionLabel = "Selecciona",
 }: {
   equipment: ServiceEquipmentOption[];
@@ -32,6 +33,7 @@ export function ServiceEquipmentPicker({
   brands: string[];
   models: Array<{ type: string; brand: string; model: string }>;
   warranty?: boolean;
+  allowQuickEquipment?: boolean;
   emptyOptionLabel?: string;
 }) {
   const [equipmentId, setEquipmentId] = useState("");
@@ -105,6 +107,7 @@ export function ServiceEquipmentPicker({
           name="equipmentId"
           className={controlClass}
           value={equipmentId}
+          required={emptyOptionLabel !== "Sin equipo físico"}
           disabled={!clientId || showNew}
           onChange={(event) => {
             setEquipmentId(event.target.value);
@@ -120,26 +123,28 @@ export function ServiceEquipmentPicker({
         </select>
       </Field>
 
-      <QuickCreateButton
-        label="+ Alta de equipo"
-        disabled={!clientId}
-        disabledHint="Primero elige el cliente."
-        onClick={() => {
-          setEquipmentId("");
-          setShowNew(true);
-        }}
-      />
-
-      <EquipmentQuickFieldsModal
-        open={showNew}
-        onClose={() => setShowNew(false)}
-        onCommit={commitQuickEquipment}
-        companyCode={companyCode}
-        types={types}
-        brands={brands}
-        models={models}
-        doneLabel="Guardar y continuar"
-      />
+      {allowQuickEquipment ? (
+        <>
+          <QuickCreateButton
+            label="+ Alta de equipo"
+            disabled={!clientId}
+            disabledHint="Primero elige el cliente."
+            onClick={() => {
+              setEquipmentId("");
+              setShowNew(true);
+            }}
+          />
+          <EquipmentQuickFieldsModal
+            open={showNew}
+            onClose={() => setShowNew(false)}
+            onCommit={commitQuickEquipment}
+            companyCode={companyCode}
+            types={types}
+            brands={brands}
+            models={models}
+          />
+        </>
+      ) : null}
     </>
   );
 }

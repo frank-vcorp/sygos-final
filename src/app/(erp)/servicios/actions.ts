@@ -25,7 +25,6 @@ export async function startServiceAction(formData: FormData) {
       throw new Error("No puedes abrir este servicio.");
     }
     if (!isAttentionType(attentionType)) throw new Error("Ese tipo de servicio no existe.");
-    const kind = optionalText(formData.get("equipmentKind"));
     const equipmentId = optionalText(formData.get("equipmentId"));
     let clientId = optionalText(formData.get("clientId"));
     if (!clientId && !equipmentId) {
@@ -36,12 +35,12 @@ export async function startServiceAction(formData: FormData) {
       clientId,
       newClientName: null,
       contactName: null,
-      equipmentId: optionalText(formData.get("equipmentId")),
-      equipmentKind: kind === "EQUI" || kind === "MOT" ? kind : null,
-      model: optionalText(formData.get("model")),
-      typeName: optionalText(formData.get("newType")) ?? optionalText(formData.get("typeName")),
-      brandName: optionalText(formData.get("newBrand")) ?? optionalText(formData.get("brandName")),
-      serial: optionalText(formData.get("serial")),
+      equipmentId,
+      equipmentKind: null,
+      model: null,
+      typeName: null,
+      brandName: null,
+      serial: null,
       priorityId: requiredText(formData.get("priorityId"), "Prioridad"),
       reportedFault: requiredText(formData.get("reportedFault"), "Falla reportada"),
       antecedent: optionalText(formData.get("antecedent")),

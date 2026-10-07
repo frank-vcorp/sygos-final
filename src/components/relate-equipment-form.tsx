@@ -1,14 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { EquipmentQuickFieldsModal } from "@/components/equipment-quick-fields";
-import { QuickCreateButton } from "@/components/form-quick-modal";
+import { ServiceEquipmentPicker, type ServiceEquipmentOption } from "@/components/service-equipment-picker";
 import { SubmitButton } from "@/components/submit-button";
 import { controlClass, Field } from "@/components/ui";
-import { quickCreateEquipmentAction } from "@/lib/quick-create-actions";
-import { validateQuickEquipmentDraft, type QuickFormFieldMap } from "@/lib/quick-form-persist";
 
-type Gear = { id: string; folio: string; model: string };
 type ModelRow = { type: string; brand: string; model: string };
 
 export function RelateEquipmentForm({
@@ -27,7 +22,7 @@ export function RelateEquipmentForm({
   quoteId: string;
   version: number;
   clientId: string;
-  gear: Gear[];
+  gear: ServiceEquipmentOption[];
   priorities: Array<{ id: string; name: string }>;
   companyCode: string;
   allowQuickEquipment: boolean;
@@ -36,63 +31,22 @@ export function RelateEquipmentForm({
   models: ModelRow[];
   relateAction: (formData: FormData) => void | Promise<void>;
 }) {
-  const [equipmentId, setEquipmentId] = useState("");
-  const [showNew, setShowNew] = useState(false);
-  const [extraGear, setExtraGear] = useState<Gear[]>([]);
-  const options = useMemo(() => [...gear, ...extraGear], [gear, extraGear]);
-
-  const commitQuickEquipment = async (fields: QuickFormFieldMap) => {
-    const validation = validateQuickEquipmentDraft(fields);
-    if (validation) return validation;
-    const created = await quickCreateEquipmentAction(clientId, fields);
-    setExtraGear((current) => [...current, { id: created.equipmentId, folio: created.folio, model: created.model }]);
-    setEquipmentId(created.equipmentId);
-    return null;
-  };
-
   return (
     <form action={relateAction} className="grid gap-2 rounded-lg border border-[var(--line)] bg-white p-4">
       <h2 className="font-medium">Relacionar equipo</h2>
       <p className="text-sm text-[var(--muted)]">La operación no arranca hasta que este equipo tenga entrada o ingreso físico.</p>
       <input type="hidden" name="quoteId" value={quoteId} />
       <input type="hidden" name="version" value={version} />
-      <Field label="Equipo del cliente" hint="Elige un equipo existente o regístralo nuevo.">
-        <select
-          name="equipmentId"
-          className={controlClass}
-          value={equipmentId}
-          disabled={showNew}
-          onChange={(event) => {
-            setEquipmentId(event.target.value);
-            if (event.target.value) setShowNew(false);
-          }}
-          required={!allowQuickEquipment}
-        >
-          <option value="">Selecciona</option>
-          {options.map((item) => <option key={item.id} value={item.id}>{item.folio} · {item.model}</option>)}
-        </select>
-      </Field>
-      {allowQuickEquipment ? (
-        <>
-          <QuickCreateButton
-            label="+ Alta de equipo"
-            onClick={() => {
-              setEquipmentId("");
-              setShowNew(true);
-            }}
-          />
-          <EquipmentQuickFieldsModal
-            open={showNew}
-            onClose={() => setShowNew(false)}
-            onCommit={commitQuickEquipment}
-            companyCode={companyCode}
-            types={types}
-            brands={brands}
-            models={models}
-            doneLabel="Guardar y relacionar"
-          />
-        </>
-      ) : null}
+      <ServiceEquipmentPicker
+        equipment={gear}
+        clientId={clientId}
+        companyCode={companyCode}
+        types={types}
+        brands={brands}
+        models={models}
+        allowQuickEquipment={allowQuickEquipment}
+        emptyOptionLabel="Selecciona"
+      />
       <Field label="Prioridad del servicio">
         <select name="priorityId" required className={controlClass} defaultValue="">
           <option value="">Selecciona</option>

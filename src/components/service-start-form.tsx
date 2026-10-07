@@ -21,6 +21,7 @@ export function ServiceStartForm({
   defaultClientId,
   companyCode,
   allowQuickClient,
+  allowQuickEquipment = true,
   warranty,
 }: {
   action: (formData: FormData) => void | Promise<void>;
@@ -35,6 +36,7 @@ export function ServiceStartForm({
   defaultClientId: string;
   companyCode: string;
   allowQuickClient: boolean;
+  allowQuickEquipment?: boolean;
   warranty: boolean;
 }) {
   const [clientId, setClientId] = useState(defaultClientId);
@@ -60,6 +62,7 @@ export function ServiceStartForm({
         brands={brands}
         models={models}
         warranty={warranty}
+        allowQuickEquipment={allowQuickEquipment}
       />
       <Field label="Prioridad">
         <select name="priorityId" required className={controlClass}>

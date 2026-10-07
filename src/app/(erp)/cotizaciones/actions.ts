@@ -3,7 +3,6 @@
 import { redirect } from "next/navigation";
 import { setFlash } from "@/lib/flash";
 import { clientIdFromForm } from "@/lib/form-quick-entities";
-import { createEqui, createMotIdentity } from "@/lib/equipment-service";
 import { optionalText, parseVersion, requiredText } from "@/lib/form";
 import { can, type Action } from "@/lib/permissions";
 import { QUOTE_TYPES, type QuoteType, applyDiscount, createSellerQuote, decideQuote, linkIntercompanyQuote, prepareQuoteFromCase, relateQuoteEquipment, setPrices } from "@/lib/quotes";
@@ -74,23 +73,7 @@ export async function relateEquipmentAction(formData: FormData) {
   try {
     const session = await guard("quote.follow");
     const quoteId = requiredText(formData.get("quoteId"), "Cotización");
-    let equipmentId = optionalText(formData.get("equipmentId"));
-    if (!equipmentId) {
-      const quote = await prisma.quote.findFirst({ where: { id: quoteId, companyId: session.activeCompanyId } });
-      if (!quote) throw new Error("Esa cotización no es de esta empresa.");
-      const kind = optionalText(formData.get("equipmentKind"));
-      const typeName = optionalText(formData.get("newType")) ?? requiredText(formData.get("typeName"), "Tipo");
-      const brandName = optionalText(formData.get("newBrand")) ?? requiredText(formData.get("brandName"), "Marca");
-      const model = requiredText(formData.get("model"), "Modelo");
-      const serial = optionalText(formData.get("serial"));
-      if (kind === "MOT") {
-        if (!can(session.role, "mot.create", session.activeCompanyCode)) throw new Error("No puedes dar de alta un MOT.");
-        equipmentId = (await createMotIdentity(session, { clientId: quote.clientId, typeName, brandName, model, description: null, serial })).id;
-      } else {
-        if (!can(session.role, "equi.create", session.activeCompanyCode)) throw new Error("No puedes dar de alta un EQUI.");
-        equipmentId = (await createEqui(session, { clientId: quote.clientId, typeName, brandName, model, description: null, serial })).id;
-      }
-    }
+    const equipmentId = requiredText(formData.get("equipmentId"), "Equipo");
     await relateQuoteEquipment(
       session,
       quoteId,

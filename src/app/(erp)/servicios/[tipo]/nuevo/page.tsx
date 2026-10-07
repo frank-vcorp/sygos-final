@@ -72,6 +72,7 @@ export default async function NuevoServicioPage({
         defaultClientId={defaultClientId}
         companyCode={session.activeCompanyCode ?? "SYSTRON"}
         allowQuickClient={can(session.role, "client.create", session.activeCompanyCode)}
+        allowQuickEquipment={can(session.role, "equi.create", session.activeCompanyCode) || can(session.role, "mot.create", session.activeCompanyCode)}
         warranty={warranty}
       />
     </>

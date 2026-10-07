@@ -1,33 +1,39 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { ClientPicker } from "@/components/client-picker";
+import { ServiceEquipmentPicker, type ServiceEquipmentOption } from "@/components/service-equipment-picker";
 import { SubmitButton } from "@/components/submit-button";
 import { controlClass, Field } from "@/components/ui";
 
 type Contact = { id: string; name: string; isPrimary: boolean };
 type Client = { id: string; name: string; contacts: Contact[] };
-type Gear = { id: string; folio: string; model: string; clientId: string };
 
 export function QuoteDraft({
   clients,
   equipment,
   defaultClientId = "",
   allowQuickClient = false,
+  allowQuickEquipment = false,
+  companyCode,
+  types,
+  brands,
+  models,
 }: {
   clients: Client[];
-  equipment: Gear[];
+  equipment: ServiceEquipmentOption[];
   defaultClientId?: string;
   allowQuickClient?: boolean;
+  allowQuickEquipment?: boolean;
+  companyCode: string;
+  types: string[];
+  brands: string[];
+  models: Array<{ type: string; brand: string; model: string }>;
 }) {
   const [clientId, setClientId] = useState(defaultClientId);
   const [lines, setLines] = useState([{ concept: "", quantity: "1" }]);
   const client = clients.find((row) => row.id === clientId);
   const contacts = client?.contacts ?? [];
-  const gear = useMemo(
-    () => equipment.filter((row) => !clientId || row.clientId === clientId),
-    [equipment, clientId],
-  );
   const concepts = lines
     .map((line) => ({ concept: line.concept.replaceAll("|", " ").trim(), quantity: line.quantity.trim() || "1" }))
     .filter((line) => line.concept)
@@ -49,20 +55,17 @@ export function QuoteDraft({
         defaultClientId={defaultClientId}
         onClientChange={setClientId}
       />
-      <Field
-        label="Equipo existente"
-        hint={
-          !clientId
-            ? "Selecciona un cliente para ver sus equipos."
-            : "Vacío si todavía no ingresó, o si es servicio en campo o venta de equipo."
-        }
-      >
-        <select name="equipmentId" className={controlClass} defaultValue="" disabled={!clientId}>
-          <option value="">Sin equipo físico</option>
-          {gear.map((item) => <option key={item.id} value={item.id}>{item.folio} · {item.model}</option>)}
-        </select>
-      </Field>
-      <Field label="Tipo preliminar" hint="Obligatorio en diagnóstico o reparación si no eliges un equipo.">
+      <ServiceEquipmentPicker
+        equipment={equipment}
+        clientId={clientId}
+        companyCode={companyCode}
+        types={types}
+        brands={brands}
+        models={models}
+        allowQuickEquipment={allowQuickEquipment}
+        emptyOptionLabel="Sin equipo físico"
+      />
+      <Field label="Tipo preliminar" hint="Solo si dejas «Sin equipo físico»: obligatorio en diagnóstico o reparación. Con «+ Alta de equipo» no hace falta.">
         <input name="preliminaryType" className={controlClass} />
       </Field>
       <Field label="Marca preliminar"><input name="preliminaryBrand" className={controlClass} /></Field>

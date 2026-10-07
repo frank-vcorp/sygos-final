@@ -14,7 +14,7 @@ export function EquipmentQuickFieldsModal({
   brands,
   models,
   title = "Alta de equipo",
-  doneLabel = "Listo — continuar",
+  doneLabel = "Guardar y continuar",
 }: {
   open: boolean;
   onClose: () => void;
