@@ -6,7 +6,7 @@ import { ErpShell } from "@/components/erp-shell";
 import { SideNav } from "@/components/side-nav";
 import { prisma, sandboxFor } from "@/lib/db";
 import { takeFlash } from "@/lib/flash";
-import { canSeeHomeSummary } from "@/lib/home";
+import { NAV_GROUPS } from "@/lib/nav-links";
 import { can } from "@/lib/permissions";
 import { ROLE_LABEL, isRole } from "@/lib/roles";
 import { getSession } from "@/lib/session";
@@ -19,70 +19,71 @@ type NavLink = {
   showCreate?: (role: Parameters<typeof can>[0], code: string | null) => boolean;
 };
 
-const seesOperation = (role: Parameters<typeof can>[0], code: string | null) =>
-  role !== "ALMACEN" && (can(role, "equi.view", code) || can(role, "mot.view", code));
+const LABELS: Record<string, string | ((code: string | null) => string)> = {
+  "/inicio": "Inicio",
+  "/panel": "Panel",
+  "/clientes": "Clientes",
+  "/prospectos": "Prospectos",
+  "/cotizaciones": "Cotizaciones",
+  "/ventas": "Ventas",
+  "/agenda": "Agenda",
+  "/facturacion": "Facturación",
+  "/cobranza": "Cobranza",
+  "/pagos": "Pagos",
+  "/compras": "Compras",
+  "/finanzas": "Finanzas",
+  "/personal": "Colaboradores",
+  "/personal/asistencia": "Asistencia",
+  "/personal/horas": "Horas extra",
+  "/nomina": "Nómina",
+  "/comisiones": "Comisiones",
+  "/produccion": "Producción",
+  "/reportes": "Reportes",
+  "/kiosco": "Kiosco",
+  "/servicios/diagnostico": "Diagnóstico",
+  "/servicios/reparacion": "Reparación",
+  "/servicios/garantia": "Diagnóstico de Garantía",
+  "/operacion": "En proceso",
+  "/equipos": "Equipos",
+  "/motores": "Motores",
+  "/custodia": (code) => (code === "SERVOMOTORES" ? "Custodia" : "Almacén"),
+  "/inventario": "Inventario",
+  "/proveedores": "Proveedores",
+  "/usuarios": "Usuarios",
+  "/configuracion": "Configuración",
+  "/pruebas": "Modo de pruebas",
+};
 
-const GROUPS: Array<{ title: string | null; links: NavLink[] }> = [
-  { title: null, links: [
-    { href: "/inicio", label: "Inicio", show: (role, code) => canSeeHomeSummary(role, code) },
-    { href: "/panel", label: "Panel", show: (role) => can(role, "panel.view") },
-  ] },
-  {
-    title: "Comercial",
-    links: [
-      { href: "/clientes", label: "Clientes", show: (role, code) => can(role, "client.create", code) || can(role, "client.edit", code), createHref: "/clientes/nuevo", showCreate: (role, code) => can(role, "client.create", code) },
-      { href: "/prospectos", label: "Prospectos", show: (role, code) => can(role, "prospect.operate", code), createHref: "/prospectos/nuevo", showCreate: (role, code) => can(role, "prospect.operate", code) },
-      { href: "/cotizaciones", label: "Cotizaciones", show: (role, code) => can(role, "quote.create", code) || can(role, "quote.price", code), createHref: "/cotizaciones/nuevo", showCreate: (role, code) => can(role, "quote.create", code) },
-      { href: "/ventas", label: "Ventas", show: (role, code) => can(role, "agenda.use", code) || can(role, "quote.follow", code) },
-      { href: "/agenda", label: "Agenda", show: (role, code) => can(role, "agenda.use", code) },
-      { href: "/facturacion", label: "Facturación", show: (role, code) => can(role, "invoice.request", code) || can(role, "invoice.issue", code), createHref: "/facturacion/nuevo", showCreate: (role, code) => can(role, "invoice.issue", code) },
-      { href: "/cobranza", label: "Cobranza", show: (role, code) => can(role, "receivable.view", code) },
-      { href: "/pagos", label: "Pagos", show: (role, code) => can(role, "payment.register", code) || can(role, "payment.validate", code), createHref: "/pagos/nuevo", showCreate: (role, code) => can(role, "payment.register", code) },
-      { href: "/compras", label: "Compras", show: (role, code) => can(role, "purchase.operate", code), createHref: "/compras/nueva", showCreate: (role, code) => can(role, "purchase.operate", code) },
-      { href: "/finanzas", label: "Finanzas", show: (role, code) => can(role, "finance.view", code) },
-    ],
-  },
-  {
-    title: "Personal",
-    links: [
-      { href: "/personal", label: "Colaboradores", show: (role) => can(role, "personnel.manage"), createHref: "/personal/nuevo", showCreate: (role) => can(role, "personnel.manage") },
-      { href: "/personal/asistencia", label: "Asistencia", show: (role) => can(role, "personnel.manage") },
-      { href: "/personal/horas", label: "Horas extra", show: (role, code) => can(role, "overtime.capture", code) || can(role, "personnel.authorize") },
-      { href: "/nomina", label: "Nómina", show: (role) => can(role, "personnel.manage") },
-      { href: "/comisiones", label: "Comisiones", show: (role) => can(role, "personnel.manage") },
-      { href: "/produccion", label: "Producción", show: (role) => can(role, "production.view") },
-      { href: "/reportes", label: "Reportes", show: (role) => can(role, "report.view") },
-      { href: "/kiosco", label: "Kiosco", show: (role) => role === "KIOSCO_ASISTENCIA" },
-    ],
-  },
-  {
-    title: "Servicios",
-    links: [
-      { href: "/servicios/diagnostico", label: "Diagnóstico", show: (role, code) => can(role, "attention.catalog", code), createHref: "/servicios/diagnostico/nuevo", showCreate: (role, code) => can(role, "attention.create", code) },
-      { href: "/servicios/reparacion", label: "Reparación", show: (role, code) => can(role, "attention.catalog", code), createHref: "/servicios/reparacion/nuevo", showCreate: (role, code) => can(role, "attention.create", code) },
-      { href: "/servicios/garantia", label: "Diagnóstico de Garantía", show: (role, code) => can(role, "attention.catalog", code), createHref: "/servicios/garantia/nuevo", showCreate: (role, code) => can(role, "attention.create", code) },
-      { href: "/operacion", label: "En proceso", show: seesOperation },
-    ],
-  },
-  {
-    title: "Taller",
-    links: [
-      { href: "/equipos", label: "Equipos", show: (role, code) => can(role, "equipment.catalog", code), createHref: "/equipos/nuevo", showCreate: (role, code) => can(role, "equi.create", code) },
-      { href: "/motores", label: "Motores", show: (role, code) => can(role, "equipment.catalog", code) && can(role, "mot.view", code), createHref: "/motores/nuevo", showCreate: (role, code) => can(role, "mot.create", code) },
-      { href: "/custodia", label: (code) => (code === "SERVOMOTORES" ? "Custodia" : "Almacén"), show: (role, code) => can(role, "custody.confirm", code) },
-      { href: "/inventario", label: "Inventario", show: (role, code) => can(role, "inventory.operate", code) },
-    ],
-  },
-  {
-    title: "Administración",
-    links: [
-      { href: "/proveedores", label: "Proveedores", show: (role, code) => can(role, "supplier.operate", code), createHref: "/proveedores/nuevo", showCreate: (role, code) => can(role, "supplier.operate", code) },
-      { href: "/usuarios", label: "Usuarios", show: (role) => can(role, "user.manage") },
-      { href: "/configuracion", label: "Configuración", show: (role) => can(role, "config.company") || can(role, "config.integrations") },
-      { href: "/pruebas", label: "Modo de pruebas", show: (role) => role === "ADMINISTRADOR" },
-    ],
-  },
-];
+const CREATE: Partial<Record<string, { href: string; show: NavLink["showCreate"] }>> = {
+  "/clientes": { href: "/clientes/nuevo", show: (role, code) => can(role, "client.create", code) },
+  "/prospectos": { href: "/prospectos/nuevo", show: (role, code) => can(role, "prospect.operate", code) },
+  "/cotizaciones": { href: "/cotizaciones/nuevo", show: (role, code) => can(role, "quote.create", code) },
+  "/facturacion": { href: "/facturacion/nuevo", show: (role, code) => can(role, "invoice.issue", code) },
+  "/pagos": { href: "/pagos/nuevo", show: (role, code) => can(role, "payment.register", code) },
+  "/compras": { href: "/compras/nueva", show: (role, code) => can(role, "purchase.operate", code) },
+  "/personal": { href: "/personal/nuevo", show: (role) => can(role, "personnel.manage") },
+  "/servicios/diagnostico": { href: "/servicios/diagnostico/nuevo", show: (role, code) => can(role, "attention.create", code) },
+  "/servicios/reparacion": { href: "/servicios/reparacion/nuevo", show: (role, code) => can(role, "attention.create", code) },
+  "/servicios/garantia": { href: "/servicios/garantia/nuevo", show: (role, code) => can(role, "attention.create", code) },
+  "/equipos": { href: "/equipos/nuevo", show: (role, code) => can(role, "equi.create", code) },
+  "/motores": { href: "/motores/nuevo", show: (role, code) => can(role, "mot.create", code) },
+  "/proveedores": { href: "/proveedores/nuevo", show: (role, code) => can(role, "supplier.operate", code) },
+};
+
+const GROUPS: Array<{ title: string | null; links: NavLink[] }> = NAV_GROUPS.map((group) => ({
+  title: group.title,
+  links: group.links.map((link) => {
+    const label = LABELS[link.href];
+    const create = CREATE[link.href];
+    return {
+      href: link.href,
+      label: typeof label === "function" ? label : label ?? link.href,
+      show: link.show,
+      createHref: create?.href,
+      showCreate: create?.show,
+    };
+  }),
+}));
 
 export default async function ErpLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();

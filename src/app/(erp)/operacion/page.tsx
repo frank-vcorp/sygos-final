@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Badge, Empty, MobileCard, PageHeader, ResponsiveData, SegmentedNav, Table, Td, Th } from "@/components/ui";
+import { homePath } from "@/lib/home";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { compareBySla } from "@/lib/sla";
@@ -9,8 +10,8 @@ import { requireCompany } from "@/lib/session";
 
 export default async function OperacionPage({ searchParams }: { searchParams: Promise<{ vista?: string }> }) {
   const session = await requireCompany();
-  if (session.role === "ALMACEN" || (!can(session.role, "equi.view", session.activeCompanyCode) && !can(session.role, "mot.view", session.activeCompanyCode))) {
-    redirect("/inicio");
+  if (!can(session.role, "operation.queue", session.activeCompanyCode)) {
+    redirect(homePath(session.role, session.activeCompanyCode));
   }
   const { vista } = await searchParams;
   const view = vista === "validacion" || vista === "cotizar" ? vista : "activas";

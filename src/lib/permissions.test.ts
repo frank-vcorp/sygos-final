@@ -45,6 +45,12 @@ describe("permisos de fase 1", () => {
     assert.equal(can("ALMACEN", "client.create", "SYSTRON"), false);
   });
 
+  it("mantiene a coordinación fuera de la operación técnica", () => {
+    assert.equal(can("COORDINACION_ADMINISTRACION", "attention.catalog", "SYSTRON"), false);
+    assert.equal(can("COORDINACION_ADMINISTRACION", "equipment.catalog", "SYSTRON"), false);
+    assert.equal(can("COORDINACION_ADMINISTRACION", "operation.queue", "SYSTRON"), false);
+  });
+
   it("deja al técnico fuera de bandejas de servicio y catálogo de equipos", () => {
     assert.equal(can("TECNICO", "attention.catalog", "SYSTRON"), false);
     assert.equal(can("TECNICO", "equipment.catalog", "SYSTRON"), false);

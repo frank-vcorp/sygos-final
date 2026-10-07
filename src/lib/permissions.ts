@@ -20,6 +20,7 @@ export type Action =
   | "attention.create"
   | "attention.catalog"
   | "equipment.catalog"
+  | "operation.queue"
   | "custody.confirm"
   | "inventory.operate"
   | "quote.create"
@@ -102,16 +103,24 @@ export function can(role: Role, action: Action, companyCode?: string | null): bo
     case "attention.create":
       return can(role, "equi.create", companyCode) || can(role, "mot.create", companyCode);
     case "attention.catalog":
-      if (admin || ceo || coord) return true;
+      if (admin || ceo) return true;
       if (companyCode === "SYSTRON") return sales || gerenteSy || role === "SUPERVISOR_TECNICO";
       if (companyCode === "SERVOMOTORES") return gerenteSm;
       return false;
     case "equipment.catalog":
-      if (role === "TECNICO" || role === "AYUDANTE_GENERAL" || role === "KIOSCO_ASISTENCIA") return false;
+      if (role === "TECNICO" || role === "COORDINACION_ADMINISTRACION" || role === "AYUDANTE_GENERAL" || role === "KIOSCO_ASISTENCIA") {
+        return false;
+      }
+      return can(role, "equi.view", companyCode) || can(role, "mot.view", companyCode);
+    case "operation.queue":
+      if (role === "ALMACEN" || role === "COORDINACION_ADMINISTRACION" || role === "AYUDANTE_GENERAL" || role === "KIOSCO_ASISTENCIA") {
+        return false;
+      }
+      if (admin || ceo || gerenteSy || gerenteSm || role === "SUPERVISOR_TECNICO" || role === "TECNICO" || sales) return true;
       return can(role, "equi.view", companyCode) || can(role, "mot.view", companyCode);
     case "custody.confirm":
-      if (companyCode === "SYSTRON") return admin || ceo || coord || gerenteSy || role === "ALMACEN";
-      if (companyCode === "SERVOMOTORES") return admin || ceo || coord || gerenteSm;
+      if (companyCode === "SYSTRON") return admin || ceo || gerenteSy || role === "ALMACEN";
+      if (companyCode === "SERVOMOTORES") return admin || ceo || gerenteSm;
       return false;
     case "inventory.operate":
       if (companyCode === "SYSTRON") return admin || ceo || gerenteSy || role === "ALMACEN";
@@ -169,9 +178,9 @@ export function can(role: Role, action: Action, companyCode?: string | null): bo
     case "panel.view":
       return admin || ceo || coord || sales || gerenteSy || gerenteSm || role === "SUPERVISOR_TECNICO" || role === "TECNICO";
     case "production.view":
-      return admin || ceo || coord || gerenteSm;
+      return admin || ceo || gerenteSm;
     case "report.view":
-      return admin || ceo || coord || sales || gerenteSy || gerenteSm || role === "SUPERVISOR_TECNICO" || role === "ALMACEN";
+      return admin || ceo || coord || gerenteSy || gerenteSm || role === "SUPERVISOR_TECNICO" || role === "ALMACEN";
     default:
       return false;
   }
