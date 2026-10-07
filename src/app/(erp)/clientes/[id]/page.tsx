@@ -8,13 +8,12 @@ import {
   updateClientAction,
 } from "../actions";
 import {
-  ClientAdminAside,
-  ClientContactsPanel,
-  ClientProfileSection,
+  ClientDataAccordion,
+  ClientQuickActionBar,
   ClientRelationsHub,
 } from "@/components/client-detail-panels";
 import { HistoryTimeline } from "@/components/history-timeline";
-import { Badge, DetailGrid, PageHeader } from "@/components/ui";
+import { Badge, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { historyFor } from "@/lib/history";
 import { can } from "@/lib/permissions";
@@ -114,79 +113,81 @@ export default async function ClienteDetallePage({ params }: { params: Promise<{
     active: client.active,
   };
 
+  const canQuote = can(session.role, "quote.create", session.activeCompanyCode);
+  const canService = can(session.role, "attention.create", session.activeCompanyCode);
+  const ownerLabel = owner?.name ?? null;
+
   return (
     <>
       <PageHeader
         back={{ href: "/clientes", label: "Clientes" }}
         title={client.name}
-        subtitle={client.active ? "Cliente activo" : "Cliente inactivo"}
+        subtitle={[client.active ? "Activo" : "Inactivo", ownerLabel ? `· ${ownerLabel}` : null].filter(Boolean).join(" ")}
         action={client.active ? <Badge tone="ok">Activo</Badge> : <Badge tone="danger">Inactivo</Badge>}
       />
-      <DetailGrid>
-        <div className="space-y-8">
-          <ClientProfileSection client={clientData} ownerName={owner?.name ?? null} updateAction={updateClientAction} />
-          <ClientContactsPanel
-            clientId={client.id}
-            contacts={client.contacts.map((contact) => ({
-              id: contact.id,
-              name: contact.name,
-              roleTitle: contact.roleTitle,
-              phone: contact.phone,
-              email: contact.email,
-              isPrimary: contact.isPrimary,
-            }))}
-            addAction={addContactAction}
-            inactivateAction={inactivateContactAction}
-          />
-        </div>
-        <ClientAdminAside
+
+      <ClientQuickActionBar clientId={client.id} canQuote={canQuote} canService={canService} />
+
+      <ClientRelationsHub
+        clientId={client.id}
+        quotes={quotes.map((quote) => ({
+          id: quote.id,
+          folio: quote.folio,
+          status: quote.status,
+          quoteType: quote.quoteType,
+          updatedAt: quote.updatedAt.toISOString(),
+        }))}
+        attentions={attentions.map((row) => ({
+          id: row.id,
+          attentionType: row.attentionType,
+          priorityName: row.priorityName,
+          status: row.status,
+          reportedFault: row.reportedFault,
+          createdAt: row.createdAt.toISOString(),
+          equipment: row.equipment,
+          technicalCases: row.technicalCases,
+        }))}
+        equipments={client.equipments.map((equipment) => ({
+          id: equipment.id,
+          folio: equipment.folio,
+          kind: equipment.kind,
+          model: equipment.model,
+          custody: equipment.custody,
+        }))}
+        canQuote={canQuote}
+        canService={canService}
+      />
+
+      <div className="mt-3">
+        <ClientDataAccordion
+          client={clientData}
+          ownerName={ownerLabel}
+          contacts={client.contacts.map((contact) => ({
+            id: contact.id,
+            name: contact.name,
+            roleTitle: contact.roleTitle,
+            phone: contact.phone,
+            email: contact.email,
+            isPrimary: contact.isPrimary,
+          }))}
           clientId={client.id}
           version={client.version}
           ownerUserId={client.ownerUserId}
+          prospects={client.prospects.map((prospect) => ({ id: prospect.id, name: prospect.name }))}
+          updateAction={updateClientAction}
+          addContactAction={addContactAction}
+          inactivateContactAction={inactivateContactAction}
+          reassignAction={reassignClientAction}
+          inactivateAction={inactivateClientAction}
           canReassign={can(session.role, "client.reassign")}
           canInactivate={can(session.role, "client.inactivate") && client.active}
           candidates={candidates.map((user) => ({ id: user.id, name: user.name }))}
-          reassignAction={reassignClientAction}
-          inactivateAction={inactivateClientAction}
-        />
-      </DetailGrid>
-
-      <div className="mt-8">
-        <ClientRelationsHub
-          clientId={client.id}
-          prospects={client.prospects.map((prospect) => ({ id: prospect.id, name: prospect.name }))}
-          quotes={quotes.map((quote) => ({
-            id: quote.id,
-            folio: quote.folio,
-            status: quote.status,
-            quoteType: quote.quoteType,
-            updatedAt: quote.updatedAt.toISOString(),
-          }))}
-          attentions={attentions.map((row) => ({
-            id: row.id,
-            attentionType: row.attentionType,
-            priorityName: row.priorityName,
-            status: row.status,
-            reportedFault: row.reportedFault,
-            createdAt: row.createdAt.toISOString(),
-            equipment: row.equipment,
-            technicalCases: row.technicalCases,
-          }))}
-          equipments={client.equipments.map((equipment) => ({
-            id: equipment.id,
-            folio: equipment.folio,
-            kind: equipment.kind,
-            model: equipment.model,
-            custody: equipment.custody,
-          }))}
-          canQuote={can(session.role, "quote.create", session.activeCompanyCode)}
-          canService={can(session.role, "attention.create", session.activeCompanyCode)}
         />
       </div>
 
       {history.length > 0 ? (
         <HistoryTimeline
-          className="mt-8"
+          className="mt-4"
           items={history.map((item) => ({ id: item.id, createdAt: item.createdAt, summary: item.summary, authorName: item.author?.name }))}
         />
       ) : null}
