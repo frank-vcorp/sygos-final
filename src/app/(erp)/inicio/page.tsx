@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
+import { canSeeHomeSummary, homePath } from "@/lib/home";
 import { can } from "@/lib/permissions";
 import { requireSession } from "@/lib/session";
 import { Card, PageHeader } from "@/components/ui";
@@ -14,6 +16,9 @@ export default async function InicioPage() {
         <Link href="/empresa" className="font-medium text-[var(--accent)]">Seleccionar empresa</Link>
       </>
     );
+  }
+  if (!canSeeHomeSummary(session.role, session.activeCompanyCode)) {
+    redirect(homePath(session.role, session.activeCompanyCode));
   }
   const systron = session.activeCompanyCode === "SYSTRON";
   const own = session.role === "VENTAS" ? { ownerUserId: session.userId } : {};
@@ -37,7 +42,7 @@ export default async function InicioPage() {
         title={session.activeCompanyName ?? "Inicio"}
         subtitle="Los registros de esta vista pertenecen solo a la empresa activa."
       />
-      {can(session.role, "nav.business") ? (
+      {canSeeHomeSummary(session.role, session.activeCompanyCode) ? (
         <>
           <section>
             <div className="mb-3 flex items-center justify-between">

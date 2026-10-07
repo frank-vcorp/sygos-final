@@ -29,6 +29,7 @@ export function SupplierPicker({
   emptyLabel?: string;
   required?: boolean;
 }) {
+  const router = useRouter();
   const [supplierId, setSupplierId] = useState(defaultSupplierId);
   const [showNew, setShowNew] = useState(false);
   const [extraSuppliers, setExtraSuppliers] = useState<SupplierOption[]>([]);
@@ -48,6 +49,7 @@ export function SupplierPicker({
     const created = await quickCreateSupplierAction(fields);
     setExtraSuppliers((current) => [...current, { id: created.supplierId, name: created.name }]);
     selectSupplier(created.supplierId);
+    router.refresh();
     return null;
   };
 

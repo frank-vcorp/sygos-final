@@ -41,7 +41,8 @@ export type Action =
   | "kiosk.punch"
   | "panel.view"
   | "production.view"
-  | "report.view";
+  | "report.view"
+  | "home.summary";
 
 export function can(role: Role, action: Action, companyCode?: string | null): boolean {
   const admin = role === "ADMINISTRADOR";
@@ -54,6 +55,8 @@ export function can(role: Role, action: Action, companyCode?: string | null): bo
   switch (action) {
     case "nav.business":
       return role !== "AYUDANTE_GENERAL" && role !== "KIOSCO_ASISTENCIA";
+    case "home.summary":
+      return admin || ceo || coord || sales || gerenteSy || gerenteSm;
     case "search.global":
       return admin || ceo;
     case "user.manage":

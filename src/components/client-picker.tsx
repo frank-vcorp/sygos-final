@@ -48,6 +48,7 @@ export function ClientPicker({
     const created = await quickCreateClientAction(fields);
     setExtraClients((current) => [...current, { id: created.clientId, name: created.name }]);
     selectClient(created.clientId);
+    router.refresh();
     return null;
   };
 

@@ -44,4 +44,12 @@ describe("permisos de fase 1", () => {
     assert.equal(can("ALMACEN", "nav.business"), true);
     assert.equal(can("ALMACEN", "client.create", "SYSTRON"), false);
   });
+
+  it("restringe el resumen de inicio a perfiles comerciales y directivos", () => {
+    assert.equal(can("TECNICO", "home.summary", "SYSTRON"), false);
+    assert.equal(can("SUPERVISOR_TECNICO", "home.summary", "SYSTRON"), false);
+    assert.equal(can("ALMACEN", "home.summary", "SYSTRON"), false);
+    assert.equal(can("VENTAS", "home.summary", "SYSTRON"), true);
+    assert.equal(can("CEO", "home.summary", "SYSTRON"), true);
+  });
 });

@@ -3,6 +3,7 @@ import { prismaProd } from "@/lib/db";
 import { setFlash } from "@/lib/flash";
 import { optionalText, requiredText } from "@/lib/form";
 import { verifyPassword } from "@/lib/crypto";
+import { homePath } from "@/lib/home";
 import { needsExplicitCompany } from "@/lib/permissions";
 import { isRole } from "@/lib/roles";
 import { endSession, requireSession, setActiveCompany, startSession } from "@/lib/session";
@@ -21,7 +22,7 @@ export async function loginAction(formData: FormData) {
     redirect("/login");
   }
   if (!session.activeCompanyId) redirect("/empresa");
-  redirect("/inicio");
+  redirect(homePath(session.role, session.activeCompanyCode));
 }
 
 export async function logoutAction() {
@@ -48,8 +49,8 @@ export async function switchCompanyAction(formData: FormData) {
     redirect("/inicio");
   }
   await setActiveCompany(session.sessionId, company.id);
-  const next = optionalText(formData.get("next")) ?? "/inicio";
-  redirect(next.startsWith("/") ? next : "/inicio");
+  const next = optionalText(formData.get("next")) ?? homePath(session.role, company.code);
+  redirect(next.startsWith("/") ? next : homePath(session.role, company.code));
 }
 
 export async function viewAsAction(formData: FormData) {
@@ -79,7 +80,10 @@ export async function viewAsAction(formData: FormData) {
       activeCompanyId: needsExplicitCompany(target.role) ? null : target.companyId,
     },
   });
-  redirect(needsExplicitCompany(target.role) ? "/empresa" : "/inicio");
+  const company = target.companyId
+    ? await prismaProd.company.findUnique({ where: { id: target.companyId }, select: { code: true } })
+    : null;
+  redirect(needsExplicitCompany(target.role) ? "/empresa" : homePath(target.role, company?.code ?? null));
 }
 
 export async function changeOwnPasswordAction(formData: FormData) {

@@ -6,6 +6,7 @@ import { ErpShell } from "@/components/erp-shell";
 import { SideNav } from "@/components/side-nav";
 import { prisma, sandboxFor } from "@/lib/db";
 import { takeFlash } from "@/lib/flash";
+import { canSeeHomeSummary } from "@/lib/home";
 import { can } from "@/lib/permissions";
 import { ROLE_LABEL, isRole } from "@/lib/roles";
 import { getSession } from "@/lib/session";
@@ -23,7 +24,7 @@ const seesService = (role: Parameters<typeof can>[0], code: string | null) =>
 
 const GROUPS: Array<{ title: string | null; links: NavLink[] }> = [
   { title: null, links: [
-    { href: "/inicio", label: "Inicio", show: () => true },
+    { href: "/inicio", label: "Inicio", show: (role, code) => canSeeHomeSummary(role, code) },
     { href: "/panel", label: "Panel", show: (role) => can(role, "panel.view") },
   ] },
   {

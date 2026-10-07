@@ -9,7 +9,10 @@ import { getSession } from "@/lib/session";
 
 export default async function LoginPage() {
   const session = await getSession();
-  if (session) redirect(session.activeCompanyId ? "/inicio" : "/empresa");
+  if (session) {
+    const { homePath } = await import("@/lib/home");
+    redirect(session.activeCompanyId ? homePath(session.role, session.activeCompanyCode) : "/empresa");
+  }
   const flash = await takeFlash();
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4">
