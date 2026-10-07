@@ -5,6 +5,7 @@ import { ConcurrencyError, optionalBool, optionalInt, optionalText, parseVersion
 import { recordHistory } from "@/lib/history";
 import { can } from "@/lib/permissions";
 import { parseRegimen } from "@/lib/sat-regimen";
+import { SALES_NOT_ASSIGNED_MESSAGE } from "@/lib/sales-assignment";
 import { requireCompany } from "@/lib/session";
 
 async function guard(action: "client.create" | "client.edit" | "client.reassign" | "client.inactivate") {
@@ -20,7 +21,7 @@ async function assertOwn(session: Awaited<ReturnType<typeof guard>>, clientId: s
   if (session.role !== "VENTAS") return;
   const own = await prisma.client.findFirst({ where: { id: clientId, companyId: session.activeCompanyId, ownerUserId: session.userId } });
   if (!own) {
-    await setFlash({ tone: "error", message: "Ese cliente no está en tu cartera." });
+    await setFlash({ tone: "error", message: SALES_NOT_ASSIGNED_MESSAGE });
     redirect("/clientes");
   }
 }

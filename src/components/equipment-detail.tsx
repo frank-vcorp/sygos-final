@@ -10,14 +10,22 @@ import { historyFor } from "@/lib/history";
 import { can } from "@/lib/permissions";
 import { openPendingCases } from "@/lib/technical";
 import { ATTENTION_LABEL, type AttentionType } from "@/lib/priorities";
+import { redirectIfSalesNotAssigned } from "@/lib/sales-assignment";
 import { requireCompany } from "@/lib/session";
 
 export async function EquipmentDetail({ id, expectedKind }: { id: string; expectedKind: "EQUI" | "MOT" }) {
   const session = await requireCompany();
+  const custodyDetail =
+    can(session.role, "custody.confirm", session.activeCompanyCode)
+    && ((expectedKind === "EQUI" && session.activeCompanyCode === "SYSTRON")
+      || (expectedKind === "MOT" && session.activeCompanyCode === "SERVOMOTORES"));
   const allowed = expectedKind === "EQUI"
-    ? can(session.role, "equi.view", session.activeCompanyCode)
-    : can(session.role, "mot.view", session.activeCompanyCode);
+    ? can(session.role, "equi.view", session.activeCompanyCode) || custodyDetail
+    : can(session.role, "mot.view", session.activeCompanyCode) || custodyDetail;
   if (!allowed) notFound();
+  const listHref = can(session.role, "equipment.catalog", session.activeCompanyCode)
+    ? (expectedKind === "EQUI" ? "/equipos" : "/motores")
+    : "/custodia";
   try {
     await openPendingCases(id, new Date());
   } catch {
@@ -33,7 +41,6 @@ export async function EquipmentDetail({ id, expectedKind }: { id: string; expect
       ...(expectedKind === "MOT" && session.activeCompanyCode === "SERVOMOTORES"
         ? { OR: [{ originCompanyId: session.activeCompanyId }, ...(systron ? [{ originCompanyId: systron.id }] : [])] }
         : {}),
-      ...(session.role === "VENTAS" ? { client: { ownerUserId: session.userId } } : {}),
     },
     include: {
       client: true,
@@ -43,6 +50,7 @@ export async function EquipmentDetail({ id, expectedKind }: { id: string; expect
     },
   });
   if (!equipment) notFound();
+  await redirectIfSalesNotAssigned(session, equipment.client.ownerUserId, expectedKind === "EQUI" ? "/equipos" : "/motores");
   if (session.role === "TECNICO") {
     const linked = await prisma.technicalCase.findFirst({
       where: {
@@ -79,7 +87,7 @@ export async function EquipmentDetail({ id, expectedKind }: { id: string; expect
   return (
     <>
       <PageHeader
-        back={{ href: expectedKind === "EQUI" ? "/equipos" : "/motores", label: expectedKind === "EQUI" ? "Equipos" : "Motores" }}
+        back={{ href: listHref, label: listHref === "/custodia" ? "Almacén" : expectedKind === "EQUI" ? "Equipos" : "Motores" }}
         title={equipment.folio}
         subtitle={expectedKind === "EQUI" ? "Identidad física EQUI" : "Identidad física MOT"}
         action={<Badge>{CUSTODY_LABEL[equipment.custody as Custody] ?? equipment.custody}</Badge>}
@@ -106,7 +114,9 @@ export async function EquipmentDetail({ id, expectedKind }: { id: string; expect
                     <p className="font-medium">
                       {ATTENTION_LABEL[attention.attentionType as AttentionType] ?? attention.attentionType} · {attention.priorityName}
                       {attention.technicalCases.map((item) => (
-                        <Link key={item.id} href={`/operacion/${item.id}`} className="ml-2 text-[var(--accent)]">{item.folio}</Link>
+                        can(session.role, "operation.queue", session.activeCompanyCode)
+                          ? <Link key={item.id} href={`/operacion/${item.id}`} className="ml-2 text-[var(--accent)]">{item.folio}</Link>
+                          : <span key={item.id} className="ml-2 text-[var(--muted)]">{item.folio}</span>
                       ))}
                     </p>
                     <p className="mt-1">{attention.reportedFault}</p>

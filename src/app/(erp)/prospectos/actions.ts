@@ -4,6 +4,7 @@ import { setFlash } from "@/lib/flash";
 import { ConcurrencyError, optionalText, parseVersion, requiredText } from "@/lib/form";
 import { recordHistory } from "@/lib/history";
 import { can } from "@/lib/permissions";
+import { SALES_NOT_ASSIGNED_MESSAGE } from "@/lib/sales-assignment";
 import { requireCompany } from "@/lib/session";
 
 const OPEN = ["NUEVO", "EN_SEGUIMIENTO"];
@@ -21,7 +22,7 @@ async function assertOwnProspect(session: Awaited<ReturnType<typeof guard>>, id:
   if (session.role !== "VENTAS") return;
   const own = await prisma.prospect.findFirst({ where: { id, companyId: session.activeCompanyId, ownerUserId: session.userId } });
   if (!own) {
-    await setFlash({ tone: "error", message: "Ese prospecto no está en tu cartera." });
+    await setFlash({ tone: "error", message: SALES_NOT_ASSIGNED_MESSAGE });
     redirect("/prospectos");
   }
 }

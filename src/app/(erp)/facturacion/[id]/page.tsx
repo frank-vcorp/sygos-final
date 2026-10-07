@@ -8,6 +8,7 @@ import { formatWhen } from "@/lib/form";
 import { historyFor } from "@/lib/history";
 import { money } from "@/lib/money";
 import { can } from "@/lib/permissions";
+import { redirectIfSalesNotAssigned } from "@/lib/sales-assignment";
 import { requireCompany } from "@/lib/session";
 
 export default async function DocumentoPage({ params }: { params: Promise<{ id: string }> }) {
@@ -15,10 +16,11 @@ export default async function DocumentoPage({ params }: { params: Promise<{ id: 
   if (!can(session.role, "invoice.request", session.activeCompanyCode) && !can(session.role, "invoice.issue", session.activeCompanyCode)) redirect("/inicio");
   const { id } = await params;
   const row = await prisma.billingDocument.findFirst({
-    where: { id, companyId: session.activeCompanyId, ...(session.role === "VENTAS" ? { client: { ownerUserId: session.userId } } : {}) },
+    where: { id, companyId: session.activeCompanyId },
     include: { client: true, quote: true, receivable: true, lines: true },
   });
   if (!row) notFound();
+  await redirectIfSalesNotAssigned(session, row.client.ownerUserId, "/facturacion");
   const history = await historyFor("DOCUMENTO", row.id);
   return (
     <>

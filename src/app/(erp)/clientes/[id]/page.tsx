@@ -18,6 +18,7 @@ import { prisma } from "@/lib/db";
 import { historyFor } from "@/lib/history";
 import { can } from "@/lib/permissions";
 import { regimenLabel } from "@/lib/sat-regimen";
+import { redirectIfSalesNotAssigned } from "@/lib/sales-assignment";
 import { requireCompany } from "@/lib/session";
 
 export default async function ClienteDetallePage({ params }: { params: Promise<{ id: string }> }) {
@@ -61,7 +62,7 @@ export default async function ClienteDetallePage({ params }: { params: Promise<{
       </>
     );
   }
-  if (session.role === "VENTAS" && client.ownerUserId !== session.userId) notFound();
+  await redirectIfSalesNotAssigned(session, client.ownerUserId, "/clientes");
   if (!can(session.role, "client.edit", session.activeCompanyCode)) redirect("/inicio");
 
   const equipmentFilter = {

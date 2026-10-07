@@ -22,10 +22,11 @@ export default async function InicioPage() {
   }
   const systron = session.activeCompanyCode === "SYSTRON";
   const own = session.role === "VENTAS" ? { ownerUserId: session.userId } : {};
+  const ventas = session.role === "VENTAS";
   const [clients, prospects, suppliers, custody] = await Promise.all([
     prisma.client.count({ where: { companyId: session.activeCompanyId, active: true, ...own } }),
     prisma.prospect.count({ where: { companyId: session.activeCompanyId, status: { in: ["NUEVO", "EN_SEGUIMIENTO"] }, ...own } }),
-    prisma.supplier.count({ where: { companyId: session.activeCompanyId, active: true, isSystem: false } }),
+    ventas ? Promise.resolve(0) : prisma.supplier.count({ where: { companyId: session.activeCompanyId, active: true, isSystem: false } }),
     systron
       ? prisma.equipment.count({ where: { kind: "EQUI", originCompanyId: session.activeCompanyId, custody: "SIN_CUSTODIA", ...(session.role === "VENTAS" ? { client: own } : {}) } })
       : prisma.equipment.count({ where: { kind: "MOT", custody: "PENDIENTE_INGRESO", OR: [{ originCompanyId: session.activeCompanyId }, { originCompany: { code: "SYSTRON" } }], ...(session.role === "VENTAS" ? { client: own } : {}) } }),
@@ -40,7 +41,7 @@ export default async function InicioPage() {
     <>
       <PageHeader
         title={session.activeCompanyName ?? "Inicio"}
-        subtitle="Los registros de esta vista pertenecen solo a la empresa activa."
+        subtitle={ventas ? "Solo registros asignados a ti en la empresa activa." : "Los registros de esta vista pertenecen solo a la empresa activa."}
       />
       {canSeeHomeSummary(session.role, session.activeCompanyCode) ? (
         <>
@@ -52,7 +53,7 @@ export default async function InicioPage() {
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
               <HomeCard index="01" href={can(session.role, "client.edit", session.activeCompanyCode) || can(session.role, "client.create", session.activeCompanyCode) ? "/clientes" : undefined} label="Clientes activos" value={clients} />
               <HomeCard index="02" href={can(session.role, "prospect.operate", session.activeCompanyCode) ? "/prospectos" : undefined} label="Prospectos abiertos" value={prospects} />
-              <HomeCard index="03" href={can(session.role, "supplier.operate", session.activeCompanyCode) ? "/proveedores" : undefined} label="Proveedores activos" value={suppliers} />
+              {!ventas ? <HomeCard index="03" href={can(session.role, "supplier.operate", session.activeCompanyCode) ? "/proveedores" : undefined} label="Proveedores activos" value={suppliers} /> : null}
               <HomeCard index="04" href={systron && can(session.role, "equi.view", session.activeCompanyCode) ? "/equipos" : !systron && can(session.role, "mot.view", session.activeCompanyCode) ? "/motores" : undefined} label={systron ? "EQUI sin entrada" : "MOT por ingresar"} value={custody} />
             </div>
           </section>
@@ -73,7 +74,7 @@ export default async function InicioPage() {
               </div>
               <div className="space-y-4 p-5 text-sm">
                 <div><p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Perfil</p><p className="mt-1 font-medium">{ROLE_LABEL[session.role]}</p></div>
-                <div><p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Alcance</p><p className="mt-1 text-[var(--muted)]">Todas las cifras, búsquedas y documentos se limitan a la empresa activa.</p></div>
+                <div><p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Alcance</p><p className="mt-1 text-[var(--muted)]">{ventas ? "Solo ves clientes, prospectos y equipos asignados a ti. Si abres un enlace de otro vendedor, el sistema te avisa que no está asignado a ti." : "Todas las cifras, búsquedas y documentos se limitan a la empresa activa."}</p></div>
               </div>
             </Card>
           </div>

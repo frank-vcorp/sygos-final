@@ -6,6 +6,7 @@ import { ConcurrencyError } from "./form";
 import { recordHistory } from "./history";
 import { rememberCatalog } from "./catalog";
 import { isAttentionType, type AttentionType } from "./priorities";
+import { SALES_NOT_ASSIGNED_MESSAGE } from "./sales-assignment";
 import { assertWarrantyOrigin, openCase, openPendingCases } from "./technical";
 
 type Actor = {
@@ -21,7 +22,7 @@ async function ownClient(actor: Actor, clientId: string) {
   });
   if (!client) throw new Error("Selecciona un cliente activo de esta empresa.");
   if (actor.role === "VENTAS" && client.ownerUserId !== actor.userId) {
-    throw new Error("Ese cliente no está en tu cartera.");
+    throw new Error(SALES_NOT_ASSIGNED_MESSAGE);
   }
   return client;
 }

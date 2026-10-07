@@ -12,20 +12,18 @@ import { historyFor } from "@/lib/history";
 import { linesForTotal, money, quoteTotals } from "@/lib/money";
 import { can } from "@/lib/permissions";
 import { QUOTE_STATUS_LABEL, QUOTE_TYPE_LABEL, seesEconomicDetail, type QuoteType } from "@/lib/quotes";
+import { redirectIfSalesNotAssigned } from "@/lib/sales-assignment";
 import { requireCompany } from "@/lib/session";
 
 export default async function CotizacionDetallePage({ params }: { params: Promise<{ id: string }> }) {
   const session = await requireCompany();
   const { id } = await params;
   const quote = await prisma.quote.findFirst({
-    where: {
-      id,
-      companyId: session.activeCompanyId,
-      ...(session.role === "VENTAS" ? { sellerUserId: session.userId } : {}),
-    },
+    where: { id, companyId: session.activeCompanyId },
     include: { client: { include: { contacts: { where: { active: true }, orderBy: [{ isPrimary: "desc" }, { name: "asc" }] } } }, lines: true, sales: true, company: true, equipment: true },
   });
   if (!quote) notFound();
+  await redirectIfSalesNotAssigned(session, quote.sellerUserId, "/cotizaciones");
   const base = quote.linkedQuoteId && (session.role === "ADMINISTRADOR" || session.role === "CEO")
     ? await prisma.quote.findUnique({ where: { id: quote.linkedQuoteId }, include: { lines: true, company: true } })
     : null;

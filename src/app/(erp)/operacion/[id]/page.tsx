@@ -25,6 +25,7 @@ import { historyFor } from "@/lib/history";
 import { can } from "@/lib/permissions";
 import { ATTENTION_LABEL, type AttentionType } from "@/lib/priorities";
 import { CASE_STATUS_LABEL } from "@/lib/technical";
+import { redirectIfSalesNotAssigned } from "@/lib/sales-assignment";
 import { requireCompany } from "@/lib/session";
 
 export default async function OperacionDetallePage({ params }: { params: Promise<{ id: string }> }) {
@@ -47,7 +48,7 @@ export default async function OperacionDetallePage({ params }: { params: Promise
   const owns = row.serviceCompanyId === session.activeCompanyId;
   if (!owns && !reflected) notFound();
   if (!can(session.role, row.equipment.kind === "EQUI" ? "equi.view" : "mot.view", session.activeCompanyCode) && !reflected) notFound();
-  if (session.role === "VENTAS" && row.equipment.client.ownerUserId !== session.userId) notFound();
+  await redirectIfSalesNotAssigned(session, row.equipment.client.ownerUserId, "/operacion");
   if (session.role === "TECNICO" && row.assigneeUserId !== session.userId) notFound();
   const readOnly = !owns;
   const authors = await prisma.user.findMany({

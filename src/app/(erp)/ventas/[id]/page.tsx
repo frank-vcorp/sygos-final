@@ -4,6 +4,7 @@ import { deliverSaleAction, receiveSaleAction } from "./actions";
 import { Button, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
+import { redirectIfSalesNotAssigned } from "@/lib/sales-assignment";
 import { requireCompany } from "@/lib/session";
 
 export default async function VentaDetallePage({ params }: { params: Promise<{ id: string }> }) {
@@ -14,7 +15,7 @@ export default async function VentaDetallePage({ params }: { params: Promise<{ i
     include: { lines: true, quote: true, client: true },
   });
   if (!sale) notFound();
-  if (session.role === "VENTAS" && sale.quote.sellerUserId !== session.userId) redirect("/ventas");
+  await redirectIfSalesNotAssigned(session, sale.quote.sellerUserId, "/ventas");
   const canMove = can(session.role, "sale.receive", session.activeCompanyCode);
   return (
     <>

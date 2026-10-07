@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
 import { money } from "@/lib/money";
 import { can } from "@/lib/permissions";
+import { redirectIfSalesNotAssigned } from "@/lib/sales-assignment";
 import { requireCompany } from "@/lib/session";
 
 export default async function CuentaPage({ params }: { params: Promise<{ id: string }> }) {
@@ -13,10 +14,11 @@ export default async function CuentaPage({ params }: { params: Promise<{ id: str
   if (!can(session.role, "receivable.view", session.activeCompanyCode)) redirect("/inicio");
   const { id } = await params;
   const row = await prisma.receivable.findFirst({
-    where: { id, companyId: session.activeCompanyId, ...(session.role === "VENTAS" ? { sellerUserId: session.userId } : {}) },
+    where: { id, companyId: session.activeCompanyId },
     include: { client: true, document: true, notes: { orderBy: { createdAt: "desc" } }, applications: { include: { payment: true } } },
   });
   if (!row) notFound();
+  await redirectIfSalesNotAssigned(session, row.sellerUserId, "/cobranza");
   const overdue = row.balance > 0 && row.dueAt.getTime() < Date.now();
   return (
     <>

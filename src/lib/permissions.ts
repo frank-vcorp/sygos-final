@@ -89,7 +89,12 @@ export function can(role: Role, action: Action, companyCode?: string | null): bo
     case "supplier.operate":
       return admin || ceo || coord || gerenteSy || gerenteSm;
     case "equi.view":
-      return companyCode === "SYSTRON" && role !== "AYUDANTE_GENERAL" && role !== "KIOSCO_ASISTENCIA";
+      return (
+        companyCode === "SYSTRON"
+        && role !== "AYUDANTE_GENERAL"
+        && role !== "KIOSCO_ASISTENCIA"
+        && role !== "ALMACEN"
+      );
     case "equi.create":
       return companyCode === "SYSTRON" && (admin || ceo || coord || sales || gerenteSy);
     case "mot.view":
@@ -108,7 +113,13 @@ export function can(role: Role, action: Action, companyCode?: string | null): bo
       if (companyCode === "SERVOMOTORES") return gerenteSm;
       return false;
     case "equipment.catalog":
-      if (role === "TECNICO" || role === "COORDINACION_ADMINISTRACION" || role === "AYUDANTE_GENERAL" || role === "KIOSCO_ASISTENCIA") {
+      if (
+        role === "TECNICO"
+        || role === "ALMACEN"
+        || role === "COORDINACION_ADMINISTRACION"
+        || role === "AYUDANTE_GENERAL"
+        || role === "KIOSCO_ASISTENCIA"
+      ) {
         return false;
       }
       return can(role, "equi.view", companyCode) || can(role, "mot.view", companyCode);

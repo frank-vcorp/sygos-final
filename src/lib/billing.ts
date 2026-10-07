@@ -6,6 +6,7 @@ import { ConcurrencyError } from "./form";
 import { recordHistory } from "./history";
 import { linesForTotal, quoteTotals, roundMoney } from "./money";
 import type { Role } from "./roles";
+import { SALES_NOT_ASSIGNED_MESSAGE } from "./sales-assignment";
 
 type Actor = { userId: string; role: Role; activeCompanyId: string; activeCompanyCode: string };
 
@@ -41,7 +42,7 @@ export async function requestFromQuote(actor: Actor, quoteId: string, kind: "FAC
     include: { lines: true, client: true },
   });
   if (!quote || quote.status !== "AUTORIZADA") throw new Error("Solo se solicita documento de una cotización autorizada.");
-  if (actor.role === "VENTAS" && quote.sellerUserId !== actor.userId) throw new Error("Esa cotización no está en tu cartera.");
+  if (actor.role === "VENTAS" && quote.sellerUserId !== actor.userId) throw new Error(SALES_NOT_ASSIGNED_MESSAGE);
   const totals = quoteTotals(linesForTotal(quote.lines, quote.quoteType, quote.status), quote.discountPct);
   if (!totals) throw new Error("La cotización no tiene importe.");
   const used = await invoicedTotal(quote.id);
@@ -432,7 +433,7 @@ export async function confirmIntercompanyPayment(actor: Actor, paymentId: string
 export async function addCollectionNote(actor: Actor, receivableId: string, note: string, followUpAt: Date | null) {
   const row = await prisma.receivable.findFirst({ where: { id: receivableId, companyId: actor.activeCompanyId } });
   if (!row) throw new Error("Esa cuenta no es de esta empresa.");
-  if (actor.role === "VENTAS" && row.sellerUserId !== actor.userId) throw new Error("Esa cartera no es tuya.");
+  if (actor.role === "VENTAS" && row.sellerUserId !== actor.userId) throw new Error(SALES_NOT_ASSIGNED_MESSAGE);
   await prisma.collectionNote.create({
     data: { receivableId: row.id, note, followUpAt, authorUserId: actor.userId },
   });

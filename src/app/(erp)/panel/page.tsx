@@ -131,7 +131,7 @@ async function Sales({ companyId, userId }: { companyId: string; userId: string 
   ]);
   return (
     <>
-      <PageHeader title="Panel de ventas" subtitle="Tu cartera y tu agenda. No muestra costos internos ni la base de Servomotores." />
+      <PageHeader title="Panel de ventas" subtitle="Solo lo asignado a ti: clientes, cotizaciones y seguimiento. Sin costos internos ni la base de Servomotores." />
       <div className="grid gap-3">
         <Block title="Cotizaciones por seguimiento" empty="Nada por seguir." rows={quotes.map((row) => ({ href: `/cotizaciones/${row.id}`, label: row.folio, detail: row.status }))} />
         <Block title="Cobranza" empty="Sin saldos propios." rows={receivables.map((row) => ({ href: `/cobranza/${row.id}`, label: row.document.folio, detail: `${row.client.name} · ${money(row.balance)}` }))} />

@@ -13,6 +13,7 @@ import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
 import { historyFor } from "@/lib/history";
 import { can } from "@/lib/permissions";
+import { redirectIfSalesNotAssigned } from "@/lib/sales-assignment";
 import { requireCompany } from "@/lib/session";
 
 const LABEL: Record<string, string> = {
@@ -31,7 +32,7 @@ export default async function ProspectoDetallePage({ params }: { params: Promise
     include: { activities: { orderBy: { createdAt: "desc" } }, client: true },
   });
   if (!prospect) notFound();
-  if (session.role === "VENTAS" && prospect.ownerUserId !== session.userId) notFound();
+  await redirectIfSalesNotAssigned(session, prospect.ownerUserId, "/prospectos");
   const open = prospect.status === "NUEVO" || prospect.status === "EN_SEGUIMIENTO";
   const clients = open
     ? await prisma.client.findMany({

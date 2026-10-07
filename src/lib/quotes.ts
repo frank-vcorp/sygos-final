@@ -5,6 +5,7 @@ import { recordHistory } from "./history";
 import { finalFromBase } from "./money";
 import type { Role } from "./roles";
 import { QUOTE_STATUS_LABEL, QUOTE_TYPE_LABEL, QUOTE_TYPES, type QuoteType } from "./quote-meta";
+import { SALES_NOT_ASSIGNED_MESSAGE } from "./sales-assignment";
 
 export { QUOTE_STATUS_LABEL, QUOTE_TYPE_LABEL, QUOTE_TYPES, type QuoteType };
 
@@ -37,7 +38,7 @@ export async function createSellerQuote(
     where: { id: input.clientId, companyId: actor.activeCompanyId, active: true, isSystem: false },
   });
   if (!client) throw new Error("Selecciona un cliente activo de esta empresa.");
-  if (actor.role === "VENTAS" && client.ownerUserId !== actor.userId) throw new Error("Ese cliente no está en tu cartera.");
+  if (actor.role === "VENTAS" && client.ownerUserId !== actor.userId) throw new Error(SALES_NOT_ASSIGNED_MESSAGE);
   if (input.equipmentId) {
     const equipment = await prisma.equipment.findFirst({ where: { id: input.equipmentId, originCompanyId: actor.activeCompanyId } });
     if (!equipment) throw new Error("El equipo no pertenece a esta empresa.");
