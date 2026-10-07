@@ -22,16 +22,19 @@ export function AttentionForm({
   version,
   priorities,
   repairs,
+  variant = "card",
 }: {
   equipmentId: string;
   kind: "EQUI" | "MOT";
   version: number;
   priorities: PriorityRow[];
   repairs: Array<{ id: string; folio: string }>;
+  variant?: "card" | "plain";
 }) {
+  const shell = variant === "card" ? "grid gap-3 rounded-lg border border-[var(--line)] bg-white p-4" : "grid gap-3";
   return (
-    <form action={createAttentionAction} className="grid gap-3 rounded-lg border border-[var(--line)] bg-white p-4">
-      <h2 className="font-medium">Nueva atención</h2>
+    <form action={createAttentionAction} className={shell}>
+      {variant === "card" ? <h2 className="font-medium">Nueva atención</h2> : null}
       <p className="text-sm text-[var(--muted)]">Es un episodio de servicio. No crea otro equipo ni otro folio.</p>
       <input type="hidden" name="equipmentId" value={equipmentId} />
       <input type="hidden" name="kind" value={kind} />
@@ -81,6 +84,7 @@ export function MovementForm({
   version,
   suppliers,
   allowQuickSupplier = false,
+  variant = "card",
 }: {
   equipmentId: string;
   kind: "EQUI" | "MOT";
@@ -88,12 +92,14 @@ export function MovementForm({
   version: number;
   suppliers: Array<{ id: string; name: string }>;
   allowQuickSupplier?: boolean;
+  variant?: "card" | "plain";
 }) {
   const movements = allowedMovements(kind, custody);
   if (movements.length === 0) return null;
+  const shell = variant === "card" ? "grid gap-3 rounded-lg border border-[var(--line)] bg-white p-4" : "grid gap-3";
   return (
-    <form action={movementAction} className="grid gap-3 rounded-lg border border-[var(--line)] bg-white p-4">
-      <h2 className="font-medium">Registrar movimiento</h2>
+    <form action={movementAction} className={shell}>
+      {variant === "card" ? <h2 className="font-medium">Registrar movimiento</h2> : null}
       <input type="hidden" name="equipmentId" value={equipmentId} />
       <input type="hidden" name="kind" value={kind} />
       <input type="hidden" name="version" value={version} />

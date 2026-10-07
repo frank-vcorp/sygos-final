@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AttentionForm, CancelMovementForm, MovementForm } from "@/components/custody-forms";
+import { EquipmentCustodyActions } from "@/components/equipment-custody-actions";
 import { HistoryTimeline } from "@/components/history-timeline";
 import { Badge, PageHeader, Table, Td, Th } from "@/components/ui";
-import { CUSTODY_LABEL, MOVEMENT_LABEL, type Custody, type MovementKind } from "@/lib/custody";
+import { allowedMovements, CUSTODY_LABEL, MOVEMENT_LABEL, type Custody, type MovementKind } from "@/lib/custody";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
 import { historyFor } from "@/lib/history";
@@ -83,6 +84,7 @@ export async function EquipmentDetail({ id, expectedKind }: { id: string; expect
     && ((expectedKind === "EQUI" && session.activeCompanyCode === "SYSTRON") || (expectedKind === "MOT" && session.activeCompanyCode === "SERVOMOTORES"));
   const canAttend = equipment.originCompanyId === session.activeCompanyId && can(session.role, "attention.create", session.activeCompanyCode);
   const latestOpen = equipment.movements.find((row) => !row.cancelledAt);
+  const movementOptions = allowedMovements(expectedKind, equipment.custody as Custody);
 
   return (
     <>
@@ -105,21 +107,31 @@ export async function EquipmentDetail({ id, expectedKind }: { id: string; expect
           ) : null}
         </section>
 
-        {(canMove || canAttend) ? (
-          <div className="grid max-w-3xl gap-4">
-            {canMove ? (
-              <MovementForm
-                equipmentId={equipment.id}
-                kind={expectedKind}
-                custody={equipment.custody as Custody}
-                version={equipment.version}
-                suppliers={suppliers.map((supplier) => ({ id: supplier.id, name: supplier.name }))}
-                allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)}
-              />
-            ) : null}
-            {canAttend ? <AttentionForm equipmentId={equipment.id} kind={expectedKind} version={equipment.version} priorities={priorities} repairs={repairs} /> : null}
-          </div>
-        ) : null}
+        <EquipmentCustodyActions
+          showMovement={canMove && movementOptions.length > 0}
+          showAttention={canAttend}
+          movement={
+            <MovementForm
+              variant="plain"
+              equipmentId={equipment.id}
+              kind={expectedKind}
+              custody={equipment.custody as Custody}
+              version={equipment.version}
+              suppliers={suppliers.map((supplier) => ({ id: supplier.id, name: supplier.name }))}
+              allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)}
+            />
+          }
+          attention={
+            <AttentionForm
+              variant="plain"
+              equipmentId={equipment.id}
+              kind={expectedKind}
+              version={equipment.version}
+              priorities={priorities}
+              repairs={repairs}
+            />
+          }
+        />
 
         <section>
             <h2 className="mb-2 font-medium">Atenciones</h2>
