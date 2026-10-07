@@ -8,7 +8,7 @@ import { requireCompany } from "@/lib/session";
 
 export default async function MotoresPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const session = await requireCompany();
-  if (!can(session.role, "mot.view", session.activeCompanyCode)) redirect("/inicio");
+  if (!can(session.role, "equipment.catalog", session.activeCompanyCode) || !can(session.role, "mot.view", session.activeCompanyCode)) redirect("/panel");
   const { q } = await searchParams;
   const query = (q ?? "").trim();
   const systron = session.activeCompanyCode === "SERVOMOTORES"

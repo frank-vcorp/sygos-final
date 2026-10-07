@@ -19,7 +19,7 @@ type NavLink = {
   showCreate?: (role: Parameters<typeof can>[0], code: string | null) => boolean;
 };
 
-const seesService = (role: Parameters<typeof can>[0], code: string | null) =>
+const seesOperation = (role: Parameters<typeof can>[0], code: string | null) =>
   role !== "ALMACEN" && (can(role, "equi.view", code) || can(role, "mot.view", code));
 
 const GROUPS: Array<{ title: string | null; links: NavLink[] }> = [
@@ -58,17 +58,17 @@ const GROUPS: Array<{ title: string | null; links: NavLink[] }> = [
   {
     title: "Servicios",
     links: [
-      { href: "/servicios/diagnostico", label: "Diagnóstico", show: seesService, createHref: "/servicios/diagnostico/nuevo", showCreate: (role, code) => can(role, "attention.create", code) },
-      { href: "/servicios/reparacion", label: "Reparación", show: seesService, createHref: "/servicios/reparacion/nuevo", showCreate: (role, code) => can(role, "attention.create", code) },
-      { href: "/servicios/garantia", label: "Diagnóstico de Garantía", show: seesService, createHref: "/servicios/garantia/nuevo", showCreate: (role, code) => can(role, "attention.create", code) },
-      { href: "/operacion", label: "En proceso", show: seesService },
+      { href: "/servicios/diagnostico", label: "Diagnóstico", show: (role, code) => can(role, "attention.catalog", code), createHref: "/servicios/diagnostico/nuevo", showCreate: (role, code) => can(role, "attention.create", code) },
+      { href: "/servicios/reparacion", label: "Reparación", show: (role, code) => can(role, "attention.catalog", code), createHref: "/servicios/reparacion/nuevo", showCreate: (role, code) => can(role, "attention.create", code) },
+      { href: "/servicios/garantia", label: "Diagnóstico de Garantía", show: (role, code) => can(role, "attention.catalog", code), createHref: "/servicios/garantia/nuevo", showCreate: (role, code) => can(role, "attention.create", code) },
+      { href: "/operacion", label: "En proceso", show: seesOperation },
     ],
   },
   {
     title: "Taller",
     links: [
-      { href: "/equipos", label: "Equipos", show: (role, code) => can(role, "equi.view", code), createHref: "/equipos/nuevo", showCreate: (role, code) => can(role, "equi.create", code) },
-      { href: "/motores", label: "Motores", show: (role, code) => can(role, "mot.view", code), createHref: "/motores/nuevo", showCreate: (role, code) => can(role, "mot.create", code) },
+      { href: "/equipos", label: "Equipos", show: (role, code) => can(role, "equipment.catalog", code), createHref: "/equipos/nuevo", showCreate: (role, code) => can(role, "equi.create", code) },
+      { href: "/motores", label: "Motores", show: (role, code) => can(role, "equipment.catalog", code) && can(role, "mot.view", code), createHref: "/motores/nuevo", showCreate: (role, code) => can(role, "mot.create", code) },
       { href: "/custodia", label: (code) => (code === "SERVOMOTORES" ? "Custodia" : "Almacén"), show: (role, code) => can(role, "custody.confirm", code) },
       { href: "/inventario", label: "Inventario", show: (role, code) => can(role, "inventory.operate", code) },
     ],

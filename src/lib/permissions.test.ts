@@ -45,6 +45,14 @@ describe("permisos de fase 1", () => {
     assert.equal(can("ALMACEN", "client.create", "SYSTRON"), false);
   });
 
+  it("deja al técnico fuera de bandejas de servicio y catálogo de equipos", () => {
+    assert.equal(can("TECNICO", "attention.catalog", "SYSTRON"), false);
+    assert.equal(can("TECNICO", "equipment.catalog", "SYSTRON"), false);
+    assert.equal(can("VENTAS", "attention.catalog", "SYSTRON"), true);
+    assert.equal(can("SUPERVISOR_TECNICO", "attention.catalog", "SYSTRON"), true);
+    assert.equal(can("TECNICO", "panel.view", "SYSTRON"), true);
+  });
+
   it("restringe el resumen de inicio a perfiles comerciales y directivos", () => {
     assert.equal(can("TECNICO", "home.summary", "SYSTRON"), false);
     assert.equal(can("SUPERVISOR_TECNICO", "home.summary", "SYSTRON"), false);

@@ -18,6 +18,8 @@ export type Action =
   | "mot.view"
   | "mot.create"
   | "attention.create"
+  | "attention.catalog"
+  | "equipment.catalog"
   | "custody.confirm"
   | "inventory.operate"
   | "quote.create"
@@ -99,6 +101,14 @@ export function can(role: Role, action: Action, companyCode?: string | null): bo
       return false;
     case "attention.create":
       return can(role, "equi.create", companyCode) || can(role, "mot.create", companyCode);
+    case "attention.catalog":
+      if (admin || ceo || coord) return true;
+      if (companyCode === "SYSTRON") return sales || gerenteSy || role === "SUPERVISOR_TECNICO";
+      if (companyCode === "SERVOMOTORES") return gerenteSm;
+      return false;
+    case "equipment.catalog":
+      if (role === "TECNICO" || role === "AYUDANTE_GENERAL" || role === "KIOSCO_ASISTENCIA") return false;
+      return can(role, "equi.view", companyCode) || can(role, "mot.view", companyCode);
     case "custody.confirm":
       if (companyCode === "SYSTRON") return admin || ceo || coord || gerenteSy || role === "ALMACEN";
       if (companyCode === "SERVOMOTORES") return admin || ceo || coord || gerenteSm;

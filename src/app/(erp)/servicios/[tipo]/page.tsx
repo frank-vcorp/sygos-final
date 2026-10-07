@@ -14,8 +14,8 @@ const TYPES = {
 
 export default async function ServiciosPage({ params, searchParams }: { params: Promise<{ tipo: string }>; searchParams: Promise<{ q?: string }> }) {
   const session = await requireCompany();
-  if (session.role === "ALMACEN" || (!can(session.role, "equi.view", session.activeCompanyCode) && !can(session.role, "mot.view", session.activeCompanyCode))) {
-    redirect("/inicio");
+  if (!can(session.role, "attention.catalog", session.activeCompanyCode)) {
+    redirect("/panel");
   }
   const { tipo } = await params;
   const { q } = await searchParams;

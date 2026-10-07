@@ -43,6 +43,15 @@ export async function EquipmentDetail({ id, expectedKind }: { id: string; expect
     },
   });
   if (!equipment) notFound();
+  if (session.role === "TECNICO") {
+    const linked = await prisma.technicalCase.findFirst({
+      where: {
+        equipmentId: equipment.id,
+        OR: [{ assigneeUserId: session.userId }, { finishedByUserId: session.userId }],
+      },
+    });
+    if (!linked) notFound();
+  }
   const intercompany = expectedKind === "MOT" && session.activeCompanyCode === "SERVOMOTORES" && equipment.originCompany.code === "SYSTRON";
   const seller = equipment.attentions.find((row) => row.sellerUserId)?.sellerUserId;
   const sellerUser = seller ? await prisma.user.findUnique({ where: { id: seller } }) : null;
