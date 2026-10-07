@@ -25,6 +25,7 @@ export function ClientPicker({
   extendedContact?: boolean;
 }) {
   const [clientId, setClientId] = useState(defaultClientId);
+  const [quickOpen, setQuickOpen] = useState(allowQuickClient && !defaultClientId && clients.length === 0);
   const quick = allowQuickClient && !clientId;
 
   return (
@@ -39,16 +40,18 @@ export function ClientPicker({
           className={controlClass}
           value={clientId}
           onChange={(event) => {
-            setClientId(event.target.value);
-            onClientChange?.(event.target.value);
+            const next = event.target.value;
+            setClientId(next);
+            onClientChange?.(next);
+            if (next) setQuickOpen(false);
           }}
         >
           {allowQuickClient ? <option value="">Crear cliente en este paso</option> : <option value="">Selecciona</option>}
           {clients.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}
         </select>
       </Field>
-      {allowQuickClient ? (
-        <QuickPanel label="Alta rápida de cliente" defaultOpen={clients.length === 0 || quick}>
+      {allowQuickClient && !clientId ? (
+        <QuickPanel label="Alta rápida de cliente" open={quickOpen} onOpenChange={setQuickOpen}>
           <QuickClientFields required={quick} extended={extendedContact} />
         </QuickPanel>
       ) : null}
