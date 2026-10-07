@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AttentionForm, CancelMovementForm, MovementForm } from "@/components/custody-forms";
 import { HistoryTimeline } from "@/components/history-timeline";
-import { Badge, DetailGrid, PageHeader, Table, Td, Th } from "@/components/ui";
+import { Badge, PageHeader, Table, Td, Th } from "@/components/ui";
 import { CUSTODY_LABEL, MOVEMENT_LABEL, type Custody, type MovementKind } from "@/lib/custody";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
@@ -92,20 +92,36 @@ export async function EquipmentDetail({ id, expectedKind }: { id: string; expect
         subtitle={expectedKind === "EQUI" ? "Identidad física EQUI" : "Identidad física MOT"}
         action={<Badge>{CUSTODY_LABEL[equipment.custody as Custody] ?? equipment.custody}</Badge>}
       />
-      <DetailGrid>
-        <div className="space-y-4">
-          <section className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
-            <p>Origen: {equipment.originCompany.name}</p>
-            <p className="mt-1">Cliente: {intercompany ? "SYSTRON, cliente administrativo. El cliente final no se muestra en Servomotores." : can(session.role, "client.edit", session.activeCompanyCode) ? <Link href={`/clientes/${equipment.client.id}`} className="text-[var(--accent)]">{equipment.client.name}</Link> : equipment.client.name}</p>
-            {intercompany && sellerUser ? <p className="mt-1">Contacto operativo SYSTRON: {sellerUser.name}</p> : null}
-            <p className="mt-1">Identificación: {[equipment.typeName, equipment.brandName, equipment.model].filter(Boolean).join(" · ")}</p>
-            {equipment.serial ? <p className="mt-1">Serie: {equipment.serial}</p> : null}
-            {equipment.description ? <p className="mt-1">{equipment.description}</p> : null}
-            {expectedKind === "MOT" && session.activeCompanyCode === "SYSTRON" ? (
-              <p className="mt-3 text-[var(--muted)]">Este MOT no entra al almacén SYSTRON. El estado físico lo confirma Servomotores.</p>
+      <div className="space-y-6">
+        <section className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
+          <p>Origen: {equipment.originCompany.name}</p>
+          <p className="mt-1">Cliente: {intercompany ? "SYSTRON, cliente administrativo. El cliente final no se muestra en Servomotores." : can(session.role, "client.edit", session.activeCompanyCode) ? <Link href={`/clientes/${equipment.client.id}`} className="text-[var(--accent)]">{equipment.client.name}</Link> : equipment.client.name}</p>
+          {intercompany && sellerUser ? <p className="mt-1">Contacto operativo SYSTRON: {sellerUser.name}</p> : null}
+          <p className="mt-1">Identificación: {[equipment.typeName, equipment.brandName, equipment.model].filter(Boolean).join(" · ")}</p>
+          {equipment.serial ? <p className="mt-1">Serie: {equipment.serial}</p> : null}
+          {equipment.description ? <p className="mt-1">{equipment.description}</p> : null}
+          {expectedKind === "MOT" && session.activeCompanyCode === "SYSTRON" ? (
+            <p className="mt-3 text-[var(--muted)]">Este MOT no entra al almacén SYSTRON. El estado físico lo confirma Servomotores.</p>
+          ) : null}
+        </section>
+
+        {(canMove || canAttend) ? (
+          <div className="grid max-w-3xl gap-4">
+            {canMove ? (
+              <MovementForm
+                equipmentId={equipment.id}
+                kind={expectedKind}
+                custody={equipment.custody as Custody}
+                version={equipment.version}
+                suppliers={suppliers.map((supplier) => ({ id: supplier.id, name: supplier.name }))}
+                allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)}
+              />
             ) : null}
-          </section>
-          <section>
+            {canAttend ? <AttentionForm equipmentId={equipment.id} kind={expectedKind} version={equipment.version} priorities={priorities} repairs={repairs} /> : null}
+          </div>
+        ) : null}
+
+        <section>
             <h2 className="mb-2 font-medium">Atenciones</h2>
             {equipment.attentions.length === 0 ? <p className="text-sm text-[var(--muted)]">Todavía no hay un episodio de servicio.</p> : (
               <ul className="space-y-2">
@@ -159,23 +175,13 @@ export async function EquipmentDetail({ id, expectedKind }: { id: string; expect
                 </tbody>
               </Table>
             )}
-          </section>
-        </div>
-        <div className="space-y-4">
-          {canMove ? (
-            <MovementForm
-              equipmentId={equipment.id}
-              kind={expectedKind}
-              custody={equipment.custody as Custody}
-              version={equipment.version}
-              suppliers={suppliers.map((supplier) => ({ id: supplier.id, name: supplier.name }))}
-              allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)}
-            />
-          ) : null}
-          {canAttend ? <AttentionForm equipmentId={equipment.id} kind={expectedKind} version={equipment.version} priorities={priorities} repairs={repairs} /> : null}
+        </section>
+
+        <section>
+          <h2 className="mb-2 font-medium">Historial</h2>
           <HistoryTimeline items={history.map((row) => ({ id: row.id, createdAt: row.createdAt, summary: row.summary, authorName: row.author?.name }))} />
-        </div>
-      </DetailGrid>
+        </section>
+      </div>
     </>
   );
 }
