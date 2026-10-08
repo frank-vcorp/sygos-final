@@ -31,7 +31,7 @@ import { diagnosisPresolicitudEditable, fieldPresolicitudOnly, PRESOLICITUD_LABE
 import { CASE_STATUS_LABEL } from "@/lib/technical";
 import { homePath } from "@/lib/home";
 import { redirectIfSalesNotAssigned } from "@/lib/sales-assignment";
-import { serviciosBandejaHref, usesServiciosBandeja } from "@/lib/servicios-catalog";
+import { serviciosBandejaHref } from "@/lib/servicios-catalog";
 import { HISTORIAL_CASE } from "@/lib/servicios-supervisor";
 import { requireCompany } from "@/lib/session";
 
@@ -102,10 +102,10 @@ export default async function OperacionDetallePage({ params }: { params: Promise
     <>
       <PageHeader
         back={
-          usesServiciosBandeja(session.role)
+          can(session.role, "attention.catalog", session.activeCompanyCode)
             ? {
                 href: serviciosBandejaHref({ vista: historial ? "historial" : "activos" }),
-                label: historial ? "Historial de servicio" : "Servicios activos",
+                label: "Servicios",
               }
             : { href: "/operacion", label: "En proceso" }
         }

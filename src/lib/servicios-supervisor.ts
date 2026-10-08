@@ -8,10 +8,16 @@ export const HISTORIAL_CASE = [...CLOSED_CASE, "CANCELADA"] as const;
 
 type ListScope = {
   assigneeUserId?: string;
+  /** Cartera de ventas: solo equipos de clientes asignados al vendedor. */
+  clientOwnerUserId?: string;
   tipo?: ServicioTipoParam | null;
   desde?: string;
   hasta?: string;
 };
+
+function clientOwnerScope(userId: string) {
+  return { equipment: { client: { ownerUserId: userId } } };
+}
 
 function technicianCaseScope(userId: string) {
   return { OR: [{ assigneeUserId: userId }, { finishedByUserId: userId }] };
@@ -124,12 +130,14 @@ export async function listActiveServicios(
   const attentionType = tipo ? (SERVICIO_TIPO_PARAM[tipo] as AttentionType) : null;
   const q = query.trim();
   const technicianId = options?.assigneeUserId;
+  const clientOwnerUserId = options?.clientOwnerUserId;
 
   const cases = await prisma.technicalCase.findMany({
     where: {
       serviceCompanyId: companyId,
       status: { notIn: [...HISTORIAL_CASE] },
       ...(technicianId ? technicianCaseScope(technicianId) : {}),
+      ...(clientOwnerUserId ? clientOwnerScope(clientOwnerUserId) : {}),
       ...(attentionType ? { attention: { attentionType } } : {}),
       ...createdAtRange(options?.desde, options?.hasta),
       ...(q
@@ -170,6 +178,7 @@ export async function listHistorialServicios(
   const attentionType = tipo ? (SERVICIO_TIPO_PARAM[tipo] as AttentionType) : null;
   const q = query.trim();
   const technicianId = options?.assigneeUserId;
+  const clientOwnerUserId = options?.clientOwnerUserId;
   const statusFilter =
     options?.status && options.status !== "todos" && (HISTORIAL_CASE as readonly string[]).includes(options.status)
       ? options.status
@@ -180,6 +189,7 @@ export async function listHistorialServicios(
       serviceCompanyId: companyId,
       status: statusFilter ? statusFilter : { in: [...HISTORIAL_CASE] },
       ...(technicianId ? technicianCaseScope(technicianId) : {}),
+      ...(clientOwnerUserId ? clientOwnerScope(clientOwnerUserId) : {}),
       attention: {
         status: { not: "ABIERTA" },
         ...(attentionType ? { attentionType } : {}),
@@ -213,6 +223,7 @@ export async function listHistorialServicios(
             serviceCompanyId: companyId,
             status: "CANCELADA",
             ...(attentionType ? { attentionType } : {}),
+            ...(clientOwnerUserId ? clientOwnerScope(clientOwnerUserId) : {}),
             ...updatedAtRange(options?.desde, options?.hasta),
             technicalCases: { none: {} },
             ...(q

@@ -15,16 +15,6 @@ export type NavGroupDef = {
 
 const ventas = (role: Role) => role === "VENTAS";
 const notVentas = (role: Role) => role !== "VENTAS";
-const serviciosBandejaNav = (role: Role) => role === "TECNICO" || role === "SUPERVISOR_TECNICO";
-
-function showServiciosCatalogNav(role: Role, companyCode: string | null) {
-  return can(role, "attention.catalog", companyCode) && !serviciosBandejaNav(role);
-}
-
-function showServiciosBandejaNav(role: Role, companyCode: string | null) {
-  return can(role, "attention.catalog", companyCode) && serviciosBandejaNav(role);
-}
-
 /** Operación vía Servicios + detalle; técnico y supervisor no ven acordeón Taller. */
 const showTallerNav = (role: Role) => role !== "TECNICO" && role !== "SUPERVISOR_TECNICO";
 
@@ -63,16 +53,8 @@ export const NAV_GROUPS: NavGroupDef[] = [
     direct: true,
     links: [
       {
-        href: "/servicios/activos",
-        show: (role, code) => showServiciosBandejaNav(role, code),
-      },
-      {
-        href: "/servicios/historial",
-        show: (role, code) => showServiciosBandejaNav(role, code),
-      },
-      {
         href: "/servicios",
-        show: (role, code) => showServiciosCatalogNav(role, code),
+        show: (role, code) => can(role, "attention.catalog", code),
       },
     ],
   },

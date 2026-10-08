@@ -65,7 +65,7 @@ function serviciosSearchParams(params: ServiciosListParams) {
   return search;
 }
 
-/** Catálogo comercial (gerente, ventas, etc.). */
+/** @deprecated Prefer serviciosBandejaHref; conservado para enlaces con query legacy. */
 export function serviciosListHref(params: ServiciosListParams = {}) {
   const search = serviciosSearchParams(params);
   const query = search.toString();
@@ -78,10 +78,6 @@ export function serviciosBandejaHref(params: ServiciosListParams = {}) {
   const search = serviciosSearchParams(params);
   const query = search.toString();
   return query ? `${base}?${query}` : base;
-}
-
-export function usesServiciosBandeja(role: string) {
-  return role === "SUPERVISOR_TECNICO" || role === "TECNICO";
 }
 
 export function serviciosTipoHref(tipo: ServicioTipoParam, q?: string) {

@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { ServiciosTecnicoBandeja } from "@/components/servicios-tecnico-bandeja";
 import { homePath } from "@/lib/home";
 import { can } from "@/lib/permissions";
-import { parseServicioTipo, usesServiciosBandeja } from "@/lib/servicios-catalog";
+import { parseServicioTipo } from "@/lib/servicios-catalog";
 import { requireCompany } from "@/lib/session";
 
 export default async function ServiciosActivosPage({
@@ -11,7 +11,6 @@ export default async function ServiciosActivosPage({
   searchParams: Promise<{ tipo?: string; q?: string; desde?: string; hasta?: string }>;
 }) {
   const session = await requireCompany();
-  if (!usesServiciosBandeja(session.role)) redirect("/servicios");
   if (!can(session.role, "attention.catalog", session.activeCompanyCode)) {
     redirect(homePath(session.role, session.activeCompanyCode));
   }
@@ -23,7 +22,9 @@ export default async function ServiciosActivosPage({
     <ServiciosTecnicoBandeja
       companyId={session.activeCompanyId}
       userId={session.userId}
+      role={session.role}
       technician={session.role === "TECNICO"}
+      canCreate={can(session.role, "attention.create", session.activeCompanyCode)}
       vista="activos"
       tipo={tipo}
       query={(q ?? "").trim()}

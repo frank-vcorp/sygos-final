@@ -1,4 +1,5 @@
 import {
+  ActionLink,
   Button,
   controlClass,
   Empty,
@@ -8,6 +9,7 @@ import {
   SegmentedNav,
   TextLink,
 } from "@/components/ui";
+import type { Role } from "@/lib/roles";
 import { ServiciosSupervisorList } from "@/components/servicios-supervisor-list";
 import {
   SERVICIO_TIPO_OPTIONS,
@@ -28,10 +30,32 @@ const HISTORIAL_ESTADO_OPTIONS = [
   { value: "CANCELADA", label: "Cancelada" },
 ] as const;
 
+function bandejaSubtitle(role: Role, vista: ServiciosVista, technician: boolean): string {
+  const sales = role === "VENTAS";
+  if (vista === "historial") {
+    if (technician) {
+      return "Operaciones cerradas o canceladas en las que participaste. No incluye pendientes de ingreso.";
+    }
+    if (sales) {
+      return "Operaciones cerradas o canceladas de tu cartera. No incluye pendientes de ingreso.";
+    }
+    return "Operaciones cerradas o canceladas del taller. No incluye pendientes de ingreso.";
+  }
+  if (technician) {
+    return "Solo operaciones abiertas asignadas a ti. Vencidas y en espera de refacciones se resaltan.";
+  }
+  if (sales) {
+    return "Operaciones abiertas de tu cartera con ingreso confirmado. Vencidas y en espera de refacciones se resaltan.";
+  }
+  return "Operaciones abiertas con ingreso confirmado. Vencidas y en espera de refacciones se resaltan.";
+}
+
 export async function ServiciosTecnicoBandeja({
   companyId,
   userId,
+  role,
   technician,
+  canCreate,
   vista,
   tipo,
   estado,
@@ -41,7 +65,9 @@ export async function ServiciosTecnicoBandeja({
 }: {
   companyId: string;
   userId: string;
+  role: Role;
   technician: boolean;
+  canCreate: boolean;
   vista: ServiciosVista;
   tipo?: string;
   estado?: string;
@@ -60,38 +86,49 @@ export async function ServiciosTecnicoBandeja({
     hasta,
     estado: estado && estado !== "todos" ? estado : undefined,
   };
-  const scope = technician ? { assigneeUserId: userId } : undefined;
+  const listScope = {
+    ...(technician ? { assigneeUserId: userId } : {}),
+    ...(role === "VENTAS" ? { clientOwnerUserId: userId } : {}),
+  };
   const dateRange = { desde, hasta };
 
   const rows =
     vista === "historial"
       ? await listHistorialServicios(companyId, query, {
-          ...scope,
+          ...listScope,
           tipo: tipoParam,
           status: estado && estado !== "todos" ? estado : null,
           ...dateRange,
         })
-      : await listActiveServicios(companyId, query, { ...scope, tipo: tipoParam, ...dateRange });
-
-  const title = vista === "historial" ? "Historial de servicio" : "Servicios activos";
-  const subtitle =
-    vista === "historial"
-      ? technician
-        ? "Operaciones cerradas o canceladas en las que participaste. No incluye pendientes de ingreso."
-        : "Operaciones cerradas o canceladas del taller. No incluye pendientes de ingreso."
-      : technician
-        ? "Solo operaciones abiertas asignadas a ti. Vencidas y en espera de refacciones se resaltan."
-        : "Solo operaciones abiertas con ingreso confirmado. Vencidas y en espera de refacciones se resaltan.";
+      : await listActiveServicios(companyId, query, { ...listScope, tipo: tipoParam, ...dateRange });
 
   const formAction = vista === "historial" ? SERVICIOS_BANDEJA_HISTORIAL : SERVICIOS_BANDEJA_ACTIVOS;
 
   return (
     <>
-      <PageHeader title={title} subtitle={subtitle} />
+      <PageHeader
+        title="Servicios"
+        subtitle={bandejaSubtitle(role, vista, technician)}
+        action={canCreate ? <ActionLink href="/servicios/nuevo">Nuevo servicio</ActionLink> : null}
+      />
       <SegmentedNav
         items={[
           {
-            href: serviciosBandejaHref({ ...navBase, vista: "activos", tipo: navBase.tipo }),
+            href: serviciosBandejaHref({ ...navBase, vista: "activos" }),
+            label: "Activos",
+            active: vista === "activos",
+          },
+          {
+            href: serviciosBandejaHref({ ...navBase, vista: "historial" }),
+            label: "Historial",
+            active: vista === "historial",
+          },
+        ]}
+      />
+      <SegmentedNav
+        items={[
+          {
+            href: serviciosBandejaHref({ ...navBase, tipo: "todos" }),
             label: "Todos los tipos",
             active: !tipo || tipo === "todos",
           },

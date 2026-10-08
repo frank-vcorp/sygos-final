@@ -1,13 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { homePath } from "@/lib/home";
 import { can } from "@/lib/permissions";
-import {
-  SERVICIO_TIPO_PARAM,
-  serviciosBandejaHref,
-  serviciosListHref,
-  usesServiciosBandeja,
-  type ServicioTipoParam,
-} from "@/lib/servicios-catalog";
+import { SERVICIO_TIPO_PARAM, serviciosBandejaHref, type ServicioTipoParam } from "@/lib/servicios-catalog";
 import { requireCompany } from "@/lib/session";
 
 /** Rutas legadas `/servicios/diagnostico` → bandeja unificada. */
@@ -26,8 +20,7 @@ export default async function ServiciosTipoPage({
   if (!can(session.role, "attention.catalog", session.activeCompanyCode)) {
     redirect(homePath(session.role, session.activeCompanyCode));
   }
-  const target = usesServiciosBandeja(session.role)
-    ? serviciosBandejaHref({ tipo: tipoParam, q: q?.trim(), vista: vista === "historial" ? "historial" : "activos" })
-    : serviciosListHref({ tipo: tipoParam, q: q?.trim() });
-  redirect(target);
+  redirect(
+    serviciosBandejaHref({ tipo: tipoParam, q: q?.trim(), vista: vista === "historial" ? "historial" : "activos" }),
+  );
 }
