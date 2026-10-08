@@ -103,38 +103,23 @@ function caseRowMap(list: Array<{
 }
 
 async function SupervisorShop({ companyId, userId }: { companyId: string; userId: string }) {
-  const [rows, assignedHistory] = await Promise.all([
-    prisma.technicalCase.findMany({
-      where: { serviceCompanyId: companyId, status: { notIn: CLOSED } },
-      include: { equipment: { include: { client: true } }, attention: true, assignee: true },
-      orderBy: { slaDueAt: "asc" },
-      take: 120,
-    }),
-    prisma.functionalHistory.findMany({
-      where: { entityType: "OPERACION", action: "ASIGNACION", authorUserId: userId },
-      select: { entityId: true },
-      distinct: ["entityId"],
-    }),
-  ]);
-  const assignedBySupervisor = new Set(assignedHistory.map((entry) => entry.entityId));
-  const pending = rows.filter((row) => !row.assigneeUserId && !row.externalSupplierId);
-  const coordinated = rows.filter((row) => {
-    if (!row.assigneeUserId && !row.externalSupplierId) return false;
-    return row.assigneeUserId === userId || assignedBySupervisor.has(row.id);
+  const rows = await prisma.technicalCase.findMany({
+    where: { serviceCompanyId: companyId, status: { notIn: CLOSED } },
+    include: { equipment: { include: { client: true } }, attention: true, assignee: true },
+    orderBy: { slaDueAt: "asc" },
+    take: 120,
   });
+  const pending = rows.filter((row) => !row.assigneeUserId && !row.externalSupplierId);
+  const mine = rows.filter((row) => row.assigneeUserId === userId);
   return (
     <>
       <PageHeader
         title="Inicio"
-        subtitle="Operaciones activas de tu taller. Asigna responsable o proveedor desde el detalle de cada folio."
+        subtitle="Pendientes de asignar en el taller y operaciones activas asignadas a ti. El resto está en Servicios."
       />
       <div className="grid gap-3">
         <Block title="Pendientes de asignación" empty="Todo lo activo tiene responsable o proveedor." rows={caseRowMap(pending)} />
-        <Block
-          title="Asignaciones realizadas y/o asignadas por el propio supervisor"
-          empty="No hay operaciones activas bajo tu coordinación."
-          rows={caseRowMap(coordinated)}
-        />
+        <Block title="Asignadas a ti" empty="No tienes operaciones activas asignadas." rows={caseRowMap(mine)} />
       </div>
     </>
   );
