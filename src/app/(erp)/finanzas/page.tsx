@@ -1,16 +1,18 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { accountAction, movementAction, payCardAction, payPayableAction, proofAction, transferAction } from "./actions";
-import { controlClass, Field, PageHeader } from "@/components/ui";
+import { controlClass, Field, PageHeader, SegmentedNav } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
 
-export default async function FinanzasPage({ searchParams }: { searchParams: Promise<{ mes?: string }> }) {
+export default async function FinanzasPage({ searchParams }: { searchParams: Promise<{ mes?: string; vista?: string }> }) {
   const session = await requireCompany();
   if (!can(session.role, "finance.view", session.activeCompanyCode)) redirect("/inicio");
-  const { mes } = await searchParams;
+  const { mes, vista } = await searchParams;
+  const focus = vista ?? "";
+  const showSection = (section: string) => !focus || focus === section;
   const now = new Date();
   const key = mes && /^\d{4}-\d{2}$/.test(mes) ? mes : `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const [year, month] = key.split("-").map(Number);
@@ -32,21 +34,48 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
   const ingresos = movements.filter((row) => row.direction === "INGRESO").reduce((sum, row) => sum + row.amount, 0);
   const cardDebt = accounts.filter((row) => row.kind === "TARJETA").reduce((sum, row) => sum + row.balance, 0);
   const banks = accounts.filter((row) => row.kind === "BANCO");
+  const movementRows =
+    focus === "ingresos"
+      ? movements.filter((row) => row.direction === "INGRESO")
+      : focus === "egresos"
+        ? movements.filter((row) => row.direction === "EGRESO")
+        : movements;
+  const navItems = [
+    { href: `/finanzas?mes=${key}`, label: "Resumen", active: !focus },
+    { href: `/finanzas?vista=movimientos&mes=${key}`, label: "Movimientos", active: focus === "movimientos" || focus === "ingresos" || focus === "egresos" },
+    { href: `/finanzas?vista=ingresos&mes=${key}`, label: "Ingresos", active: focus === "ingresos" },
+    { href: `/finanzas?vista=egresos&mes=${key}`, label: "Egresos", active: focus === "egresos" },
+    { href: `/finanzas?vista=transferencias&mes=${key}`, label: "Transferencias", active: focus === "transferencias" },
+    { href: `/finanzas?vista=cuentas&mes=${key}`, label: "Cuentas", active: focus === "cuentas" },
+    { href: `/finanzas?vista=cxp&mes=${key}`, label: "CxP", active: focus === "cxp" },
+  ];
   return (
     <>
       <PageHeader title="Finanzas" subtitle={`${session.activeCompanyCode === "SERVOMOTORES" ? "Servomotores" : "SYSTRON"} · ${key}. No hay consolidado entre empresas.`} />
+      <SegmentedNav items={navItems} />
       <form className="mb-4">
         <input name="mes" type="month" defaultValue={key} className="rounded-md border border-[var(--line)] px-3 py-2 text-sm" />
+        {focus ? <input type="hidden" name="vista" value={focus} /> : null}
         <button className="ml-2 rounded-md border border-[var(--line)] px-3 py-2 text-sm">Ver mes</button>
       </form>
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      {showSection("dashboard") ? <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <Link href="/facturacion" className="rounded-lg border border-[var(--line)] bg-white p-4"><p className="text-sm text-[var(--muted)]">Facturado</p><p className="text-xl font-medium">{money(facturado)}</p></Link>
         <Link href="/pagos" className="rounded-lg border border-[var(--line)] bg-white p-4"><p className="text-sm text-[var(--muted)]">Cobrado</p><p className="text-xl font-medium">{money(cobrado)}</p></Link>
         <Link href="/compras" className="rounded-lg border border-[var(--line)] bg-white p-4"><p className="text-sm text-[var(--muted)]">Egresos</p><p className="text-xl font-medium">{money(egresos)}</p></Link>
         <div className="rounded-lg border border-[var(--line)] bg-white p-4"><p className="text-sm text-[var(--muted)]">Utilidad sobre facturación</p><p className="text-xl font-medium">{money(facturado - egresos)}</p><p className="text-xs text-[var(--muted)]">Flujo de movimientos {money(ingresos - egresos)}</p></div>
-      </div>
-      <section className="mt-6 grid gap-4 lg:grid-cols-2">
-        <div className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
+      </div> : null}
+      {(showSection("movimientos") || showSection("ingresos") || showSection("egresos")) && movementRows.length > 0 ? (
+        <section className="mt-4 rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
+          <h2 className="font-medium">Movimientos del mes</h2>
+          <ul className="mt-2 max-h-80 space-y-1 overflow-y-auto">
+            {movementRows.map((row) => (
+              <li key={row.id}>{row.direction} · {money(row.amount)} · {row.note ?? row.category}</li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+      {showSection("dashboard") ? <section className="mt-6 grid gap-4 lg:grid-cols-2">
+        <div id="fin-cuentas" className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
           <h2 className="font-medium">Cuentas</h2>
           <ul className="mt-2 space-y-1">{accounts.map((row) => <li key={row.id}>{row.name} · {row.kind === "TARJETA" ? "deuda" : "saldo"} {money(row.balance)}</li>)}</ul>
           <p className="mt-2">CxC {money(receivables._sum.balance ?? 0)} · CxP {money(payables._sum.balance ?? 0)} · Tarjetas {money(cardDebt)}</p>
@@ -61,8 +90,27 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
           <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="pendingProof" value="si" /> Pendiente de comprobación</label>
           <button className="w-fit rounded-md bg-[var(--accent)] px-3 py-2 text-sm font-medium text-white">Registrar</button>
         </form>
-      </section>
-      {pending.length > 0 ? (
+      </section> : null}
+      {showSection("cuentas") && !showSection("dashboard") ? (
+        <div id="fin-cuentas" className="mt-4 rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
+          <h2 className="font-medium">Cuentas</h2>
+          <ul className="mt-2 space-y-1">{accounts.map((row) => <li key={row.id}>{row.name} · {row.kind === "TARJETA" ? "deuda" : "saldo"} {money(row.balance)}</li>)}</ul>
+          <p className="mt-2">CxC {money(receivables._sum.balance ?? 0)} · CxP {money(payables._sum.balance ?? 0)} · Tarjetas {money(cardDebt)}</p>
+        </div>
+      ) : null}
+      {(showSection("movimientos") || showSection("ingresos") || showSection("egresos")) && !showSection("dashboard") ? (
+        <form action={movementAction} className="mt-4 grid max-w-xl gap-2 rounded-lg border border-[var(--line)] bg-white p-4">
+          <h2 className="font-medium">Movimiento manual</h2>
+          <Field label="Cuenta"><select name="accountId" className={controlClass}>{accounts.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select></Field>
+          <Field label="Dirección"><select name="direction" className={controlClass}><option value="EGRESO">Egreso</option><option value="INGRESO">Ingreso</option></select></Field>
+          <Field label="Importe"><input name="amount" type="number" min="0.01" step="0.01" required className={controlClass} /></Field>
+          <Field label="Categoría"><input name="category" required className={controlClass} /></Field>
+          <Field label="Nota"><input name="note" required className={controlClass} /></Field>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="pendingProof" value="si" /> Pendiente de comprobación</label>
+          <button className="w-fit rounded-md bg-[var(--accent)] px-3 py-2 text-sm font-medium text-white">Registrar</button>
+        </form>
+      ) : null}
+      {showSection("dashboard") && pending.length > 0 ? (
         <section className="mt-4 rounded-lg border border-[var(--line)] bg-white p-4">
           <h2 className="font-medium">Pendientes de comprobación</h2>
           {pending.map((row) => (
@@ -75,7 +123,7 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
           ))}
         </section>
       ) : null}
-      <section className="mt-4 grid gap-4 lg:grid-cols-2">
+      {(showSection("cuentas") || showSection("dashboard")) ? <section className="mt-4 grid gap-4 lg:grid-cols-2">
         <form action={accountAction} className="grid gap-2 rounded-lg border border-[var(--line)] bg-white p-4">
           <h2 className="font-medium">Nueva cuenta</h2>
           <Field label="Nombre"><input name="name" required className={controlClass} /></Field>
@@ -83,15 +131,15 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
           <Field label="Saldo o deuda inicial"><input name="opening" type="number" step="0.01" defaultValue="0" className={controlClass} /></Field>
           <button className="w-fit rounded-md border border-[var(--line)] px-3 py-2 text-sm">Guardar cuenta</button>
         </form>
-        <form action={transferAction} className="grid gap-2 rounded-lg border border-[var(--line)] bg-white p-4">
+        {showSection("transferencias") || showSection("dashboard") ? <form action={transferAction} className="grid gap-2 rounded-lg border border-[var(--line)] bg-white p-4">
           <h2 className="font-medium">Transferencia entre bancos</h2>
           <Field label="Desde"><select name="fromId" className={controlClass}>{banks.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select></Field>
           <Field label="Hacia"><select name="toId" className={controlClass}>{banks.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select></Field>
           <Field label="Importe"><input name="amount" type="number" min="0.01" step="0.01" required className={controlClass} /></Field>
           <button className="w-fit rounded-md border border-[var(--line)] px-3 py-2 text-sm">Transferir</button>
-        </form>
-      </section>
-      {accounts.some((row) => row.kind === "TARJETA" && row.balance > 0) ? (
+        </form> : null}
+      </section> : null}
+      {showSection("dashboard") && accounts.some((row) => row.kind === "TARJETA" && row.balance > 0) ? (
         <form action={payCardAction} className="mt-4 grid max-w-xl gap-2 rounded-lg border border-[var(--line)] bg-white p-4">
           <h2 className="font-medium">Pagar tarjeta</h2>
           <Field label="Tarjeta"><select name="cardId" className={controlClass}>{accounts.filter((row) => row.kind === "TARJETA").map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select></Field>
@@ -100,7 +148,7 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
           <button className="w-fit rounded-md border border-[var(--line)] px-3 py-2 text-sm">Abonar</button>
         </form>
       ) : null}
-      {openPayables.length > 0 ? (
+      {(showSection("cxp") || showSection("dashboard")) && openPayables.length > 0 ? (
         <section className="mt-4 rounded-lg border border-[var(--line)] bg-white p-4">
           <h2 className="font-medium">Pagar cuenta por pagar</h2>
           {openPayables.map((row) => (

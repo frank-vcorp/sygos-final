@@ -16,8 +16,14 @@ export const REPORTS: Array<{ id: string; label: string; roles: Role[] | "all" }
   { id: "nomina", label: "Nómina y asistencia", roles: ["ADMINISTRADOR", "CEO", "COORDINACION_ADMINISTRACION"] },
 ];
 
+const COORDINATION_REPORT_IDS = new Set(["movimientos", "cxp", "cxc", "nomina"]);
+
 export function visibleReports(role: Role) {
-  return REPORTS.filter((report) => report.roles === "all" || report.roles.includes(role));
+  const allowed = REPORTS.filter((report) => report.roles === "all" || report.roles.includes(role));
+  if (role === "COORDINACION_ADMINISTRACION") {
+    return allowed.filter((report) => COORDINATION_REPORT_IDS.has(report.id));
+  }
+  return allowed;
 }
 
 function inRange(from: string | null, to: string | null) {

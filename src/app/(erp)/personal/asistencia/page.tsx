@@ -6,21 +6,23 @@ import { mexicoToday } from "@/lib/personnel";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
 
-export default async function AsistenciaPage({ searchParams }: { searchParams: Promise<{ dia?: string }> }) {
+export default async function AsistenciaPage({ searchParams }: { searchParams: Promise<{ dia?: string; vista?: string }> }) {
   const session = await requireCompany();
   if (!can(session.role, "personnel.manage")) redirect("/inicio");
-  const { dia } = await searchParams;
+  const { dia, vista } = await searchParams;
   const day = dia && /^\d{4}-\d{2}-\d{2}$/.test(dia) ? dia : mexicoToday();
   const people = await prisma.collaborator.findMany({ where: { companyId: session.activeCompanyId, status: "ACTIVO", exemptBenefits: false }, include: { user: true, attendance: { where: { workDate: day } } }, orderBy: { user: { name: "asc" } } });
+  const listed = vista === "vacaciones" ? people.filter((person) => person.attendance[0]?.status === "VACACIONES") : people;
   return (
     <>
-      <PageHeader title="Asistencia" subtitle="Normal, retardo, ausencia, vacaciones, permiso y salida faltante. La salida faltante no descuenta." />
+      <PageHeader title={vista === "vacaciones" ? "Vacaciones" : "Asistencia"} subtitle="Normal, retardo, ausencia, vacaciones, permiso y salida faltante. La salida faltante no descuenta." />
       <form className="mb-4">
         <input name="dia" type="date" defaultValue={day} className="rounded-md border border-[var(--line)] px-3 py-2 text-sm" />
+        {vista === "vacaciones" ? <input type="hidden" name="vista" value="vacaciones" /> : null}
         <button className="ml-2 rounded-md border border-[var(--line)] px-3 py-2 text-sm">Ver día</button>
       </form>
       <ul className="space-y-2 text-sm">
-        {people.map((person) => {
+        {listed.map((person) => {
           const mark = person.attendance[0];
           return <li key={person.id} className="rounded-md border border-[var(--line)] bg-white px-3 py-2">{person.user.name} · {mark?.status ?? "Sin marca"}</li>;
         })}

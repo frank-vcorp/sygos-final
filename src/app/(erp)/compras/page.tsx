@@ -20,12 +20,14 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
   const session = await requireCompany();
   if (!can(session.role, "purchase.operate", session.activeCompanyCode)) redirect("/inicio");
   const { vista } = await searchParams;
-  const view = vista === "autorizar" ? "autorizar" : vista === "procesar" ? "procesar" : "directas";
+  const view = vista === "autorizar" ? "autorizar" : vista === "procesar" ? "procesar" : vista === "oc" ? "oc" : "directas";
   const where = view === "autorizar"
     ? { kind: "OC", status: "PENDIENTE_AUTORIZACION" }
     : view === "procesar"
       ? { OR: [{ kind: "DIRECTA", status: "PENDIENTE_VALIDAR" }, { kind: "OC", status: "AUTORIZADA" }] }
-      : { kind: "DIRECTA", status: { not: "ELIMINADA" } };
+      : view === "oc"
+        ? { kind: "OC", status: { not: "ELIMINADA" } }
+        : { kind: "DIRECTA", status: { not: "ELIMINADA" } };
   const rows = await prisma.purchase.findMany({
     where: { companyId: session.activeCompanyId, ...where },
     include: { supplier: true },
@@ -34,8 +36,9 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
   });
   const tabs = [
     ["directas", "Compras directas"],
+    ["oc", "Órdenes de compra"],
     ["procesar", "Por procesar"],
-    ["autorizar", "Por autorizar"],
+    ...(session.role === "CEO" || session.role === "ADMINISTRADOR" ? [["autorizar", "Por autorizar"] as const] : []),
   ];
   return (
     <>

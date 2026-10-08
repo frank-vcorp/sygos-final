@@ -1,7 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
+
+function isLinkActive(pathname: string, search: URLSearchParams, href: string): boolean {
+  const [path, queryString] = href.split("?", 2);
+  if (pathname !== path && !pathname.startsWith(`${path}/`)) return false;
+  if (!queryString) {
+    if (pathname !== path) return pathname.startsWith(`${path}/`);
+    return !search.get("vista");
+  }
+  const expected = new URLSearchParams(queryString);
+  for (const [key, value] of expected.entries()) {
+    if (search.get(key) !== value) return false;
+  }
+  return true;
+}
 
 export function SideNav({
   groups,
@@ -13,12 +27,14 @@ export function SideNav({
   }>;
 }) {
   const path = usePathname();
+  const searchParams = useSearchParams();
+  const search = searchParams ?? new URLSearchParams();
   return (
     <nav className="space-y-1 px-3 pb-5">
       {groups.map((group) => {
         if (group.direct && group.title && group.links.length === 1) {
           const link = group.links[0]!;
-          const active = path === link.href || path.startsWith(`${link.href}/`);
+          const active = isLinkActive(path, search, link.href);
           return (
             <div
               key={link.href}
@@ -43,9 +59,9 @@ export function SideNav({
             </div>
           );
         }
-        const groupActive = group.links.some((link) => path === link.href || path.startsWith(`${link.href}/`));
+        const groupActive = group.links.some((link) => isLinkActive(path, search, link.href));
         const links = group.links.map((link) => {
-            const active = path === link.href || path.startsWith(`${link.href}/`);
+            const active = isLinkActive(path, search, link.href);
             return (
               <div key={link.href} className={`flex min-h-10 items-center rounded-lg transition-colors ${active ? "bg-[var(--accent)] text-white" : "text-[#263b55] hover:bg-[var(--accent-soft)]"}`}>
                 <Link href={link.href} className="block min-w-0 flex-1 px-3 py-2 text-[14px] font-medium">
@@ -66,7 +82,7 @@ export function SideNav({
               {group.title}
               <span className="text-base transition-transform group-open:rotate-90" aria-hidden>›</span>
             </summary>
-            <div className="space-y-1 pb-2">{links}</div>
+            <div className="space-y-1 pb-2 pl-1">{links}</div>
           </details>
         );
       })}

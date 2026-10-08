@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { logoutAction, switchCompanyAction, viewAsAction } from "@/app/auth-actions";
 import { CompanyLogo, SygosLogo } from "@/components/brand-logo";
@@ -7,7 +8,7 @@ import { SideNav } from "@/components/side-nav";
 import { prisma, sandboxFor } from "@/lib/db";
 import { takeFlash } from "@/lib/flash";
 import { navLabel } from "@/lib/nav-labels";
-import { NAV_GROUPS } from "@/lib/nav-links";
+import { navGroupsForRole } from "@/lib/nav-links";
 import { can } from "@/lib/permissions";
 import { ROLE_LABEL, isRole } from "@/lib/roles";
 import { getSession } from "@/lib/session";
@@ -72,21 +73,25 @@ const CREATE: Partial<Record<string, { href: string; show: NavLink["showCreate"]
   "/proveedores": { href: "/proveedores/nuevo", show: (role, code) => can(role, "supplier.operate", code) },
 };
 
-const GROUPS: Array<{ title: string | null; direct?: boolean; links: NavLink[] }> = NAV_GROUPS.map((group) => ({
-  title: group.title,
-  direct: group.direct,
-  links: group.links.map((link) => {
-    const label = LABELS[link.href];
-    const create = CREATE[link.href];
-    return {
-      href: link.href,
-      label: typeof label === "function" ? label : label ?? link.href,
-      show: link.show,
-      createHref: create?.href,
-      showCreate: create?.show,
-    };
-  }),
-}));
+function erpNavGroups(role: Parameters<typeof can>[0]): Array<{ title: string | null; direct?: boolean; links: NavLink[] }> {
+  return navGroupsForRole(role).map((group) => ({
+    title: group.title,
+    direct: group.direct,
+    links: group.links.map((link) => {
+      const base = link.href.split("?")[0]!;
+      const fromCatalog = LABELS[base];
+      const label = link.label ?? (typeof fromCatalog === "function" ? fromCatalog : fromCatalog ?? base);
+      const create = CREATE[base];
+      return {
+        href: link.href,
+        label,
+        show: link.show,
+        createHref: create?.href,
+        showCreate: create?.show,
+      };
+    }),
+  }));
+}
 
 export default async function ErpLayout({ children }: { children: React.ReactNode }) {
   const session = await getSession();
@@ -113,26 +118,28 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
             <p className="mt-0.5 text-xs text-[var(--muted)]">{ROLE_LABEL[session.role]}</p>
           </div>
         </div>
-        <SideNav
-          groups={[
-            ...GROUPS.map((group) => ({
-              title: group.title,
-              direct: group.direct,
-              links: group.links
-                .filter((link) => link.show(session.role, session.activeCompanyCode))
-                .map((link) => {
-                  const base = typeof link.label === "function" ? link.label(session.activeCompanyCode) : link.label;
-                  const label = navLabel(link.href, session.role, session.activeCompanyCode) ?? base;
-                  return {
-                    href: link.href,
-                    label,
-                    createHref: link.showCreate?.(session.role, session.activeCompanyCode) ? link.createHref : undefined,
-                  };
-                }),
-            })).filter((group) => group.links.length > 0),
-            { title: null, links: [{ href: "/cuenta", label: "Cuenta" }] },
-          ]}
-        />
+        <Suspense fallback={<nav className="px-3 pb-5 text-sm text-[var(--muted)]">Menú…</nav>}>
+          <SideNav
+            groups={[
+              ...erpNavGroups(session.role).map((group) => ({
+                title: group.title,
+                direct: group.direct,
+                links: group.links
+                  .filter((link) => link.show(session.role, session.activeCompanyCode))
+                  .map((link) => {
+                    const base = typeof link.label === "function" ? link.label(session.activeCompanyCode) : link.label;
+                    const label = navLabel(link.href, session.role, session.activeCompanyCode) ?? base;
+                    return {
+                      href: link.href,
+                      label,
+                      createHref: link.showCreate?.(session.role, session.activeCompanyCode) ? link.createHref : undefined,
+                    };
+                  }),
+              })).filter((group) => group.links.length > 0),
+              { title: null, links: [{ href: "/cuenta", label: "Cuenta" }] },
+            ]}
+          />
+        </Suspense>
     </>
   );
   const toolbar = (

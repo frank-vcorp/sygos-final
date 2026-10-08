@@ -1,9 +1,12 @@
+import { COORDINATION_NAV_GROUPS } from "@/lib/nav-links-coordination";
 import { can } from "@/lib/permissions";
 import type { Role } from "@/lib/roles";
 
 export type NavLinkDef = {
   href: string;
   show: (role: Role, companyCode: string | null) => boolean;
+  /** Etiqueta en menú (p. ej. rol Coordinación). */
+  label?: string;
 };
 
 export type NavGroupDef = {
@@ -99,10 +102,15 @@ export const NAV_GROUPS: NavGroupDef[] = [
   },
 ];
 
+export function navGroupsForRole(role: Role): NavGroupDef[] {
+  if (role === "COORDINACION_ADMINISTRACION") return COORDINATION_NAV_GROUPS;
+  return NAV_GROUPS;
+}
+
 export function visibleNavHrefs(role: Role, companyCode: string | null): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
-  for (const group of NAV_GROUPS) {
+  for (const group of navGroupsForRole(role)) {
     for (const link of group.links) {
       if (!link.show(role, companyCode) || seen.has(link.href)) continue;
       seen.add(link.href);

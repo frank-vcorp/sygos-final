@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ClientNameLink } from "@/components/client-entity-links";
-import { Badge, Empty, MobileCard, PageHeader, ResponsiveData, Table, Td, Th } from "@/components/ui";
+import { Badge, Empty, MobileCard, PageHeader, ResponsiveData, SegmentedNav, Table, Td, Th } from "@/components/ui";
 import { homePath } from "@/lib/home";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
@@ -9,13 +9,21 @@ import { money } from "@/lib/money";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
 
-export default async function CobranzaPage() {
+export default async function CobranzaPage({ searchParams }: { searchParams: Promise<{ vista?: string }> }) {
   const session = await requireCompany();
   if (!can(session.role, "receivable.view", session.activeCompanyCode)) redirect(homePath(session.role, session.activeCompanyCode));
+  const { vista } = await searchParams;
   const canEditClient = can(session.role, "client.edit", session.activeCompanyCode);
   const own = session.role === "VENTAS" ? { sellerUserId: session.userId } : {};
+  const now = new Date();
+  const balanceFilter =
+    vista === "cxc"
+      ? { balance: { gt: 0 } }
+      : vista === "vencidas"
+        ? { balance: { gt: 0 }, dueAt: { lt: now } }
+        : {};
   const rows = await prisma.receivable.findMany({
-    where: { companyId: session.activeCompanyId, ...own },
+    where: { companyId: session.activeCompanyId, ...own, ...balanceFilter },
     include: { client: true, document: true },
     orderBy: { dueAt: "asc" },
     take: 100,
@@ -27,9 +35,17 @@ export default async function CobranzaPage() {
     const late = (row: typeof a) => row.balance > 0 && row.dueAt.getTime() < Date.now() ? Date.now() - row.dueAt.getTime() : 0;
     return late(b) - late(a);
   });
+  const tabs = session.role === "VENTAS"
+    ? []
+    : [
+        { href: "/cobranza", label: "Todas", active: !vista },
+        { href: "/cobranza?vista=cxc", label: "Con saldo", active: vista === "cxc" },
+        { href: "/cobranza?vista=vencidas", label: "Vencidas", active: vista === "vencidas" },
+      ];
   return (
     <>
       <PageHeader title={session.role === "VENTAS" ? "Mi cobranza" : "Cobranza"} subtitle="Saldos de esta empresa. Vencida es saldo después de la fecha." />
+      {tabs.length > 0 ? <SegmentedNav items={tabs} /> : null}
       {ordered.length === 0 ? <Empty title="Sin cuentas por cobrar" body="Aparecen cuando Coordinación emite una factura." /> : (
         <ResponsiveData
           table={

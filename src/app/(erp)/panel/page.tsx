@@ -39,7 +39,7 @@ export default async function PanelPage({ searchParams }: { searchParams: Promis
   const companyId = session.activeCompanyId;
   if (session.role === "TECNICO") return <Technician companyId={companyId} userId={session.userId} history={vista === "historial"} />;
   if (session.role === "VENTAS") return <Sales companyId={companyId} userId={session.userId} />;
-  if (session.role === "COORDINACION_ADMINISTRACION") return <Coordination companyId={companyId} code={session.activeCompanyCode} />;
+  if (session.role === "COORDINACION_ADMINISTRACION") return <Coordination companyId={companyId} code={session.activeCompanyCode} vista={vista} />;
   if (session.role === "GERENTE_OPERATIVO_SERVOMOTORES") return <Servomotores companyId={companyId} />;
   if (session.role === "SUPERVISOR_TECNICO") {
     return <SupervisorShop companyId={companyId} userId={session.userId} />;
@@ -319,7 +319,7 @@ function MetricCard({ label, value }: { label: string; value: string }) {
   );
 }
 
-async function Coordination({ companyId, code }: { companyId: string; code: string }) {
+async function Coordination({ companyId, code, vista }: { companyId: string; code: string; vista?: string }) {
   const [invoices, remissions, payments, purchases, orders, proofs, payrolls, dueReceivables] = await Promise.all([
     prisma.billingDocument.findMany({ where: { companyId, status: "SOLICITADA", kind: { not: "REMISION" } }, take: 12 }),
     prisma.billingDocument.findMany({ where: { companyId, status: "SOLICITADA", kind: "REMISION" }, take: 12 }),
@@ -330,9 +330,32 @@ async function Coordination({ companyId, code }: { companyId: string; code: stri
     prisma.payrollPeriod.findMany({ where: { companyId, status: "PRELIMINAR" }, include: { lines: true }, take: 6 }),
     prisma.receivable.findMany({ where: { companyId, balance: { gt: 0 }, dueAt: { lt: new Date() } }, include: { document: true }, take: 12 }),
   ]);
+  const subtitle =
+    vista === "pendientes"
+      ? "Pendientes administrativos de la empresa activa."
+      : vista === "accesos"
+        ? "Atajos a los módulos que más usa Coordinación."
+        : `${code === "SERVOMOTORES" ? "Servomotores" : "SYSTRON"}. La bandeja es de esta empresa.`;
+  const quickLinks = [
+    { href: "/facturacion?vista=solicitudes", label: "Facturación pendiente" },
+    { href: "/pagos?vista=pendientes", label: "Pagos por validar" },
+    { href: "/compras?vista=procesar", label: "Compras y O.C. por procesar" },
+    { href: "/cobranza?vista=vencidas", label: "Cobranza vencida" },
+    { href: "/finanzas", label: "Finanzas" },
+    { href: "/nomina", label: "Nómina" },
+  ];
   return (
     <>
-      <PageHeader title="Panel de coordinación" subtitle={`${code === "SERVOMOTORES" ? "Servomotores" : "SYSTRON"}. La bandeja es de esta empresa.`} />
+      <PageHeader title="Panel de coordinación" subtitle={subtitle} />
+      {vista === "accesos" ? (
+        <section className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {quickLinks.map((link) => (
+            <Link key={link.href} href={link.href} className="rounded-lg border border-[var(--line)] bg-white px-4 py-3 text-sm font-medium text-[var(--accent)]">
+              {link.label}
+            </Link>
+          ))}
+        </section>
+      ) : null}
       <div className="grid gap-3">
         <Block title="Facturas solicitadas" empty="Sin solicitudes." rows={invoices.map((row) => ({ href: `/facturacion/${row.id}`, label: row.folio, detail: row.kind }))} />
         <Block title="Remisiones solicitadas" empty="Sin remisiones por generar." rows={remissions.map((row) => ({ href: `/facturacion/${row.id}`, label: row.folio, detail: "Remisión" }))} />
