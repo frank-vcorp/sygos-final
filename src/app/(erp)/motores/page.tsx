@@ -67,7 +67,17 @@ export default async function MotoresPage({ searchParams }: { searchParams: Prom
           </tbody>
         </Table>} cards={rows.map((row) => {
           const intercompany = session.activeCompanyCode === "SERVOMOTORES" && row.originCompany.code === "SYSTRON";
-          return <MobileCard key={row.id} href={`/motores/${row.id}`} title={row.folio} meta={<Badge>{CUSTODY_LABEL[row.custody as Custody] ?? row.custody}</Badge>}><p>{intercompany ? "SYSTRON · intercompañía" : <ClientNameLink clientId={row.client.id} name={row.client.name} isSystem={row.client.isSystem} canEdit={canEditClient} />}</p><p>{row.originCompany.name} · {[row.brandName, row.model, row.serial].filter(Boolean).join(" · ") || "Sin identificación adicional"}</p></MobileCard>;
+          return (
+            <MobileCard
+              key={row.id}
+              href={`/motores/${row.id}`}
+              title={row.folio}
+              meta={<Badge>{CUSTODY_LABEL[row.custody as Custody] ?? row.custody}</Badge>}
+              footer={intercompany ? "SYSTRON · intercompañía" : <ClientNameLink clientId={row.client.id} name={row.client.name} isSystem={row.client.isSystem} canEdit={canEditClient} />}
+            >
+              <p>{row.originCompany.name} · {[row.brandName, row.model, row.serial].filter(Boolean).join(" · ") || "Sin identificación adicional"}</p>
+            </MobileCard>
+          );
         })} />
       )}
       <ListCap shown={rows.length} />

@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { ClientNameLink } from "@/components/client-entity-links";
 import { Badge, Empty, PageHeader, Table, Td, Th } from "@/components/ui";
+import { homePath } from "@/lib/home";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
 import { can } from "@/lib/permissions";
@@ -8,7 +10,8 @@ import { requireCompany } from "@/lib/session";
 
 export default async function PagosPage() {
   const session = await requireCompany();
-  if (!can(session.role, "payment.register", session.activeCompanyCode) && !can(session.role, "payment.validate", session.activeCompanyCode)) redirect("/inicio");
+  if (!can(session.role, "payment.register", session.activeCompanyCode) && !can(session.role, "payment.validate", session.activeCompanyCode)) redirect(homePath(session.role, session.activeCompanyCode));
+  const canEditClient = can(session.role, "client.edit", session.activeCompanyCode);
   const own = session.activeCompanyCode === "SERVOMOTORES"
     ? { OR: [{ companyId: session.activeCompanyId }, { kind: "INTERCOMPANIA", status: "PENDIENTE" }] }
     : { companyId: session.activeCompanyId };
@@ -23,12 +26,17 @@ export default async function PagosPage() {
       <PageHeader title="Pagos" subtitle="Un pago pendiente no reduce saldos. Validarlo sí." action={can(session.role, "payment.register", session.activeCompanyCode) ? <Link href="/pagos/nuevo" className="rounded-md bg-[var(--accent)] px-3 py-2 text-sm font-medium text-white">Registrar pago</Link> : null} />
       {rows.length === 0 ? <Empty title="Sin pagos" body="El comprobante, el importe y el destino se capturan al registrar." /> : (
         <Table>
-          <thead><tr><Th>Folio</Th><Th>Tipo</Th><Th>Importe</Th><Th>Estado</Th></tr></thead>
+          <thead><tr><Th>Folio</Th><Th>Cliente</Th><Th>Tipo</Th><Th>Importe</Th><Th>Estado</Th></tr></thead>
           <tbody>
             {rows.map((row) => (
               <tr key={row.id}>
                 <Td><Link href={`/pagos/${row.id}`} className="font-medium text-[var(--accent)]">{row.folio}</Link></Td>
-                <Td>{row.kind === "INTERCOMPANIA" ? "Intercompañía" : row.client?.name ?? "Cliente"}</Td>
+                <Td>
+                  {row.kind === "INTERCOMPANIA" || !row.client ? "—" : (
+                    <ClientNameLink clientId={row.client.id} name={row.client.name} isSystem={row.client.isSystem} canEdit={canEditClient} />
+                  )}
+                </Td>
+                <Td>{row.kind === "INTERCOMPANIA" ? "Intercompañía" : "Cliente"}</Td>
                 <Td>{money(row.amount)}</Td>
                 <Td><Badge tone={row.status === "PENDIENTE" ? "warn" : "neutral"}>{row.status === "PENDIENTE" ? "Pendiente" : "Validado"}</Badge></Td>
               </tr>

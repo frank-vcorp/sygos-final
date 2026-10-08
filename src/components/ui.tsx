@@ -166,20 +166,26 @@ export function MobileCard({
   title,
   meta,
   children,
+  footer,
 }: {
   href: string;
   title: React.ReactNode;
   meta?: React.ReactNode;
   children?: React.ReactNode;
+  /** Fuera del enlace principal para permitir links anidados (p. ej. cliente). */
+  footer?: React.ReactNode;
 }) {
   return (
-    <Link href={href} className="block rounded-lg border border-[var(--line)] bg-white p-4 outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]">
-      <div className="flex min-h-6 items-start justify-between gap-3">
-        <p className="font-semibold text-[var(--accent)]">{title}</p>
-        {meta}
-      </div>
-      {children ? <div className="mt-2 space-y-1 text-sm text-[var(--muted)]">{children}</div> : null}
-    </Link>
+    <div className="overflow-hidden rounded-lg border border-[var(--line)] bg-white">
+      <Link href={href} className="block p-4 outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]">
+        <div className="flex min-h-6 items-start justify-between gap-3">
+          <p className="font-semibold text-[var(--accent)]">{title}</p>
+          {meta}
+        </div>
+        {children ? <div className="mt-2 space-y-1 text-sm text-[var(--muted)]">{children}</div> : null}
+      </Link>
+      {footer ? <div className="border-t border-[var(--line)] px-4 py-2 text-sm text-[var(--muted)]">{footer}</div> : null}
+    </div>
   );
 }
 

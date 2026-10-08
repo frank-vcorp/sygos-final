@@ -103,7 +103,17 @@ export default async function CotizacionesPage({ searchParams }: { searchParams:
         </Table>} cards={quotes.map((quote) => {
           const hidePrice = session.role === "VENTAS" && quote.status === "PENDIENTE_COTIZAR";
           const totals = hidePrice ? null : quoteTotals(linesForTotal(quote.lines, quote.quoteType, quote.status), quote.discountPct);
-          return <MobileCard key={quote.id} href={`/cotizaciones/${quote.id}`} title={quote.folio} meta={<Badge>{QUOTE_STATUS_LABEL[quote.status] ?? quote.status}</Badge>}><p>{quote.client.isSystem ? "SYSTRON · intercompañía" : quote.client.name}</p><p>{QUOTE_TYPE_LABEL[quote.quoteType as QuoteType] ?? quote.quoteType} · {hidePrice ? "Sin precio" : money(totals?.total)}</p></MobileCard>;
+          return (
+            <MobileCard
+              key={quote.id}
+              href={`/cotizaciones/${quote.id}`}
+              title={quote.folio}
+              meta={<Badge>{QUOTE_STATUS_LABEL[quote.status] ?? quote.status}</Badge>}
+              footer={<ClientNameLink clientId={quote.client.id} name={quote.client.name} isSystem={quote.client.isSystem} canEdit={canEditClient} />}
+            >
+              <p>{QUOTE_TYPE_LABEL[quote.quoteType as QuoteType] ?? quote.quoteType} · {hidePrice ? "Sin precio" : money(totals?.total)}</p>
+            </MobileCard>
+          );
         })} />
       )}
       <ListCap shown={quotes.length} />

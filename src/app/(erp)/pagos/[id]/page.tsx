@@ -1,7 +1,9 @@
 import { notFound, redirect } from "next/navigation";
 import { confirmIntercompanyAction, validatePaymentAction } from "../actions";
 import { HistoryTimeline } from "@/components/history-timeline";
+import { ClientNameLink } from "@/components/client-entity-links";
 import { Badge, PageHeader } from "@/components/ui";
+import { homePath } from "@/lib/home";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
 import { historyFor } from "@/lib/history";
@@ -11,7 +13,7 @@ import { requireCompany } from "@/lib/session";
 
 export default async function PagoPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await requireCompany();
-  if (!can(session.role, "payment.register", session.activeCompanyCode) && !can(session.role, "payment.validate", session.activeCompanyCode)) redirect("/inicio");
+  if (!can(session.role, "payment.register", session.activeCompanyCode) && !can(session.role, "payment.validate", session.activeCompanyCode)) redirect(homePath(session.role, session.activeCompanyCode));
   const { id } = await params;
   const row = await prisma.payment.findFirst({
     where: session.activeCompanyCode === "SERVOMOTORES" && can(session.role, "payment.validate", session.activeCompanyCode)
@@ -20,12 +22,16 @@ export default async function PagoPage({ params }: { params: Promise<{ id: strin
     include: { client: true },
   });
   if (!row) notFound();
+  const canEditClient = can(session.role, "client.edit", session.activeCompanyCode);
   const history = await historyFor("PAGO", row.id);
   return (
     <>
-      <PageHeader back={{ href: "/pagos", label: "Pagos" }} title={row.folio} subtitle={row.kind === "INTERCOMPANIA" ? "Pago intercompañía" : row.client?.name ?? "Pago"} action={<Badge tone={row.status === "PENDIENTE" ? "warn" : "neutral"}>{row.status === "PENDIENTE" ? "Pendiente" : "Validado"}</Badge>} />
+      <PageHeader back={{ href: "/pagos", label: "Pagos" }} title={row.folio} subtitle={row.kind === "INTERCOMPANIA" ? "Pago intercompañía" : "Pago de cliente"} action={<Badge tone={row.status === "PENDIENTE" ? "warn" : "neutral"}>{row.status === "PENDIENTE" ? "Pendiente" : "Validado"}</Badge>} />
       <section className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
-        <p>Importe {money(row.amount)} · {row.method === "EFECTIVO" ? "Efectivo" : "Transferencia"}</p>
+        {row.kind === "CLIENTE" && row.client ? (
+          <p>Cliente: <ClientNameLink clientId={row.client.id} name={row.client.name} isSystem={row.client.isSystem} canEdit={canEditClient} /></p>
+        ) : null}
+        <p className={row.kind === "CLIENTE" && row.client ? "mt-1" : ""}>Importe {money(row.amount)} · {row.method === "EFECTIVO" ? "Efectivo" : "Transferencia"}</p>
         <p className="mt-1">Comprobante: {row.receipt}</p>
         <p className="mt-1">Destino: {row.destination}</p>
         <p className="mt-1 text-[var(--muted)]">{formatWhen(row.createdAt)}</p>

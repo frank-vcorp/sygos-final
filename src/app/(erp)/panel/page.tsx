@@ -1,5 +1,7 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { ClientNameLink } from "@/components/client-entity-links";
 import { PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
@@ -10,7 +12,7 @@ import { requireCompany } from "@/lib/session";
 
 const CLOSED = ["VALIDADO", "TERMINADA", "SIN_REPARACION"];
 
-function Block({ title, empty, rows }: { title: string; empty: string; rows: Array<{ href: string; label: string; detail: string }> }) {
+function Block({ title, empty, rows }: { title: string; empty: string; rows: Array<{ href: string; label: string; detail: ReactNode }> }) {
   return (
     <section className="rounded-lg border border-[var(--line)] bg-white p-4">
       <h2 className="font-medium">{title}</h2>
@@ -21,6 +23,10 @@ function Block({ title, empty, rows }: { title: string; empty: string; rows: Arr
       )}
     </section>
   );
+}
+
+function panelClientLink(client: { id: string; name: string; isSystem: boolean }) {
+  return <ClientNameLink clientId={client.id} name={client.name} isSystem={client.isSystem} canEdit />;
 }
 
 export default async function PanelPage({ searchParams }: { searchParams: Promise<{ vista?: string; filtro?: string }> }) {
@@ -157,16 +163,16 @@ async function Sales({ companyId, userId }: { companyId: string; userId: string 
         </section>
       ) : null}
       <div className="grid gap-3">
-        <Block title="Cotizaciones por seguimiento" empty="Nada por seguir." rows={quotes.map((row) => ({ href: `/cotizaciones/${row.id}`, label: row.folio, detail: `${QUOTE_STATUS_LABEL[row.status] ?? row.status} · ${row.client.name}` }))} />
-        <Block title="Esperando precio (CEO/Administrador)" empty="No hay cotizaciones sin precio." rows={waitingPrice.map((row) => ({ href: `/cotizaciones/${row.id}`, label: row.folio, detail: row.client.name }))} />
+        <Block title="Cotizaciones por seguimiento" empty="Nada por seguir." rows={quotes.map((row) => ({ href: `/cotizaciones/${row.id}`, label: row.folio, detail: <>{QUOTE_STATUS_LABEL[row.status] ?? row.status} · {panelClientLink(row.client)}</> }))} />
+        <Block title="Esperando precio (CEO/Administrador)" empty="No hay cotizaciones sin precio." rows={waitingPrice.map((row) => ({ href: `/cotizaciones/${row.id}`, label: row.folio, detail: panelClientLink(row.client) }))} />
         <Block title="Entregas pendientes" empty="Sin mercancía ni entregas por cerrar." rows={deliveries.map((row) => {
           const pendingReceive = row.lines.reduce((sum, line) => sum + Math.max(0, line.qtySold - line.qtyReceived), 0);
           const pendingDeliver = row.lines.reduce((sum, line) => sum + Math.max(0, line.qtyReceived - line.qtyDelivered), 0);
           const detail = pendingReceive > 0 ? `por recibir ${pendingReceive}` : `por entregar ${pendingDeliver}`;
-          return { href: `/ventas/${row.id}`, label: row.folio, detail: `${row.client.name} · ${detail}` };
+          return { href: `/ventas/${row.id}`, label: row.folio, detail: <>{panelClientLink(row.client)} · {detail}</> };
         })} />
-        <Block title="Cobranza" empty="Sin saldos propios." rows={receivables.map((row) => ({ href: `/cobranza/${row.id}`, label: row.document.folio, detail: `${row.client.name} · ${money(row.balance)}` }))} />
-        <Block title="Facturación pendiente" empty="No hay operaciones con factura obligatoria sin emitir." rows={invoices.map((row) => ({ href: `/cotizaciones/${row.id}`, label: row.folio, detail: row.client.name }))} />
+        <Block title="Cobranza" empty="Sin saldos propios." rows={receivables.map((row) => ({ href: `/cobranza/${row.id}`, label: row.document.folio, detail: <>{panelClientLink(row.client)} · {money(row.balance)}</> }))} />
+        <Block title="Facturación pendiente" empty="No hay operaciones con factura obligatoria sin emitir." rows={invoices.map((row) => ({ href: `/cotizaciones/${row.id}`, label: row.folio, detail: panelClientLink(row.client) }))} />
         <Block title="Agenda / próximas actividades" empty="Sin actividades próximas." rows={activities.map((row) => ({
           href: row.clientId ? `/clientes/${row.clientId}` : row.prospectId ? `/prospectos/${row.prospectId}` : "/agenda",
           label: row.note,

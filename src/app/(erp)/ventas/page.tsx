@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ClientNameLink } from "@/components/client-entity-links";
-import { Badge, Empty, PageHeader, Table, Td, Th } from "@/components/ui";
+import { Badge, Empty, MobileCard, PageHeader, ResponsiveData, Table, Td, Th } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { homePath } from "@/lib/home";
@@ -30,24 +30,47 @@ export default async function VentasPage() {
       {sales.length === 0 ? (
         <Empty title="Sin ventas de equipo" body="Aparecen aquí cuando una cotización de venta de equipo queda autorizada." />
       ) : (
-        <Table>
-          <thead><tr><Th>Folio</Th><Th>Cliente</Th><Th>Cotización</Th><Th>Pendiente</Th></tr></thead>
-          <tbody>
-            {sales.map((sale) => {
-              const pendingReceive = sale.lines.reduce((sum, line) => sum + Math.max(0, line.qtySold - line.qtyReceived), 0);
-              const pendingDeliver = sale.lines.reduce((sum, line) => sum + Math.max(0, line.qtyReceived - line.qtyDelivered), 0);
-              const pending = pendingReceive > 0 ? `Recibir ${pendingReceive}` : pendingDeliver > 0 ? `Entregar ${pendingDeliver}` : "Al día";
-              return (
-                <tr key={sale.id}>
-                  <Td><Link href={`/ventas/${sale.id}`} className="font-medium text-[var(--accent)]">{sale.folio}</Link></Td>
-                  <Td><ClientNameLink clientId={sale.client.id} name={sale.client.name} isSystem={sale.client.isSystem} canEdit={canEditClient} /></Td>
-                  <Td><Link href={`/cotizaciones/${sale.quoteId}`} className="text-[var(--accent)]">{sale.quote.folio}</Link></Td>
-                  <Td><Badge>{pending}</Badge></Td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </Table>
+        <ResponsiveData
+          table={
+            <Table>
+              <thead><tr><Th>Folio</Th><Th>Cliente</Th><Th>Cotización</Th><Th>Pendiente</Th></tr></thead>
+              <tbody>
+                {sales.map((sale) => {
+                  const pendingReceive = sale.lines.reduce((sum, line) => sum + Math.max(0, line.qtySold - line.qtyReceived), 0);
+                  const pendingDeliver = sale.lines.reduce((sum, line) => sum + Math.max(0, line.qtyReceived - line.qtyDelivered), 0);
+                  const pending = pendingReceive > 0 ? `Recibir ${pendingReceive}` : pendingDeliver > 0 ? `Entregar ${pendingDeliver}` : "Al día";
+                  return (
+                    <tr key={sale.id}>
+                      <Td><Link href={`/ventas/${sale.id}`} className="font-medium text-[var(--accent)]">{sale.folio}</Link></Td>
+                      <Td><ClientNameLink clientId={sale.client.id} name={sale.client.name} isSystem={sale.client.isSystem} canEdit={canEditClient} /></Td>
+                      <Td><Link href={`/cotizaciones/${sale.quoteId}`} className="text-[var(--accent)]">{sale.quote.folio}</Link></Td>
+                      <Td><Badge>{pending}</Badge></Td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </Table>
+          }
+          cards={sales.map((sale) => {
+            const pendingReceive = sale.lines.reduce((sum, line) => sum + Math.max(0, line.qtySold - line.qtyReceived), 0);
+            const pendingDeliver = sale.lines.reduce((sum, line) => sum + Math.max(0, line.qtyReceived - line.qtyDelivered), 0);
+            const pending = pendingReceive > 0 ? `Recibir ${pendingReceive}` : pendingDeliver > 0 ? `Entregar ${pendingDeliver}` : "Al día";
+            return (
+              <MobileCard
+                key={sale.id}
+                href={`/ventas/${sale.id}`}
+                title={sale.folio}
+                meta={<Badge>{pending}</Badge>}
+                footer={
+                  <>
+                    <p><ClientNameLink clientId={sale.client.id} name={sale.client.name} isSystem={sale.client.isSystem} canEdit={canEditClient} /></p>
+                    <p className="mt-1">Cotización <Link href={`/cotizaciones/${sale.quoteId}`} className="text-[var(--accent)]">{sale.quote.folio}</Link></p>
+                  </>
+                }
+              />
+            );
+          })}
+        />
       )}
     </>
   );
