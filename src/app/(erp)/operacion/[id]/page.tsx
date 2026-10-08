@@ -25,12 +25,13 @@ import { historyFor } from "@/lib/history";
 import { can } from "@/lib/permissions";
 import { ATTENTION_LABEL, type AttentionType } from "@/lib/priorities";
 import { CASE_STATUS_LABEL } from "@/lib/technical";
+import { homePath } from "@/lib/home";
 import { redirectIfSalesNotAssigned } from "@/lib/sales-assignment";
 import { requireCompany } from "@/lib/session";
 
 export default async function OperacionDetallePage({ params }: { params: Promise<{ id: string }> }) {
   const session = await requireCompany();
-  if (session.role === "ALMACEN") redirect("/inicio");
+  if (session.role === "ALMACEN") redirect(homePath(session.role, session.activeCompanyCode));
   const { id } = await params;
   const row = await prisma.technicalCase.findUnique({
     where: { id },

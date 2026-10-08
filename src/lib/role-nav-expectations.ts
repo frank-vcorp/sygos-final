@@ -3,7 +3,6 @@ import type { Role } from "@/lib/roles";
 /** Menú lateral esperado por rol (SYSTRON). Alineado al Discovery funcional. */
 export const SYSTRON_NAV: Partial<Record<Role, readonly string[]>> = {
   VENTAS: [
-    "/inicio",
     "/panel",
     "/clientes",
     "/prospectos",
@@ -34,7 +33,6 @@ export const SYSTRON_NAV: Partial<Record<Role, readonly string[]>> = {
     "/reportes",
   ],
   GERENTE_OPERATIVO_SYSTRON: [
-    "/inicio",
     "/panel",
     "/compras",
     "/personal/horas",
@@ -51,7 +49,6 @@ export const SYSTRON_NAV: Partial<Record<Role, readonly string[]>> = {
   ],
   ALMACEN: ["/custodia", "/inventario", "/personal/horas", "/reportes"],
   COORDINACION_ADMINISTRACION: [
-    "/inicio",
     "/panel",
     "/clientes",
     "/prospectos",

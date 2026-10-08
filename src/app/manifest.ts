@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "SYGOS 3.0",
     short_name: "SYGOS",
     description: "Operación de SYSTRON y Servomotores",
-    start_url: "/inicio",
+    start_url: "/login",
     display: "standalone",
     background_color: "#f4f6f5",
     theme_color: "#073b78",

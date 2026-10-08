@@ -20,7 +20,6 @@ type NavLink = {
 };
 
 const LABELS: Record<string, string | ((code: string | null) => string)> = {
-  "/inicio": "Inicio",
   "/panel": "Panel",
   "/clientes": "Clientes",
   "/prospectos": "Prospectos",

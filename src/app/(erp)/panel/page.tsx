@@ -4,6 +4,7 @@ import { PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
 import { can } from "@/lib/permissions";
+import { homePath } from "@/lib/home";
 import { requireCompany } from "@/lib/session";
 
 const CLOSED = ["VALIDADO", "TERMINADA", "SIN_REPARACION"];
@@ -23,7 +24,7 @@ function Block({ title, empty, rows }: { title: string; empty: string; rows: Arr
 
 export default async function PanelPage({ searchParams }: { searchParams: Promise<{ vista?: string; filtro?: string }> }) {
   const session = await requireCompany();
-  if (!can(session.role, "panel.view", session.activeCompanyCode)) redirect("/inicio");
+  if (!can(session.role, "panel.view", session.activeCompanyCode)) redirect(homePath(session.role, session.activeCompanyCode));
   const { vista, filtro } = await searchParams;
   const companyId = session.activeCompanyId;
   if (session.role === "TECNICO") return <Technician companyId={companyId} userId={session.userId} history={vista === "historial"} filter={filtro ?? "todos"} />;

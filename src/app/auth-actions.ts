@@ -46,7 +46,7 @@ export async function switchCompanyAction(formData: FormData) {
   }
   if (session.homeCompanyId && session.homeCompanyId !== company.id) {
     await setFlash({ tone: "error", message: "Tu usuario opera en una sola empresa." });
-    redirect("/inicio");
+    redirect(homePath(session.role, session.activeCompanyCode));
   }
   await setActiveCompany(session.sessionId, company.id);
   const next = optionalText(formData.get("next")) ?? homePath(session.role, company.code);
@@ -58,7 +58,7 @@ export async function viewAsAction(formData: FormData) {
   const session = await requireSession();
   if (session.realRole !== "ADMINISTRADOR") {
     await setFlash({ tone: "error", message: "Solo el Administrador puede ver como otro perfil." });
-    redirect("/inicio");
+    redirect(homePath(session.role, session.activeCompanyCode));
   }
   const userId = optionalText(formData.get("userId"));
   if (!userId) {
@@ -66,12 +66,12 @@ export async function viewAsAction(formData: FormData) {
       where: { id: session.sessionId },
       data: { impersonatedUserId: null },
     });
-    redirect("/inicio");
+    redirect(homePath(session.role, session.activeCompanyCode));
   }
   const target = await prismaProd.user.findUnique({ where: { id: userId } });
   if (!target || !target.active || !isRole(target.role) || target.role === "ADMINISTRADOR") {
     await setFlash({ tone: "error", message: "Esa cuenta no se puede usar para ver el sistema." });
-    redirect("/inicio");
+    redirect(homePath(session.role, session.activeCompanyCode));
   }
   await prismaProd.session.update({
     where: { id: session.sessionId },

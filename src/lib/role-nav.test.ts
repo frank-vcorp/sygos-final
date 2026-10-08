@@ -17,6 +17,13 @@ describe("menú lateral por rol (SYSTRON)", () => {
     });
   }
 
+  it("ningún rol ve el resumen global /inicio en el menú", () => {
+    for (const role of Object.keys(SYSTRON_NAV) as Role[]) {
+      const visible = visibleNavHrefs(role, CODE);
+      assert.equal(visible.includes("/inicio"), false, `${role} no debería ver /inicio`);
+    }
+  });
+
   for (const [role, forbidden] of Object.entries(SYSTRON_NAV_FORBIDDEN) as Array<[Role, readonly string[]]>) {
     it(`${role} no muestra módulos prohibidos`, () => {
       const visible = visibleNavHrefs(role, CODE);

@@ -12,9 +12,9 @@ export function SideNav({
   return (
     <nav className="space-y-1 px-3 pb-5">
       {groups.map((group) => {
-        const groupActive = group.links.some((link) => path === link.href || (link.href !== "/inicio" && path.startsWith(`${link.href}/`)));
+        const groupActive = group.links.some((link) => path === link.href || path.startsWith(`${link.href}/`));
         const links = group.links.map((link) => {
-            const active = path === link.href || (link.href !== "/inicio" && path.startsWith(`${link.href}/`));
+            const active = path === link.href || path.startsWith(`${link.href}/`);
             return (
               <div key={link.href} className={`flex min-h-10 items-center rounded-lg transition-colors ${active ? "bg-[var(--accent)] text-white" : "text-[#263b55] hover:bg-[var(--accent-soft)]"}`}>
                 <Link href={link.href} className="block min-w-0 flex-1 px-3 py-2 text-[14px] font-medium">

@@ -1,4 +1,3 @@
-import { canSeeHomeSummary } from "@/lib/home";
 import { can } from "@/lib/permissions";
 import type { Role } from "@/lib/roles";
 
@@ -11,7 +10,6 @@ export const NAV_GROUPS: Array<{ title: string | null; links: NavLinkDef[] }> = 
   {
     title: null,
     links: [
-      { href: "/inicio", show: (role, code) => canSeeHomeSummary(role, code) },
       { href: "/panel", show: (role) => can(role, "panel.view") },
     ],
   },
