@@ -38,8 +38,11 @@ export default async function PanelPage({ searchParams }: { searchParams: Promis
   if (session.role === "VENTAS") return <Sales companyId={companyId} userId={session.userId} />;
   if (session.role === "COORDINACION_ADMINISTRACION") return <Coordination companyId={companyId} code={session.activeCompanyCode} />;
   if (session.role === "GERENTE_OPERATIVO_SERVOMOTORES") return <Servomotores companyId={companyId} />;
-  if (session.role === "SUPERVISOR_TECNICO" || session.role === "GERENTE_OPERATIVO_SYSTRON") {
-    return <Shop companyId={companyId} manager={session.role === "GERENTE_OPERATIVO_SYSTRON"} history={vista === "historial"} />;
+  if (session.role === "SUPERVISOR_TECNICO") {
+    return <SupervisorShop companyId={companyId} userId={session.userId} />;
+  }
+  if (session.role === "GERENTE_OPERATIVO_SYSTRON") {
+    return <Shop companyId={companyId} manager history={vista === "historial"} />;
   }
   return <Executive companyId={companyId} name={session.activeCompanyName} />;
 }
@@ -81,6 +84,59 @@ async function Technician({ companyId, userId, history, filter }: { companyId: s
   );
 }
 
+function caseRowMap(list: Array<{
+  id: string;
+  folio: string;
+  equipment: { folio: string; client: { name: string } | null };
+  attention: { priorityName: string };
+  externalSupplierId: string | null;
+  assignee: { name: string } | null;
+}>) {
+  return list.map((row) => ({
+    href: `/operacion/${row.id}`,
+    label: row.folio,
+    detail: `${row.equipment.client?.name ?? "Equipo"} · ${row.equipment.folio} · ${row.attention.priorityName} · ${row.externalSupplierId ? "Proveedor externo" : row.assignee?.name ?? "Sin asignar"}`,
+  }));
+}
+
+async function SupervisorShop({ companyId, userId }: { companyId: string; userId: string }) {
+  const [rows, assignedHistory] = await Promise.all([
+    prisma.technicalCase.findMany({
+      where: { serviceCompanyId: companyId, status: { notIn: CLOSED } },
+      include: { equipment: { include: { client: true } }, attention: true, assignee: true },
+      orderBy: { slaDueAt: "asc" },
+      take: 120,
+    }),
+    prisma.functionalHistory.findMany({
+      where: { entityType: "OPERACION", action: "ASIGNACION", authorUserId: userId },
+      select: { entityId: true },
+      distinct: ["entityId"],
+    }),
+  ]);
+  const assignedBySupervisor = new Set(assignedHistory.map((entry) => entry.entityId));
+  const pending = rows.filter((row) => !row.assigneeUserId && !row.externalSupplierId);
+  const coordinated = rows.filter((row) => {
+    if (!row.assigneeUserId && !row.externalSupplierId) return false;
+    return row.assigneeUserId === userId || assignedBySupervisor.has(row.id);
+  });
+  return (
+    <>
+      <PageHeader
+        title="Inicio"
+        subtitle="Operaciones activas de tu taller. Asigna responsable o proveedor desde el detalle de cada folio."
+      />
+      <div className="grid gap-3">
+        <Block title="Pendientes de asignación" empty="Todo lo activo tiene responsable o proveedor." rows={caseRowMap(pending)} />
+        <Block
+          title="Asignaciones realizadas y/o asignadas por el propio supervisor"
+          empty="No hay operaciones activas bajo tu coordinación."
+          rows={caseRowMap(coordinated)}
+        />
+      </div>
+    </>
+  );
+}
+
 async function Shop({ companyId, manager, history }: { companyId: string; manager: boolean; history: boolean }) {
   const rows = await prisma.technicalCase.findMany({
     where: { serviceCompanyId: companyId, ...(history ? { status: { in: CLOSED } } : { status: { notIn: CLOSED } }) },
@@ -89,18 +145,17 @@ async function Shop({ companyId, manager, history }: { companyId: string; manage
     take: 100,
   });
   const now = Date.now();
-  const map = (list: typeof rows) => list.map((row) => ({ href: `/operacion/${row.id}`, label: row.folio, detail: `${row.equipment.client?.name ?? "Equipo"} · ${row.equipment.folio} · ${row.attention.priorityName} · ${row.externalSupplierId ? "Proveedor externo" : row.assignee?.name ?? "Sin asignar"}` }));
   return (
     <>
       <PageHeader title={manager ? "Panel del gerente" : "Panel de supervisión"} subtitle="Activos de esta empresa. Validar o devolver se hace en el detalle." action={<Link href={history ? "/panel" : "/panel?vista=historial"} className="text-sm text-[var(--accent)]">{history ? "Ver activos" : "Ver historial"}</Link>} />
       <div className="grid gap-3">
-        <Block title="Pendientes de asignación" empty="Todo lo activo tiene responsable o proveedor." rows={map(rows.filter((row) => !row.assigneeUserId && !row.externalSupplierId))} />
-        <Block title="Diagnósticos activos" empty="Sin diagnósticos activos." rows={map(rows.filter((row) => row.kind === "DIAGNOSTICO"))} />
-        <Block title="Reparaciones activas" empty="Sin reparaciones activas." rows={map(rows.filter((row) => row.kind === "OS"))} />
-        <Block title="Vencidos" empty="Nada vencido." rows={map(rows.filter((row) => row.slaDueAt != null && row.slaDueAt.getTime() < now))} />
-        <Block title="En espera de refacciones" empty="Ninguna orden espera refacción." rows={map(rows.filter((row) => row.status === "EN_ESPERA_REFACCIONES"))} />
-        <Block title="Proveedor externo" empty="Nada está en proveedor externo." rows={map(rows.filter((row) => row.externalSupplierId))} />
-        {manager ? <Block title="Diagnósticos pendientes de validación" empty="No hay diagnósticos por validar." rows={map(rows.filter((row) => row.status === "PENDIENTE_VALIDACION"))} /> : null}
+        <Block title="Pendientes de asignación" empty="Todo lo activo tiene responsable o proveedor." rows={caseRowMap(rows.filter((row) => !row.assigneeUserId && !row.externalSupplierId))} />
+        <Block title="Diagnósticos activos" empty="Sin diagnósticos activos." rows={caseRowMap(rows.filter((row) => row.kind === "DIAGNOSTICO"))} />
+        <Block title="Reparaciones activas" empty="Sin reparaciones activas." rows={caseRowMap(rows.filter((row) => row.kind === "OS"))} />
+        <Block title="Vencidos" empty="Nada vencido." rows={caseRowMap(rows.filter((row) => row.slaDueAt != null && row.slaDueAt.getTime() < now))} />
+        <Block title="En espera de refacciones" empty="Ninguna orden espera refacción." rows={caseRowMap(rows.filter((row) => row.status === "EN_ESPERA_REFACCIONES"))} />
+        <Block title="Proveedor externo" empty="Nada está en proveedor externo." rows={caseRowMap(rows.filter((row) => row.externalSupplierId))} />
+        {manager ? <Block title="Diagnósticos pendientes de validación" empty="No hay diagnósticos por validar." rows={caseRowMap(rows.filter((row) => row.status === "PENDIENTE_VALIDACION"))} /> : null}
       </div>
     </>
   );
