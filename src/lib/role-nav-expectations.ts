@@ -45,10 +45,8 @@ export const SYSTRON_NAV: Partial<Record<Role, readonly string[]>> = {
   ],
   ALMACEN: ["/custodia", "/inventario", "/personal/horas", "/reportes"],
   COORDINACION_ADMINISTRACION: [
-    "/panel",
     "/panel?vista=pendientes",
     "/cobranza?vista=vencidas",
-    "/panel?vista=accesos",
     "/clientes",
     "/cotizaciones",
     "/ventas",

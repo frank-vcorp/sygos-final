@@ -8,10 +8,8 @@ export const COORDINATION_NAV_GROUPS: NavGroupDef[] = [
   {
     title: "Inicio",
     links: [
-      { href: "/panel", label: "Dashboard de coordinación", show: showCoord },
       { href: "/panel?vista=pendientes", label: "Pendientes administrativos", show: showCoord },
       { href: "/cobranza?vista=vencidas", label: "Alertas de vencimientos", show: showCoord },
-      { href: "/panel?vista=accesos", label: "Accesos rápidos", show: showCoord },
     ],
   },
   {
