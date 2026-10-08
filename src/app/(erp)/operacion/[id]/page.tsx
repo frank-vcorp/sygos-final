@@ -3,6 +3,8 @@ import { notFound, redirect } from "next/navigation";
 import { prepareFromCaseAction } from "@/app/(erp)/cotizaciones/actions";
 import {
   assignCaseAction,
+  createPresolicitudAction,
+  deletePresolicitudAction,
   externalDocumentAction,
   finishDiagnosisAction,
   finishRepairAction,
@@ -14,6 +16,7 @@ import {
   reopenAction,
   requestPartAction,
   startCaseAction,
+  updatePresolicitudAction,
   validateAction,
 } from "../actions";
 import { HistoryTimeline } from "@/components/history-timeline";
@@ -24,6 +27,7 @@ import { formatWhen } from "@/lib/form";
 import { historyFor } from "@/lib/history";
 import { can } from "@/lib/permissions";
 import { ATTENTION_LABEL, type AttentionType } from "@/lib/priorities";
+import { diagnosisPresolicitudEditable, PRESOLICITUD_LABEL } from "@/lib/part-presolicitud";
 import { CASE_STATUS_LABEL } from "@/lib/technical";
 import { homePath } from "@/lib/home";
 import { redirectIfSalesNotAssigned } from "@/lib/sales-assignment";
@@ -42,6 +46,7 @@ export default async function OperacionDetallePage({ params }: { params: Promise
       assignee: true,
       logs: { orderBy: { createdAt: "asc" } },
       requests: { orderBy: { createdAt: "asc" } },
+      presolicitudes: { orderBy: { createdAt: "asc" } },
     },
   });
   if (!row) notFound();
@@ -80,6 +85,12 @@ export default async function OperacionDetallePage({ params }: { params: Promise
   const warranty = row.attention.attentionType === "DIAGNOSTICO_GARANTIA" && row.kind === "DIAGNOSTICO";
   const canManage = !readOnly && ["ADMINISTRADOR", "CEO", "SUPERVISOR_TECNICO", "GERENTE_OPERATIVO_SYSTRON", "GERENTE_OPERATIVO_SERVOMOTORES"].includes(session.role);
   const canWork = !readOnly && (session.role === "ADMINISTRADOR" || session.role === "CEO" || session.role === "SUPERVISOR_TECNICO" || (session.role === "GERENTE_OPERATIVO_SERVOMOTORES" && session.activeCompanyCode === "SERVOMOTORES") || (session.role === "TECNICO" && row.assigneeUserId === session.userId));
+  const canEditPresolicitud =
+    !readOnly &&
+    session.role === "TECNICO" &&
+    row.assigneeUserId === session.userId &&
+    row.kind === "DIAGNOSTICO" &&
+    diagnosisPresolicitudEditable(row.status);
 
   return (
     <>
@@ -115,6 +126,89 @@ export default async function OperacionDetallePage({ params }: { params: Promise
             ) : row.quotePending ? <p className="mt-3 text-[var(--muted)]">Queda pendiente de cotizar.</p> : null}
             {row.paidAt ? <p className="mt-1">Marcada como pagada {formatWhen(row.paidAt)}.</p> : null}
           </section>
+          {row.kind === "DIAGNOSTICO" ? (
+            <section className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
+              <h2 className="font-medium">Refacciones previstas</h2>
+              <p className="mt-1 text-[var(--muted)]">
+                Presolicitud del técnico durante el diagnóstico. Si el cliente autoriza, pasan a solicitud en la orden de servicio.
+              </p>
+              {row.presolicitudes.length === 0 ? (
+                <p className="mt-2 text-[var(--muted)]">Sin presolicitudes.</p>
+              ) : (
+                <ul className="mt-2 space-y-3">
+                  {row.presolicitudes.map((item) => (
+                    <li key={item.id} className="border-t border-[var(--line)] pt-2">
+                      <p>
+                        {item.partNumber} · {item.description} · {PRESOLICITUD_LABEL[item.status] ?? item.status}
+                      </p>
+                      <p className="text-[var(--muted)]">
+                        Cantidad {item.qtyRequested}
+                        {item.link ? (
+                          <>
+                            {" "}
+                            ·{" "}
+                            <a href={item.link} className="text-[var(--accent)]" target="_blank" rel="noreferrer">
+                              Referencia
+                            </a>
+                          </>
+                        ) : null}
+                      </p>
+                      {canEditPresolicitud && item.status === "ACTIVA" ? (
+                        <div className="mt-2 space-y-2">
+                          <form action={updatePresolicitudAction} className="grid gap-2">
+                            <input type="hidden" name="caseId" value={row.id} />
+                            <input type="hidden" name="presolicitudId" value={item.id} />
+                            <Field label="Número de parte">
+                              <input name="partNumber" required defaultValue={item.partNumber} className={controlClass} />
+                            </Field>
+                            <Field label="Descripción">
+                              <input name="description" required defaultValue={item.description} className={controlClass} />
+                            </Field>
+                            <Field label="Liga opcional">
+                              <input name="link" defaultValue={item.link ?? ""} className={controlClass} />
+                            </Field>
+                            <Field label="Cantidad">
+                              <input name="quantity" type="number" min={1} required defaultValue={item.qtyRequested} className={controlClass} />
+                            </Field>
+                            <Button type="submit" tone="ghost">
+                              Guardar cambio
+                            </Button>
+                          </form>
+                          <form action={deletePresolicitudAction}>
+                            <input type="hidden" name="caseId" value={row.id} />
+                            <input type="hidden" name="presolicitudId" value={item.id} />
+                            <Button type="submit" tone="ghost">
+                              Quitar
+                            </Button>
+                          </form>
+                        </div>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {canEditPresolicitud ? (
+                <form action={createPresolicitudAction} className="mt-3 grid gap-2">
+                  <input type="hidden" name="caseId" value={row.id} />
+                  <Field label="Número de parte">
+                    <input name="partNumber" required className={controlClass} />
+                  </Field>
+                  <Field label="Descripción">
+                    <input name="description" required className={controlClass} />
+                  </Field>
+                  <Field label="Liga opcional">
+                    <input name="link" className={controlClass} />
+                  </Field>
+                  <Field label="Cantidad">
+                    <input name="quantity" type="number" min={1} required className={controlClass} />
+                  </Field>
+                  <Button type="submit" tone="ghost">
+                    Agregar presolicitud
+                  </Button>
+                </form>
+              ) : null}
+            </section>
+          ) : null}
           <section className="rounded-lg border border-[var(--line)] bg-white p-4">
             <h2 className="font-medium">Bitácora</h2>
             <p className="mt-1 text-sm text-[var(--muted)]">Las entradas no se editan ni se borran. Una corrección es una entrada nueva.</p>

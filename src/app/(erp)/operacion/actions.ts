@@ -2,6 +2,11 @@
 
 import { redirect } from "next/navigation";
 import {
+  createPartPresolicitud,
+  deletePartPresolicitud,
+  updatePartPresolicitud,
+} from "@/lib/part-presolicitud";
+import {
   addLog,
   assignCase,
   captureExternalDocument,
@@ -92,6 +97,31 @@ export async function overrideWarrantyAction(formData: FormData) {
   "use server";
   const decision = formData.get("decision") === "COTIZAR" ? "COTIZAR" : "VALIDA";
   await run(formData, (session) => overrideWarranty(session, requiredText(formData.get("caseId"), "Operación"), parseVersion(formData.get("version")), decision, requiredText(formData.get("reason"), "Motivo")), "Decisión comercial registrada. La determinación técnica original se conserva.");
+}
+
+export async function createPresolicitudAction(formData: FormData) {
+  "use server";
+  await run(formData, (session) => createPartPresolicitud(session, requiredText(formData.get("caseId"), "Operación"), {
+    partNumber: requiredText(formData.get("partNumber"), "Número de parte"),
+    description: requiredText(formData.get("description"), "Descripción"),
+    link: optionalText(formData.get("link")),
+    quantity: Number(formData.get("quantity")),
+  }), "Presolicitud registrada.");
+}
+
+export async function updatePresolicitudAction(formData: FormData) {
+  "use server";
+  await run(formData, (session) => updatePartPresolicitud(session, requiredText(formData.get("presolicitudId"), "Presolicitud"), {
+    partNumber: requiredText(formData.get("partNumber"), "Número de parte"),
+    description: requiredText(formData.get("description"), "Descripción"),
+    link: optionalText(formData.get("link")),
+    quantity: Number(formData.get("quantity")),
+  }), "Presolicitud actualizada.");
+}
+
+export async function deletePresolicitudAction(formData: FormData) {
+  "use server";
+  await run(formData, (session) => deletePartPresolicitud(session, requiredText(formData.get("presolicitudId"), "Presolicitud")), "Presolicitud eliminada.");
 }
 
 export async function requestPartAction(formData: FormData) {

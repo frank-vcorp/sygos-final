@@ -387,8 +387,9 @@ model TechnicalCase {
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
-  logs     TechnicalLog[]
-  requests PartRequest[]
+  logs            TechnicalLog[]
+  requests        PartRequest[]
+  presolicitudes  PartPresolicitud[] @relation("DiagnosisPresolicitudes")
 
   @@unique([serviceCompanyId, folio])
   @@index([serviceCompanyId, status])
@@ -423,7 +424,27 @@ model PartRequest {
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
+  presolicitud PartPresolicitud?
+
   @@index([caseId])
+}
+
+model PartPresolicitud {
+  id              String         @id @default(cuid())
+  diagnosisCaseId String
+  diagnosisCase   TechnicalCase  @relation("DiagnosisPresolicitudes", fields: [diagnosisCaseId], references: [id])
+  companyId       String
+  partNumber      String
+  description     String
+  link            String?
+  qtyRequested    Int
+  status          String         @default("ACTIVA")
+  partRequestId   String?        @unique
+  partRequest     PartRequest?   @relation(fields: [partRequestId], references: [id])
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([diagnosisCaseId, status])
 }
 
 model CustodyMovement {

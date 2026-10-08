@@ -290,6 +290,10 @@ export async function decideQuote(
     summary: authorized ? `Decisión: ${status}. El crédito queda congelado.` : "El cliente no autorizó. Se conserva el historial.",
     authorUserId: actor.userId,
   });
+  if (!authorized && diagnosis?.kind === "DIAGNOSTICO") {
+    const { archivePartPresolicitudesForDiagnosis } = await import("./part-presolicitud");
+    await archivePartPresolicitudesForDiagnosis(diagnosis.id);
+  }
   if (authorized && inShop && diagnosis) await openRepairOrder(diagnosis.id, actor.userId);
 }
 
@@ -397,7 +401,11 @@ async function openRepairOrder(diagnosisCaseId: string, authorUserId: string) {
   });
   if (!diagnosis) return null;
   const existing = await prisma.technicalCase.findFirst({ where: { spawnedFromId: diagnosis.id, kind: "OS" } });
-  if (existing) return existing;
+  if (existing) {
+    const { promotePartPresolicitudesToRepairOrder } = await import("./part-presolicitud");
+    await promotePartPresolicitudesToRepairOrder(diagnosis.id, existing.id, authorUserId);
+    return existing;
+  }
   const folio = await allocateFolio(diagnosis.serviceCompanyId, "OS");
   const created = await prisma.technicalCase.create({
     data: {
@@ -420,6 +428,8 @@ async function openRepairOrder(diagnosisCaseId: string, authorUserId: string) {
     summary: `${folio} abierta porque la cotización fue autorizada y el equipo ya está en resguardo.`,
     authorUserId,
   });
+  const { promotePartPresolicitudesToRepairOrder } = await import("./part-presolicitud");
+  await promotePartPresolicitudesToRepairOrder(diagnosis.id, created.id, authorUserId);
   return created;
 }
 
