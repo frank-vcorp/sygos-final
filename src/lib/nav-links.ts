@@ -49,7 +49,29 @@ export const NAV_GROUPS: NavGroupDef[] = [
   {
     title: "Servicios",
     direct: true,
-    links: [{ href: "/servicios", show: (role, code) => can(role, "attention.catalog", code) }],
+    links: [
+      {
+        href: "/servicios",
+        show: (role, code) => can(role, "attention.catalog", code) && role !== "SUPERVISOR_TECNICO",
+      },
+    ],
+  },
+  {
+    title: "Servicios",
+    links: [
+      {
+        href: "/servicios/diagnostico",
+        show: (role, code) => role === "SUPERVISOR_TECNICO" && can(role, "attention.catalog", code),
+      },
+      {
+        href: "/servicios/reparacion",
+        show: (role, code) => role === "SUPERVISOR_TECNICO" && can(role, "attention.catalog", code),
+      },
+      {
+        href: "/servicios/garantia",
+        show: (role, code) => role === "SUPERVISOR_TECNICO" && can(role, "attention.catalog", code),
+      },
+    ],
   },
   {
     title: "Personal",

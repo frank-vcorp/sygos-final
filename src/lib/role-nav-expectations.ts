@@ -19,7 +19,9 @@ export const SYSTRON_NAV: Partial<Record<Role, readonly string[]>> = {
   SUPERVISOR_TECNICO: [
     "/panel",
     "/personal/horas",
-    "/servicios",
+    "/servicios/diagnostico",
+    "/servicios/reparacion",
+    "/servicios/garantia",
     "/operacion",
     "/equipos",
     "/motores",

@@ -34,6 +34,19 @@ export function serviciosListHref(params: { tipo?: string; estado?: string; q?: 
   return query ? `/servicios?${query}` : "/servicios";
 }
 
+export function serviciosTipoHref(tipo: ServicioTipoParam, q?: string) {
+  const search = new URLSearchParams();
+  if (q?.trim()) search.set("q", q.trim());
+  const query = search.toString();
+  return query ? `/servicios/${tipo}?${query}` : `/servicios/${tipo}`;
+}
+
+export const SUPERVISOR_SERVICIO_SECTIONS: Array<{ param: ServicioTipoParam; menuLabel: string; title: string }> = [
+  { param: "diagnostico", menuLabel: "Diagnósticos", title: "Diagnósticos" },
+  { param: "reparacion", menuLabel: "Reparaciones", title: "Reparaciones" },
+  { param: "garantia", menuLabel: "Garantías", title: "Garantías" },
+];
+
 type SessionScope = {
   userId: string;
   role: string;
