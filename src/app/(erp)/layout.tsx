@@ -78,7 +78,7 @@ function erpNavGroups(role: Parameters<typeof can>[0]): Array<{ title: string | 
     title: group.title,
     direct: group.direct,
     links: group.links.map((link) => {
-      const base = link.href.split("?")[0]!;
+      const base = link.href.split("?")[0]!.split("#")[0]!;
       const fromCatalog = LABELS[base];
       const label = link.label ?? (typeof fromCatalog === "function" ? fromCatalog : fromCatalog ?? base);
       const create = CREATE[base];

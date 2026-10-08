@@ -1,3 +1,4 @@
+import { CEO_NAV_GROUPS } from "@/lib/nav-links-ceo";
 import { COORDINATION_NAV_GROUPS } from "@/lib/nav-links-coordination";
 import { can } from "@/lib/permissions";
 import type { Role } from "@/lib/roles";
@@ -103,6 +104,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
 ];
 
 export function navGroupsForRole(role: Role): NavGroupDef[] {
+  if (role === "CEO") return CEO_NAV_GROUPS;
   if (role === "COORDINACION_ADMINISTRACION") return COORDINATION_NAV_GROUPS;
   return NAV_GROUPS;
 }

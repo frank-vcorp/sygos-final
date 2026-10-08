@@ -66,7 +66,7 @@ export default async function AgendaPage({ searchParams }: { searchParams: Promi
         </QuickPanel>
       </div>
       {goalType && sellers.length > 0 ? (
-        <form action={saveGoalAction} className="mt-4 grid max-w-xl gap-3 rounded-lg border border-[var(--line)] bg-white p-4">
+        <form id="metas" action={saveGoalAction} className="mt-4 grid max-w-xl gap-3 rounded-lg border border-[var(--line)] bg-white p-4">
           <h2 className="font-medium">Meta mensual · {goalType.name}</h2>
           <input type="hidden" name="goalTypeId" value={goalType.id} />
           <Field label="Vendedor">

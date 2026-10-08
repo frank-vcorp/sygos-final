@@ -17,11 +17,26 @@ export const REPORTS: Array<{ id: string; label: string; roles: Role[] | "all" }
 ];
 
 const COORDINATION_REPORT_IDS = new Set(["movimientos", "cxp", "cxc", "nomina"]);
+const CEO_REPORT_IDS = new Set([
+  "cotizaciones",
+  "conversion",
+  "produccion",
+  "diagnosticos",
+  "reparaciones",
+  "inventario",
+  "movimientos",
+  "cxp",
+  "cxc",
+  "nomina",
+]);
 
 export function visibleReports(role: Role) {
   const allowed = REPORTS.filter((report) => report.roles === "all" || report.roles.includes(role));
   if (role === "COORDINACION_ADMINISTRACION") {
     return allowed.filter((report) => COORDINATION_REPORT_IDS.has(report.id));
+  }
+  if (role === "CEO") {
+    return allowed.filter((report) => CEO_REPORT_IDS.has(report.id));
   }
   return allowed;
 }

@@ -2,15 +2,20 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 
-function isLinkActive(pathname: string, search: URLSearchParams, href: string): boolean {
-  const [path, queryString] = href.split("?", 2);
+function isLinkActive(pathname: string, search: URLSearchParams, href: string, locationHash: string): boolean {
+  const hashIdx = href.indexOf("#");
+  const wantHash = hashIdx >= 0 ? href.slice(hashIdx) : "";
+  const pathQuery = hashIdx >= 0 ? href.slice(0, hashIdx) : href;
+  const [path, queryString] = pathQuery.split("?", 2);
   if (pathname !== path && !pathname.startsWith(`${path}/`)) return false;
+  if (wantHash) return locationHash === wantHash;
   if (!queryString) {
     if (pathname !== path) return pathname.startsWith(`${path}/`);
     return !search.get("vista");
   }
-  const expected = new URLSearchParams(queryString);
+  const expected = new URLSearchParams(queryString.split("#")[0] ?? queryString);
   for (const [key, value] of expected.entries()) {
     if (search.get(key) !== value) return false;
   }
@@ -29,12 +34,19 @@ export function SideNav({
   const path = usePathname();
   const searchParams = useSearchParams();
   const search = searchParams ?? new URLSearchParams();
+  const [locationHash, setLocationHash] = useState("");
+  useEffect(() => {
+    const sync = () => setLocationHash(window.location.hash);
+    sync();
+    window.addEventListener("hashchange", sync);
+    return () => window.removeEventListener("hashchange", sync);
+  }, [path]);
   return (
     <nav className="space-y-1 px-3 pb-5">
       {groups.map((group) => {
         if (group.direct && group.title && group.links.length === 1) {
           const link = group.links[0]!;
-          const active = isLinkActive(path, search, link.href);
+          const active = isLinkActive(path, search, link.href, locationHash);
           return (
             <div
               key={link.href}
@@ -59,9 +71,9 @@ export function SideNav({
             </div>
           );
         }
-        const groupActive = group.links.some((link) => isLinkActive(path, search, link.href));
+        const groupActive = group.links.some((link) => isLinkActive(path, search, link.href, locationHash));
         const links = group.links.map((link) => {
-            const active = isLinkActive(path, search, link.href);
+            const active = isLinkActive(path, search, link.href, locationHash);
             return (
               <div key={link.href} className={`flex min-h-10 items-center rounded-lg transition-colors ${active ? "bg-[var(--accent)] text-white" : "text-[#263b55] hover:bg-[var(--accent-soft)]"}`}>
                 <Link href={link.href} className="block min-w-0 flex-1 px-3 py-2 text-[14px] font-medium">

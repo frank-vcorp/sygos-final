@@ -47,6 +47,7 @@ export default async function PanelPage({ searchParams }: { searchParams: Promis
   if (session.role === "GERENTE_OPERATIVO_SYSTRON") {
     return <Shop companyId={companyId} manager history={vista === "historial"} />;
   }
+  if (session.role === "CEO") return <CeoExecutive companyId={companyId} name={session.activeCompanyName ?? "Empresa"} vista={vista} />;
   return <Executive companyId={companyId} name={session.activeCompanyName} />;
 }
 
@@ -365,6 +366,105 @@ async function Coordination({ companyId, code, vista }: { companyId: string; cod
         <Block title="Cobranza vencida" empty="Sin cuentas vencidas." rows={dueReceivables.map((row) => ({ href: `/cobranza/${row.id}`, label: row.document.folio, detail: money(row.balance) }))} />
         <Block title="Nómina preliminar" empty="No hay una semana abierta." rows={payrolls.map((row) => ({ href: `/nomina/${row.id}`, label: row.folio, detail: row.lines.some((line) => line.missing) ? "Falta un dato para timbrar" : row.status }))} />
         {code === "SERVOMOTORES" || proofs.length > 0 ? <Block title="Pendientes de comprobación" empty="Sin comprobantes pendientes." rows={proofs.map((row) => ({ href: "/finanzas", label: money(row.amount), detail: row.note ?? "Egreso" }))} /> : null}
+      </div>
+    </>
+  );
+}
+
+async function CeoExecutive({ companyId, name, vista }: { companyId: string; name: string; vista?: string }) {
+  const [
+    quotes,
+    orders,
+    warranties,
+    payrolls,
+    commissions,
+    overtime,
+    overdue,
+    invoiced,
+    validations,
+    invoices,
+    payments,
+    dueReceivables,
+    receivableSum,
+    payableSum,
+  ] = await Promise.all([
+    prisma.quote.findMany({ where: { companyId, status: "PENDIENTE_COTIZAR" }, take: 12 }),
+    prisma.purchase.findMany({ where: { companyId, kind: "OC", status: "PENDIENTE_AUTORIZACION" }, take: 12 }),
+    prisma.technicalCase.findMany({ where: { serviceCompanyId: companyId, warrantyDecision: "NO_PROCEDENTE", commercialDecision: null }, take: 12 }),
+    prisma.payrollPeriod.findMany({ where: { companyId, status: "PRELIMINAR" }, take: 6 }),
+    prisma.commissionRun.findMany({ where: { companyId, status: "PRELIMINAR" }, take: 6 }),
+    prisma.overtimeRequest.findMany({ where: { status: "PENDIENTE_CEO", collaborator: { companyId } }, include: { collaborator: { include: { user: true } } }, take: 12 }),
+    prisma.technicalCase.count({ where: { serviceCompanyId: companyId, status: { notIn: CLOSED }, slaDueAt: { lt: new Date() } } }),
+    prisma.billingDocument.aggregate({ where: { companyId, status: "EMITIDA", kind: { not: "REMISION" } }, _sum: { total: true } }),
+    prisma.technicalCase.findMany({ where: { serviceCompanyId: companyId, status: "PENDIENTE_VALIDACION" }, take: 12 }),
+    prisma.billingDocument.findMany({ where: { companyId, status: "SOLICITADA", kind: { not: "REMISION" } }, take: 12 }),
+    prisma.payment.findMany({ where: { companyId, status: "PENDIENTE" }, orderBy: { createdAt: "asc" }, take: 12 }),
+    prisma.receivable.findMany({ where: { companyId, balance: { gt: 0 }, dueAt: { lt: new Date() } }, include: { document: true }, take: 12 }),
+    prisma.receivable.aggregate({ where: { companyId, balance: { gt: 0 } }, _sum: { balance: true } }),
+    prisma.payable.aggregate({ where: { companyId, balance: { gt: 0 } }, _sum: { balance: true } }),
+  ]);
+  const show = (section: string) => !vista || vista === section;
+  const subtitle =
+    vista === "autorizacion"
+      ? "Órdenes de compra, nómina, comisiones y horas extra que esperan tu decisión."
+      : vista === "comercial"
+        ? "Cotizaciones sin precio y garantías con decisión comercial pendiente."
+        : vista === "tecnico"
+          ? "Validaciones y SLA de la operación técnica de esta empresa."
+          : vista === "admin"
+            ? "Supervisión de facturación, pagos y cobranza vencida."
+            : vista === "finanzas"
+              ? "Indicadores de la empresa activa. No hay consolidado entre empresas."
+              : vista === "empresa"
+                ? "Usa el selector de empresa activa en la barra superior."
+                : "Solo esta empresa. No hay suma con la otra.";
+  return (
+    <>
+      <PageHeader title={`Panel ${name}`} subtitle={subtitle} />
+      {vista === "empresa" ? (
+        <p className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm text-[var(--muted)]">
+          El CEO y Coordinación trabajan en SYSTRON o Servomotores cambiando la empresa activa arriba. Todas las cifras y listas de esta pantalla corresponden solo a la empresa seleccionada.
+        </p>
+      ) : null}
+      <div className="grid gap-3">
+        {show("comercial") ? (
+          <>
+            <Block title="Pendientes de cotizar" empty="Nada por cotizar." rows={quotes.map((row) => ({ href: `/cotizaciones/${row.id}`, label: row.folio, detail: "Asignar precio" }))} />
+            <Block title="Garantías no procedentes" empty="Sin decisión comercial pendiente." rows={warranties.map((row) => ({ href: `/operacion/${row.id}`, label: row.folio, detail: "Decidir comercialmente" }))} />
+          </>
+        ) : null}
+        {show("autorizacion") ? (
+          <>
+            <Block title="Órdenes por autorizar" empty="Sin órdenes pendientes." rows={orders.map((row) => ({ href: `/compras/${row.id}`, label: row.folio, detail: money(row.amount) }))} />
+            <Block title="Nómina" empty="Sin preliminar." rows={payrolls.map((row) => ({ href: `/nomina/${row.id}`, label: row.folio, detail: "Autorizar" }))} />
+            <Block title="Comisiones" empty="Sin preliminar." rows={commissions.map((row) => ({ href: `/comisiones/${row.id}`, label: row.month, detail: "Validar" }))} />
+            <Block title="Horas extra" empty="Nada espera autorización final." rows={overtime.map((row) => ({ href: "/personal/horas", label: row.collaborator.user.name, detail: `${row.hours} h` }))} />
+          </>
+        ) : null}
+        {show("tecnico") ? (
+          <>
+            <Block title="Diagnósticos por validar" empty="Sin validaciones pendientes." rows={validations.map((row) => ({ href: `/operacion/${row.id}`, label: row.folio, detail: "Revisar" }))} />
+            <section className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
+              <h2 className="font-medium">Operación técnica</h2>
+              <p className="mt-2"><Link href="/operacion" className="text-[var(--accent)]">Cola de operación</Link> · {overdue} con SLA vencido</p>
+              <p className="mt-1"><Link href="/produccion" className="text-[var(--accent)]">Producción técnica</Link></p>
+            </section>
+          </>
+        ) : null}
+        {show("admin") ? (
+          <>
+            <Block title="Facturas solicitadas" empty="Sin solicitudes." rows={invoices.map((row) => ({ href: `/facturacion/${row.id}`, label: row.folio, detail: row.kind }))} />
+            <Block title="Pagos por validar" empty="Sin pagos pendientes." rows={payments.map((row) => ({ href: `/pagos/${row.id}`, label: row.folio, detail: money(row.amount) }))} />
+            <Block title="Cobranza vencida" empty="Sin cuentas vencidas." rows={dueReceivables.map((row) => ({ href: `/cobranza/${row.id}`, label: row.document.folio, detail: money(row.balance) }))} />
+          </>
+        ) : null}
+        {show("finanzas") ? (
+          <section className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
+            <h2 className="font-medium">Indicadores financieros</h2>
+            <p className="mt-2"><Link href="/finanzas" className="text-[var(--accent)]">Finanzas</Link> · facturado {money(invoiced._sum.total ?? 0)}</p>
+            <p className="mt-1">CxC abierta {money(receivableSum._sum.balance ?? 0)} · CxP {money(payableSum._sum.balance ?? 0)}</p>
+          </section>
+        ) : null}
       </div>
     </>
   );
