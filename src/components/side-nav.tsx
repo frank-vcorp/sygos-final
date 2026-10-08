@@ -6,12 +6,43 @@ import { usePathname } from "next/navigation";
 export function SideNav({
   groups,
 }: {
-  groups: Array<{ title: string | null; links: Array<{ href: string; label: string; createHref?: string }> }>;
+  groups: Array<{
+    title: string | null;
+    direct?: boolean;
+    links: Array<{ href: string; label: string; createHref?: string }>;
+  }>;
 }) {
   const path = usePathname();
   return (
     <nav className="space-y-1 px-3 pb-5">
       {groups.map((group) => {
+        if (group.direct && group.title && group.links.length === 1) {
+          const link = group.links[0]!;
+          const active = path === link.href || path.startsWith(`${link.href}/`);
+          return (
+            <div
+              key={link.href}
+              className={`flex min-h-10 items-center rounded-lg transition-colors ${active ? "bg-[var(--accent)] text-white" : "text-[var(--muted)] hover:bg-[#edf5f8]"}`}
+            >
+              <Link
+                href={link.href}
+                className={`block min-w-0 flex-1 px-3 py-2 text-[12px] font-bold uppercase tracking-[0.08em] ${active ? "text-white" : ""}`}
+              >
+                {group.title}
+              </Link>
+              {link.createHref ? (
+                <Link
+                  href={link.createHref}
+                  aria-label={`Alta rápida de ${group.title}`}
+                  title={`Alta rápida de ${group.title}`}
+                  className={`mr-1 inline-flex min-h-9 min-w-9 items-center justify-center rounded-md text-lg font-semibold leading-none ${active ? "text-white hover:bg-white/15" : "text-[var(--accent)] hover:bg-white"}`}
+                >
+                  +
+                </Link>
+              ) : null}
+            </div>
+          );
+        }
         const groupActive = group.links.some((link) => path === link.href || path.startsWith(`${link.href}/`));
         const links = group.links.map((link) => {
             const active = path === link.href || path.startsWith(`${link.href}/`);

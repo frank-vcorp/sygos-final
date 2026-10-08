@@ -67,8 +67,9 @@ const CREATE: Partial<Record<string, { href: string; show: NavLink["showCreate"]
   "/proveedores": { href: "/proveedores/nuevo", show: (role, code) => can(role, "supplier.operate", code) },
 };
 
-const GROUPS: Array<{ title: string | null; links: NavLink[] }> = NAV_GROUPS.map((group) => ({
+const GROUPS: Array<{ title: string | null; direct?: boolean; links: NavLink[] }> = NAV_GROUPS.map((group) => ({
   title: group.title,
+  direct: group.direct,
   links: group.links.map((link) => {
     const label = LABELS[link.href];
     const create = CREATE[link.href];
@@ -111,6 +112,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
           groups={[
             ...GROUPS.map((group) => ({
               title: group.title,
+              direct: group.direct,
               links: group.links
                 .filter((link) => link.show(session.role, session.activeCompanyCode))
                 .map((link) => {

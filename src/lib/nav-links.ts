@@ -6,6 +6,13 @@ export type NavLinkDef = {
   show: (role: Role, companyCode: string | null) => boolean;
 };
 
+export type NavGroupDef = {
+  title: string | null;
+  links: NavLinkDef[];
+  /** Título en mayúsculas como enlace directo, sin submenú desplegable. */
+  direct?: boolean;
+};
+
 const ventas = (role: Role) => role === "VENTAS";
 const notVentas = (role: Role) => role !== "VENTAS";
 
@@ -15,7 +22,7 @@ function showEquiCatalog(role: Role, companyCode: string | null) {
   return ventas(role) || can(role, "equipment.catalog", companyCode);
 }
 
-export const NAV_GROUPS: Array<{ title: string | null; links: NavLinkDef[] }> = [
+export const NAV_GROUPS: NavGroupDef[] = [
   {
     title: null,
     links: [
@@ -30,7 +37,6 @@ export const NAV_GROUPS: Array<{ title: string | null; links: NavLinkDef[] }> = 
       { href: "/clientes", show: (role, code) => can(role, "client.create", code) || can(role, "client.edit", code) },
       { href: "/prospectos", show: (role, code) => can(role, "prospect.operate", code) },
       { href: "/equipos", show: (role, code) => ventas(role) && showEquiCatalog(role, code) },
-      { href: "/servicios", show: (role, code) => can(role, "attention.catalog", code) },
       { href: "/ventas", show: (role, code) => notVentas(role) && (can(role, "agenda.use", code) || can(role, "quote.follow", code)) },
       { href: "/agenda", show: (role, code) => can(role, "agenda.use", code) && notVentas(role) },
       { href: "/facturacion", show: (role, code) => notVentas(role) && (can(role, "invoice.request", code) || can(role, "invoice.issue", code)) },
@@ -39,6 +45,11 @@ export const NAV_GROUPS: Array<{ title: string | null; links: NavLinkDef[] }> = 
       { href: "/compras", show: (role, code) => can(role, "purchase.operate", code) },
       { href: "/finanzas", show: (role, code) => can(role, "finance.view", code) },
     ],
+  },
+  {
+    title: "Servicios",
+    direct: true,
+    links: [{ href: "/servicios", show: (role, code) => can(role, "attention.catalog", code) }],
   },
   {
     title: "Personal",
