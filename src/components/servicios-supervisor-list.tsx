@@ -49,7 +49,9 @@ export function ServiciosSupervisorList({ rows }: { rows: SupervisorServicioRow[
                       <Badge tone="neutral">Espera ingreso</Badge>
                     </Td>
                     <Td>—</Td>
-                    <Td className="text-[var(--muted)]">Pendiente entrada</Td>
+                    <Td>
+                      <span className="text-[var(--muted)]">Pendiente entrada</span>
+                    </Td>
                   </tr>
                 );
               }
