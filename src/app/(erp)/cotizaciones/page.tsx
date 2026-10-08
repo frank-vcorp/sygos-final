@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { ClientNameLink } from "@/components/client-entity-links";
 import { ActionLink, Badge, Button, controlClass, Empty, FilterBar, ListCap, MobileCard, PageHeader, ResponsiveData, SegmentedNav, Table, Td, Th, TextLink } from "@/components/ui";
+import { homePath } from "@/lib/home";
 import { prisma } from "@/lib/db";
 import { linesForTotal, money, quoteTotals } from "@/lib/money";
 import { can } from "@/lib/permissions";
@@ -10,8 +12,9 @@ import { requireCompany } from "@/lib/session";
 export default async function CotizacionesPage({ searchParams }: { searchParams: Promise<{ vista?: string; q?: string }> }) {
   const session = await requireCompany();
   if (!can(session.role, "quote.create", session.activeCompanyCode) && !can(session.role, "quote.price", session.activeCompanyCode) && !can(session.role, "quote.follow", session.activeCompanyCode)) {
-    redirect("/inicio");
+    redirect(homePath(session.role, session.activeCompanyCode));
   }
+  const canEditClient = can(session.role, "client.edit", session.activeCompanyCode);
   const { vista, q } = await searchParams;
   const query = (q ?? "").trim();
   const pending = vista === "pendientes";
@@ -89,7 +92,7 @@ export default async function CotizacionesPage({ searchParams }: { searchParams:
               return (
                 <tr key={quote.id}>
                   <Td><Link href={`/cotizaciones/${quote.id}`} className="font-medium text-[var(--accent)]">{quote.folio}</Link></Td>
-                  <Td>{quote.client.isSystem ? "SYSTRON · intercompañía" : quote.client.name}</Td>
+                  <Td><ClientNameLink clientId={quote.client.id} name={quote.client.name} isSystem={quote.client.isSystem} canEdit={canEditClient} /></Td>
                   <Td>{QUOTE_TYPE_LABEL[quote.quoteType as QuoteType] ?? quote.quoteType}</Td>
                   <Td><Badge>{QUOTE_STATUS_LABEL[quote.status] ?? quote.status}</Badge></Td>
                   <Td>{hidePrice ? "Sin precio" : money(totals?.total)}</Td>

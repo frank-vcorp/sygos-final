@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { ClientNameLink } from "@/components/client-entity-links";
 import { Badge, Button, Empty, ListCap, PageHeader, Table, Td, Th, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
@@ -22,6 +23,7 @@ export default async function ServiciosPage({ params, searchParams }: { params: 
   const query = (q ?? "").trim();
   const attentionType = TYPES[tipo as keyof typeof TYPES];
   if (!attentionType) notFound();
+  const canEditClient = can(session.role, "client.edit", session.activeCompanyCode);
   const systron = session.activeCompanyCode === "SERVOMOTORES" ? await prisma.company.findUnique({ where: { code: "SYSTRON" } }) : null;
   const rows = await prisma.attention.findMany({
     where: {
@@ -65,7 +67,11 @@ export default async function ServiciosPage({ params, searchParams }: { params: 
               return (
                 <tr key={row.id}>
                   <Td><Link href={href} className="font-medium text-[var(--accent)]">{row.equipment.folio}</Link></Td>
-                  <Td>{intercompany ? "SYSTRON · intercompañía" : row.equipment.client.name}</Td>
+                  <Td>
+                    {intercompany ? "SYSTRON · intercompañía" : (
+                      <ClientNameLink clientId={row.equipment.client.id} name={row.equipment.client.name} canEdit={canEditClient} />
+                    )}
+                  </Td>
                   <Td>{row.priorityName}</Td>
                   <Td><Badge>{row.status === "ABIERTA" ? "Espera ingreso" : "En proceso"}</Badge></Td>
                 </tr>

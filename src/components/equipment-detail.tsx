@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ClientNameLink } from "@/components/client-entity-links";
 import { notFound } from "next/navigation";
 import { AttentionForm, CancelMovementForm, MovementForm } from "@/components/custody-forms";
 import { EquipmentCustodyActions } from "@/components/equipment-custody-actions";
@@ -97,7 +98,7 @@ export async function EquipmentDetail({ id, expectedKind }: { id: string; expect
       <div className="space-y-6">
         <section className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
           <p>Origen: {equipment.originCompany.name}</p>
-          <p className="mt-1">Cliente: {intercompany ? "SYSTRON, cliente administrativo. El cliente final no se muestra en Servomotores." : can(session.role, "client.edit", session.activeCompanyCode) ? <Link href={`/clientes/${equipment.client.id}`} className="text-[var(--accent)]">{equipment.client.name}</Link> : equipment.client.name}</p>
+          <p className="mt-1">Cliente: {intercompany ? "SYSTRON, cliente administrativo. El cliente final no se muestra en Servomotores." : <ClientNameLink clientId={equipment.client.id} name={equipment.client.name} isSystem={equipment.client.isSystem} canEdit={can(session.role, "client.edit", session.activeCompanyCode)} />}</p>
           {intercompany && sellerUser ? <p className="mt-1">Contacto operativo SYSTRON: {sellerUser.name}</p> : null}
           <p className="mt-1">Identificación: {[equipment.typeName, equipment.brandName, equipment.model].filter(Boolean).join(" · ")}</p>
           {equipment.serial ? <p className="mt-1">Serie: {equipment.serial}</p> : null}

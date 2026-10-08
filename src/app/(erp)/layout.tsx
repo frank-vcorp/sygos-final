@@ -6,6 +6,7 @@ import { ErpShell } from "@/components/erp-shell";
 import { SideNav } from "@/components/side-nav";
 import { prisma, sandboxFor } from "@/lib/db";
 import { takeFlash } from "@/lib/flash";
+import { navLabel } from "@/lib/nav-labels";
 import { NAV_GROUPS } from "@/lib/nav-links";
 import { can } from "@/lib/permissions";
 import { ROLE_LABEL, isRole } from "@/lib/roles";
@@ -115,11 +116,15 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
               title: group.title,
               links: group.links
                 .filter((link) => link.show(session.role, session.activeCompanyCode))
-                .map((link) => ({
-                  href: link.href,
-                  label: typeof link.label === "function" ? link.label(session.activeCompanyCode) : link.label,
-                  createHref: link.showCreate?.(session.role, session.activeCompanyCode) ? link.createHref : undefined,
-                })),
+                .map((link) => {
+                  const base = typeof link.label === "function" ? link.label(session.activeCompanyCode) : link.label;
+                  const label = navLabel(link.href, session.role, session.activeCompanyCode) ?? base;
+                  return {
+                    href: link.href,
+                    label,
+                    createHref: link.showCreate?.(session.role, session.activeCompanyCode) ? link.createHref : undefined,
+                  };
+                }),
             })).filter((group) => group.links.length > 0),
             { title: null, links: [{ href: "/cuenta", label: "Cuenta" }] },
           ]}

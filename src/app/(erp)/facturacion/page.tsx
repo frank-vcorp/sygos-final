@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { ClientNameLink } from "@/components/client-entity-links";
 import { Badge, Empty, PageHeader, Table, Td, Th } from "@/components/ui";
+import { homePath } from "@/lib/home";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
 import { can } from "@/lib/permissions";
@@ -15,7 +17,8 @@ const KIND: Record<string, string> = {
 
 export default async function FacturacionPage() {
   const session = await requireCompany();
-  if (!can(session.role, "invoice.request", session.activeCompanyCode) && !can(session.role, "invoice.issue", session.activeCompanyCode)) redirect("/inicio");
+  if (!can(session.role, "invoice.request", session.activeCompanyCode) && !can(session.role, "invoice.issue", session.activeCompanyCode)) redirect(homePath(session.role, session.activeCompanyCode));
+  const canEditClient = can(session.role, "client.edit", session.activeCompanyCode);
   const rows = await prisma.billingDocument.findMany({
     where: {
       companyId: session.activeCompanyId,
@@ -36,7 +39,7 @@ export default async function FacturacionPage() {
               <tr key={row.id}>
                 <Td><Link href={`/facturacion/${row.id}`} className="font-medium text-[var(--accent)]">{row.folio}</Link></Td>
                 <Td>{KIND[row.kind] ?? row.kind}</Td>
-                <Td>{row.client.isSystem ? "SYSTRON · intercompañía" : row.client.name}</Td>
+                <Td><ClientNameLink clientId={row.client.id} name={row.client.name} isSystem={row.client.isSystem} canEdit={canEditClient} /></Td>
                 <Td><Badge>{row.status === "SOLICITADA" ? "Solicitada" : row.status === "EMITIDA" ? "Emitida" : row.status}</Badge></Td>
                 <Td>{money(row.total)}</Td>
               </tr>

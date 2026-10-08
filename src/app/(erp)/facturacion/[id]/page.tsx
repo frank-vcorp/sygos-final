@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { issueDocumentAction, retryFiscalAction } from "../actions";
 import { HistoryTimeline } from "@/components/history-timeline";
+import { ClientNameLink } from "@/components/client-entity-links";
 import { Badge, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
@@ -21,12 +22,13 @@ export default async function DocumentoPage({ params }: { params: Promise<{ id: 
   });
   if (!row) notFound();
   await redirectIfSalesNotAssigned(session, row.client.ownerUserId, "/facturacion");
+  const canEditClient = can(session.role, "client.edit", session.activeCompanyCode);
   const history = await historyFor("DOCUMENTO", row.id);
   return (
     <>
       <PageHeader back={{ href: "/facturacion", label: "Facturación" }} title={row.folio} subtitle={row.kind === "REMISION" ? "Remisión" : "Factura"} action={<Badge>{row.status === "SOLICITADA" ? "Solicitada" : "Emitida"}</Badge>} />
       <section className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
-        <p>Cliente: <Link href={`/clientes/${row.client.id}`} className="text-[var(--accent)]">{row.client.isSystem ? "SYSTRON · intercompañía" : row.client.name}</Link></p>
+        <p>Cliente: <ClientNameLink clientId={row.client.id} name={row.client.name} isSystem={row.client.isSystem} canEdit={canEditClient} /></p>
         {row.quote ? <p className="mt-1">Cotización: <Link href={`/cotizaciones/${row.quote.id}`} className="text-[var(--accent)]">{row.quote.folio}</Link></p> : null}
         {row.rfcSnapshot ? <p className="mt-1">RFC congelado: {row.rfcSnapshot}</p> : null}
         <p className="mt-1">Subtotal {money(row.subtotal)} · IVA {money(row.iva)} · total {money(row.total)}</p>

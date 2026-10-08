@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { ContactNameLink } from "@/components/client-entity-links";
 import { ClientPicker } from "@/components/client-picker";
 import { ServiceEquipmentPicker, type ServiceEquipmentOption } from "@/components/service-equipment-picker";
 import { SubmitButton } from "@/components/submit-button";
@@ -15,6 +16,7 @@ export function QuoteDraft({
   defaultClientId = "",
   allowQuickClient = false,
   allowQuickEquipment = false,
+  canEditClient = false,
   companyCode,
   types,
   brands,
@@ -25,6 +27,7 @@ export function QuoteDraft({
   defaultClientId?: string;
   allowQuickClient?: boolean;
   allowQuickEquipment?: boolean;
+  canEditClient?: boolean;
   companyCode: string;
   types: string[];
   brands: string[];
@@ -110,7 +113,12 @@ export function QuoteDraft({
         {contacts.map((contact) => (
           <label key={contact.id} className="flex items-center gap-2 text-sm">
             <input type="checkbox" name="contactId" value={contact.id} defaultChecked={contact.isPrimary} />
-            {contact.name}{contact.isPrimary ? " · principal" : ""}
+            {canEditClient && clientId ? (
+              <ContactNameLink clientId={clientId} name={contact.name} canEdit />
+            ) : (
+              contact.name
+            )}
+            {contact.isPrimary ? " · principal" : ""}
           </label>
         ))}
       </fieldset>

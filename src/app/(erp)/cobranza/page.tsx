@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { ClientNameLink } from "@/components/client-entity-links";
 import { Badge, Empty, PageHeader, Table, Td, Th } from "@/components/ui";
+import { homePath } from "@/lib/home";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
 import { money } from "@/lib/money";
@@ -9,7 +11,8 @@ import { requireCompany } from "@/lib/session";
 
 export default async function CobranzaPage() {
   const session = await requireCompany();
-  if (!can(session.role, "receivable.view", session.activeCompanyCode)) redirect("/inicio");
+  if (!can(session.role, "receivable.view", session.activeCompanyCode)) redirect(homePath(session.role, session.activeCompanyCode));
+  const canEditClient = can(session.role, "client.edit", session.activeCompanyCode);
   const own = session.role === "VENTAS" ? { sellerUserId: session.userId } : {};
   const rows = await prisma.receivable.findMany({
     where: { companyId: session.activeCompanyId, ...own },
@@ -36,7 +39,7 @@ export default async function CobranzaPage() {
               return (
                 <tr key={row.id}>
                   <Td><Link href={`/cobranza/${row.id}`} className="font-medium text-[var(--accent)]">{row.document.folio}</Link></Td>
-                  <Td>{row.client.isSystem ? "SYSTRON · intercompañía" : row.client.name}</Td>
+                  <Td><ClientNameLink clientId={row.client.id} name={row.client.name} isSystem={row.client.isSystem} canEdit={canEditClient} /></Td>
                   <Td>{money(row.balance)}</Td>
                   <Td>{formatWhen(row.dueAt)}</Td>
                   <Td><Badge tone={overdue ? "warn" : "neutral"}>{overdue ? "Vencida" : row.status === "SALDADA" ? "Saldada" : row.status === "PARCIAL" ? "Parcial" : "Abierta"}</Badge></Td>

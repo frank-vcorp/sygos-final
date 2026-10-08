@@ -4,21 +4,18 @@ import type { Role } from "@/lib/roles";
 export const SYSTRON_NAV: Partial<Record<Role, readonly string[]>> = {
   VENTAS: [
     "/panel",
-    "/clientes",
-    "/prospectos",
     "/cotizaciones",
     "/ventas",
-    "/agenda",
-    "/facturacion",
-    "/cobranza",
-    "/pagos",
-    "/personal/horas",
+    "/clientes",
+    "/prospectos",
+    "/equipos",
     "/servicios/diagnostico",
     "/servicios/reparacion",
     "/servicios/garantia",
-    "/operacion",
-    "/equipos",
-    "/motores",
+    "/cobranza",
+    "/facturacion",
+    "/pagos",
+    "/personal/horas",
   ],
   TECNICO: ["/panel", "/operacion", "/personal/horas"],
   SUPERVISOR_TECNICO: [
@@ -71,7 +68,7 @@ export const SYSTRON_NAV: Partial<Record<Role, readonly string[]>> = {
 };
 
 export const SYSTRON_NAV_FORBIDDEN: Partial<Record<Role, readonly string[]>> = {
-  VENTAS: ["/compras", "/finanzas", "/proveedores", "/usuarios", "/configuracion", "/inventario", "/custodia", "/nomina", "/produccion"],
+  VENTAS: ["/compras", "/finanzas", "/proveedores", "/usuarios", "/configuracion", "/inventario", "/custodia", "/nomina", "/produccion", "/agenda", "/operacion", "/motores"],
   TECNICO: [
     "/inicio",
     "/clientes",

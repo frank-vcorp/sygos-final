@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { deliverSaleAction, receiveSaleAction } from "./actions";
+import { ClientNameLink } from "@/components/client-entity-links";
 import { Button, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
@@ -17,9 +18,11 @@ export default async function VentaDetallePage({ params }: { params: Promise<{ i
   if (!sale) notFound();
   await redirectIfSalesNotAssigned(session, sale.quote.sellerUserId, "/ventas");
   const canMove = can(session.role, "sale.receive", session.activeCompanyCode);
+  const canEditClient = can(session.role, "client.edit", session.activeCompanyCode);
   return (
     <>
-      <PageHeader back={canMove && session.role === "ALMACEN" ? { href: "/custodia", label: "Almacén" } : { href: "/ventas", label: "Panel de ventas" }} title={sale.folio} subtitle={`Venta de ${sale.client.name}`} />
+      <PageHeader back={canMove && session.role === "ALMACEN" ? { href: "/custodia", label: "Almacén" } : { href: "/ventas", label: "Venta de equipos" }} title={sale.folio} subtitle="Venta de equipos" />
+      <p className="mb-2 text-sm text-[var(--muted)]">Cliente: <ClientNameLink clientId={sale.client.id} name={sale.client.name} isSystem={sale.client.isSystem} canEdit={canEditClient} /></p>
       <p className="mb-4 text-sm">Cotización <Link href={`/cotizaciones/${sale.quoteId}`} className="text-[var(--accent)]">{sale.quote.folio}</Link>. La mercancía no entra al inventario de refacciones. Factura y remisión llegan en la fase siguiente.</p>
       <ul className="space-y-3">
         {sale.lines.map((line) => (

@@ -99,18 +99,20 @@ function formatWhen(iso: string) {
 }
 
 function CollapseBlock({
+  id,
   title,
   count,
   defaultOpen = false,
   children,
 }: {
+  id?: string;
   title: string;
   count?: number;
   defaultOpen?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <details open={defaultOpen} className="group rounded-lg border border-[var(--line)] bg-white">
+    <details id={id} open={defaultOpen} className="group rounded-lg border border-[var(--line)] bg-white">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-sm font-medium text-[#0b1f3a] marker:content-none [&::-webkit-details-marker]:hidden">
         <span>{title}{count != null ? ` (${count})` : ""}</span>
         <span className="text-xs text-[var(--muted)] group-open:rotate-180 transition-transform">▼</span>
@@ -411,7 +413,7 @@ export function ClientDataAccordion({
   candidates: Array<{ id: string; name: string }>;
 }) {
   return (
-    <CollapseBlock title="Datos del cliente y contactos" count={contacts.length}>
+    <CollapseBlock id="contactos" title="Datos del cliente y contactos" count={contacts.length}>
       <ClientProfileSection client={client} ownerName={ownerName} updateAction={updateAction} compact />
       <ClientContactsPanel clientId={clientId} contacts={contacts} addAction={addContactAction} inactivateAction={inactivateContactAction} embedded />
       {prospects.length > 0 ? (

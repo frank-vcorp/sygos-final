@@ -12,6 +12,7 @@ import { historyFor } from "@/lib/history";
 import { linesForTotal, money, quoteTotals } from "@/lib/money";
 import { can } from "@/lib/permissions";
 import { QUOTE_STATUS_LABEL, QUOTE_TYPE_LABEL, seesEconomicDetail, type QuoteType } from "@/lib/quotes";
+import { ClientNameLink, ContactNameLink } from "@/components/client-entity-links";
 import { redirectIfSalesNotAssigned } from "@/lib/sales-assignment";
 import { requireCompany } from "@/lib/session";
 
@@ -24,6 +25,7 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
   });
   if (!quote) notFound();
   await redirectIfSalesNotAssigned(session, quote.sellerUserId, "/cotizaciones");
+  const canEditClient = can(session.role, "client.edit", session.activeCompanyCode);
   const base = quote.linkedQuoteId && (session.role === "ADMINISTRADOR" || session.role === "CEO")
     ? await prisma.quote.findUnique({ where: { id: quote.linkedQuoteId }, include: { lines: true, company: true } })
     : null;
@@ -69,11 +71,21 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
       </form>
       <DetailGrid>
         <section className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
-          <p>Cliente: <Link href={`/clientes/${quote.client.id}`} className="text-[var(--accent)]">{quote.client.isSystem ? "SYSTRON · intercompañía" : quote.client.name}</Link></p>
+          <p>Cliente: <ClientNameLink clientId={quote.client.id} name={quote.client.name} isSystem={quote.client.isSystem} canEdit={canEditClient} /></p>
           <p className="mt-1">Equipo: {quote.equipment ? <Link href={quote.equipment.kind === "MOT" ? `/motores/${quote.equipment.id}` : `/equipos/${quote.equipment.id}`} className="text-[var(--accent)]">{quote.equipment.folio}</Link> : [quote.preliminaryType, quote.preliminaryBrand, quote.preliminaryModel, quote.preliminarySerial].filter(Boolean).join(" · ") || "Sin equipo físico"}</p>
           {source ? <p className="mt-1">{source.kind === "OS" ? "Orden de servicio" : "Diagnóstico de origen"}: <Link href={`/operacion/${source.id}`} className="text-[var(--accent)]">{source.folio}</Link></p> : null}
           {repairOrder ? <p className="mt-1">Orden de servicio: <Link href={`/operacion/${repairOrder.id}`} className="text-[var(--accent)]">{repairOrder.folio}</Link></p> : null}
-          {quote.client.contacts.length > 0 ? <p className="mt-1">Contactos: {quote.client.contacts.map((contact) => contact.name).join(", ")}</p> : <p className="mt-1 text-[var(--danger)]">Este cliente no tiene contactos activos.</p>}
+          {quote.client.contacts.length > 0 ? (
+            <p className="mt-1">
+              Contactos:{" "}
+              {quote.client.contacts.map((contact, index) => (
+                <span key={contact.id}>
+                  {index > 0 ? ", " : ""}
+                  <ContactNameLink clientId={quote.client.id} name={contact.name} canEdit={canEditClient} />
+                </span>
+              ))}
+            </p>
+          ) : <p className="mt-1 text-[var(--danger)]">Este cliente no tiene contactos activos.</p>}
           {quote.status === "PENDIENTE_COTIZAR" && referencePrice != null ? <p className="mt-1">Referencia congelada de la prioridad: {money(referencePrice)}. El precio lo confirma CEO o Administrador.</p> : null}
           {quote.reference ? <p className="mt-1">Referencia: {quote.reference}</p> : null}
           {quote.creditDays != null ? <p className="mt-1">Crédito congelado: {quote.creditDays} días</p> : null}

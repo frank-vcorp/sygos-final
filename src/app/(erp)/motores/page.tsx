@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { ClientNameLink } from "@/components/client-entity-links";
 import { ActionLink, Badge, Button, controlClass, Empty, FilterBar, ListCap, MobileCard, PageHeader, ResponsiveData, Table, Td, Th, TextLink } from "@/components/ui";
 import { CUSTODY_LABEL, type Custody } from "@/lib/custody";
 import { prisma } from "@/lib/db";
@@ -14,6 +15,7 @@ export default async function MotoresPage({ searchParams }: { searchParams: Prom
   const systron = session.activeCompanyCode === "SERVOMOTORES"
     ? await prisma.company.findUnique({ where: { code: "SYSTRON" } })
     : null;
+  const canEditClient = can(session.role, "client.edit", session.activeCompanyCode);
   const rows = await prisma.equipment.findMany({
     where: {
       kind: "MOT",
@@ -25,7 +27,7 @@ export default async function MotoresPage({ searchParams }: { searchParams: Prom
         ...(query ? [{ OR: [{ folio: { contains: query } }, { model: { contains: query } }, { serial: { contains: query } }] }] : []),
       ],
     },
-    include: { client: { select: { name: true } }, originCompany: { select: { code: true, name: true } } },
+    include: { client: { select: { id: true, name: true, isSystem: true } }, originCompany: { select: { code: true, name: true } } },
     orderBy: { createdAt: "desc" },
     take: 100,
   });
@@ -56,7 +58,7 @@ export default async function MotoresPage({ searchParams }: { searchParams: Prom
                 <tr key={row.id}>
                   <Td><Link href={`/motores/${row.id}`} className="font-medium text-[var(--accent)]">{row.folio}</Link></Td>
                   <Td>{row.originCompany.name}</Td>
-                  <Td>{intercompany ? "SYSTRON · intercompañía" : row.client.name}</Td>
+                  <Td>{intercompany ? "SYSTRON · intercompañía" : <ClientNameLink clientId={row.client.id} name={row.client.name} isSystem={row.client.isSystem} canEdit={canEditClient} />}</Td>
                   <Td>{[row.brandName, row.model, row.serial].filter(Boolean).join(" · ")}</Td>
                   <Td><Badge>{CUSTODY_LABEL[row.custody as Custody] ?? row.custody}</Badge></Td>
                 </tr>
@@ -65,7 +67,7 @@ export default async function MotoresPage({ searchParams }: { searchParams: Prom
           </tbody>
         </Table>} cards={rows.map((row) => {
           const intercompany = session.activeCompanyCode === "SERVOMOTORES" && row.originCompany.code === "SYSTRON";
-          return <MobileCard key={row.id} href={`/motores/${row.id}`} title={row.folio} meta={<Badge>{CUSTODY_LABEL[row.custody as Custody] ?? row.custody}</Badge>}><p>{intercompany ? "SYSTRON · intercompañía" : row.client.name}</p><p>{row.originCompany.name} · {[row.brandName, row.model, row.serial].filter(Boolean).join(" · ") || "Sin identificación adicional"}</p></MobileCard>;
+          return <MobileCard key={row.id} href={`/motores/${row.id}`} title={row.folio} meta={<Badge>{CUSTODY_LABEL[row.custody as Custody] ?? row.custody}</Badge>}><p>{intercompany ? "SYSTRON · intercompañía" : <ClientNameLink clientId={row.client.id} name={row.client.name} isSystem={row.client.isSystem} canEdit={canEditClient} />}</p><p>{row.originCompany.name} · {[row.brandName, row.model, row.serial].filter(Boolean).join(" · ") || "Sin identificación adicional"}</p></MobileCard>;
         })} />
       )}
       <ListCap shown={rows.length} />

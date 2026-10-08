@@ -1,65 +1,54 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Empty, PageHeader } from "@/components/ui";
+import { ClientNameLink } from "@/components/client-entity-links";
+import { Badge, Empty, PageHeader, Table, Td, Th } from "@/components/ui";
 import { prisma } from "@/lib/db";
-import { formatWhen } from "@/lib/form";
 import { can } from "@/lib/permissions";
-import { QUOTE_STATUS_LABEL } from "@/lib/quotes";
+import { homePath } from "@/lib/home";
 import { requireCompany } from "@/lib/session";
 
 export default async function VentasPage() {
   const session = await requireCompany();
-  if (!can(session.role, "agenda.use", session.activeCompanyCode) && !can(session.role, "quote.follow", session.activeCompanyCode)) redirect("/inicio");
-  const own = session.role === "VENTAS" ? { sellerUserId: session.userId } : {};
-  const [pending, agenda, goals] = await Promise.all([
-    prisma.quote.findMany({
-      where: { companyId: session.activeCompanyId, status: "PENDIENTE_DECISION", ...own },
-      include: { client: true },
-      orderBy: { updatedAt: "desc" },
-      take: 20,
-    }),
-    prisma.agendaActivity.findMany({
-      where: { companyId: session.activeCompanyId, ...(session.role === "VENTAS" ? { authorUserId: session.userId } : {}), scheduledAt: { gte: new Date() } },
-      orderBy: { scheduledAt: "asc" },
-      take: 8,
-      include: { category: true },
-    }),
-    session.activeCompanyCode === "SYSTRON"
-      ? prisma.salesGoal.findMany({
-          where: { companyId: session.activeCompanyId, ...(session.role === "VENTAS" ? { userId: session.userId } : {}), year: new Date().getFullYear(), month: new Date().getMonth() + 1 },
-          include: { goalType: true },
-        })
-      : Promise.resolve([]),
-  ]);
+  if (!can(session.role, "agenda.use", session.activeCompanyCode) && !can(session.role, "quote.follow", session.activeCompanyCode)) {
+    redirect(homePath(session.role, session.activeCompanyCode));
+  }
+  const canEditClient = can(session.role, "client.edit", session.activeCompanyCode);
+  const own = session.role === "VENTAS" ? { quote: { sellerUserId: session.userId } } : {};
+  const sales = await prisma.sale.findMany({
+    where: { companyId: session.activeCompanyId, ...own },
+    include: { client: true, quote: true, lines: true },
+    orderBy: { updatedAt: "desc" },
+    take: 100,
+  });
   return (
     <>
-      <PageHeader title="Panel de ventas" subtitle="Decisiones pendientes y próximas actividades. No hay recordatorios automáticos." action={<Link href="/agenda" className="text-sm text-[var(--accent)]">Abrir agenda</Link>} />
-      <div className="grid gap-4 lg:grid-cols-2">
-        <section className="rounded-lg border border-[var(--line)] bg-white p-4">
-          <h2 className="font-medium">Pendientes de decisión</h2>
-          {pending.length === 0 ? <p className="mt-2 text-sm text-[var(--muted)]">Nada esperando al cliente.</p> : (
-            <ul className="mt-2 space-y-2 text-sm">
-              {pending.map((quote) => <li key={quote.id}><Link href={`/cotizaciones/${quote.id}`} className="text-[var(--accent)]">{quote.folio}</Link> · {quote.client.name} · {QUOTE_STATUS_LABEL[quote.status]}</li>)}
-            </ul>
-          )}
-        </section>
-        <section className="rounded-lg border border-[var(--line)] bg-white p-4">
-          <h2 className="font-medium">Agenda</h2>
-          {agenda.length === 0 ? <Empty title="Sin actividades próximas" body="Registra una desde la agenda. No se crean tareas solas." /> : (
-            <ul className="mt-2 space-y-2 text-sm">
-              {agenda.map((item) => <li key={item.id}><Link href="/agenda" className="text-[var(--accent)]">{formatWhen(item.scheduledAt)}</Link> · {item.category?.name ?? "Actividad"} · {item.note}</li>)}
-            </ul>
-          )}
-        </section>
-        {goals.length > 0 ? (
-          <section className="rounded-lg border border-[var(--line)] bg-white p-4">
-            <h2 className="font-medium">Metas del mes</h2>
-            <ul className="mt-2 space-y-1 text-sm">
-              {goals.map((goal) => <li key={goal.id}>{goal.goalType.name}: objetivo {goal.target}</li>)}
-            </ul>
-          </section>
-        ) : null}
-      </div>
+      <PageHeader
+        title="Venta de equipos"
+        subtitle="Ventas autorizadas de tu cartera. Recepción y entrega se confirman en el detalle."
+        back={session.role === "VENTAS" ? { href: "/panel", label: "Inicio" } : undefined}
+      />
+      {sales.length === 0 ? (
+        <Empty title="Sin ventas de equipo" body="Aparecen aquí cuando una cotización de venta de equipo queda autorizada." />
+      ) : (
+        <Table>
+          <thead><tr><Th>Folio</Th><Th>Cliente</Th><Th>Cotización</Th><Th>Pendiente</Th></tr></thead>
+          <tbody>
+            {sales.map((sale) => {
+              const pendingReceive = sale.lines.reduce((sum, line) => sum + Math.max(0, line.qtySold - line.qtyReceived), 0);
+              const pendingDeliver = sale.lines.reduce((sum, line) => sum + Math.max(0, line.qtyReceived - line.qtyDelivered), 0);
+              const pending = pendingReceive > 0 ? `Recibir ${pendingReceive}` : pendingDeliver > 0 ? `Entregar ${pendingDeliver}` : "Al día";
+              return (
+                <tr key={sale.id}>
+                  <Td><Link href={`/ventas/${sale.id}`} className="font-medium text-[var(--accent)]">{sale.folio}</Link></Td>
+                  <Td><ClientNameLink clientId={sale.client.id} name={sale.client.name} isSystem={sale.client.isSystem} canEdit={canEditClient} /></Td>
+                  <Td><Link href={`/cotizaciones/${sale.quoteId}`} className="text-[var(--accent)]">{sale.quote.folio}</Link></Td>
+                  <Td><Badge>{pending}</Badge></Td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </Table>
+      )}
     </>
   );
 }

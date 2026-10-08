@@ -42,6 +42,7 @@ export default async function NuevaCotizacionPage({ searchParams }: { searchPara
           <QuoteDraft
             allowQuickClient={can(session.role, "client.create", session.activeCompanyCode)}
             allowQuickEquipment={allowQuickEquipment}
+            canEditClient={can(session.role, "client.edit", session.activeCompanyCode)}
             companyCode={session.activeCompanyCode ?? "SYSTRON"}
             defaultClientId={clients.some((client) => client.id === clientId) ? clientId : ""}
             clients={clients.map((client) => ({ id: client.id, name: client.name, contacts: client.contacts.map((contact) => ({ id: contact.id, name: contact.name, isPrimary: contact.isPrimary })) }))}
