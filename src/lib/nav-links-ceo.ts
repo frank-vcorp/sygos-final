@@ -14,7 +14,6 @@ export const CEO_NAV_GROUPS: NavGroupDef[] = [
       { href: "/panel?vista=tecnico", label: "Pendientes técnicos", show: showCeo },
       { href: "/panel?vista=admin", label: "Pendientes administrativos", show: showCeo },
       { href: "/panel?vista=finanzas", label: "Indicadores financieros", show: showCeo },
-      { href: "/panel?vista=empresa", label: "Cambio de empresa", show: showCeo },
     ],
   },
   {

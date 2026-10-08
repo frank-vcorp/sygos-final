@@ -50,7 +50,6 @@ export const SYSTRON_NAV: Partial<Record<Role, readonly string[]>> = {
     "/panel?vista=tecnico",
     "/panel?vista=admin",
     "/panel?vista=finanzas",
-    "/panel?vista=empresa",
     "/clientes",
     "/prospectos",
     "/cotizaciones",
