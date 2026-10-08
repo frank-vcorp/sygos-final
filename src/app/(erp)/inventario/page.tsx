@@ -33,7 +33,7 @@ export default async function InventarioPage() {
     <>
       <PageHeader
         title="Inventario"
-        subtitle={`Piezas de ${company.name}. Rack, nivel, familia y montaje distinguen líneas con el mismo nombre.`}
+        subtitle={`Piezas de ${company.name}. Existencia = stock actual del Excel; mínimo = stock mínimo (el catálogo no trae máximo).`}
         action={<ActionLink href="/inventario/conteo" tone="ghost">Conteo físico</ActionLink>}
       />
       <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -49,7 +49,7 @@ export default async function InventarioPage() {
       ) : (
         <ResponsiveData
           table={
-            <Table>
+            <Table stickyHeader>
               <thead>
                 <tr>
                   <Th>Producto</Th>
@@ -60,7 +60,7 @@ export default async function InventarioPage() {
                   <Th>Nivel</Th>
                   <Th>Montaje</Th>
                   <Th>Existencia</Th>
-                  <Th>Mín / máx</Th>
+                  <Th>Mínimo</Th>
                   <Th>Movimiento</Th>
                 </tr>
               </thead>
@@ -80,7 +80,8 @@ export default async function InventarioPage() {
                       {part.maxQty != null && part.qty > part.maxQty ? <Badge tone="warn">sobre máximo</Badge> : null}
                     </Td>
                     <Td>
-                      {part.minQty ?? "—"} / {part.maxQty ?? "—"}
+                      {part.minQty ?? "—"}
+                      {part.maxQty != null ? <span className="ml-1 text-xs text-[var(--muted)]">(máx. {part.maxQty})</span> : null}
                     </Td>
                     <Td>
                       <form action={stockAction} className="flex flex-wrap gap-1">
@@ -117,7 +118,8 @@ export default async function InventarioPage() {
                 {part.minQty != null && part.qty < part.minQty ? <Badge tone="warn">bajo mínimo</Badge> : null}
                 {part.maxQty != null && part.qty > part.maxQty ? <Badge tone="warn">sobre máximo</Badge> : null}
                 <span className="text-xs text-[var(--muted)]">
-                  Mín / máx: {part.minQty ?? "—"} / {part.maxQty ?? "—"}
+                  Mínimo: {part.minQty ?? "—"}
+                  {part.maxQty != null ? ` · Máx. ${part.maxQty}` : ""}
                 </span>
               </div>
               <form action={stockAction} className="mt-3 grid grid-cols-[1fr_88px] gap-2">

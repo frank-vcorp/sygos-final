@@ -10,6 +10,7 @@ type ActiveCaseRow = {
   id: string;
   href: string;
   folio: string;
+  attentionType: AttentionType;
   equipmentFolio: string;
   equipmentModel: string;
   clientName: string;
@@ -26,6 +27,7 @@ type IngressRow = {
   kind: "ingreso";
   id: string;
   href: string;
+  attentionType: AttentionType;
   equipmentFolio: string;
   clientName: string;
   priorityName: string;
@@ -51,13 +53,13 @@ export function servicioRowHighlight(row: SupervisorServicioRow, now = Date.now(
   return { wrapClass, statusTone, markers };
 }
 
-export async function listActiveServiciosByTipo(
+export async function listActiveServicios(
   companyId: string,
-  tipo: ServicioTipoParam,
   query: string,
-  options?: { assigneeUserId?: string },
+  options?: { assigneeUserId?: string; tipo?: ServicioTipoParam | null },
 ): Promise<SupervisorServicioRow[]> {
-  const attentionType = SERVICIO_TIPO_PARAM[tipo] as AttentionType;
+  const tipo = options?.tipo ?? null;
+  const attentionType = tipo ? (SERVICIO_TIPO_PARAM[tipo] as AttentionType) : null;
   const q = query.trim();
   const assigneeOnly = options?.assigneeUserId;
 
@@ -66,7 +68,7 @@ export async function listActiveServiciosByTipo(
       serviceCompanyId: companyId,
       status: { notIn: [...CLOSED_CASE] },
       ...(assigneeOnly ? { assigneeUserId: assigneeOnly } : {}),
-      attention: { attentionType },
+      ...(attentionType ? { attention: { attentionType } } : {}),
       ...(q
         ? {
             OR: [
@@ -80,7 +82,7 @@ export async function listActiveServiciosByTipo(
     },
     include: {
       equipment: { include: { client: true } },
-      attention: { select: { priorityName: true, slaStartedAt: true } },
+      attention: { select: { priorityName: true, slaStartedAt: true, attentionType: true } },
       assignee: { select: { name: true } },
     },
     take: 200,
@@ -91,7 +93,7 @@ export async function listActiveServiciosByTipo(
     : await prisma.attention.findMany({
         where: {
           serviceCompanyId: companyId,
-          attentionType,
+          ...(attentionType ? { attentionType } : {}),
           status: "ABIERTA",
           technicalCases: { none: { status: { notIn: [...CLOSED_CASE] } } },
           ...(q
@@ -114,6 +116,7 @@ export async function listActiveServiciosByTipo(
     id: row.id,
     href: `/operacion/${row.id}`,
     folio: row.folio,
+    attentionType: row.attention.attentionType as AttentionType,
     equipmentFolio: row.equipment.folio,
     equipmentModel: row.equipment.model,
     clientName: row.equipment.client.name,
@@ -130,6 +133,7 @@ export async function listActiveServiciosByTipo(
     kind: "ingreso",
     id: row.id,
     href: row.equipment.kind === "MOT" ? `/motores/${row.equipmentId}` : `/equipos/${row.equipmentId}`,
+    attentionType: row.attentionType as AttentionType,
     equipmentFolio: row.equipment.folio,
     clientName: row.equipment.client.name,
     priorityName: row.priorityName,
@@ -144,10 +148,20 @@ export async function listActiveServiciosByTipo(
     ),
   );
 
-  return [...sortedCases, ...ingressRows];
+  const sortedIngress = ingressRows.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  return [...sortedCases, ...sortedIngress];
 }
 
-/** @deprecated use listActiveServiciosByTipo */
+export async function listActiveServiciosByTipo(
+  companyId: string,
+  tipo: ServicioTipoParam,
+  query: string,
+  options?: { assigneeUserId?: string },
+): Promise<SupervisorServicioRow[]> {
+  return listActiveServicios(companyId, query, { ...options, tipo });
+}
+
+/** @deprecated use listActiveServicios */
 export async function listSupervisorActiveServicios(
   companyId: string,
   tipo: ServicioTipoParam,

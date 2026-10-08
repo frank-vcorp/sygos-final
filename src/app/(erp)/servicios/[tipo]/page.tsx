@@ -23,7 +23,7 @@ import { listActiveServiciosByTipo } from "@/lib/servicios-supervisor";
 import { requireCompany } from "@/lib/session";
 
 function usesServiciosPorTipo(role: string) {
-  return role === "SUPERVISOR_TECNICO" || role === "TECNICO";
+  return role === "TECNICO";
 }
 
 export default async function ServiciosTipoPage({
@@ -42,7 +42,7 @@ export default async function ServiciosTipoPage({
     redirect(homePath(session.role, session.activeCompanyCode));
   }
 
-  if (!usesServiciosPorTipo(session.role)) {
+  if (session.role === "SUPERVISOR_TECNICO" || !usesServiciosPorTipo(session.role)) {
     redirect(serviciosListHref({ tipo: tipoParam, q: q?.trim() }));
   }
 

@@ -144,9 +144,15 @@ export function Badge({ children, tone = "neutral" }: { children: React.ReactNod
   return <span className={`inline-flex rounded px-2 py-0.5 text-xs font-medium ${tones[tone]}`}>{children}</span>;
 }
 
-export function Table({ children }: { children: React.ReactNode }) {
+export function Table({ children, stickyHeader = false }: { children: React.ReactNode; stickyHeader?: boolean }) {
   return (
-    <div className="overflow-x-auto rounded-lg border border-[var(--line)] bg-white">
+    <div
+      className={
+        stickyHeader
+          ? "max-h-[calc(100dvh-11rem)] overflow-auto rounded-lg border border-[var(--line)] bg-white [&_thead_th]:sticky [&_thead_th]:top-0 [&_thead_th]:z-10 [&_thead_th]:bg-white [&_thead_th]:shadow-[inset_0_-1px_0_var(--line)]"
+          : "overflow-x-auto rounded-lg border border-[var(--line)] bg-white"
+      }
+    >
       <table className="min-w-full text-left text-sm">{children}</table>
     </div>
   );

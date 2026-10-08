@@ -21,13 +21,17 @@ import {
 import { prisma } from "@/lib/db";
 import { homePath } from "@/lib/home";
 import { can } from "@/lib/permissions";
+import { ServiciosSupervisorList } from "@/components/servicios-supervisor-list";
 import {
   equipmentScopeForServicios,
   parseServicioTipo,
   servicioTipoLabel,
   SERVICIO_TIPO_OPTIONS,
+  SERVICIO_TIPO_PARAM,
   serviciosListHref,
+  type ServicioTipoParam,
 } from "@/lib/servicios-catalog";
+import { listActiveServicios } from "@/lib/servicios-supervisor";
 import { requireCompany } from "@/lib/session";
 
 const CLOSED_CASE = ["VALIDADO", "TERMINADA", "SIN_REPARACION"] as const;
@@ -45,13 +49,62 @@ export default async function ServiciosCatalogPage({
   if (!can(session.role, "attention.catalog", session.activeCompanyCode)) {
     redirect(homePath(session.role, session.activeCompanyCode));
   }
-  if (session.role === "SUPERVISOR_TECNICO" || session.role === "TECNICO") {
+  if (session.role === "TECNICO") {
     redirect("/servicios/diagnostico");
   }
   const { tipo, estado, q } = await searchParams;
   const query = (q ?? "").trim();
   const tipoFilter = parseServicioTipo(tipo);
   if (tipo && tipo !== "todos" && !tipoFilter) redirect("/servicios");
+
+  if (session.role === "SUPERVISOR_TECNICO") {
+    const tipoParam =
+      tipo && tipo !== "todos" && tipo in SERVICIO_TIPO_PARAM ? (tipo as ServicioTipoParam) : null;
+    const tipoLabel = tipoParam ? SERVICIO_TIPO_OPTIONS.find((opt) => opt.param === tipoParam)?.label : null;
+    const rows = await listActiveServicios(session.activeCompanyId, query, { tipo: tipoParam });
+    const navBase = { tipo: tipo && tipo !== "todos" ? tipo : "todos", q: query };
+    return (
+      <>
+        <PageHeader
+          title="Servicios"
+          subtitle="Diagnósticos, reparaciones y garantías activos en una sola bandeja. Vencidas y en espera de refacciones se resaltan en la lista."
+        />
+        <SegmentedNav
+          items={[
+            { href: serviciosListHref({ ...navBase, tipo: "todos" }), label: "Todos los tipos", active: !tipo || tipo === "todos" },
+            ...SERVICIO_TIPO_OPTIONS.map((opt) => ({
+              href: serviciosListHref({ ...navBase, tipo: opt.param }),
+              label: opt.label,
+              active: tipo === opt.param,
+            })),
+          ]}
+        />
+        <FilterBar action="/servicios">
+          {tipo && tipo !== "todos" ? <input type="hidden" name="tipo" value={tipo} /> : null}
+          <input name="q" defaultValue={query} placeholder="Folio, cliente, equipo o falla" className={`${controlClass} sm:flex-1`} />
+          <Button type="submit" tone="ghost">
+            Buscar
+          </Button>
+        </FilterBar>
+        {rows.length === 0 ? (
+          <Empty
+            title={query ? "Sin coincidencias" : "Sin servicios activos"}
+            body={
+              query
+                ? `Nada activo coincide con «${query}»${tipoLabel ? ` en ${tipoLabel.toLowerCase()}` : ""}.`
+                : tipoLabel
+                  ? `No hay ${tipoLabel.toLowerCase()} activos en este momento.`
+                  : "No hay servicios activos en este momento."
+            }
+            action={query ? <TextLink href={serviciosListHref({ tipo })}>Quitar búsqueda</TextLink> : undefined}
+          />
+        ) : (
+          <ServiciosSupervisorList rows={rows} showTipo={!tipoParam} />
+        )}
+        <ListCap shown={rows.length} />
+      </>
+    );
+  }
 
   const equipmentScope = await equipmentScopeForServicios(session);
   const canEditClient = can(session.role, "client.edit", session.activeCompanyCode);

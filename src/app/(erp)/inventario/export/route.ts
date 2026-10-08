@@ -15,7 +15,7 @@ export async function GET() {
     orderBy: [{ rack: "asc" }, { nivel: "asc" }, { partNumber: "asc" }],
   });
   const lines = [
-    "id,fila_excel,nombre,descripcion,numero,familia,rack,nivel,ubicacion,unidad,montaje,existencia,minimo,maximo",
+    "id,fila_excel,nombre,descripcion,numero,familia,rack,nivel,ubicacion,unidad,montaje,existencia,minimo,maximo_manual",
   ];
   for (const part of parts) {
     lines.push(

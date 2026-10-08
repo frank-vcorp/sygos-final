@@ -15,10 +15,16 @@ export type NavGroupDef = {
 
 const ventas = (role: Role) => role === "VENTAS";
 const notVentas = (role: Role) => role !== "VENTAS";
-const serviciosPorTipoNav = (role: Role) => role === "SUPERVISOR_TECNICO" || role === "TECNICO";
+/** Técnico: submenú por tipo. Supervisor usa una sola pantalla /servicios. */
+const serviciosPorTipoNav = (role: Role) => role === "TECNICO";
 
-/** Operación vía Servicios + detalle; sin acordeón Taller en menú. */
-const showTallerNav = (role: Role) => !serviciosPorTipoNav(role);
+function showServiciosCatalogNav(role: Role, companyCode: string | null) {
+  if (!can(role, "attention.catalog", companyCode)) return false;
+  return !serviciosPorTipoNav(role);
+}
+
+/** Operación vía Servicios + detalle; técnico y supervisor no ven acordeón Taller. */
+const showTallerNav = (role: Role) => role !== "TECNICO" && role !== "SUPERVISOR_TECNICO";
 
 /** Catálogo EQUI: SYSTRON y roles con bandeja; nunca Servomotores (sin equi.view allí). */
 function showEquiCatalog(role: Role, companyCode: string | null) {
@@ -56,7 +62,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
     links: [
       {
         href: "/servicios",
-        show: (role, code) => can(role, "attention.catalog", code) && !serviciosPorTipoNav(role),
+        show: (role, code) => showServiciosCatalogNav(role, code),
       },
     ],
   },

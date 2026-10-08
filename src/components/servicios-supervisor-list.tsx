@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Badge, MobileCard, ResponsiveData, Table, Td, Th } from "@/components/ui";
 import { CASE_STATUS_LABEL } from "@/lib/case-labels";
+import { servicioTipoLabel } from "@/lib/servicios-catalog";
 import { servicioRowHighlight, type SupervisorServicioRow } from "@/lib/servicios-supervisor";
 
 function Markers({ markers }: { markers: string[] }) {
@@ -16,13 +17,22 @@ function Markers({ markers }: { markers: string[] }) {
   );
 }
 
-export function ServiciosSupervisorList({ rows, hideAssignee = false }: { rows: SupervisorServicioRow[]; hideAssignee?: boolean }) {
+export function ServiciosSupervisorList({
+  rows,
+  hideAssignee = false,
+  showTipo = false,
+}: {
+  rows: SupervisorServicioRow[];
+  hideAssignee?: boolean;
+  showTipo?: boolean;
+}) {
   return (
     <ResponsiveData
       table={
         <Table>
           <thead>
             <tr>
+              {showTipo ? <Th>Tipo</Th> : null}
               <Th>Folio / equipo</Th>
               <Th>Cliente</Th>
               <Th>Prioridad</Th>
@@ -37,6 +47,11 @@ export function ServiciosSupervisorList({ rows, hideAssignee = false }: { rows: 
               if (row.kind === "ingreso") {
                 return (
                   <tr key={`ing-${row.id}`} className={wrapClass}>
+                    {showTipo ? (
+                      <Td>
+                        <Badge>{servicioTipoLabel(row.attentionType)}</Badge>
+                      </Td>
+                    ) : null}
                     <Td>
                       <Link href={row.href} className="font-medium text-[var(--accent)]">
                         {row.equipmentFolio}
@@ -57,6 +72,11 @@ export function ServiciosSupervisorList({ rows, hideAssignee = false }: { rows: 
               }
               return (
                 <tr key={row.id} className={wrapClass}>
+                  {showTipo ? (
+                    <Td>
+                      <Badge>{servicioTipoLabel(row.attentionType)}</Badge>
+                    </Td>
+                  ) : null}
                   <Td>
                     <Link href={row.href} className="font-medium text-[var(--accent)]">
                       {row.folio}
@@ -95,7 +115,12 @@ export function ServiciosSupervisorList({ rows, hideAssignee = false }: { rows: 
               <MobileCard
                 href={row.href}
                 title={row.equipmentFolio}
-                meta={<Badge tone="neutral">Espera ingreso</Badge>}
+                meta={
+                  <>
+                    {showTipo ? <Badge>{servicioTipoLabel(row.attentionType)}</Badge> : null}
+                    <Badge tone="neutral">Espera ingreso</Badge>
+                  </>
+                }
               >
                 <p>{row.clientName}</p>
                 <p>{row.priorityName}</p>
@@ -114,7 +139,12 @@ export function ServiciosSupervisorList({ rows, hideAssignee = false }: { rows: 
                   <Markers markers={markers} />
                 </>
               }
-              meta={<Badge tone={statusTone}>{CASE_STATUS_LABEL[row.status] ?? row.status}</Badge>}
+              meta={
+                <>
+                  {showTipo ? <Badge>{servicioTipoLabel(row.attentionType)}</Badge> : null}
+                  <Badge tone={statusTone}>{CASE_STATUS_LABEL[row.status] ?? row.status}</Badge>
+                </>
+              }
             >
               <p>
                 {row.equipmentFolio} · {row.equipmentModel}
