@@ -30,6 +30,7 @@ export const NAV_GROUPS: Array<{ title: string | null; links: NavLinkDef[] }> = 
       { href: "/clientes", show: (role, code) => can(role, "client.create", code) || can(role, "client.edit", code) },
       { href: "/prospectos", show: (role, code) => can(role, "prospect.operate", code) },
       { href: "/equipos", show: (role, code) => ventas(role) && showEquiCatalog(role, code) },
+      { href: "/servicios", show: (role, code) => can(role, "attention.catalog", code) },
       { href: "/ventas", show: (role, code) => notVentas(role) && (can(role, "agenda.use", code) || can(role, "quote.follow", code)) },
       { href: "/agenda", show: (role, code) => can(role, "agenda.use", code) && notVentas(role) },
       { href: "/facturacion", show: (role, code) => notVentas(role) && (can(role, "invoice.request", code) || can(role, "invoice.issue", code)) },
@@ -37,13 +38,6 @@ export const NAV_GROUPS: Array<{ title: string | null; links: NavLinkDef[] }> = 
       { href: "/pagos", show: (role, code) => notVentas(role) && (can(role, "payment.register", code) || can(role, "payment.validate", code)) },
       { href: "/compras", show: (role, code) => can(role, "purchase.operate", code) },
       { href: "/finanzas", show: (role, code) => can(role, "finance.view", code) },
-    ],
-  },
-  {
-    title: "Servicios",
-    links: [
-      { href: "/servicios", show: (role, code) => can(role, "attention.catalog", code) },
-      { href: "/operacion", show: (role, code) => can(role, "operation.queue", code) && notVentas(role) },
     ],
   },
   {
@@ -64,6 +58,7 @@ export const NAV_GROUPS: Array<{ title: string | null; links: NavLinkDef[] }> = 
     links: [
       { href: "/equipos", show: (role, code) => notVentas(role) && showEquiCatalog(role, code) },
       { href: "/motores", show: (role, code) => notVentas(role) && can(role, "equipment.catalog", code) && can(role, "mot.view", code) },
+      { href: "/operacion", show: (role, code) => can(role, "operation.queue", code) && notVentas(role) },
       { href: "/custodia", show: (role, code) => can(role, "custody.confirm", code) },
       { href: "/inventario", show: (role, code) => can(role, "inventory.operate", code) },
     ],
