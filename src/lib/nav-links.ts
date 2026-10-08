@@ -15,6 +15,8 @@ export type NavGroupDef = {
 
 const ventas = (role: Role) => role === "VENTAS";
 const notVentas = (role: Role) => role !== "VENTAS";
+/** Operación vía Servicios + detalle; sin acordeón Taller en menú. */
+const showTallerNav = (role: Role) => role !== "SUPERVISOR_TECNICO";
 
 /** Catálogo EQUI: SYSTRON y roles con bandeja; nunca Servomotores (sin equi.view allí). */
 function showEquiCatalog(role: Role, companyCode: string | null) {
@@ -89,11 +91,11 @@ export const NAV_GROUPS: NavGroupDef[] = [
   {
     title: "Taller",
     links: [
-      { href: "/equipos", show: (role, code) => notVentas(role) && showEquiCatalog(role, code) },
-      { href: "/motores", show: (role, code) => notVentas(role) && can(role, "equipment.catalog", code) && can(role, "mot.view", code) },
-      { href: "/operacion", show: (role, code) => can(role, "operation.queue", code) && notVentas(role) },
-      { href: "/custodia", show: (role, code) => can(role, "custody.confirm", code) },
-      { href: "/inventario", show: (role, code) => can(role, "inventory.operate", code) },
+      { href: "/equipos", show: (role, code) => showTallerNav(role) && notVentas(role) && showEquiCatalog(role, code) },
+      { href: "/motores", show: (role, code) => showTallerNav(role) && notVentas(role) && can(role, "equipment.catalog", code) && can(role, "mot.view", code) },
+      { href: "/operacion", show: (role, code) => showTallerNav(role) && can(role, "operation.queue", code) && notVentas(role) },
+      { href: "/custodia", show: (role, code) => showTallerNav(role) && can(role, "custody.confirm", code) },
+      { href: "/inventario", show: (role, code) => showTallerNav(role) && can(role, "inventory.operate", code) },
     ],
   },
   {

@@ -18,13 +18,10 @@ export const SYSTRON_NAV: Partial<Record<Role, readonly string[]>> = {
   TECNICO: ["/panel", "/operacion", "/personal/horas"],
   SUPERVISOR_TECNICO: [
     "/panel",
-    "/personal/horas",
     "/servicios/diagnostico",
     "/servicios/reparacion",
     "/servicios/garantia",
-    "/operacion",
-    "/equipos",
-    "/motores",
+    "/personal/horas",
     "/reportes",
   ],
   GERENTE_OPERATIVO_SYSTRON: [
@@ -85,6 +82,16 @@ export const SYSTRON_NAV_FORBIDDEN: Partial<Record<Role, readonly string[]>> = {
     "/motores",
     "/custodia",
     "/proveedores",
+  ],
+  SUPERVISOR_TECNICO: [
+    "/operacion",
+    "/equipos",
+    "/motores",
+    "/custodia",
+    "/inventario",
+    "/compras",
+    "/finanzas",
+    "/servicios",
   ],
   COORDINACION_ADMINISTRACION: [
     "/servicios",
