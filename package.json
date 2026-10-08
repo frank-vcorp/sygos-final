@@ -9,6 +9,7 @@
     "postinstall": "prisma generate",
     "db:push": "prisma db push",
     "db:seed": "tsx prisma/seed.ts",
+    "db:import-inventario": "tsx scripts/import-inventario-oct26.mts",
     "test": "tsx --test src/lib/permissions.test.ts src/lib/role-nav.test.ts src/lib/folios.test.ts src/lib/custody.test.ts src/lib/sla.test.ts src/lib/money.test.ts src/lib/catalog-key.test.ts src/lib/billing.test.ts src/lib/purchases.test.ts src/lib/personnel.test.ts src/lib/panels.test.ts src/lib/part-presolicitud.test.ts src/lib/client-search.test.ts src/lib/sandbox.test.ts src/lib/integrations.test.ts",
     "e2e:browser": "tsx scripts/e2e-browser-flows.mts",
     "e2e:discovery": "tsx scripts/e2e-discovery-flows.ts"

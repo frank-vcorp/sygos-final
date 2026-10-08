@@ -27,13 +27,30 @@ export async function createPartAction(formData: FormData) {
   "use server";
   try {
     const session = await guard();
-    const partNumber = requiredText(formData.get("partNumber"), "Número de parte");
-    const description = requiredText(formData.get("description"), "Descripción");
+    const partNumber = requiredText(formData.get("partNumber"), "Nombre de producto");
+    const description = optionalText(formData.get("description")) ?? "";
+    const catalogNumero = optionalText(formData.get("catalogNumero")) ?? "";
+    const family = optionalText(formData.get("family")) ?? "";
+    const location = optionalText(formData.get("location")) ?? "";
+    const unit = optionalText(formData.get("unit")) ?? "";
+    const mountType = optionalText(formData.get("mountType")) ?? "";
     const minQty = optionalInt(formData.get("minQty"));
     const maxQty = optionalInt(formData.get("maxQty"));
     if (minQty != null && maxQty != null && minQty > maxQty) throw new Error("El mínimo no puede ser mayor que el máximo.");
     const part = await prisma.part.create({
-      data: { companyId: session.activeCompanyId, partNumber, description, minQty, maxQty, qty: 0 },
+      data: {
+        companyId: session.activeCompanyId,
+        partNumber,
+        description,
+        catalogNumero,
+        family,
+        location,
+        unit,
+        mountType,
+        minQty,
+        maxQty,
+        qty: 0,
+      },
     });
     await recordHistory({
       companyId: session.activeCompanyId,
@@ -75,37 +92,40 @@ export async function stockAction(formData: FormData) {
 
 export type CountPreview = {
   error?: string;
-  rows: Array<{ partNumber: string; description: string; current: number; counted: number; delta: number }>;
+  rows: Array<{ partId: string; label: string; description: string; current: number; counted: number; delta: number }>;
   unknown: string[];
+  conteoPayload: string;
 };
 
 export async function previewCountAction(_prev: CountPreview, formData: FormData): Promise<CountPreview> {
   "use server";
   const session = await requireCompany();
   if (!can(session.role, "inventory.operate", session.activeCompanyCode)) {
-    return { error: "No tienes permiso para el inventario.", rows: [], unknown: [] };
+    return { error: "No tienes permiso para el inventario.", rows: [], unknown: [], conteoPayload: "" };
   }
   const parsed = parseCount(String(formData.get("conteo") ?? ""));
-  if (parsed.error) return { error: parsed.error, rows: [], unknown: [] };
+  if (parsed.error) return { error: parsed.error, rows: [], unknown: [], conteoPayload: "" };
   const parts = await prisma.part.findMany({ where: { companyId: session.activeCompanyId, active: true } });
-  const byNumber = new Map(parts.map((part) => [part.partNumber, part]));
+  const byId = new Map(parts.map((part) => [part.id, part]));
   const unknown: string[] = [];
   const rows = [];
   for (const row of parsed.rows) {
-    const part = byNumber.get(row.partNumber);
+    const part = byId.get(row.partId);
     if (!part) {
-      unknown.push(row.partNumber);
+      unknown.push(row.partId);
       continue;
     }
     rows.push({
-      partNumber: part.partNumber,
+      partId: part.id,
+      label: part.partNumber,
       description: part.description,
       current: part.qty,
       counted: row.counted,
       delta: row.counted - part.qty,
     });
   }
-  return { rows, unknown };
+  const conteoPayload = parsed.rows.map((row) => `${row.partId},${row.counted}`).join("\n");
+  return { rows, unknown, conteoPayload };
 }
 
 export async function applyCountAction(formData: FormData) {
@@ -124,21 +144,21 @@ export async function applyCountAction(formData: FormData) {
   }
 }
 
-function parseCount(text: string): { rows: Array<{ partNumber: string; counted: number }>; error?: string } {
-  const rows: Array<{ partNumber: string; counted: number }> = [];
+function parseCount(text: string): { rows: Array<{ partId: string; counted: number }>; error?: string } {
+  const rows: Array<{ partId: string; counted: number }> = [];
   const seen = new Set<string>();
   for (const line of text.split(/\r?\n/)) {
     const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith("numero")) continue;
-    const [partNumber, raw] = trimmed.split(/[,;\t]/).map((part) => part.trim());
-    if (!partNumber || raw == null || raw === "") return { rows: [], error: `La línea "${trimmed}" necesita número de parte y conteo.` };
-    if (seen.has(partNumber)) return { rows: [], error: `El número ${partNumber} está repetido.` };
+    if (!trimmed || trimmed.startsWith("id") || trimmed.startsWith("numero")) continue;
+    const [partId, raw] = trimmed.split(/[,;\t]/).map((part) => part.trim());
+    if (!partId || raw == null || raw === "") return { rows: [], error: `La línea "${trimmed}" necesita id de línea y conteo.` };
+    if (seen.has(partId)) return { rows: [], error: `El id ${partId} está repetido.` };
     const counted = Number(raw);
-    if (!Number.isInteger(counted) || counted < 0) return { rows: [], error: `El conteo de ${partNumber} debe ser un entero positivo o cero.` };
-    seen.add(partNumber);
-    rows.push({ partNumber, counted });
+    if (!Number.isInteger(counted) || counted < 0) return { rows: [], error: `El conteo de ${partId} debe ser un entero positivo o cero.` };
+    seen.add(partId);
+    rows.push({ partId, counted });
   }
-  if (rows.length === 0) return { rows: [], error: "Pega al menos una línea con número de parte y conteo." };
+  if (rows.length === 0) return { rows: [], error: "Pega al menos una línea con id de línea (exportar inventario) y conteo." };
   return { rows };
 }
 

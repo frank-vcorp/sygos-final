@@ -11,11 +11,28 @@ export async function GET() {
   if (!company?.inventoryEnabled) return new Response("Inventario deshabilitado", { status: 404 });
   const parts = await prisma.part.findMany({
     where: { companyId: company.id, active: true },
-    orderBy: { partNumber: "asc" },
+    orderBy: [{ partNumber: "asc" }, { location: "asc" }],
   });
-  const lines = ["numero,descripcion,existencia,minimo,maximo"];
+  const lines = [
+    "id,fila_excel,nombre,descripcion,numero,familia,ubicacion,unidad,montaje,existencia,minimo,maximo",
+  ];
   for (const part of parts) {
-    lines.push([csv(part.partNumber), csv(part.description), String(part.qty), part.minQty ?? "", part.maxQty ?? ""].join(","));
+    lines.push(
+      [
+        part.id,
+        part.catalogLine > 0 ? String(part.catalogLine) : "",
+        csv(part.partNumber),
+        csv(part.description),
+        csv(part.catalogNumero),
+        csv(part.family),
+        csv(part.location),
+        csv(part.unit),
+        csv(part.mountType),
+        String(part.qty),
+        part.minQty ?? "",
+        part.maxQty ?? "",
+      ].join(","),
+    );
   }
   return new Response(lines.join("\n"), {
     headers: {

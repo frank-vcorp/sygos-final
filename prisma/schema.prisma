@@ -478,22 +478,28 @@ model CustodyMovement {
 }
 
 model Part {
-  id          String   @id @default(cuid())
-  companyId   String
-  company     Company  @relation(fields: [companyId], references: [id])
-  partNumber  String
-  description String
-  qty         Int      @default(0)
-  minQty      Int?
-  maxQty      Int?
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  version     Int      @default(1)
+  id            String   @id @default(cuid())
+  companyId     String
+  company       Company  @relation(fields: [companyId], references: [id])
+  partNumber    String
+  description   String   @default("")
+  catalogNumero String   @default("")
+  family        String   @default("")
+  location      String   @default("")
+  unit          String   @default("")
+  mountType     String   @default("")
+  catalogLine   Int      @default(0)
+  qty           Int      @default(0)
+  minQty        Int?
+  maxQty        Int?
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  version       Int      @default(1)
 
   movements StockMovement[]
 
-  @@unique([companyId, partNumber])
+  @@unique([companyId, partNumber, description, catalogNumero, family, location, unit, mountType, catalogLine], name: "part_inventory_line")
 }
 
 model StockMovement {

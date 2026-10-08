@@ -72,7 +72,14 @@ export async function reportTable(companyId: string, inventoryEnabled: boolean, 
   if (type === "inventario") {
     if (!inventoryEnabled) return { title: "Inventario", headers: ["Aviso"], rows: [{ cells: ["El inventario de esta empresa no está habilitado."] }] };
     const rows = await prisma.part.findMany({ where: { companyId, active: true }, orderBy: { partNumber: "asc" } });
-    return { title: "Inventario actual", headers: ["Número", "Descripción", "Existencia", "Mínimo"], rows: rows.map((row) => ({ href: "/inventario", cells: [row.partNumber, row.description, String(row.qty), row.minQty == null ? "—" : String(row.minQty)] })) };
+    return {
+      title: "Inventario actual",
+      headers: ["Producto", "Ubicación", "Familia", "Existencia", "Mínimo"],
+      rows: rows.map((row) => ({
+        href: "/inventario",
+        cells: [row.partNumber, row.location || "—", row.family || "—", String(row.qty), row.minQty == null ? "—" : String(row.minQty)],
+      })),
+    };
   }
   if (type === "nomina") {
     const rows = await prisma.payrollPeriod.findMany({ where: { companyId, ...(hasRange ? { createdAt: created } : {}) }, include: { lines: true }, orderBy: { createdAt: "desc" }, take: 50 });

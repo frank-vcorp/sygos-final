@@ -440,11 +440,14 @@ export async function receivePartRequest(actor: Actor, requestId: string, versio
     const updated = await tx.partRequest.updateMany({ where: { id: request.id, version }, data: { qtyReceived, status, version: { increment: 1 } } });
     if (updated.count === 0) throw new ConcurrencyError();
     if (company.inventoryEnabled) {
-      const part = await tx.part.upsert({
-        where: { companyId_partNumber: { companyId: company.id, partNumber: request.partNumber } },
-        update: {},
-        create: { companyId: company.id, partNumber: request.partNumber, description: request.description, qty: 0 },
+      let part = await tx.part.findFirst({
+        where: { companyId: company.id, partNumber: request.partNumber, description: request.description },
       });
+      if (!part) {
+        part = await tx.part.create({
+          data: { companyId: company.id, partNumber: request.partNumber, description: request.description, qty: 0 },
+        });
+      }
       const qtyAfter = part.qty + quantity;
       await tx.part.update({ where: { id: part.id }, data: { qty: qtyAfter, version: { increment: 1 } } });
       await tx.stockMovement.create({
@@ -466,7 +469,9 @@ export async function issuePartRequest(actor: Actor, requestId: string, version:
     const updated = await tx.partRequest.updateMany({ where: { id: request.id, version }, data: { qtyIssued, status, version: { increment: 1 } } });
     if (updated.count === 0) throw new ConcurrencyError();
     if (request.case.serviceCompany.inventoryEnabled) {
-      const part = await tx.part.findUnique({ where: { companyId_partNumber: { companyId: request.companyId, partNumber: request.partNumber } } });
+      const part = await tx.part.findFirst({
+        where: { companyId: request.companyId, partNumber: request.partNumber, description: request.description },
+      });
       if (!part || part.qty < quantity) throw new Error("La existencia no alcanza para surtir.");
       const qtyAfter = part.qty - quantity;
       await tx.part.update({ where: { id: part.id }, data: { qty: qtyAfter, version: { increment: 1 } } });

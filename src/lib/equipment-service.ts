@@ -561,15 +561,15 @@ export async function changeStock(
 
 export async function applyCount(
   actor: Actor,
-  rows: Array<{ partNumber: string; counted: number }>,
+  rows: Array<{ partId: string; counted: number }>,
 ) {
   const parts = await prisma.part.findMany({ where: { companyId: actor.activeCompanyId, active: true } });
-  const byNumber = new Map(parts.map((part) => [part.partNumber, part]));
+  const byId = new Map(parts.map((part) => [part.id, part]));
   const changes: Array<{ partId: string; version: number; from: number; to: number; partNumber: string }> = [];
   for (const row of rows) {
-    const part = byNumber.get(row.partNumber);
-    if (!part) throw new Error(`No existe la refacción ${row.partNumber} en esta empresa.`);
-    if (!Number.isInteger(row.counted) || row.counted < 0) throw new Error(`El conteo de ${row.partNumber} no es válido.`);
+    const part = byId.get(row.partId);
+    if (!part) throw new Error(`No existe la línea de inventario ${row.partId} en esta empresa.`);
+    if (!Number.isInteger(row.counted) || row.counted < 0) throw new Error(`El conteo de ${part.partNumber} no es válido.`);
     if (part.qty !== row.counted) {
       changes.push({ partId: part.id, version: part.version, from: part.qty, to: row.counted, partNumber: part.partNumber });
     }

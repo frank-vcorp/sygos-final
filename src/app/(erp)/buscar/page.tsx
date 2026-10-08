@@ -38,7 +38,16 @@ export default async function BuscarPage({ searchParams }: { searchParams: Promi
       take: 20,
     }),
     prisma.part.findMany({
-      where: { companyId: session.activeCompanyId, OR: [{ partNumber: contains }, { description: contains }] },
+      where: {
+        companyId: session.activeCompanyId,
+        OR: [
+          { partNumber: contains },
+          { description: contains },
+          { location: contains },
+          { family: contains },
+          { catalogNumero: contains },
+        ],
+      },
       take: 20,
     }),
     prisma.technicalCase.findMany({
