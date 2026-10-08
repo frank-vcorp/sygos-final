@@ -58,12 +58,18 @@ export async function createQuoteAction(formData: FormData) {
       concepts,
       contactIds,
     });
-    await setFlash({ tone: "ok", message: `${quote.folio} quedó registrada, sin precio.` });
+    const fromVentas = optionalText(formData.get("origin")) === "ventas";
+    await setFlash({
+      tone: "ok",
+      message: fromVentas
+        ? `${quote.folio} registrada como venta de equipo, sin precio. Sigue en cotizaciones hasta autorización.`
+        : `${quote.folio} quedó registrada, sin precio.`,
+    });
     redirect(`/cotizaciones/${quote.id}`);
   } catch (error) {
     if (isRedirect(error)) throw error;
     await setFlash({ tone: "error", message: messageOf(error) });
-    redirect("/cotizaciones/nuevo");
+    redirect(optionalText(formData.get("origin")) === "ventas" ? "/ventas/nuevo" : "/cotizaciones/nuevo");
   }
 }
 

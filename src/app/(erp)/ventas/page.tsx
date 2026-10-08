@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ClientNameLink } from "@/components/client-entity-links";
-import { Badge, Empty, MobileCard, PageHeader, ResponsiveData, Table, Td, Th } from "@/components/ui";
+import { ActionLink, Badge, Empty, MobileCard, PageHeader, ResponsiveData, Table, Td, Th, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { homePath } from "@/lib/home";
@@ -26,9 +26,14 @@ export default async function VentasPage() {
         title="Venta de equipos"
         subtitle="Ventas autorizadas de tu cartera. Recepción y entrega se confirman en el detalle."
         back={session.role === "VENTAS" ? { href: "/panel", label: "Inicio" } : undefined}
+        action={can(session.role, "quote.create", session.activeCompanyCode) ? <ActionLink href="/ventas/nuevo">Nueva venta de equipo</ActionLink> : null}
       />
       {sales.length === 0 ? (
-        <Empty title="Sin ventas de equipo" body="Aparecen aquí cuando una cotización de venta de equipo queda autorizada." />
+        <Empty
+          title="Sin ventas de equipo"
+          body="Inicia una cotización de venta de equipo; cuando el cliente autorice, el folio VTA aparece aquí."
+          action={can(session.role, "quote.create", session.activeCompanyCode) ? <TextLink href="/ventas/nuevo">Nueva venta de equipo</TextLink> : undefined}
+        />
       ) : (
         <ResponsiveData
           table={
