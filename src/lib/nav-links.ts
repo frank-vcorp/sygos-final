@@ -42,9 +42,7 @@ export const NAV_GROUPS: Array<{ title: string | null; links: NavLinkDef[] }> = 
   {
     title: "Servicios",
     links: [
-      { href: "/servicios/diagnostico", show: (role, code) => can(role, "attention.catalog", code) },
-      { href: "/servicios/reparacion", show: (role, code) => can(role, "attention.catalog", code) },
-      { href: "/servicios/garantia", show: (role, code) => can(role, "attention.catalog", code) },
+      { href: "/servicios", show: (role, code) => can(role, "attention.catalog", code) },
       { href: "/operacion", show: (role, code) => can(role, "operation.queue", code) && notVentas(role) },
     ],
   },
