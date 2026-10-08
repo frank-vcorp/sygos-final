@@ -126,11 +126,44 @@ export default async function OperacionDetallePage({ params }: { params: Promise
             ) : row.quotePending ? <p className="mt-3 text-[var(--muted)]">Queda pendiente de cotizar.</p> : null}
             {row.paidAt ? <p className="mt-1">Marcada como pagada {formatWhen(row.paidAt)}.</p> : null}
           </section>
+          {canWork && row.kind === "DIAGNOSTICO" && ["EN_DIAGNOSTICO", "DEVUELTO"].includes(row.status) ? (
+            <form action={finishDiagnosisAction} className="grid gap-2 rounded-lg border border-[var(--line)] bg-white p-4">
+              <h2 className="font-medium">Terminar diagnóstico</h2>
+              <p className="text-sm text-[var(--muted)]">Resume el hallazgo técnico. La bitácora queda aparte para avances durante el trabajo.</p>
+              <input type="hidden" name="caseId" value={row.id} />
+              <input type="hidden" name="version" value={row.version} />
+              <Field label="Resultado del diagnóstico">
+                <textarea name="resultText" required rows={4} className={controlClass} placeholder="Hallazgo, pruebas y conclusión" />
+              </Field>
+              <Button type="submit">Terminar diagnóstico</Button>
+            </form>
+          ) : null}
+          <section className="rounded-lg border border-[var(--line)] bg-white p-4">
+            <h2 className="font-medium">Bitácora</h2>
+            <p className="mt-1 text-sm text-[var(--muted)]">Las entradas no se editan ni se borran. Una corrección es una entrada nueva.</p>
+            <ul className="mt-3 space-y-2 text-sm">
+              {row.logs.map((item) => (
+                <li key={item.id} className="border-t border-[var(--line)] pt-2">
+                  <span className="text-[var(--muted)]">{formatWhen(item.createdAt)} · {names.get(item.authorUserId) ?? "—"}</span>
+                  <p>{item.body}</p>
+                </li>
+              ))}
+            </ul>
+            {canWork && !closed ? (
+              <form action={logAction} className="mt-3 grid gap-2">
+                <input type="hidden" name="caseId" value={row.id} />
+                <textarea name="body" required rows={3} className={controlClass} placeholder="Avance, hallazgo, prueba o incidencia" />
+                <Button type="submit" tone="ghost">Agregar entrada</Button>
+              </form>
+            ) : null}
+          </section>
+        </div>
+        <div className="space-y-4">
           {row.kind === "DIAGNOSTICO" ? (
             <section className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
               <h2 className="font-medium">Refacciones previstas</h2>
               <p className="mt-1 text-[var(--muted)]">
-                Presolicitud del técnico durante el diagnóstico. Si el cliente autoriza, pasan a solicitud en la orden de servicio.
+                Presolicitud durante el diagnóstico. Si el cliente autoriza, pasan a la orden de servicio.
               </p>
               {row.presolicitudes.length === 0 ? (
                 <p className="mt-2 text-[var(--muted)]">Sin presolicitudes.</p>
@@ -171,7 +204,7 @@ export default async function OperacionDetallePage({ params }: { params: Promise
                               <input name="quantity" type="number" min={1} required defaultValue={item.qtyRequested} className={controlClass} />
                             </Field>
                             <Button type="submit" tone="ghost">
-                              Guardar cambio
+                              Guardar
                             </Button>
                           </form>
                           <form action={deletePresolicitudAction}>
@@ -203,31 +236,12 @@ export default async function OperacionDetallePage({ params }: { params: Promise
                     <input name="quantity" type="number" min={1} required className={controlClass} />
                   </Field>
                   <Button type="submit" tone="ghost">
-                    Agregar presolicitud
+                    Agregar
                   </Button>
                 </form>
               ) : null}
             </section>
           ) : null}
-          <section className="rounded-lg border border-[var(--line)] bg-white p-4">
-            <h2 className="font-medium">Bitácora</h2>
-            <p className="mt-1 text-sm text-[var(--muted)]">Las entradas no se editan ni se borran. Una corrección es una entrada nueva.</p>
-            <ul className="mt-3 space-y-2 text-sm">
-              {row.logs.map((item) => (
-                <li key={item.id} className="border-t border-[var(--line)] pt-2">
-                  <span className="text-[var(--muted)]">{formatWhen(item.createdAt)} · {names.get(item.authorUserId) ?? "—"}</span>
-                  <p>{item.body}</p>
-                </li>
-              ))}
-            </ul>
-            {canWork && !closed ? (
-              <form action={logAction} className="mt-3 grid gap-2">
-                <input type="hidden" name="caseId" value={row.id} />
-                <textarea name="body" required rows={3} className={controlClass} placeholder="Avance, hallazgo, prueba o incidencia" />
-                <Button type="submit" tone="ghost">Agregar entrada</Button>
-              </form>
-            ) : null}
-          </section>
           {row.kind === "OS" ? (
             <section className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
               <h2 className="font-medium">Refacciones</h2>
@@ -237,7 +251,7 @@ export default async function OperacionDetallePage({ params }: { params: Promise
                     <li key={request.id}>
                       <p>{request.partNumber} · {request.description} · {request.status}</p>
                       <p className="text-[var(--muted)]">Solicitada {request.qtyRequested} · recibida {request.qtyReceived} · surtida {request.qtyIssued}</p>
-                      {canWork && !closed ? (
+                      {canWork && !closed && !readOnly ? (
                         <div className="mt-1 flex flex-wrap gap-2">
                           <form action={receivePartAction} className="flex gap-1">
                             <input type="hidden" name="caseId" value={row.id} />
@@ -259,7 +273,7 @@ export default async function OperacionDetallePage({ params }: { params: Promise
                   ))}
                 </ul>
               )}
-              {canWork && !closed ? (
+              {canWork && !closed && !readOnly ? (
                 <form action={requestPartAction} className="mt-3 grid gap-2">
                   <input type="hidden" name="caseId" value={row.id} />
                   <Field label="Número de parte"><input name="partNumber" required className={controlClass} /></Field>
@@ -271,9 +285,8 @@ export default async function OperacionDetallePage({ params }: { params: Promise
               ) : null}
             </section>
           ) : null}
-        </div>
-        {!readOnly ? (
-          <div className="space-y-4">
+          {!readOnly ? (
+            <>
             {canManage && !closed ? (
               <form action={assignCaseAction} className="grid gap-2 rounded-lg border border-[var(--line)] bg-white p-4">
                 <h2 className="font-medium">Asignación</h2>
@@ -303,15 +316,6 @@ export default async function OperacionDetallePage({ params }: { params: Promise
                 <input type="hidden" name="caseId" value={row.id} />
                 <input type="hidden" name="version" value={row.version} />
                 <Button type="submit">Iniciar trabajo</Button>
-              </form>
-            ) : null}
-            {canWork && row.kind === "DIAGNOSTICO" && ["EN_DIAGNOSTICO", "DEVUELTO"].includes(row.status) ? (
-              <form action={finishDiagnosisAction} className="grid gap-2 rounded-lg border border-[var(--line)] bg-white p-4">
-                <h2 className="font-medium">Terminar diagnóstico</h2>
-                <input type="hidden" name="caseId" value={row.id} />
-                <input type="hidden" name="version" value={row.version} />
-                <textarea name="resultText" required rows={3} className={controlClass} />
-                <Button type="submit">Terminar</Button>
               </form>
             ) : null}
             {canManage && row.kind === "DIAGNOSTICO" && (row.status === "PENDIENTE_VALIDACION" || (row.serviceCompany.code === "SERVOMOTORES" && row.status === "VALIDADO" && warranty && !row.warrantyDecision)) ? (
@@ -379,11 +383,10 @@ export default async function OperacionDetallePage({ params }: { params: Promise
                 <Button type="submit">Guardar decisión</Button>
               </form>
             ) : null}
-            <HistoryTimeline items={history.map((item) => ({ id: item.id, createdAt: item.createdAt, summary: item.summary, authorName: item.author?.name }))} />
-          </div>
-        ) : (
+            </>
+          ) : null}
           <HistoryTimeline items={history.map((item) => ({ id: item.id, createdAt: item.createdAt, summary: item.summary, authorName: item.author?.name }))} />
-        )}
+        </div>
       </DetailGrid>
     </>
   );
