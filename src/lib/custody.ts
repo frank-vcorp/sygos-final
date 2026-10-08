@@ -82,6 +82,22 @@ export function isReceipt(movement: MovementKind): boolean {
   return movement === "ENTRADA" || movement === "INGRESO";
 }
 
+/** Primera recepción en almacén (no retornos posteriores). */
+export function isInitialWarehouseReceipt(kind: "EQUI" | "MOT", custody: Custody, movement: MovementKind): boolean {
+  if (!isReceipt(movement)) return false;
+  return kind === "EQUI" ? custody === "SIN_CUSTODIA" : custody === "PENDIENTE_INGRESO";
+}
+
+const ATTENTION_TO_RECEIPT_REASON: Record<string, string> = {
+  DIAGNOSTICO: "Diagnóstico",
+  REPARACION: "Reparación",
+  DIAGNOSTICO_GARANTIA: "Diagnóstico de Garantía",
+};
+
+export function receiptReasonFromAttention(attentionType: string): string | null {
+  return ATTENTION_TO_RECEIPT_REASON[attentionType] ?? null;
+}
+
 export function allowedMovements(kind: "EQUI" | "MOT", current: Custody): MovementKind[] {
   return MOVEMENTS.filter((movement) => NEXT[`${kind}:${current}`]?.[movement]);
 }

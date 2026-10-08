@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { allowedMovements, nextCustody, reasonsFor } from "./custody";
+import { allowedMovements, isInitialWarehouseReceipt, nextCustody, reasonsFor, receiptReasonFromAttention } from "./custody";
 
 describe("custodia física", () => {
   it("recibe un EQUI en almacén y deja salir a prueba sin cerrarlo", () => {
@@ -25,6 +25,13 @@ describe("custodia física", () => {
       "Retorno de proveedor",
     ]);
     assert.deepEqual(reasonsFor("SALIDA_PRUEBA"), ["Salida a prueba"]);
+  });
+
+  it("detecta la primera entrada de almacén y el motivo desde la atención", () => {
+    assert.equal(isInitialWarehouseReceipt("EQUI", "SIN_CUSTODIA", "ENTRADA"), true);
+    assert.equal(isInitialWarehouseReceipt("EQUI", "FUERA", "ENTRADA"), false);
+    assert.equal(receiptReasonFromAttention("DIAGNOSTICO"), "Diagnóstico");
+    assert.equal(receiptReasonFromAttention("REPARACION"), "Reparación");
   });
 
   it("no simula retorno si el equipo permanece fuera después de la prueba", () => {

@@ -110,7 +110,7 @@ export async function movementAction(formData: FormData) {
     const session = await guard("custody.confirm");
     const movement = requiredText(formData.get("movement"), "Movimiento");
     if (!(MOVEMENTS as readonly string[]).includes(movement)) throw new Error("Movimiento no reconocido.");
-    await registerMovement(session, {
+    const result = await registerMovement(session, {
       equipmentId,
       version: parseVersion(formData.get("version")),
       kind: movement as MovementKind,
@@ -123,7 +123,12 @@ export async function movementAction(formData: FormData) {
       supplierId: await supplierIdFromForm(session, formData),
       notes: optionalText(formData.get("notes")),
     });
-    await setFlash({ tone: "ok", message: "Movimiento físico registrado." });
+    await setFlash({
+      tone: "ok",
+      message: result.folio
+        ? `${result.folio} confirmado. Imprime el documento de recepción para firma del vendedor.`
+        : "Movimiento físico registrado.",
+    });
     redirect(back);
   } catch (error) {
     if (isRedirect(error)) throw error;

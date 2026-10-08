@@ -17,7 +17,7 @@ export default async function VentasPage() {
   const sales = await prisma.sale.findMany({
     where: { companyId: session.activeCompanyId, ...own },
     include: { client: true, quote: true, lines: true },
-    orderBy: { updatedAt: "desc" },
+    orderBy: { createdAt: "desc" },
     take: 100,
   });
   return (

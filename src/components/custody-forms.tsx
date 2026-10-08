@@ -2,7 +2,7 @@ import { cancelMovementAction, createAttentionAction, movementAction } from "@/a
 import { MovementReasonFields } from "@/components/movement-reason-fields";
 import { SupplierPicker } from "@/components/supplier-picker";
 import { Button, controlClass, Field } from "@/components/ui";
-import { allowedMovements, type Custody, type MovementKind } from "@/lib/custody";
+import { allowedMovements, MOVEMENT_LABEL, type Custody, type MovementKind } from "@/lib/custody";
 import { ATTENTION_LABEL, ATTENTION_TYPES, prioritySummary } from "@/lib/priorities";
 
 type PriorityRow = {
@@ -79,24 +79,60 @@ export function AttentionForm({
 
 export function MovementForm({
   equipmentId,
+  equipmentFolio,
   kind,
   custody,
   version,
   suppliers,
   allowQuickSupplier = false,
   variant = "card",
+  receiptPreset,
 }: {
   equipmentId: string;
+  equipmentFolio: string;
   kind: "EQUI" | "MOT";
   custody: Custody;
   version: number;
   suppliers: Array<{ id: string; name: string }>;
   allowQuickSupplier?: boolean;
   variant?: "card" | "plain";
+  receiptPreset?: {
+    movement: MovementKind;
+    reason: string;
+    serviceLabel: string;
+    reportedFault: string;
+    clientName: string;
+  };
 }) {
   const movements = allowedMovements(kind, custody);
   if (movements.length === 0) return null;
   const shell = variant === "card" ? "grid gap-3 rounded-lg border border-[var(--line)] bg-white p-4" : "grid gap-3";
+
+  if (receiptPreset) {
+    return (
+      <form action={movementAction} className={shell}>
+        <input type="hidden" name="equipmentId" value={equipmentId} />
+        <input type="hidden" name="kind" value={kind} />
+        <input type="hidden" name="version" value={version} />
+        <input type="hidden" name="movement" value={receiptPreset.movement} />
+        <input type="hidden" name="reason" value={receiptPreset.reason} />
+        <p className="text-sm text-[var(--muted)]">
+          El tipo de servicio ya lo definió ventas. Al confirmar, el equipo queda en resguardo y arranca el SLA.
+        </p>
+        <dl className="grid gap-2 rounded-md border border-[var(--line)] bg-[#f7f8f9] p-3 text-sm">
+          <div><dt className="text-[var(--muted)]">Equipo</dt><dd className="font-medium">{equipmentFolio}</dd></div>
+          <div><dt className="text-[var(--muted)]">Cliente</dt><dd>{receiptPreset.clientName}</dd></div>
+          <div><dt className="text-[var(--muted)]">Servicio</dt><dd>{receiptPreset.serviceLabel}</dd></div>
+          <div><dt className="text-[var(--muted)]">Falla reportada</dt><dd>{receiptPreset.reportedFault}</dd></div>
+          <div><dt className="text-[var(--muted)]">Movimiento</dt><dd>{MOVEMENT_LABEL[receiptPreset.movement]}</dd></div>
+        </dl>
+        <Button type="submit">Confirmar {MOVEMENT_LABEL[receiptPreset.movement].toLowerCase()} física</Button>
+      </form>
+    );
+  }
+
+  const isSimpleExit = movements.length === 1 && movements[0] === "RETORNO";
+
   return (
     <form action={movementAction} className={shell}>
       {variant === "card" ? <h2 className="font-medium">Registrar movimiento</h2> : null}
@@ -104,22 +140,26 @@ export function MovementForm({
       <input type="hidden" name="kind" value={kind} />
       <input type="hidden" name="version" value={version} />
       <MovementReasonFields movements={movements} />
-      <Field label="Fecha y hora"><input name="occurredAt" type="datetime-local" className={controlClass} /></Field>
-      <Field label="Persona que recibe" hint="No se convierte en cliente. Obligatoria en salida a prueba y en salida definitiva.">
-        <input name="receiverName" className={controlClass} />
-      </Field>
-      <Field label="Modalidad de entrega">
-        <select name="deliveryMode" className={controlClass} defaultValue="">
-          <option value="">Sin definir</option>
-          <option value="Recoge en sitio">Recoge en sitio</option>
-          <option value="Entrega directa">Entrega directa</option>
-          <option value="Paquetería">Paquetería</option>
-        </select>
-      </Field>
-      <Field label="Contacto"><input name="contact" className={controlClass} /></Field>
-      <Field label="Documento habilitante" hint="Factura o remisión cuando la salida es definitiva. El documento fiscal se liga en su fase.">
-        <input name="enablingDocument" className={controlClass} />
-      </Field>
+      {!isSimpleExit ? (
+        <>
+          <Field label="Fecha y hora"><input name="occurredAt" type="datetime-local" className={controlClass} /></Field>
+          <Field label="Persona que recibe" hint="No se convierte en cliente. Obligatoria en salida a prueba y en salida definitiva.">
+            <input name="receiverName" className={controlClass} />
+          </Field>
+          <Field label="Modalidad de entrega">
+            <select name="deliveryMode" className={controlClass} defaultValue="">
+              <option value="">Sin definir</option>
+              <option value="Recoge en sitio">Recoge en sitio</option>
+              <option value="Entrega directa">Entrega directa</option>
+              <option value="Paquetería">Paquetería</option>
+            </select>
+          </Field>
+          <Field label="Contacto"><input name="contact" className={controlClass} /></Field>
+          <Field label="Documento habilitante" hint="Factura o remisión cuando la salida es definitiva. El documento fiscal se liga en su fase.">
+            <input name="enablingDocument" className={controlClass} />
+          </Field>
+        </>
+      ) : null}
       {movements.includes("SALIDA_PROVEEDOR" as MovementKind) ? (
         <SupplierPicker
           suppliers={suppliers}

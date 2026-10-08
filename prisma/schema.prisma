@@ -117,8 +117,9 @@ model Client {
   updatedAt        DateTime @updatedAt
   version          Int      @default(1)
 
-  contacts   Contact[]
-  prospects  Prospect[]
+  contacts         Contact[]
+  prospects        Prospect[]
+  agendaActivities AgendaActivity[]
   equipments Equipment[]
   attentions Attention[]
   quotes     Quote[]
@@ -427,6 +428,7 @@ model PartRequest {
 
 model CustodyMovement {
   id               String    @id @default(cuid())
+  folio            String?
   equipmentId      String
   equipment        Equipment @relation(fields: [equipmentId], references: [id])
   companyId        String
@@ -447,6 +449,7 @@ model CustodyMovement {
   cancelReason     String?
   createdAt        DateTime  @default(now())
 
+  @@unique([companyId, folio])
   @@index([equipmentId, createdAt])
   @@index([companyId, kind])
 }
@@ -579,6 +582,7 @@ model AgendaActivity {
   categoryId   String?
   category     AgendaCategory? @relation(fields: [categoryId], references: [id])
   clientId     String?
+  client       Client?         @relation(fields: [clientId], references: [id])
   prospectId   String?
   note         String
   scheduledAt  DateTime

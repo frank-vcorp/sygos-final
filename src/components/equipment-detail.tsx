@@ -5,7 +5,7 @@ import { AttentionForm, CancelMovementForm, MovementForm } from "@/components/cu
 import { EquipmentCustodyActions } from "@/components/equipment-custody-actions";
 import { HistoryTimeline } from "@/components/history-timeline";
 import { Badge, PageHeader, Table, Td, Th } from "@/components/ui";
-import { allowedMovements, CUSTODY_LABEL, MOVEMENT_LABEL, type Custody, type MovementKind } from "@/lib/custody";
+import { allowedMovements, CUSTODY_LABEL, isInitialWarehouseReceipt, isReceipt, MOVEMENT_LABEL, receiptReasonFromAttention, type Custody, type MovementKind } from "@/lib/custody";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
 import { historyFor } from "@/lib/history";
@@ -88,6 +88,17 @@ export async function EquipmentDetail({ id, expectedKind }: { id: string; expect
   const canAttend = equipment.originCompanyId === session.activeCompanyId && can(session.role, "attention.create", session.activeCompanyCode);
   const latestOpen = equipment.movements.find((row) => !row.cancelledAt);
   const movementOptions = allowedMovements(expectedKind, equipment.custody as Custody);
+  const openAttention = equipment.attentions.find((row) => row.status === "ABIERTA");
+  const receiptMovement = movementOptions.find((movement) => isReceipt(movement));
+  const receiptReason = openAttention ? receiptReasonFromAttention(openAttention.attentionType) : null;
+  const simplifiedReceipt =
+    receiptMovement
+    && receiptReason
+    && isInitialWarehouseReceipt(expectedKind, equipment.custody as Custody, receiptMovement);
+  const awaitingAttentionForReceipt =
+    receiptMovement
+    && isInitialWarehouseReceipt(expectedKind, equipment.custody as Custody, receiptMovement)
+    && !openAttention;
 
   return (
     <>
@@ -110,18 +121,33 @@ export async function EquipmentDetail({ id, expectedKind }: { id: string; expect
           ) : null}
         </section>
 
+        {awaitingAttentionForReceipt ? (
+          <p className="rounded-md border border-[#efd0d0] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]">
+            Falta la atención de ventas (diagnóstico o reparación) antes de confirmar la entrada física.
+          </p>
+        ) : null}
         <EquipmentCustodyActions
-          showMovement={canMove && movementOptions.length > 0}
+          showMovement={canMove && movementOptions.length > 0 && !awaitingAttentionForReceipt}
           showAttention={canAttend}
+          movementButtonLabel={simplifiedReceipt ? "Confirmar entrada física" : "Registrar movimiento"}
+          movementTitle={simplifiedReceipt ? "Confirmar entrada física" : "Registrar movimiento"}
           movement={
             <MovementForm
               variant="plain"
               equipmentId={equipment.id}
+              equipmentFolio={equipment.folio}
               kind={expectedKind}
               custody={equipment.custody as Custody}
               version={equipment.version}
               suppliers={suppliers.map((supplier) => ({ id: supplier.id, name: supplier.name }))}
               allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)}
+              receiptPreset={simplifiedReceipt && receiptMovement && openAttention && receiptReason ? {
+                movement: receiptMovement,
+                reason: receiptReason,
+                serviceLabel: ATTENTION_LABEL[openAttention.attentionType as AttentionType] ?? openAttention.attentionType,
+                reportedFault: openAttention.reportedFault,
+                clientName: intercompany ? "SYSTRON · intercompañía" : equipment.client.name,
+              } : undefined}
             />
           }
           attention={
@@ -176,10 +202,17 @@ export async function EquipmentDetail({ id, expectedKind }: { id: string; expect
                         {movement.cancelledAt ? " · cancelado" : ""}
                       </Td>
                       <Td>
+                        {movement.folio ? <span className="font-medium">{movement.folio}</span> : null}
+                        {movement.folio ? " · " : ""}
                         {movement.reason}
                         {movement.receiverName ? ` · recibe ${movement.receiverName}` : ""}
                         {movement.enablingDocument ? ` · ${movement.enablingDocument}` : ""}
                         {movement.cancelReason ? ` · ${movement.cancelReason}` : ""}
+                        {!movement.cancelledAt && movement.folio && isReceipt(movement.kind as MovementKind) ? (
+                          <span className="ml-2">
+                            <Link href={`/documentos/entrada/${movement.id}`} className="text-[var(--accent)]">Documento de recepción</Link>
+                          </span>
+                        ) : null}
                         {canMove && latestOpen?.id === movement.id && movement.kind !== "ENTRADA" && movement.kind !== "INGRESO" && !movement.cancelledAt ? (
                           <CancelMovementForm equipmentId={equipment.id} kind={expectedKind} movementId={movement.id} />
                         ) : null}

@@ -1,6 +1,6 @@
 import { resolveClientIdForProcess } from "./client-quick-create";
 import { prisma } from "./db";
-import { nextCustody, isReceipt, reasonsFor, type Custody, type MovementKind } from "./custody";
+import { isReceipt, nextCustody, reasonsFor, receiptReasonFromAttention, type Custody, type MovementKind } from "./custody";
 import { allocateFolio } from "./folios";
 import { ConcurrencyError } from "./form";
 import { recordHistory } from "./history";
@@ -414,6 +414,15 @@ export async function registerMovement(
     where: { equipmentId: equipment.id, status: "ABIERTA" },
     orderBy: { createdAt: "desc" },
   });
+  const receipt = isReceipt(input.kind);
+  if (receipt && attention) {
+    const expected = receiptReasonFromAttention(attention.attentionType);
+    if (expected && input.reason !== expected) {
+      throw new Error(`El motivo debe ser «${expected}» según la atención abierta.`);
+    }
+  }
+  const folio = receipt ? await allocateFolio(actor.activeCompanyId, input.kind === "INGRESO" ? "ING" : "ENT") : null;
+  let movementId = "";
   await prisma.$transaction(async (tx) => {
     const updated = await tx.equipment.updateMany({
       where: { id: equipment.id, version: input.version },
@@ -424,8 +433,9 @@ export async function registerMovement(
       },
     });
     if (updated.count === 0) throw new ConcurrencyError();
-    await tx.custodyMovement.create({
+    const created = await tx.custodyMovement.create({
       data: {
+        folio,
         equipmentId: equipment.id,
         companyId: actor.activeCompanyId,
         attentionId: attention?.id ?? null,
@@ -441,6 +451,7 @@ export async function registerMovement(
         occurredAt: input.occurredAt,
       },
     });
+    movementId = created.id;
     if (isReceipt(input.kind)) {
       await tx.attention.updateMany({
         where: { equipmentId: equipment.id, slaStartedAt: null },
@@ -458,9 +469,10 @@ export async function registerMovement(
     entityType: "EQUIPO",
     entityId: equipment.id,
     action: "CUSTODIA",
-    summary: `${input.kind} confirmado. Custodia: ${custody}.`,
+    summary: folio ? `${folio} confirmado. Custodia: ${custody}.` : `${input.kind} confirmado. Custodia: ${custody}.`,
     authorUserId: actor.userId,
   });
+  return { id: movementId, folio };
 }
 
 export async function cancelMovement(actor: Actor, movementId: string, reason: string) {
