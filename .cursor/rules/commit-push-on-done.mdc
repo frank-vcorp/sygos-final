@@ -1,0 +1,22 @@
+---
+description: Al terminar una tarea con cambios, commit y push sin pedir confirmación
+alwaysApply: true
+---
+
+# Entrega: commit y push
+
+Cuando **completes una tarea** que dejó cambios en el repo (código, config, tests):
+
+1. Haz **commit** con mensaje claro (qué y por qué).
+2. Haz **push** a la rama de trabajo (normalmente `main` en este proyecto).
+
+No pidas confirmación solo para commit/push al cerrar la tarea.
+
+**Excepciones**
+
+- No commitear secretos (`.env`, credenciales).
+- No incluir archivos no relacionados con la tarea (catálogos locales, screenshots e2e, etc.) salvo que la tarea lo pida.
+- No force push a `main` sin OK explícito.
+- Si la tarea fue solo consulta/revisión sin cambios, no hagas commit vacío.
+
+Si el commit falla por identidad de git en el entorno, usa el autor del último commit del repo (`git log -1`) vía variables de entorno en ese commit, sin modificar `git config`.
