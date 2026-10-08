@@ -138,7 +138,12 @@ async function Sales({ companyId, userId }: { companyId: string; userId: string 
     prisma.quote.findMany({ where: { companyId, sellerUserId: userId, status: { in: ["PENDIENTE_DECISION", "AUTORIZADA", "AUTORIZADA_PENDIENTE_EQUIPO"] } }, include: { client: true }, take: 12, orderBy: { updatedAt: "desc" } }),
     prisma.quote.findMany({ where: { companyId, sellerUserId: userId, status: "PENDIENTE_COTIZAR" }, include: { client: true }, take: 8, orderBy: { updatedAt: "desc" } }),
     prisma.receivable.findMany({ where: { companyId, sellerUserId: userId, balance: { gt: 0 } }, include: { document: true, client: true }, take: 12 }),
-    prisma.agendaActivity.findMany({ where: { companyId, authorUserId: userId, scheduledAt: { gte: new Date() } }, orderBy: { scheduledAt: "asc" }, take: 6 }),
+    prisma.agendaActivity.findMany({
+      where: { companyId, authorUserId: userId, scheduledAt: { gte: new Date() } },
+      include: { client: { select: { id: true, name: true, isSystem: true } } },
+      orderBy: { scheduledAt: "asc" },
+      take: 6,
+    }),
     prisma.quote.findMany({ where: { companyId, sellerUserId: userId, status: { startsWith: "AUTORIZADA" }, client: { requiresInvoice: true }, billingDocuments: { none: { kind: "FACTURA", status: "EMITIDA" } } }, include: { client: true }, take: 12 }),
     prisma.sale.findMany({ where: { companyId, quote: { sellerUserId: userId } }, include: { client: true, lines: true }, take: 20, orderBy: { updatedAt: "desc" } }),
     prisma.salesGoal.findMany({ where: { companyId, userId, year: new Date().getFullYear(), month: new Date().getMonth() + 1 }, include: { goalType: true } }),
@@ -173,11 +178,16 @@ async function Sales({ companyId, userId }: { companyId: string; userId: string 
         })} />
         <Block title="Cobranza" empty="Sin saldos propios." rows={receivables.map((row) => ({ href: `/cobranza/${row.id}`, label: row.document.folio, detail: <>{panelClientLink(row.client)} · {money(row.balance)}</> }))} />
         <Block title="Facturación pendiente" empty="No hay operaciones con factura obligatoria sin emitir." rows={invoices.map((row) => ({ href: `/cotizaciones/${row.id}`, label: row.folio, detail: panelClientLink(row.client) }))} />
-        <Block title="Agenda / próximas actividades" empty="Sin actividades próximas." rows={activities.map((row) => ({
-          href: row.clientId ? `/clientes/${row.clientId}` : row.prospectId ? `/prospectos/${row.prospectId}` : "/agenda",
-          label: row.note,
-          detail: row.scheduledAt.toLocaleDateString("es-MX", { timeZone: "America/Mexico_City" }),
-        }))} />
+        <Block title="Agenda / próximas actividades" empty="Sin actividades próximas." rows={activities.map((row) => {
+          const when = row.scheduledAt.toLocaleDateString("es-MX", { timeZone: "America/Mexico_City" });
+          const href = row.clientId ? `/clientes/${row.clientId}` : row.prospectId ? `/prospectos/${row.prospectId}` : "/agenda";
+          const detail = row.client
+            ? <>{panelClientLink(row.client)} · {when}</>
+            : row.prospectId
+              ? <><Link href={`/prospectos/${row.prospectId}`} className="text-[var(--accent)]">Prospecto</Link> · {when}</>
+              : when;
+          return { href, label: row.note, detail };
+        })} />
         <p className="text-sm"><Link href="/agenda" className="text-[var(--accent)]">Abrir agenda comercial</Link></p>
       </div>
     </>

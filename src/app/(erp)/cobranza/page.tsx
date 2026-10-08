@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ClientNameLink } from "@/components/client-entity-links";
-import { Badge, Empty, PageHeader, Table, Td, Th } from "@/components/ui";
+import { Badge, Empty, MobileCard, PageHeader, ResponsiveData, Table, Td, Th } from "@/components/ui";
 import { homePath } from "@/lib/home";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
@@ -31,23 +31,43 @@ export default async function CobranzaPage() {
     <>
       <PageHeader title={session.role === "VENTAS" ? "Mi cobranza" : "Cobranza"} subtitle="Saldos de esta empresa. Vencida es saldo después de la fecha." />
       {ordered.length === 0 ? <Empty title="Sin cuentas por cobrar" body="Aparecen cuando Coordinación emite una factura." /> : (
-        <Table>
-          <thead><tr><Th>Documento</Th><Th>Cliente</Th><Th>Saldo</Th><Th>Vence</Th><Th>Estado</Th></tr></thead>
-          <tbody>
-            {ordered.map((row) => {
-              const overdue = row.balance > 0 && row.dueAt.getTime() < Date.now();
-              return (
-                <tr key={row.id}>
-                  <Td><Link href={`/cobranza/${row.id}`} className="font-medium text-[var(--accent)]">{row.document.folio}</Link></Td>
-                  <Td><ClientNameLink clientId={row.client.id} name={row.client.name} isSystem={row.client.isSystem} canEdit={canEditClient} /></Td>
-                  <Td>{money(row.balance)}</Td>
-                  <Td>{formatWhen(row.dueAt)}</Td>
-                  <Td><Badge tone={overdue ? "warn" : "neutral"}>{overdue ? "Vencida" : row.status === "SALDADA" ? "Saldada" : row.status === "PARCIAL" ? "Parcial" : "Abierta"}</Badge></Td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </Table>
+        <ResponsiveData
+          table={
+            <Table>
+              <thead><tr><Th>Documento</Th><Th>Cliente</Th><Th>Saldo</Th><Th>Vence</Th><Th>Estado</Th></tr></thead>
+              <tbody>
+                {ordered.map((row) => {
+                  const overdue = row.balance > 0 && row.dueAt.getTime() < Date.now();
+                  const statusLabel = overdue ? "Vencida" : row.status === "SALDADA" ? "Saldada" : row.status === "PARCIAL" ? "Parcial" : "Abierta";
+                  return (
+                    <tr key={row.id}>
+                      <Td><Link href={`/cobranza/${row.id}`} className="font-medium text-[var(--accent)]">{row.document.folio}</Link></Td>
+                      <Td><ClientNameLink clientId={row.client.id} name={row.client.name} isSystem={row.client.isSystem} canEdit={canEditClient} /></Td>
+                      <Td>{money(row.balance)}</Td>
+                      <Td>{formatWhen(row.dueAt)}</Td>
+                      <Td><Badge tone={overdue ? "warn" : "neutral"}>{statusLabel}</Badge></Td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </Table>
+          }
+          cards={ordered.map((row) => {
+            const overdue = row.balance > 0 && row.dueAt.getTime() < Date.now();
+            const statusLabel = overdue ? "Vencida" : row.status === "SALDADA" ? "Saldada" : row.status === "PARCIAL" ? "Parcial" : "Abierta";
+            return (
+              <MobileCard
+                key={row.id}
+                href={`/cobranza/${row.id}`}
+                title={row.document.folio}
+                meta={<Badge tone={overdue ? "warn" : "neutral"}>{statusLabel}</Badge>}
+                footer={<ClientNameLink clientId={row.client.id} name={row.client.name} isSystem={row.client.isSystem} canEdit={canEditClient} />}
+              >
+                <p>{money(row.balance)} · vence {formatWhen(row.dueAt)}</p>
+              </MobileCard>
+            );
+          })}
+        />
       )}
       {payables.length > 0 ? (
         <section className="mt-6">

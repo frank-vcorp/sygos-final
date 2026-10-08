@@ -126,3 +126,46 @@ export const SYSTRON_NAV_FORBIDDEN: Partial<Record<Role, readonly string[]>> = {
     "/produccion",
   ],
 };
+
+/** Menú lateral esperado por rol en empresa Servomotores. */
+export const SERVOMOTORES_NAV: Partial<Record<Role, readonly string[]>> = {
+  GERENTE_OPERATIVO_SERVOMOTORES: [
+    "/panel",
+    "/cotizaciones",
+    "/clientes",
+    "/prospectos",
+    "/ventas",
+    "/agenda",
+    "/facturacion",
+    "/cobranza",
+    "/pagos",
+    "/compras",
+    "/servicios/diagnostico",
+    "/servicios/reparacion",
+    "/servicios/garantia",
+    "/operacion",
+    "/personal/horas",
+    "/produccion",
+    "/reportes",
+    "/equipos",
+    "/motores",
+    "/custodia",
+    "/inventario",
+    "/proveedores",
+  ],
+};
+
+export const SERVOMOTORES_NAV_FORBIDDEN: Partial<Record<Role, readonly string[]>> = {
+  GERENTE_OPERATIVO_SERVOMOTORES: [
+    "/inicio",
+    "/finanzas",
+    "/nomina",
+    "/comisiones",
+    "/personal",
+    "/personal/asistencia",
+    "/usuarios",
+    "/configuracion",
+    "/pruebas",
+    "/kiosco",
+  ],
+};
