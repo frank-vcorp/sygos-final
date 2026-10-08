@@ -7,18 +7,19 @@ import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
 import { can } from "@/lib/permissions";
 import { QUOTE_STATUS_LABEL } from "@/lib/quotes";
+import { PART_REQUEST_STATUS_LABEL } from "@/lib/case-labels";
 import { homePath } from "@/lib/home";
 import { requireCompany } from "@/lib/session";
 
 const CLOSED = ["VALIDADO", "TERMINADA", "SIN_REPARACION"];
 
-function Block({ title, empty, rows }: { title: string; empty: string; rows: Array<{ href: string; label: string; detail: ReactNode }> }) {
+function Block({ title, empty, rows }: { title: string; empty: string; rows: Array<{ key?: string; href: string; label: string; detail: ReactNode }> }) {
   return (
     <section className="rounded-lg border border-[var(--line)] bg-white p-4">
       <h2 className="font-medium">{title}</h2>
       {rows.length === 0 ? <p className="mt-2 text-sm text-[var(--muted)]">{empty}</p> : (
         <ul className="mt-2 space-y-2 text-sm">
-          {rows.map((row) => <li key={row.href + row.label}><Link href={row.href} className="font-medium text-[var(--accent)]">{row.label}</Link> · {row.detail}</li>)}
+          {rows.map((row) => <li key={row.key ?? row.href + row.label}><Link href={row.href} className="font-medium text-[var(--accent)]">{row.label}</Link> · {row.detail}</li>)}
         </ul>
       )}
     </section>
@@ -139,13 +140,50 @@ async function SupervisorShop({ companyId, userId }: { companyId: string; userId
   );
 }
 
-async function Shop({ companyId, manager, history }: { companyId: string; manager: boolean; history: boolean }) {
-  const rows = await prisma.technicalCase.findMany({
-    where: { serviceCompanyId: companyId, ...(history ? { status: { in: CLOSED } } : { status: { notIn: CLOSED } }) },
-    include: { equipment: { include: { client: true } }, attention: true, assignee: true },
-    orderBy: { slaDueAt: "asc" },
-    take: 100,
+function partRequestRowMap(
+  list: Array<{
+    id: string;
+    partNumber: string;
+    description: string;
+    qtyRequested: number;
+    qtyReceived: number;
+    qtyIssued: number;
+    status: string;
+    case: { id: string; folio: string };
+  }>,
+) {
+  return list.map((row) => {
+    const pendingIssue = Math.max(0, row.qtyReceived - row.qtyIssued);
+    const pendingTotal = Math.max(0, row.qtyRequested - row.qtyIssued);
+    const pending = pendingIssue > 0 ? `pend. surtir ${pendingIssue}` : `pend. ${pendingTotal}`;
+    const status = PART_REQUEST_STATUS_LABEL[row.status] ?? row.status;
+    return {
+      key: row.id,
+      href: `/operacion/${row.case.id}`,
+      label: row.case.folio,
+      detail: `${row.partNumber} · ${row.description} · sol. ${row.qtyRequested} · rec. ${row.qtyReceived} · surt. ${row.qtyIssued} · ${pending} · ${status}`,
+    };
   });
+}
+
+async function Shop({ companyId, manager, history }: { companyId: string; manager: boolean; history: boolean }) {
+  const [rows, partRequests] = await Promise.all([
+    prisma.technicalCase.findMany({
+      where: { serviceCompanyId: companyId, ...(history ? { status: { in: CLOSED } } : { status: { notIn: CLOSED } }) },
+      include: { equipment: { include: { client: true } }, attention: true, assignee: true },
+      orderBy: { slaDueAt: "asc" },
+      take: 100,
+    }),
+    manager && !history
+      ? prisma.partRequest.findMany({
+          where: { companyId, case: { status: { notIn: CLOSED } } },
+          include: { case: { select: { id: true, folio: true } } },
+          orderBy: { updatedAt: "desc" },
+          take: 120,
+        })
+      : Promise.resolve([]),
+  ]);
+  const openPartRequests = partRequests.filter((row) => row.qtyIssued < row.qtyRequested);
   const now = Date.now();
   return (
     <>
@@ -156,6 +194,9 @@ async function Shop({ companyId, manager, history }: { companyId: string; manage
         <Block title="Reparaciones activas" empty="Sin reparaciones activas." rows={caseRowMap(rows.filter((row) => row.kind === "OS"))} />
         <Block title="Vencidos" empty="Nada vencido." rows={caseRowMap(rows.filter((row) => row.slaDueAt != null && row.slaDueAt.getTime() < now))} />
         <Block title="En espera de refacciones" empty="Ninguna orden espera refacción." rows={caseRowMap(rows.filter((row) => row.status === "EN_ESPERA_REFACCIONES"))} />
+        {manager && !history ? (
+          <Block title="Refacciones solicitadas" empty="No hay solicitudes de refacción abiertas." rows={partRequestRowMap(openPartRequests)} />
+        ) : null}
         <Block title="Proveedor externo" empty="Nada está en proveedor externo." rows={caseRowMap(rows.filter((row) => row.externalSupplierId))} />
         {manager ? <Block title="Diagnósticos pendientes de validación" empty="No hay diagnósticos por validar." rows={caseRowMap(rows.filter((row) => row.status === "PENDIENTE_VALIDACION"))} /> : null}
       </div>

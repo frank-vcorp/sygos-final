@@ -9,3 +9,10 @@ export const CASE_STATUS_LABEL: Record<string, string> = {
   TERMINADA: "Reparación terminada",
   SIN_REPARACION: "Sin reparación",
 };
+
+export const PART_REQUEST_STATUS_LABEL: Record<string, string> = {
+  SOLICITADA: "Solicitada",
+  EN_TRANSITO: "En tránsito",
+  EN_ALMACEN: "En almacén",
+  SURTIDA: "Surtida",
+};
