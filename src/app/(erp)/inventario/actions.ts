@@ -31,7 +31,8 @@ export async function createPartAction(formData: FormData) {
     const description = optionalText(formData.get("description")) ?? "";
     const catalogNumero = optionalText(formData.get("catalogNumero")) ?? "";
     const family = optionalText(formData.get("family")) ?? "";
-    const location = optionalText(formData.get("location")) ?? "";
+    const rack = optionalText(formData.get("rack")) ?? "";
+    const nivel = optionalText(formData.get("nivel")) ?? "";
     const unit = optionalText(formData.get("unit")) ?? "";
     const mountType = optionalText(formData.get("mountType")) ?? "";
     const minQty = optionalInt(formData.get("minQty"));
@@ -44,7 +45,8 @@ export async function createPartAction(formData: FormData) {
         description,
         catalogNumero,
         family,
-        location,
+        rack,
+        nivel,
         unit,
         mountType,
         minQty,

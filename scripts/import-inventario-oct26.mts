@@ -11,7 +11,8 @@ type Row = {
   description: string;
   catalogNumero: string;
   family: string;
-  location: string;
+  rack: string;
+  nivel: string;
   unit: string;
   mountType: string;
   minQty: number | null;
@@ -60,7 +61,8 @@ export async function importInventarioOct26(
             description: row.description ?? "",
             catalogNumero: row.catalogNumero ?? "",
             family: row.family ?? "",
-            location: row.location ?? "",
+            rack: row.rack ?? "",
+            nivel: row.nivel ?? "",
             unit: row.unit ?? "",
             mountType: row.mountType ?? "",
             minQty: row.minQty != null && row.minQty >= 0 ? row.minQty : null,

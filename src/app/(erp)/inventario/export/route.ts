@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { formatUbicacion } from "@/lib/inventory-location";
 import { can } from "@/lib/permissions";
 import { getSession } from "@/lib/session";
 
@@ -11,10 +12,10 @@ export async function GET() {
   if (!company?.inventoryEnabled) return new Response("Inventario deshabilitado", { status: 404 });
   const parts = await prisma.part.findMany({
     where: { companyId: company.id, active: true },
-    orderBy: [{ partNumber: "asc" }, { location: "asc" }],
+    orderBy: [{ rack: "asc" }, { nivel: "asc" }, { partNumber: "asc" }],
   });
   const lines = [
-    "id,fila_excel,nombre,descripcion,numero,familia,ubicacion,unidad,montaje,existencia,minimo,maximo",
+    "id,fila_excel,nombre,descripcion,numero,familia,rack,nivel,ubicacion,unidad,montaje,existencia,minimo,maximo",
   ];
   for (const part of parts) {
     lines.push(
@@ -25,7 +26,9 @@ export async function GET() {
         csv(part.description),
         csv(part.catalogNumero),
         csv(part.family),
-        csv(part.location),
+        csv(part.rack),
+        csv(part.nivel),
+        csv(formatUbicacion(part.rack, part.nivel)),
         csv(part.unit),
         csv(part.mountType),
         String(part.qty),

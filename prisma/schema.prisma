@@ -485,7 +485,8 @@ model Part {
   description   String   @default("")
   catalogNumero String   @default("")
   family        String   @default("")
-  location      String   @default("")
+  rack          String   @default("")
+  nivel         String   @default("")
   unit          String   @default("")
   mountType     String   @default("")
   catalogLine   Int      @default(0)
@@ -499,7 +500,7 @@ model Part {
 
   movements StockMovement[]
 
-  @@unique([companyId, partNumber, description, catalogNumero, family, location, unit, mountType, catalogLine], name: "part_inventory_line")
+  @@unique([companyId, partNumber, description, catalogNumero, family, rack, nivel, unit, mountType, catalogLine], name: "part_inventory_line")
 }
 
 model StockMovement {

@@ -4,6 +4,7 @@ import { createPartAction, stockAction } from "./actions";
 import { ActionLink, Badge, Button, controlClass, Empty, Field, PageHeader, ResponsiveData, Table, Td, Th } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
+import { formatUbicacion } from "@/lib/inventory-location";
 import { requireCompany } from "@/lib/session";
 
 export default async function InventarioPage() {
@@ -24,7 +25,7 @@ export default async function InventarioPage() {
   }
   const parts = await prisma.part.findMany({
     where: { companyId: company.id, active: true },
-    orderBy: [{ partNumber: "asc" }, { location: "asc" }],
+    orderBy: [{ rack: "asc" }, { nivel: "asc" }, { partNumber: "asc" }],
     take: 500,
   });
   const total = await prisma.part.count({ where: { companyId: company.id, active: true } });
@@ -32,7 +33,7 @@ export default async function InventarioPage() {
     <>
       <PageHeader
         title="Inventario"
-        subtitle={`Piezas de ${company.name}. Ubicación, familia y montaje distinguen líneas con el mismo nombre.`}
+        subtitle={`Piezas de ${company.name}. Rack, nivel, familia y montaje distinguen líneas con el mismo nombre.`}
         action={<ActionLink href="/inventario/conteo" tone="ghost">Conteo físico</ActionLink>}
       />
       <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -55,7 +56,8 @@ export default async function InventarioPage() {
                   <Th>Descripción</Th>
                   <Th>Núm.</Th>
                   <Th>Familia</Th>
-                  <Th>Ubicación</Th>
+                  <Th>Rack</Th>
+                  <Th>Nivel</Th>
                   <Th>Montaje</Th>
                   <Th>Existencia</Th>
                   <Th>Mín / máx</Th>
@@ -69,7 +71,8 @@ export default async function InventarioPage() {
                     <Td>{part.description || "—"}</Td>
                     <Td>{part.catalogNumero || "—"}</Td>
                     <Td>{part.family || "—"}</Td>
-                    <Td>{part.location || "—"}</Td>
+                    <Td>{part.rack || "—"}</Td>
+                    <Td>{part.nivel || "—"}</Td>
                     <Td>{part.mountType || "—"}</Td>
                     <Td>
                       {part.qty}
@@ -105,7 +108,7 @@ export default async function InventarioPage() {
                   <h2 className="font-semibold">{part.partNumber}</h2>
                   <p className="text-sm text-[var(--muted)]">{part.description || "Sin descripción"}</p>
                   <p className="mt-1 text-xs text-[var(--muted)]">
-                    {[part.catalogNumero && `Núm. ${part.catalogNumero}`, part.family, part.location, part.mountType].filter(Boolean).join(" · ")}
+                    {[part.catalogNumero && `Núm. ${part.catalogNumero}`, part.family, formatUbicacion(part.rack, part.nivel), part.mountType].filter(Boolean).join(" · ")}
                   </p>
                 </div>
                 <strong>{part.qty}</strong>
@@ -148,8 +151,11 @@ export default async function InventarioPage() {
           <Field label="Familia">
             <input name="family" className={controlClass} />
           </Field>
-          <Field label="Ubicación">
-            <input name="location" className={controlClass} />
+          <Field label="Rack">
+            <input name="rack" className={controlClass} placeholder="2 o ORGANIZADOR GRIS" />
+          </Field>
+          <Field label="Nivel">
+            <input name="nivel" className={controlClass} placeholder="6" />
           </Field>
           <Field label="Unidad">
             <input name="unit" className={controlClass} />

@@ -74,10 +74,10 @@ export async function reportTable(companyId: string, inventoryEnabled: boolean, 
     const rows = await prisma.part.findMany({ where: { companyId, active: true }, orderBy: { partNumber: "asc" } });
     return {
       title: "Inventario actual",
-      headers: ["Producto", "Ubicación", "Familia", "Existencia", "Mínimo"],
+      headers: ["Producto", "Rack", "Nivel", "Familia", "Existencia", "Mínimo"],
       rows: rows.map((row) => ({
         href: "/inventario",
-        cells: [row.partNumber, row.location || "—", row.family || "—", String(row.qty), row.minQty == null ? "—" : String(row.minQty)],
+        cells: [row.partNumber, row.rack || "—", row.nivel || "—", row.family || "—", String(row.qty), row.minQty == null ? "—" : String(row.minQty)],
       })),
     };
   }

@@ -43,7 +43,8 @@ export default async function BuscarPage({ searchParams }: { searchParams: Promi
         OR: [
           { partNumber: contains },
           { description: contains },
-          { location: contains },
+          { rack: contains },
+          { nivel: contains },
           { family: contains },
           { catalogNumero: contains },
         ],
