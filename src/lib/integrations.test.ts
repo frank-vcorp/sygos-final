@@ -11,9 +11,32 @@ describe("integraciones", () => {
   });
 
   it("arma la factura de ingreso y señala el dato fiscal que falta", () => {
-    const missing = invoicePayload({ externalId: "1", customerName: "Cliente", rfc: null, taxSystem: "601", zip: "64000", email: null, creditDays: 0, lines: [{ concept: "Servicio", quantity: 1, unitPrice: 100 }], iva: 16 });
+    const missing = invoicePayload({
+      externalId: "1",
+      customerName: "Cliente",
+      rfc: null,
+      taxSystem: "601",
+      cfdiUse: "G03",
+      paymentMethod: "PUE",
+      zip: "64000",
+      email: null,
+      lines: [{ concept: "Servicio", quantity: 1, unitPrice: 100 }],
+      iva: 16,
+    });
     assert.equal("error" in missing, true);
-    const ready = invoicePayload({ externalId: "1", customerName: "Cliente", rfc: "XAXX010101000", taxSystem: "601", zip: "64000", email: "a@b.com", creditDays: 15, lines: [{ concept: "Servicio", quantity: 1, unitPrice: 100 }], iva: 16 });
+    const ready = invoicePayload({
+      externalId: "1",
+      customerName: "Cliente",
+      rfc: "XAXX010101000",
+      taxSystem: "601",
+      cfdiUse: "G03",
+      paymentMethod: "PPD",
+      zip: "64000",
+      email: "a@b.com",
+      lines: [{ concept: "Servicio", quantity: 1, unitPrice: 100 }],
+      iva: 16,
+    });
+    assert.equal(ready.body?.use, "G03");
     assert.equal(ready.body?.payment_method, "PPD");
     assert.equal(ready.body?.payment_form, "99");
   });

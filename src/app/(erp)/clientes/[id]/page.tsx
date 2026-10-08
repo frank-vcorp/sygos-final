@@ -107,6 +107,8 @@ export default async function ClienteDetallePage({ params }: { params: Promise<{
     requiresInvoice: client.requiresInvoice,
     rfc: client.rfc,
     taxRegime: client.taxRegime,
+    cfdiUse: client.cfdiUse,
+    paymentMethod: client.paymentMethod,
     fiscalZip: client.fiscalZip,
     fiscalAddress: client.fiscalAddress,
     creditDays: client.creditDays,

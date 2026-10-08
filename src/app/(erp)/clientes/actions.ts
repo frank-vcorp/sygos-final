@@ -4,6 +4,8 @@ import { setFlash } from "@/lib/flash";
 import { ConcurrencyError, optionalBool, optionalInt, optionalText, parseVersion, requiredText } from "@/lib/form";
 import { recordHistory } from "@/lib/history";
 import { can } from "@/lib/permissions";
+import { parseCfdiUse } from "@/lib/sat-cfdi-use";
+import { parsePaymentMethod } from "@/lib/sat-payment-method";
 import { parseRegimen } from "@/lib/sat-regimen";
 import { SALES_NOT_ASSIGNED_MESSAGE } from "@/lib/sales-assignment";
 import { requireCompany } from "@/lib/session";
@@ -59,15 +61,14 @@ function clientData(formData: FormData) {
 function fiscalIdentity(formData: FormData, requiresInvoice: boolean | null) {
   const rfc = optionalText(formData.get("rfc"));
   const taxRegime = parseRegimen(formData.get("taxRegime"));
+  const cfdiUse = parseCfdiUse(formData.get("cfdiUse"));
+  const paymentMethod = parsePaymentMethod(formData.get("paymentMethod"));
   const fiscalZip = optionalText(formData.get("fiscalZip"));
   const fiscalAddress = optionalText(formData.get("fiscalAddress"));
-  if (requiresInvoice) {
-    if (!rfc) throw new Error("El RFC es obligatorio cuando el cliente requiere factura.");
-    if (!taxRegime) throw new Error("El régimen fiscal es obligatorio cuando el cliente requiere factura.");
-    if (!fiscalZip) throw new Error("El código postal fiscal es obligatorio cuando el cliente requiere factura.");
-    if (!fiscalAddress) throw new Error("El domicilio fiscal es obligatorio cuando el cliente requiere factura.");
+  if (requiresInvoice && !rfc) {
+    throw new Error("El RFC es obligatorio cuando el cliente requiere factura.");
   }
-  return { rfc, taxRegime, fiscalZip, fiscalAddress };
+  return { rfc, taxRegime, cfdiUse, paymentMethod, fiscalZip, fiscalAddress };
 }
 
 export async function createClientAction(formData: FormData) {

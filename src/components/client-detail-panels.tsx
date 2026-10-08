@@ -21,6 +21,8 @@ import { CUSTODY_LABEL, type Custody } from "@/lib/custody";
 import { ATTENTION_LABEL, type AttentionType } from "@/lib/priorities";
 import { CASE_STATUS_LABEL } from "@/lib/case-labels";
 import { QUOTE_STATUS_LABEL, QUOTE_TYPE_LABEL, type QuoteType } from "@/lib/quote-meta";
+import { cfdiUseLabel } from "@/lib/sat-cfdi-use";
+import { paymentMethodLabel } from "@/lib/sat-payment-method";
 import { regimenLabel } from "@/lib/sat-regimen";
 
 type ClientData = {
@@ -31,6 +33,8 @@ type ClientData = {
   requiresInvoice: boolean | null;
   rfc: string | null;
   taxRegime: string | null;
+  cfdiUse: string | null;
+  paymentMethod: string | null;
   fiscalZip: string | null;
   fiscalAddress: string | null;
   creditDays: number | null;
@@ -200,6 +204,8 @@ export function ClientProfileSection({
           defaultRequires={client.requiresInvoice == null ? "" : client.requiresInvoice ? "si" : "no"}
           rfc={client.rfc ?? ""}
           taxRegime={client.taxRegime ?? ""}
+          cfdiUse={client.cfdiUse ?? ""}
+          paymentMethod={client.paymentMethod ?? ""}
           fiscalZip={client.fiscalZip ?? ""}
           fiscalAddress={client.fiscalAddress ?? ""}
         />
@@ -220,7 +226,13 @@ export function ClientProfileSection({
           <div><dt className="text-[var(--muted)]">Responsable</dt><dd className="font-medium">{ownerName ?? "—"}</dd></div>
           <div><dt className="text-[var(--muted)]">Clasificación</dt><dd>{classificationLabel(client.classification)}</dd></div>
           <div><dt className="text-[var(--muted)]">Crédito</dt><dd>{client.creditDays != null ? `${client.creditDays} días` : "—"}</dd></div>
-          <div className="sm:col-span-2 lg:col-span-3"><dt className="text-[var(--muted)]">Fiscal</dt><dd>{invoiceSummary}{client.requiresInvoice ? ` · ${regimenLabel(client.taxRegime)}` : ""}</dd></div>
+          <div className="sm:col-span-2 lg:col-span-3">
+            <dt className="text-[var(--muted)]">Fiscal</dt>
+            <dd>
+              {invoiceSummary}
+              {client.requiresInvoice ? ` · ${regimenLabel(client.taxRegime)} · ${cfdiUseLabel(client.cfdiUse)} · ${paymentMethodLabel(client.paymentMethod)}` : ""}
+            </dd>
+          </div>
         </dl>
         <Button type="button" tone="ghost" className="min-h-9 shrink-0 px-2 text-xs" onClick={() => setEditing(true)}>Editar</Button>
       </div>

@@ -108,6 +108,8 @@ model Client {
   creditDays       Int?
   rfc              String?
   taxRegime        String?
+  cfdiUse          String?
+  paymentMethod    String?
   fiscalZip        String?
   fiscalAddress    String?
   deliveryAddress  String?

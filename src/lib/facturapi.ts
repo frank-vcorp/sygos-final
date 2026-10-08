@@ -1,5 +1,6 @@
 import { decryptSecret } from "./crypto";
 import { inSandbox, prisma, prismaProd } from "./db";
+import { paymentFormForMethod } from "./sat-payment-method";
 
 const API = "https://www.facturapi.io/v2";
 const SERVICE_KEY = "78181500";
@@ -15,9 +16,10 @@ export function invoicePayload(input: {
   customerName: string;
   rfc: string | null;
   taxSystem: string | null;
+  cfdiUse: string | null;
+  paymentMethod: string | null;
   zip: string | null;
   email: string | null;
-  creditDays: number;
   lines: Array<{ concept: string; quantity: number; unitPrice: number }>;
   iva: number;
 }) {
@@ -25,9 +27,17 @@ export function invoicePayload(input: {
     !input.rfc ? "RFC del cliente" : null,
     !input.taxSystem ? "régimen fiscal del cliente" : null,
     !input.zip ? "código postal fiscal del cliente" : null,
+    !input.cfdiUse ? "uso de CFDI del cliente" : null,
+    !input.paymentMethod ? "método de pago del cliente" : null,
     input.lines.length === 0 ? "partidas" : null,
   ].filter(Boolean);
   if (missing.length > 0) return { error: `Falta ${missing.join(", ")} para timbrar.` };
+  let paymentForm: string;
+  try {
+    paymentForm = paymentFormForMethod(input.paymentMethod!);
+  } catch {
+    return { error: "El método de pago del cliente no es válido para timbrar." };
+  }
   const taxed = input.iva > 0;
   return {
     body: {
@@ -50,9 +60,9 @@ export function invoicePayload(input: {
           taxes: taxed ? [{ type: "IVA", rate: 0.16 }] : [],
         },
       })),
-      use: "G03",
-      payment_form: input.creditDays > 0 ? "99" : "03",
-      payment_method: input.creditDays > 0 ? "PPD" : "PUE",
+      use: input.cfdiUse!,
+      payment_form: paymentForm,
+      payment_method: input.paymentMethod!,
     },
   };
 }
@@ -133,9 +143,10 @@ export async function stampBillingDocument(documentId: string) {
     customerName: document.client.name,
     rfc: document.rfcSnapshot || document.client.rfc,
     taxSystem: document.client.taxRegime,
+    cfdiUse: document.client.cfdiUse,
+    paymentMethod: document.client.paymentMethod,
     zip: document.client.fiscalZip,
     email: null,
-    creditDays: document.creditDays,
     lines: document.lines.map((line) => ({ concept: line.concept, quantity: line.quantity, unitPrice: line.unitPrice })),
     iva: document.iva,
   });
