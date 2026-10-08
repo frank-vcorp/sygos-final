@@ -36,6 +36,8 @@ describe("permisos de fase 1", () => {
     assert.equal(can("GERENTE_OPERATIVO_SERVOMOTORES", "mot.create", "SERVOMOTORES"), true);
     assert.equal(can("GERENTE_OPERATIVO_SERVOMOTORES", "custody.confirm", "SERVOMOTORES"), true);
     assert.equal(can("GERENTE_OPERATIVO_SERVOMOTORES", "equi.view", "SERVOMOTORES"), false);
+    assert.equal(can("GERENTE_OPERATIVO_SERVOMOTORES", "equipment.catalog", "SERVOMOTORES"), true);
+    assert.equal(can("GERENTE_OPERATIVO_SERVOMOTORES", "mot.view", "SERVOMOTORES"), true);
     assert.equal(can("TECNICO", "inventory.operate", "SYSTRON"), false);
     assert.equal(can("ALMACEN", "inventory.operate", "SYSTRON"), true);
   });

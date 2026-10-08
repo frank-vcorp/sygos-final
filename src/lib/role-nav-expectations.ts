@@ -147,7 +147,6 @@ export const SERVOMOTORES_NAV: Partial<Record<Role, readonly string[]>> = {
     "/personal/horas",
     "/produccion",
     "/reportes",
-    "/equipos",
     "/motores",
     "/custodia",
     "/inventario",
@@ -158,6 +157,7 @@ export const SERVOMOTORES_NAV: Partial<Record<Role, readonly string[]>> = {
 export const SERVOMOTORES_NAV_FORBIDDEN: Partial<Record<Role, readonly string[]>> = {
   GERENTE_OPERATIVO_SERVOMOTORES: [
     "/inicio",
+    "/equipos",
     "/finanzas",
     "/nomina",
     "/comisiones",

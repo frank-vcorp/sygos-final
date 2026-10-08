@@ -4,12 +4,16 @@ import { ClientNameLink } from "@/components/client-entity-links";
 import { ActionLink, Badge, Button, controlClass, Empty, FilterBar, ListCap, MobileCard, PageHeader, ResponsiveData, Table, Td, Th, TextLink } from "@/components/ui";
 import { CUSTODY_LABEL, type Custody } from "@/lib/custody";
 import { prisma } from "@/lib/db";
+import { homePath } from "@/lib/home";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
 
 export default async function EquiposPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const session = await requireCompany();
-  if (!can(session.role, "equipment.catalog", session.activeCompanyCode)) redirect("/panel");
+  const mayList =
+    can(session.role, "equi.view", session.activeCompanyCode)
+    && (session.role === "VENTAS" || can(session.role, "equipment.catalog", session.activeCompanyCode));
+  if (!mayList) redirect(homePath(session.role, session.activeCompanyCode));
   const canEditClient = can(session.role, "client.edit", session.activeCompanyCode);
   const { q } = await searchParams;
   const query = (q ?? "").trim();

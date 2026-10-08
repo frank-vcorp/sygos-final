@@ -25,9 +25,11 @@ export async function EquipmentDetail({ id, expectedKind }: { id: string; expect
     ? can(session.role, "equi.view", session.activeCompanyCode) || custodyDetail
     : can(session.role, "mot.view", session.activeCompanyCode) || custodyDetail;
   if (!allowed) notFound();
-  const listHref = can(session.role, "equipment.catalog", session.activeCompanyCode)
-    ? (expectedKind === "EQUI" ? "/equipos" : "/motores")
-    : "/custodia";
+  const mayEquiList =
+    can(session.role, "equi.view", session.activeCompanyCode)
+    && (session.role === "VENTAS" || can(session.role, "equipment.catalog", session.activeCompanyCode));
+  const mayMotList = can(session.role, "equipment.catalog", session.activeCompanyCode) && can(session.role, "mot.view", session.activeCompanyCode);
+  const listHref = expectedKind === "EQUI" ? (mayEquiList ? "/equipos" : "/custodia") : (mayMotList ? "/motores" : "/custodia");
   try {
     await openPendingCases(id, new Date());
   } catch {

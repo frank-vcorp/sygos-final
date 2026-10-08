@@ -9,6 +9,12 @@ export type NavLinkDef = {
 const ventas = (role: Role) => role === "VENTAS";
 const notVentas = (role: Role) => role !== "VENTAS";
 
+/** Catálogo EQUI: SYSTRON y roles con bandeja; nunca Servomotores (sin equi.view allí). */
+function showEquiCatalog(role: Role, companyCode: string | null) {
+  if (!can(role, "equi.view", companyCode)) return false;
+  return ventas(role) || can(role, "equipment.catalog", companyCode);
+}
+
 export const NAV_GROUPS: Array<{ title: string | null; links: NavLinkDef[] }> = [
   {
     title: null,
@@ -23,7 +29,7 @@ export const NAV_GROUPS: Array<{ title: string | null; links: NavLinkDef[] }> = 
       { href: "/ventas", show: (role, code) => ventas(role) && (can(role, "agenda.use", code) || can(role, "quote.follow", code)) },
       { href: "/clientes", show: (role, code) => can(role, "client.create", code) || can(role, "client.edit", code) },
       { href: "/prospectos", show: (role, code) => can(role, "prospect.operate", code) },
-      { href: "/equipos", show: (role, code) => ventas(role) && can(role, "equipment.catalog", code) },
+      { href: "/equipos", show: (role, code) => ventas(role) && showEquiCatalog(role, code) },
       { href: "/ventas", show: (role, code) => notVentas(role) && (can(role, "agenda.use", code) || can(role, "quote.follow", code)) },
       { href: "/agenda", show: (role, code) => can(role, "agenda.use", code) && notVentas(role) },
       { href: "/facturacion", show: (role, code) => notVentas(role) && (can(role, "invoice.request", code) || can(role, "invoice.issue", code)) },
@@ -58,7 +64,7 @@ export const NAV_GROUPS: Array<{ title: string | null; links: NavLinkDef[] }> = 
   {
     title: "Taller",
     links: [
-      { href: "/equipos", show: (role, code) => notVentas(role) && can(role, "equipment.catalog", code) },
+      { href: "/equipos", show: (role, code) => notVentas(role) && showEquiCatalog(role, code) },
       { href: "/motores", show: (role, code) => notVentas(role) && can(role, "equipment.catalog", code) && can(role, "mot.view", code) },
       { href: "/custodia", show: (role, code) => can(role, "custody.confirm", code) },
       { href: "/inventario", show: (role, code) => can(role, "inventory.operate", code) },
