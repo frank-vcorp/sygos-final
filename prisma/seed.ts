@@ -63,6 +63,20 @@ async function main() {
   await seedPriorities(servomotores.id, "SERVOMOTORES");
   await seedCommercialCatalogs(systron.id, servomotores.id);
   await seedEquipmentCatalog();
+  await ensureInventarioOct26();
+}
+
+async function ensureInventarioOct26() {
+  const systron = await prisma.company.findUnique({ where: { code: "SYSTRON" } });
+  if (!systron?.inventoryEnabled) return;
+  const count = await prisma.part.count({ where: { companyId: systron.id } });
+  const withCatalogLine = await prisma.part.count({
+    where: { companyId: systron.id, catalogLine: { gt: 0 } },
+  });
+  if (count === 2277 && withCatalogLine === 2277) return;
+  const { importInventarioOct26 } = await import("../scripts/import-inventario-oct26.mts");
+  const result = await importInventarioOct26(prisma, { replace: count > 0 });
+  process.stdout.write(`Inventario Oct26: ${JSON.stringify(result)}\n`);
 }
 
 async function seedPriorities(companyId: string, code: "SYSTRON" | "SERVOMOTORES") {

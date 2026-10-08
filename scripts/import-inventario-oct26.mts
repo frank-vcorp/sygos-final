@@ -1,6 +1,9 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { PrismaClient } from "@prisma/client";
+import type { PrismaClient } from "@prisma/client";
+import { PrismaClient as PrismaClientCtor } from "@prisma/client";
+
+export const INVENTARIO_OCT26_LINES = 2277;
 
 type Row = {
   catalogLine: number;
@@ -15,10 +18,11 @@ type Row = {
   qty: number;
 };
 
-const prisma = new PrismaClient();
-const replace = process.argv.includes("--replace");
-
-async function main() {
+export async function importInventarioOct26(
+  prisma: PrismaClient,
+  options: { replace?: boolean } = {},
+): Promise<{ created: number; expected: number; totalQty: number; skipped: boolean }> {
+  const replace = options.replace ?? false;
   const company = await prisma.company.findUnique({ where: { code: "SYSTRON" } });
   if (!company?.inventoryEnabled) throw new Error("SYSTRON sin inventario habilitado.");
   const author =
@@ -27,13 +31,17 @@ async function main() {
   if (!author) throw new Error("Sin usuario de almacén.");
 
   const existing = await prisma.part.count({ where: { companyId: company.id } });
-  if (existing > 0 && !replace) {
-    console.log(`SYSTRON ya tiene ${existing} líneas. Usa --replace para borrar y volver a cargar.`);
-    return;
+  const withCatalogLine = await prisma.part.count({
+    where: { companyId: company.id, catalogLine: { gt: 0 } },
+  });
+  if (!replace && existing === INVENTARIO_OCT26_LINES && withCatalogLine === INVENTARIO_OCT26_LINES) {
+    return { created: existing, expected: INVENTARIO_OCT26_LINES, totalQty: 0, skipped: true };
   }
-  if (replace && existing > 0) {
+  if (existing > 0 && replace) {
     await prisma.stockMovement.deleteMany({ where: { companyId: company.id } });
     await prisma.part.deleteMany({ where: { companyId: company.id } });
+  } else if (existing > 0 && !replace) {
+    return { created: existing, expected: INVENTARIO_OCT26_LINES, totalQty: 0, skipped: true };
   }
 
   const path = join(process.cwd(), "prisma/data/inventario-oct26.json");
@@ -77,14 +85,23 @@ async function main() {
     });
   }
   const totalQty = rows.reduce((sum, row) => sum + (row.qty > 0 ? row.qty : 0), 0);
-  console.log(JSON.stringify({ created, expected: rows.length, totalQty }, null, 2));
+  return { created, expected: rows.length, totalQty, skipped: false };
 }
 
-main()
-  .catch((error) => {
+async function main() {
+  const prisma = new PrismaClientCtor();
+  const replace = process.argv.includes("--replace");
+  try {
+    const result = await importInventarioOct26(prisma, { replace });
+    console.log(JSON.stringify(result, null, 2));
+  } finally {
+    await prisma.$disconnect();
+  }
+}
+
+if (process.argv[1]?.includes("import-inventario-oct26")) {
+  main().catch((error) => {
     console.error(error);
     process.exitCode = 1;
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
   });
+}
