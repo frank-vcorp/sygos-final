@@ -27,7 +27,7 @@ import { formatWhen } from "@/lib/form";
 import { historyFor } from "@/lib/history";
 import { can } from "@/lib/permissions";
 import { ATTENTION_LABEL, type AttentionType } from "@/lib/priorities";
-import { diagnosisPresolicitudEditable, PRESOLICITUD_LABEL } from "@/lib/part-presolicitud";
+import { diagnosisPresolicitudEditable, fieldPresolicitudOnly, PRESOLICITUD_LABEL } from "@/lib/part-presolicitud";
 import { CASE_STATUS_LABEL } from "@/lib/technical";
 import { homePath } from "@/lib/home";
 import { redirectIfSalesNotAssigned } from "@/lib/sales-assignment";
@@ -89,12 +89,14 @@ export default async function OperacionDetallePage({ params }: { params: Promise
   const warranty = row.attention.attentionType === "DIAGNOSTICO_GARANTIA" && row.kind === "DIAGNOSTICO";
   const canManage = !readOnly && ["ADMINISTRADOR", "CEO", "SUPERVISOR_TECNICO", "GERENTE_OPERATIVO_SYSTRON", "GERENTE_OPERATIVO_SERVOMOTORES"].includes(session.role);
   const canWork = !readOnly && (session.role === "ADMINISTRADOR" || session.role === "CEO" || session.role === "SUPERVISOR_TECNICO" || (session.role === "GERENTE_OPERATIVO_SERVOMOTORES" && session.activeCompanyCode === "SERVOMOTORES") || (session.role === "TECNICO" && row.assigneeUserId === session.userId));
+  const presolicitudOnly = fieldPresolicitudOnly(session.role);
   const canEditPresolicitud =
     !readOnly &&
-    session.role === "TECNICO" &&
-    row.assigneeUserId === session.userId &&
     row.kind === "DIAGNOSTICO" &&
-    diagnosisPresolicitudEditable(row.status);
+    diagnosisPresolicitudEditable(row.status) &&
+    (session.role === "SUPERVISOR_TECNICO" ||
+      (session.role === "TECNICO" && row.assigneeUserId === session.userId));
+  const canOperatePartRequests = canWork && !closed && !readOnly && !presolicitudOnly;
 
   return (
     <>
@@ -262,7 +264,7 @@ export default async function OperacionDetallePage({ params }: { params: Promise
                     <li key={request.id}>
                       <p>{request.partNumber} · {request.description} · {request.status}</p>
                       <p className="text-[var(--muted)]">Solicitada {request.qtyRequested} · recibida {request.qtyReceived} · surtida {request.qtyIssued}</p>
-                      {canWork && !closed && !readOnly ? (
+                      {canOperatePartRequests ? (
                         <div className="mt-1 flex flex-wrap gap-2">
                           <form action={receivePartAction} className="flex gap-1">
                             <input type="hidden" name="caseId" value={row.id} />
@@ -284,7 +286,7 @@ export default async function OperacionDetallePage({ params }: { params: Promise
                   ))}
                 </ul>
               )}
-              {canWork && !closed && !readOnly ? (
+              {canOperatePartRequests ? (
                 <form action={requestPartAction} className="mt-3 grid gap-2">
                   <input type="hidden" name="caseId" value={row.id} />
                   <Field label="Número de parte"><input name="partNumber" required className={controlClass} /></Field>
@@ -293,6 +295,10 @@ export default async function OperacionDetallePage({ params }: { params: Promise
                   <Field label="Cantidad"><input name="quantity" type="number" min={1} required className={controlClass} /></Field>
                   <Button type="submit" tone="ghost">Solicitar refacción</Button>
                 </form>
+              ) : presolicitudOnly && !closed ? (
+                <p className="mt-3 text-[var(--muted)]">
+                  En reparación las solicitudes formales las registra gerencia o almacén. En diagnóstico usa presolicitudes arriba.
+                </p>
               ) : null}
             </section>
           ) : null}

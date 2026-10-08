@@ -25,10 +25,18 @@ async function loadDiagnosisCase(caseId: string) {
   return row;
 }
 
-function assertTechnicianPresolicitud(actor: Actor, row: { assigneeUserId: string | null; serviceCompanyId: string }) {
-  if (actor.role !== "TECNICO") throw new Error("Solo el técnico asignado registra presolicitudes.");
-  if (row.assigneeUserId !== actor.userId) throw new Error("Solo el técnico asignado registra presolicitudes.");
-  if (actor.activeCompanyId !== row.serviceCompanyId) throw new Error("SYSTRON consulta esta operación en solo lectura. El estado lo cambia quien ejecuta el servicio.");
+/** Técnico y supervisor no formalizan solicitudes en la orden; solo presolicitud en diagnóstico. */
+export function fieldPresolicitudOnly(role: string) {
+  return role === "TECNICO" || role === "SUPERVISOR_TECNICO";
+}
+
+function assertFieldPresolicitud(actor: Actor, row: { assigneeUserId: string | null; serviceCompanyId: string }) {
+  if (actor.activeCompanyId !== row.serviceCompanyId) {
+    throw new Error("SYSTRON consulta esta operación en solo lectura. El estado lo cambia quien ejecuta el servicio.");
+  }
+  if (actor.role === "SUPERVISOR_TECNICO") return;
+  if (actor.role === "TECNICO" && row.assigneeUserId === actor.userId) return;
+  throw new Error("Solo el técnico asignado o el supervisor técnico registran presolicitudes.");
 }
 
 function parseQty(quantity: number) {
@@ -41,7 +49,7 @@ export async function createPartPresolicitud(
   input: { partNumber: string; description: string; link: string | null; quantity: number },
 ) {
   const row = await loadDiagnosisCase(caseId);
-  assertTechnicianPresolicitud(actor, row);
+  assertFieldPresolicitud(actor, row);
   if (!diagnosisPresolicitudEditable(row.status)) throw new Error("El diagnóstico ya está terminado. Las presolicitudes ya no se editan.");
   parseQty(input.quantity);
   await prisma.partPresolicitud.create({
@@ -64,7 +72,7 @@ export async function updatePartPresolicitud(
 ) {
   const presol = await prisma.partPresolicitud.findUnique({ where: { id: presolicitudId }, include: { diagnosisCase: true } });
   if (!presol || presol.companyId !== actor.activeCompanyId) throw new Error("No se encontró la presolicitud.");
-  assertTechnicianPresolicitud(actor, presol.diagnosisCase);
+  assertFieldPresolicitud(actor, presol.diagnosisCase);
   if (presol.status !== "ACTIVA") throw new Error("Solo se editan presolicitudes activas.");
   if (!diagnosisPresolicitudEditable(presol.diagnosisCase.status)) throw new Error("El diagnóstico ya está terminado.");
   parseQty(input.quantity);
@@ -82,7 +90,7 @@ export async function updatePartPresolicitud(
 export async function deletePartPresolicitud(actor: Actor, presolicitudId: string) {
   const presol = await prisma.partPresolicitud.findUnique({ where: { id: presolicitudId }, include: { diagnosisCase: true } });
   if (!presol || presol.companyId !== actor.activeCompanyId) throw new Error("No se encontró la presolicitud.");
-  assertTechnicianPresolicitud(actor, presol.diagnosisCase);
+  assertFieldPresolicitud(actor, presol.diagnosisCase);
   if (presol.status !== "ACTIVA") throw new Error("Solo se eliminan presolicitudes activas.");
   if (!diagnosisPresolicitudEditable(presol.diagnosisCase.status)) throw new Error("El diagnóstico ya está terminado.");
   await prisma.partPresolicitud.delete({ where: { id: presol.id } });
