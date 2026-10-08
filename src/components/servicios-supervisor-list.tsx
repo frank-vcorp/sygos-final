@@ -58,7 +58,13 @@ export function ServiciosSupervisorList({
           <tbody>
             {rows.map((row) => {
               const { wrapClass, statusTone, markers } = servicioRowHighlight(row);
-              if (row.kind === "atencion_cancelada") {
+              if (row.kind === "atencion_cancelada" || row.kind === "espera_ingreso") {
+                const statusLabel =
+                  row.kind === "espera_ingreso" ? "Espera ingreso" : (CASE_STATUS_LABEL.CANCELADA ?? "Cancelada");
+                const trail =
+                  row.kind === "espera_ingreso"
+                    ? row.createdAt.toLocaleDateString("es-MX", { timeZone: "America/Mexico_City" })
+                    : formatClosedAt(row.closedAt);
                 return (
                   <tr key={`att-${row.id}`} className={wrapClass}>
                     {showTipo ? (
@@ -70,16 +76,18 @@ export function ServiciosSupervisorList({
                       <Link href={row.href} className="font-medium text-[var(--accent)]">
                         {row.equipmentFolio}
                       </Link>
-                      <span className="text-[var(--muted)]"> · sin operación</span>
+                      <span className="text-[var(--muted)]">
+                        {row.kind === "espera_ingreso" ? " · pendiente de ingreso" : " · sin operación"}
+                      </span>
                     </Td>
                     <Td>{row.clientName}</Td>
                     <Td>{row.priorityName}</Td>
                     <Td>
-                      <Badge tone="neutral">{CASE_STATUS_LABEL.CANCELADA}</Badge>
+                      <Badge tone="neutral">{statusLabel}</Badge>
                     </Td>
                     {hideAssignee ? null : <Td>—</Td>}
                     <Td>
-                      <span className="text-[var(--muted)]">{formatClosedAt(row.closedAt)}</span>
+                      <span className="text-[var(--muted)]">{trail}</span>
                     </Td>
                   </tr>
                 );
@@ -121,7 +129,9 @@ export function ServiciosSupervisorList({
       }
       cards={rows.map((row) => {
         const { wrapClass, statusTone, markers } = servicioRowHighlight(row);
-        if (row.kind === "atencion_cancelada") {
+        if (row.kind === "atencion_cancelada" || row.kind === "espera_ingreso") {
+          const statusLabel =
+            row.kind === "espera_ingreso" ? "Espera ingreso" : (CASE_STATUS_LABEL.CANCELADA ?? "Cancelada");
           return (
             <div key={`att-${row.id}`}>
               <MobileCard
@@ -130,14 +140,18 @@ export function ServiciosSupervisorList({
                 meta={
                   <>
                     {showTipo ? <Badge>{servicioTipoLabel(row.attentionType)}</Badge> : null}
-                    <Badge tone="neutral">{CASE_STATUS_LABEL.CANCELADA}</Badge>
+                    <Badge tone="neutral">{statusLabel}</Badge>
                   </>
                 }
               >
                 <p>{row.clientName}</p>
                 <p>{row.priorityName}</p>
                 <p className="line-clamp-2">{row.reportedFault}</p>
-                <p>Cierre: {formatClosedAt(row.closedAt)}</p>
+                {row.kind === "espera_ingreso" ? (
+                  <p>Alta: {row.createdAt.toLocaleDateString("es-MX", { timeZone: "America/Mexico_City" })}</p>
+                ) : (
+                  <p>Cierre: {formatClosedAt(row.closedAt)}</p>
+                )}
               </MobileCard>
             </div>
           );

@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { compareBySla } from "@/lib/sla";
 import { CASE_STATUS_LABEL } from "@/lib/technical";
+import { salesPortfolioEquipmentWhere } from "@/lib/sales-assignment";
 import { requireCompany } from "@/lib/session";
 
 export default async function OperacionPage({ searchParams }: { searchParams: Promise<{ vista?: string }> }) {
@@ -23,7 +24,7 @@ export default async function OperacionPage({ searchParams }: { searchParams: Pr
       ...(view === "cotizar" ? { quotePending: true } : {}),
       ...(view === "activas" ? { status: { notIn: ["VALIDADO", "TERMINADA", "SIN_REPARACION"] } } : {}),
       ...(session.role === "TECNICO" ? { assigneeUserId: session.userId } : {}),
-      ...(session.role === "VENTAS" ? { equipment: { client: { ownerUserId: session.userId } } } : {}),
+      ...(session.role === "VENTAS" ? { equipment: salesPortfolioEquipmentWhere(session.role, session.userId) } : {}),
       OR: [
         { serviceCompanyId: session.activeCompanyId },
         ...(session.activeCompanyCode === "SYSTRON" && servomotores

@@ -9,6 +9,7 @@ import {
   SegmentedNav,
   TextLink,
 } from "@/components/ui";
+import { salesPortfolioUserId } from "@/lib/sales-assignment";
 import type { Role } from "@/lib/roles";
 import { ServiciosSupervisorList } from "@/components/servicios-supervisor-list";
 import {
@@ -86,9 +87,10 @@ export async function ServiciosTecnicoBandeja({
     hasta,
     estado: estado && estado !== "todos" ? estado : undefined,
   };
+  const portfolioUserId = salesPortfolioUserId(role, userId);
   const listScope = {
     ...(technician ? { assigneeUserId: userId } : {}),
-    ...(role === "VENTAS" ? { clientOwnerUserId: userId } : {}),
+    ...(portfolioUserId ? { clientOwnerUserId: portfolioUserId } : {}),
   };
   const dateRange = { desde, hasta };
 

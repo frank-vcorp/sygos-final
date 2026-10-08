@@ -9,6 +9,8 @@ import { can } from "@/lib/permissions";
 import { QUOTE_STATUS_LABEL } from "@/lib/quotes";
 import { PART_REQUEST_STATUS_LABEL } from "@/lib/case-labels";
 import { homePath } from "@/lib/home";
+import { salesPortfolioUserId } from "@/lib/sales-assignment";
+import { listActiveServicios } from "@/lib/servicios-supervisor";
 import { requireCompany } from "@/lib/session";
 
 const CLOSED = ["VALIDADO", "TERMINADA", "SIN_REPARACION"];
@@ -234,9 +236,13 @@ async function Sales({ companyId, userId }: { companyId: string; userId: string 
     prisma.quote.count({ where: { companyId, sellerUserId: userId, status: "PENDIENTE_DECISION" } }),
   ]);
   const deliveries = sales.filter((sale) => sale.lines.some((line) => line.qtyReceived < line.qtySold || line.qtyDelivered < line.qtyReceived));
+  const portfolioId = salesPortfolioUserId("VENTAS", userId);
+  const serviciosCartera = portfolioId
+    ? await listActiveServicios(companyId, "", { clientOwnerUserId: portfolioId })
+    : [];
   return (
     <>
-      <PageHeader title="Inicio" subtitle="Tus pendientes comerciales y tu desempeño. Solo lo asignado a ti; sin costos internos ni base Servomotores." />
+      <PageHeader title="Inicio" subtitle="Tus pendientes comerciales y tu desempeño. Solo clientes asignados a ti en cartera; sin costos internos ni base Servomotores." />
       <section className="mb-4 grid gap-3 sm:grid-cols-3">
         <MetricCard label="Cotizaciones autorizadas (mes)" value={String(authorizedMonth)} />
         <MetricCard label="Esperando decisión del cliente" value={String(pendingDecision)} />
@@ -251,6 +257,33 @@ async function Sales({ companyId, userId }: { companyId: string; userId: string 
         </section>
       ) : null}
       <div className="grid gap-3">
+        <Block
+          title="Servicios de tu cartera"
+          empty="No hay servicios activos ni atenciones en espera de ingreso para tus clientes."
+          rows={serviciosCartera.slice(0, 10).map((row) => {
+            if (row.kind === "operacion") {
+              return {
+                key: row.id,
+                href: row.href,
+                label: row.folio,
+                detail: `${row.clientName} · ${row.equipmentFolio} · ${row.status}`,
+              };
+            }
+            return {
+              key: row.id,
+              href: row.href,
+              label: row.equipmentFolio,
+              detail: (
+                <>
+                  {row.clientName} · {row.kind === "espera_ingreso" ? "Espera ingreso físico" : "Cancelada"}
+                </>
+              ),
+            };
+          })}
+        />
+        <p className="text-sm">
+          <Link href="/servicios/activos" className="text-[var(--accent)]">Ver todos en Servicios</Link>
+        </p>
         <Block title="Cotizaciones por seguimiento" empty="Nada por seguir." rows={quotes.map((row) => ({ href: `/cotizaciones/${row.id}`, label: row.folio, detail: <>{QUOTE_STATUS_LABEL[row.status] ?? row.status} · {panelClientLink(row.client)}</> }))} />
         <Block title="Esperando precio (CEO/Administrador)" empty="No hay cotizaciones sin precio." rows={waitingPrice.map((row) => ({ href: `/cotizaciones/${row.id}`, label: row.folio, detail: panelClientLink(row.client) }))} />
         <Block title="Entregas pendientes" empty="Sin mercancía ni entregas por cerrar." rows={deliveries.map((row) => {
