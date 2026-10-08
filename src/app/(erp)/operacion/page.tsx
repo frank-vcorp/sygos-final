@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { SlaCountdown } from "@/components/sla-countdown";
 import { Badge, Empty, MobileCard, PageHeader, ResponsiveData, SegmentedNav, Table, Td, Th } from "@/components/ui";
 import { homePath } from "@/lib/home";
 import { prisma } from "@/lib/db";
@@ -66,7 +67,7 @@ export default async function OperacionPage({ searchParams }: { searchParams: Pr
                   <Td><Badge tone={overdue ? "warn" : "neutral"}>{CASE_STATUS_LABEL[row.status] ?? row.status}</Badge></Td>
                   <Td>{row.attention.priorityName}</Td>
                   <Td>{row.externalSupplierId ? "Servicio externo" : row.assignee?.name ?? "Sin asignar"}</Td>
-                  <Td>{row.slaDueAt ? row.slaDueAt.toLocaleString("es-MX", { timeZone: "America/Mexico_City", dateStyle: "medium", timeStyle: "short" }) : "—"}</Td>
+                  <Td><SlaCountdown dueAt={row.slaDueAt} /></Td>
                 </tr>
               );
             })}
@@ -74,7 +75,7 @@ export default async function OperacionPage({ searchParams }: { searchParams: Pr
         </Table>} cards={ordered.map((row) => {
           const readOnly = row.serviceCompanyId !== session.activeCompanyId;
           const overdue = row.slaDueAt != null && row.slaDueAt.getTime() < Date.now();
-          return <MobileCard key={row.id} href={`/operacion/${row.id}`} title={`${row.folio}${readOnly ? " · lectura" : ""}`} meta={<Badge tone={overdue ? "warn" : "neutral"}>{CASE_STATUS_LABEL[row.status] ?? row.status}</Badge>}><p>{row.equipment.folio} · {row.equipment.model}</p><p>{row.attention.priorityName} · {row.externalSupplierId ? "Servicio externo" : row.assignee?.name ?? "Sin asignar"}</p><p>SLA: {row.slaDueAt ? row.slaDueAt.toLocaleString("es-MX", { timeZone: "America/Mexico_City", dateStyle: "medium", timeStyle: "short" }) : "—"}</p></MobileCard>;
+          return <MobileCard key={row.id} href={`/operacion/${row.id}`} title={`${row.folio}${readOnly ? " · lectura" : ""}`} meta={<Badge tone={overdue ? "warn" : "neutral"}>{CASE_STATUS_LABEL[row.status] ?? row.status}</Badge>}><p>{row.equipment.folio} · {row.equipment.model}</p><p>{row.attention.priorityName} · {row.externalSupplierId ? "Servicio externo" : row.assignee?.name ?? "Sin asignar"}</p><p>SLA: <SlaCountdown dueAt={row.slaDueAt} /></p></MobileCard>;
         })} />
       )}
     </>

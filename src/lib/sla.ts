@@ -24,6 +24,39 @@ export function warrantyDeadline(exitAt: Date): Date {
   return deadline;
 }
 
+export type SlaCountdown = { text: string; overdue: boolean };
+
+/** Texto de cuenta regresiva (o tiempo vencido) respecto al plazo SLA. */
+export function formatSlaCountdown(dueAt: Date, now = Date.now()): SlaCountdown {
+  const diffMs = dueAt.getTime() - now;
+  const overdue = diffMs < 0;
+  const abs = Math.abs(diffMs);
+  const totalSec = Math.floor(abs / 1000);
+  const min = Math.floor(totalSec / 60);
+  const hr = Math.floor(min / 60);
+  const day = Math.floor(hr / 24);
+
+  if (!overdue && abs < 24 * 60 * 60 * 1000) {
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    const pad = (n: number) => String(n).padStart(2, "0");
+    return { text: `${h}:${pad(m)}:${pad(s)}`, overdue: false };
+  }
+
+  if (!overdue) {
+    if (day > 0) return { text: `${day} d ${hr % 24} h`, overdue: false };
+    if (hr > 0) return { text: `${hr} h ${min % 60} min`, overdue: false };
+    if (min > 0) return { text: `${min} min`, overdue: false };
+    return { text: "menos de 1 min", overdue: false };
+  }
+
+  if (day > 0) return { text: `Hace ${day} d ${hr % 24} h`, overdue: true };
+  if (hr > 0) return { text: `Hace ${hr} h ${min % 60} min`, overdue: true };
+  if (min > 0) return { text: `Hace ${min} min`, overdue: true };
+  return { text: "Vencido", overdue: true };
+}
+
 export function compareBySla<T extends { slaDueAt: Date | null; slaStartedAt: Date | null; createdAt: Date }>(a: T, b: T, now = Date.now()): number {
   const aOver = a.slaDueAt != null && a.slaDueAt.getTime() < now;
   const bOver = b.slaDueAt != null && b.slaDueAt.getTime() < now;

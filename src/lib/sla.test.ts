@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { addBusinessDays, compareBySla, warrantyDeadline } from "./sla";
+import { addBusinessDays, compareBySla, formatSlaCountdown, warrantyDeadline } from "./sla";
 
 describe("SLA", () => {
   it("salta sábado y domingo y conserva la hora de ingreso", () => {
@@ -17,6 +17,26 @@ describe("SLA", () => {
       { id: "cerca", slaDueAt: new Date("2026-10-06T12:00:00-06:00"), slaStartedAt: new Date("2026-10-01T12:00:00-06:00"), createdAt: new Date("2026-10-01T12:00:00-06:00") },
     ].sort((a, b) => compareBySla(a, b, now));
     assert.deepEqual(rows.map((row) => row.id), ["vencido", "cerca", "nuevo"]);
+  });
+
+  it("formatea cuenta regresiva con reloj cuando queda menos de un día", () => {
+    const now = new Date("2026-10-05T12:00:00-06:00").getTime();
+    const due = new Date("2026-10-05T15:30:45-06:00");
+    assert.equal(formatSlaCountdown(due, now).text, "3:30:45");
+    assert.equal(formatSlaCountdown(due, now).overdue, false);
+  });
+
+  it("formatea días y horas cuando el plazo es lejano", () => {
+    const now = new Date("2026-10-05T12:00:00-06:00").getTime();
+    const due = new Date("2026-10-08T12:00:00-06:00");
+    assert.equal(formatSlaCountdown(due, now).text, "3 d 0 h");
+  });
+
+  it("indica tiempo vencido", () => {
+    const now = new Date("2026-10-05T12:00:00-06:00").getTime();
+    const due = new Date("2026-10-03T10:00:00-06:00");
+    assert.equal(formatSlaCountdown(due, now).overdue, true);
+    assert.match(formatSlaCountdown(due, now).text, /^Hace /);
   });
 
   it("cuenta seis meses desde la salida física", () => {

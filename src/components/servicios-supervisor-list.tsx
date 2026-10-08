@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { SlaCountdown } from "@/components/sla-countdown";
 import { Badge, MobileCard, ResponsiveData, Table, Td, Th } from "@/components/ui";
 import { CASE_STATUS_LABEL } from "@/lib/case-labels";
 import { servicioTipoLabel } from "@/lib/servicios-catalog";
@@ -93,13 +94,7 @@ export function ServiciosSupervisorList({
                     <Td>{row.externalSupplier ? "Proveedor externo" : row.assigneeName ?? "Sin asignar"}</Td>
                   )}
                   <Td>
-                    {row.slaDueAt
-                      ? row.slaDueAt.toLocaleString("es-MX", {
-                          timeZone: "America/Mexico_City",
-                          dateStyle: "medium",
-                          timeStyle: "short",
-                        })
-                      : "—"}
+                    <SlaCountdown dueAt={row.slaDueAt} />
                   </Td>
                 </tr>
               );
@@ -155,14 +150,7 @@ export function ServiciosSupervisorList({
                 <p>{row.externalSupplier ? "Proveedor externo" : row.assigneeName ?? "Sin asignar"}</p>
               )}
               <p>
-                SLA:{" "}
-                {row.slaDueAt
-                  ? row.slaDueAt.toLocaleString("es-MX", {
-                      timeZone: "America/Mexico_City",
-                      dateStyle: "medium",
-                      timeStyle: "short",
-                    })
-                  : "—"}
+                SLA: <SlaCountdown dueAt={row.slaDueAt} />
               </p>
             </MobileCard>
           </div>
