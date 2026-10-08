@@ -50,10 +50,13 @@ export const NAV_GROUPS: NavGroupDef[] = [
   },
   {
     title: "Servicios",
-    direct: true,
     links: [
       {
-        href: "/servicios",
+        href: "/servicios/activos",
+        show: (role, code) => can(role, "attention.catalog", code),
+      },
+      {
+        href: "/servicios/historial",
         show: (role, code) => can(role, "attention.catalog", code),
       },
     ],
