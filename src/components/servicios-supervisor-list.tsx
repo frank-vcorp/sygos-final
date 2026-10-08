@@ -18,15 +18,28 @@ function Markers({ markers }: { markers: string[] }) {
   );
 }
 
+function formatClosedAt(date: Date) {
+  return date.toLocaleString("es-MX", {
+    timeZone: "America/Mexico_City",
+    dateStyle: "medium",
+    timeStyle: "short",
+  });
+}
+
 export function ServiciosSupervisorList({
   rows,
   hideAssignee = false,
   showTipo = false,
+  variant = "activos",
 }: {
   rows: SupervisorServicioRow[];
   hideAssignee?: boolean;
   showTipo?: boolean;
+  variant?: "activos" | "historial";
 }) {
+  const historial = variant === "historial";
+  const trailHeader = historial ? "Cierre" : "SLA";
+
   return (
     <ResponsiveData
       table={
@@ -39,15 +52,15 @@ export function ServiciosSupervisorList({
               <Th>Prioridad</Th>
               <Th>Estado</Th>
               {hideAssignee ? null : <Th>Responsable</Th>}
-              <Th>SLA</Th>
+              <Th>{trailHeader}</Th>
             </tr>
           </thead>
           <tbody>
             {rows.map((row) => {
               const { wrapClass, statusTone, markers } = servicioRowHighlight(row);
-              if (row.kind === "ingreso") {
+              if (row.kind === "atencion_cancelada") {
                 return (
-                  <tr key={`ing-${row.id}`} className={wrapClass}>
+                  <tr key={`att-${row.id}`} className={wrapClass}>
                     {showTipo ? (
                       <Td>
                         <Badge>{servicioTipoLabel(row.attentionType)}</Badge>
@@ -57,22 +70,22 @@ export function ServiciosSupervisorList({
                       <Link href={row.href} className="font-medium text-[var(--accent)]">
                         {row.equipmentFolio}
                       </Link>
-                      <span className="text-[var(--muted)]"> · espera ingreso</span>
+                      <span className="text-[var(--muted)]"> · sin operación</span>
                     </Td>
                     <Td>{row.clientName}</Td>
                     <Td>{row.priorityName}</Td>
                     <Td>
-                      <Badge tone="neutral">Espera ingreso</Badge>
+                      <Badge tone="neutral">{CASE_STATUS_LABEL.CANCELADA}</Badge>
                     </Td>
                     {hideAssignee ? null : <Td>—</Td>}
                     <Td>
-                      <span className="text-[var(--muted)]">Pendiente entrada</span>
+                      <span className="text-[var(--muted)]">{formatClosedAt(row.closedAt)}</span>
                     </Td>
                   </tr>
                 );
               }
               return (
-                <tr key={row.id} className={wrapClass}>
+                <tr key={row.id} className={historial ? undefined : wrapClass}>
                   {showTipo ? (
                     <Td>
                       <Badge>{servicioTipoLabel(row.attentionType)}</Badge>
@@ -83,18 +96,22 @@ export function ServiciosSupervisorList({
                       {row.folio}
                     </Link>
                     <span className="text-[var(--muted)]"> · {row.equipmentFolio}</span>
-                    <Markers markers={markers} />
+                    {historial ? null : <Markers markers={markers} />}
                   </Td>
                   <Td>{row.clientName}</Td>
                   <Td>{row.priorityName}</Td>
                   <Td>
-                    <Badge tone={statusTone}>{CASE_STATUS_LABEL[row.status] ?? row.status}</Badge>
+                    <Badge tone={historial ? "neutral" : statusTone}>{CASE_STATUS_LABEL[row.status] ?? row.status}</Badge>
                   </Td>
                   {hideAssignee ? null : (
                     <Td>{row.externalSupplier ? "Proveedor externo" : row.assigneeName ?? "Sin asignar"}</Td>
                   )}
                   <Td>
-                    <SlaCountdown dueAt={row.slaDueAt} />
+                    {historial ? (
+                      <span className="text-[var(--muted)]">{row.closedAt ? formatClosedAt(row.closedAt) : "—"}</span>
+                    ) : (
+                      <SlaCountdown dueAt={row.slaDueAt} />
+                    )}
                   </Td>
                 </tr>
               );
@@ -104,40 +121,41 @@ export function ServiciosSupervisorList({
       }
       cards={rows.map((row) => {
         const { wrapClass, statusTone, markers } = servicioRowHighlight(row);
-        if (row.kind === "ingreso") {
+        if (row.kind === "atencion_cancelada") {
           return (
-            <div key={`ing-${row.id}`} className={wrapClass ? `rounded-lg ${wrapClass}` : undefined}>
+            <div key={`att-${row.id}`}>
               <MobileCard
                 href={row.href}
                 title={row.equipmentFolio}
                 meta={
                   <>
                     {showTipo ? <Badge>{servicioTipoLabel(row.attentionType)}</Badge> : null}
-                    <Badge tone="neutral">Espera ingreso</Badge>
+                    <Badge tone="neutral">{CASE_STATUS_LABEL.CANCELADA}</Badge>
                   </>
                 }
               >
                 <p>{row.clientName}</p>
                 <p>{row.priorityName}</p>
                 <p className="line-clamp-2">{row.reportedFault}</p>
+                <p>Cierre: {formatClosedAt(row.closedAt)}</p>
               </MobileCard>
             </div>
           );
         }
         return (
-          <div key={row.id} className={wrapClass ? `rounded-lg ${wrapClass}` : undefined}>
+          <div key={row.id} className={historial ? undefined : wrapClass ? `rounded-lg ${wrapClass}` : undefined}>
             <MobileCard
               href={row.href}
               title={
                 <>
                   {row.folio}
-                  <Markers markers={markers} />
+                  {historial ? null : <Markers markers={markers} />}
                 </>
               }
               meta={
                 <>
                   {showTipo ? <Badge>{servicioTipoLabel(row.attentionType)}</Badge> : null}
-                  <Badge tone={statusTone}>{CASE_STATUS_LABEL[row.status] ?? row.status}</Badge>
+                  <Badge tone={historial ? "neutral" : statusTone}>{CASE_STATUS_LABEL[row.status] ?? row.status}</Badge>
                 </>
               }
             >
@@ -150,7 +168,13 @@ export function ServiciosSupervisorList({
                 <p>{row.externalSupplier ? "Proveedor externo" : row.assigneeName ?? "Sin asignar"}</p>
               )}
               <p>
-                SLA: <SlaCountdown dueAt={row.slaDueAt} />
+                {historial ? (
+                  <>Cierre: {row.closedAt ? formatClosedAt(row.closedAt) : "—"}</>
+                ) : (
+                  <>
+                    SLA: <SlaCountdown dueAt={row.slaDueAt} />
+                  </>
+                )}
               </p>
             </MobileCard>
           </div>

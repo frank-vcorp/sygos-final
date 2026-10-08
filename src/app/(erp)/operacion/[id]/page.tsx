@@ -31,6 +31,8 @@ import { diagnosisPresolicitudEditable, PRESOLICITUD_LABEL } from "@/lib/part-pr
 import { CASE_STATUS_LABEL } from "@/lib/technical";
 import { homePath } from "@/lib/home";
 import { redirectIfSalesNotAssigned } from "@/lib/sales-assignment";
+import { serviciosListHref, usesServiciosBandeja } from "@/lib/servicios-catalog";
+import { HISTORIAL_CASE } from "@/lib/servicios-supervisor";
 import { requireCompany } from "@/lib/session";
 
 export default async function OperacionDetallePage({ params }: { params: Promise<{ id: string }> }) {
@@ -55,7 +57,8 @@ export default async function OperacionDetallePage({ params }: { params: Promise
   if (!owns && !reflected) notFound();
   if (!can(session.role, row.equipment.kind === "EQUI" ? "equi.view" : "mot.view", session.activeCompanyCode) && !reflected) notFound();
   await redirectIfSalesNotAssigned(session, row.equipment.client.ownerUserId, "/operacion");
-  if (session.role === "TECNICO" && row.assigneeUserId !== session.userId) notFound();
+  const technicianOwned = row.assigneeUserId === session.userId || row.finishedByUserId === session.userId;
+  if (session.role === "TECNICO" && !technicianOwned) notFound();
   const readOnly = !owns;
   const authors = await prisma.user.findMany({
     where: { id: { in: row.logs.map((item) => item.authorUserId) } },
@@ -81,7 +84,8 @@ export default async function OperacionDetallePage({ params }: { params: Promise
   const original = row.originalCaseId ? await prisma.technicalCase.findUnique({ where: { id: row.originalCaseId }, select: { id: true, folio: true } }) : null;
   const repairAfterDiagnosis = row.kind === "OS" && row.attention.attentionType === "DIAGNOSTICO";
   const equipmentHref = row.equipment.kind === "MOT" ? `/motores/${row.equipmentId}` : `/equipos/${row.equipmentId}`;
-  const closed = ["VALIDADO", "TERMINADA", "SIN_REPARACION"].includes(row.status);
+  const historial = (HISTORIAL_CASE as readonly string[]).includes(row.status);
+  const closed = historial;
   const warranty = row.attention.attentionType === "DIAGNOSTICO_GARANTIA" && row.kind === "DIAGNOSTICO";
   const canManage = !readOnly && ["ADMINISTRADOR", "CEO", "SUPERVISOR_TECNICO", "GERENTE_OPERATIVO_SYSTRON", "GERENTE_OPERATIVO_SERVOMOTORES"].includes(session.role);
   const canWork = !readOnly && (session.role === "ADMINISTRADOR" || session.role === "CEO" || session.role === "SUPERVISOR_TECNICO" || (session.role === "GERENTE_OPERATIVO_SERVOMOTORES" && session.activeCompanyCode === "SERVOMOTORES") || (session.role === "TECNICO" && row.assigneeUserId === session.userId));
@@ -95,7 +99,14 @@ export default async function OperacionDetallePage({ params }: { params: Promise
   return (
     <>
       <PageHeader
-        back={{ href: "/operacion", label: "En proceso" }}
+        back={
+          usesServiciosBandeja(session.role)
+            ? {
+                href: serviciosListHref({ vista: historial ? "historial" : "activos" }),
+                label: historial ? "Historial de servicio" : "Servicios activos",
+              }
+            : { href: "/operacion", label: "En proceso" }
+        }
         title={row.folio}
         subtitle={`${row.kind === "OS" ? "Orden de servicio" : "Diagnóstico"} · ${row.serviceCompany.name}`}
         action={<Badge tone={row.quotePending ? "warn" : "neutral"}>{CASE_STATUS_LABEL[row.status] ?? row.status}</Badge>}

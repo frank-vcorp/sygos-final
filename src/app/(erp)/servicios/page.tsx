@@ -21,17 +21,16 @@ import {
 import { prisma } from "@/lib/db";
 import { homePath } from "@/lib/home";
 import { can } from "@/lib/permissions";
-import { ServiciosSupervisorList } from "@/components/servicios-supervisor-list";
+import { ServiciosTecnicoBandeja } from "@/components/servicios-tecnico-bandeja";
 import {
   equipmentScopeForServicios,
   parseServicioTipo,
+  parseServiciosVista,
   servicioTipoLabel,
   SERVICIO_TIPO_OPTIONS,
-  SERVICIO_TIPO_PARAM,
   serviciosListHref,
-  type ServicioTipoParam,
+  usesServiciosBandeja,
 } from "@/lib/servicios-catalog";
-import { listActiveServicios } from "@/lib/servicios-supervisor";
 import { requireCompany } from "@/lib/session";
 
 const CLOSED_CASE = ["VALIDADO", "TERMINADA", "SIN_REPARACION"] as const;
@@ -43,66 +42,30 @@ function attentionStatusLabel(status: string) {
 export default async function ServiciosCatalogPage({
   searchParams,
 }: {
-  searchParams: Promise<{ tipo?: string; estado?: string; q?: string }>;
+  searchParams: Promise<{ tipo?: string; estado?: string; q?: string; vista?: string; desde?: string; hasta?: string }>;
 }) {
   const session = await requireCompany();
   if (!can(session.role, "attention.catalog", session.activeCompanyCode)) {
     redirect(homePath(session.role, session.activeCompanyCode));
   }
-  if (session.role === "TECNICO") {
-    redirect("/servicios/diagnostico");
-  }
-  const { tipo, estado, q } = await searchParams;
+  const { tipo, estado, q, vista, desde, hasta } = await searchParams;
   const query = (q ?? "").trim();
   const tipoFilter = parseServicioTipo(tipo);
   if (tipo && tipo !== "todos" && !tipoFilter) redirect("/servicios");
 
-  if (session.role === "SUPERVISOR_TECNICO") {
-    const tipoParam =
-      tipo && tipo !== "todos" && tipo in SERVICIO_TIPO_PARAM ? (tipo as ServicioTipoParam) : null;
-    const tipoLabel = tipoParam ? SERVICIO_TIPO_OPTIONS.find((opt) => opt.param === tipoParam)?.label : null;
-    const rows = await listActiveServicios(session.activeCompanyId, query, { tipo: tipoParam });
-    const navBase = { tipo: tipo && tipo !== "todos" ? tipo : "todos", q: query };
+  if (usesServiciosBandeja(session.role)) {
     return (
-      <>
-        <PageHeader
-          title="Servicios"
-          subtitle="Solo operaciones con ingreso confirmado (folio de operación). Lo pendiente de entrada física se gestiona en ventas, custodia o almacén."
-        />
-        <SegmentedNav
-          items={[
-            { href: serviciosListHref({ ...navBase, tipo: "todos" }), label: "Todos los tipos", active: !tipo || tipo === "todos" },
-            ...SERVICIO_TIPO_OPTIONS.map((opt) => ({
-              href: serviciosListHref({ ...navBase, tipo: opt.param }),
-              label: opt.label,
-              active: tipo === opt.param,
-            })),
-          ]}
-        />
-        <FilterBar action="/servicios">
-          {tipo && tipo !== "todos" ? <input type="hidden" name="tipo" value={tipo} /> : null}
-          <input name="q" defaultValue={query} placeholder="Folio, cliente, equipo o falla" className={`${controlClass} sm:flex-1`} />
-          <Button type="submit" tone="ghost">
-            Buscar
-          </Button>
-        </FilterBar>
-        {rows.length === 0 ? (
-          <Empty
-            title={query ? "Sin coincidencias" : "Sin servicios activos"}
-            body={
-              query
-                ? `Nada activo coincide con «${query}»${tipoLabel ? ` en ${tipoLabel.toLowerCase()}` : ""}.`
-                : tipoLabel
-                  ? `No hay ${tipoLabel.toLowerCase()} activos en este momento.`
-                  : "No hay servicios activos en este momento."
-            }
-            action={query ? <TextLink href={serviciosListHref({ tipo })}>Quitar búsqueda</TextLink> : undefined}
-          />
-        ) : (
-          <ServiciosSupervisorList rows={rows} showTipo={!tipoParam} />
-        )}
-        <ListCap shown={rows.length} />
-      </>
+      <ServiciosTecnicoBandeja
+        companyId={session.activeCompanyId}
+        userId={session.userId}
+        technician={session.role === "TECNICO"}
+        vista={parseServiciosVista(vista)}
+        tipo={tipo}
+        estado={estado}
+        query={query}
+        desde={desde}
+        hasta={hasta}
+      />
     );
   }
 

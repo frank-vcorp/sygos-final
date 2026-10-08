@@ -1,9 +1,35 @@
 import { prisma } from "@/lib/db";
 import { compareBySla } from "@/lib/sla";
-import { SERVICIO_TIPO_PARAM, type ServicioTipoParam } from "@/lib/servicios-catalog";
+import { parseServiciosDateBoundary, SERVICIO_TIPO_PARAM, type ServicioTipoParam } from "@/lib/servicios-catalog";
 import type { AttentionType } from "@/lib/priorities";
 
 export const CLOSED_CASE = ["VALIDADO", "TERMINADA", "SIN_REPARACION"] as const;
+export const HISTORIAL_CASE = [...CLOSED_CASE, "CANCELADA"] as const;
+
+type ListScope = {
+  assigneeUserId?: string;
+  tipo?: ServicioTipoParam | null;
+  desde?: string;
+  hasta?: string;
+};
+
+function technicianCaseScope(userId: string) {
+  return { OR: [{ assigneeUserId: userId }, { finishedByUserId: userId }] };
+}
+
+function createdAtRange(desde?: string, hasta?: string) {
+  const from = parseServiciosDateBoundary(desde, false);
+  const to = parseServiciosDateBoundary(hasta, true);
+  if (!from && !to) return {};
+  return { createdAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } };
+}
+
+function updatedAtRange(desde?: string, hasta?: string) {
+  const from = parseServiciosDateBoundary(desde, false);
+  const to = parseServiciosDateBoundary(hasta, true);
+  if (!from && !to) return {};
+  return { updatedAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } };
+}
 
 type ActiveCaseRow = {
   kind: "operacion";
@@ -21,10 +47,11 @@ type ActiveCaseRow = {
   slaDueAt: Date | null;
   slaStartedAt: Date | null;
   createdAt: Date;
+  closedAt?: Date | null;
 };
 
-type IngressRow = {
-  kind: "ingreso";
+type CancelledAttentionRow = {
+  kind: "atencion_cancelada";
   id: string;
   href: string;
   attentionType: AttentionType;
@@ -32,13 +59,15 @@ type IngressRow = {
   clientName: string;
   priorityName: string;
   reportedFault: string;
+  status: string;
   createdAt: Date;
+  closedAt: Date;
 };
 
-export type SupervisorServicioRow = ActiveCaseRow | IngressRow;
+export type SupervisorServicioRow = ActiveCaseRow | CancelledAttentionRow;
 
 export function servicioRowHighlight(row: SupervisorServicioRow, now = Date.now()) {
-  if (row.kind === "ingreso") {
+  if (row.kind === "atencion_cancelada") {
     return { wrapClass: "", statusTone: "neutral" as const, markers: [] as string[] };
   }
   const overdue = row.slaDueAt != null && row.slaDueAt.getTime() < now;
@@ -53,22 +82,56 @@ export function servicioRowHighlight(row: SupervisorServicioRow, now = Date.now(
   return { wrapClass, statusTone, markers };
 }
 
+function mapCaseRow(row: {
+  id: string;
+  folio: string;
+  status: string;
+  slaDueAt: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+  validatedAt: Date | null;
+  externalSupplierId: string | null;
+  equipment: { folio: string; model: string; kind: string; client: { name: string } };
+  attention: { priorityName: string; slaStartedAt: Date | null; attentionType: string };
+  assignee: { name: string } | null;
+}): ActiveCaseRow {
+  return {
+    kind: "operacion",
+    id: row.id,
+    href: `/operacion/${row.id}`,
+    folio: row.folio,
+    attentionType: row.attention.attentionType as AttentionType,
+    equipmentFolio: row.equipment.folio,
+    equipmentModel: row.equipment.model,
+    clientName: row.equipment.client.name,
+    priorityName: row.attention.priorityName,
+    status: row.status,
+    assigneeName: row.assignee?.name ?? null,
+    externalSupplier: Boolean(row.externalSupplierId),
+    slaDueAt: row.slaDueAt,
+    slaStartedAt: row.attention.slaStartedAt,
+    createdAt: row.createdAt,
+    closedAt: row.validatedAt ?? row.updatedAt,
+  };
+}
+
 export async function listActiveServicios(
   companyId: string,
   query: string,
-  options?: { assigneeUserId?: string; tipo?: ServicioTipoParam | null },
+  options?: ListScope,
 ): Promise<SupervisorServicioRow[]> {
   const tipo = options?.tipo ?? null;
   const attentionType = tipo ? (SERVICIO_TIPO_PARAM[tipo] as AttentionType) : null;
   const q = query.trim();
-  const assigneeOnly = options?.assigneeUserId;
+  const technicianId = options?.assigneeUserId;
 
   const cases = await prisma.technicalCase.findMany({
     where: {
       serviceCompanyId: companyId,
-      status: { notIn: [...CLOSED_CASE] },
-      ...(assigneeOnly ? { assigneeUserId: assigneeOnly } : {}),
+      status: { notIn: [...HISTORIAL_CASE] },
+      ...(technicianId ? technicianCaseScope(technicianId) : {}),
       ...(attentionType ? { attention: { attentionType } } : {}),
+      ...createdAtRange(options?.desde, options?.hasta),
       ...(q
         ? {
             OR: [
@@ -88,32 +151,103 @@ export async function listActiveServicios(
     take: 200,
   });
 
-  const caseRows: ActiveCaseRow[] = cases.map((row) => ({
-    kind: "operacion",
-    id: row.id,
-    href: `/operacion/${row.id}`,
-    folio: row.folio,
-    attentionType: row.attention.attentionType as AttentionType,
-    equipmentFolio: row.equipment.folio,
-    equipmentModel: row.equipment.model,
-    clientName: row.equipment.client.name,
-    priorityName: row.attention.priorityName,
-    status: row.status,
-    assigneeName: row.assignee?.name ?? null,
-    externalSupplier: Boolean(row.externalSupplierId),
-    slaDueAt: row.slaDueAt,
-    slaStartedAt: row.attention.slaStartedAt,
-    createdAt: row.createdAt,
-  }));
+  const caseRows = cases.map((row) => mapCaseRow(row));
 
-  const sortedCases = caseRows.sort((a, b) =>
+  return caseRows.sort((a, b) =>
     compareBySla(
       { slaDueAt: a.slaDueAt, slaStartedAt: a.slaStartedAt, createdAt: a.createdAt },
       { slaDueAt: b.slaDueAt, slaStartedAt: b.slaStartedAt, createdAt: b.createdAt },
     ),
   );
+}
 
-  return sortedCases;
+export async function listHistorialServicios(
+  companyId: string,
+  query: string,
+  options?: ListScope & { status?: string | null },
+): Promise<SupervisorServicioRow[]> {
+  const tipo = options?.tipo ?? null;
+  const attentionType = tipo ? (SERVICIO_TIPO_PARAM[tipo] as AttentionType) : null;
+  const q = query.trim();
+  const technicianId = options?.assigneeUserId;
+  const statusFilter =
+    options?.status && options.status !== "todos" && (HISTORIAL_CASE as readonly string[]).includes(options.status)
+      ? options.status
+      : null;
+
+  const cases = await prisma.technicalCase.findMany({
+    where: {
+      serviceCompanyId: companyId,
+      status: statusFilter ? statusFilter : { in: [...HISTORIAL_CASE] },
+      ...(technicianId ? technicianCaseScope(technicianId) : {}),
+      attention: {
+        status: { not: "ABIERTA" },
+        ...(attentionType ? { attentionType } : {}),
+      },
+      ...updatedAtRange(options?.desde, options?.hasta),
+      ...(q
+        ? {
+            OR: [
+              { folio: { contains: q } },
+              { equipment: { folio: { contains: q } } },
+              { equipment: { client: { name: { contains: q } } } },
+              { attention: { reportedFault: { contains: q } } },
+            ],
+          }
+        : {}),
+    },
+    include: {
+      equipment: { include: { client: true } },
+      attention: { select: { priorityName: true, slaStartedAt: true, attentionType: true, status: true } },
+      assignee: { select: { name: true } },
+    },
+    orderBy: { updatedAt: "desc" },
+    take: 200,
+  });
+
+  const cancelledAttentions =
+    technicianId || (statusFilter && statusFilter !== "CANCELADA")
+      ? []
+      : await prisma.attention.findMany({
+          where: {
+            serviceCompanyId: companyId,
+            status: "CANCELADA",
+            ...(attentionType ? { attentionType } : {}),
+            ...updatedAtRange(options?.desde, options?.hasta),
+            technicalCases: { none: {} },
+            ...(q
+              ? {
+                  OR: [
+                    { equipment: { folio: { contains: q } } },
+                    { equipment: { client: { name: { contains: q } } } },
+                    { reportedFault: { contains: q } },
+                  ],
+                }
+              : {}),
+          },
+          include: { equipment: { include: { client: true } } },
+          orderBy: { updatedAt: "desc" },
+          take: 80,
+        });
+
+  const caseRows = cases.map((row) => mapCaseRow(row));
+  const cancelledRows: CancelledAttentionRow[] = cancelledAttentions.map((row) => ({
+    kind: "atencion_cancelada",
+    id: row.id,
+    href: row.equipment.kind === "MOT" ? `/motores/${row.equipmentId}` : `/equipos/${row.equipmentId}`,
+    attentionType: row.attentionType as AttentionType,
+    equipmentFolio: row.equipment.folio,
+    clientName: row.equipment.client.name,
+    priorityName: row.priorityName,
+    reportedFault: row.reportedFault,
+    status: "CANCELADA",
+    createdAt: row.createdAt,
+    closedAt: row.updatedAt,
+  }));
+
+  return [...caseRows, ...cancelledRows].sort(
+    (a, b) => (b.closedAt ?? b.createdAt).getTime() - (a.closedAt ?? a.createdAt).getTime(),
+  );
 }
 
 export async function listActiveServiciosByTipo(
