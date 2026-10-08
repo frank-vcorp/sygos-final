@@ -88,29 +88,6 @@ export async function listActiveServicios(
     take: 200,
   });
 
-  const ingress = assigneeOnly
-    ? []
-    : await prisma.attention.findMany({
-        where: {
-          serviceCompanyId: companyId,
-          ...(attentionType ? { attentionType } : {}),
-          status: "ABIERTA",
-          technicalCases: { none: { status: { notIn: [...CLOSED_CASE] } } },
-          ...(q
-            ? {
-                OR: [
-                  { equipment: { folio: { contains: q } } },
-                  { equipment: { client: { name: { contains: q } } } },
-                  { reportedFault: { contains: q } },
-                ],
-              }
-            : {}),
-        },
-        include: { equipment: { include: { client: true } } },
-        orderBy: { createdAt: "desc" },
-        take: 80,
-      });
-
   const caseRows: ActiveCaseRow[] = cases.map((row) => ({
     kind: "operacion",
     id: row.id,
@@ -129,18 +106,6 @@ export async function listActiveServicios(
     createdAt: row.createdAt,
   }));
 
-  const ingressRows: IngressRow[] = ingress.map((row) => ({
-    kind: "ingreso",
-    id: row.id,
-    href: row.equipment.kind === "MOT" ? `/motores/${row.equipmentId}` : `/equipos/${row.equipmentId}`,
-    attentionType: row.attentionType as AttentionType,
-    equipmentFolio: row.equipment.folio,
-    clientName: row.equipment.client.name,
-    priorityName: row.priorityName,
-    reportedFault: row.reportedFault,
-    createdAt: row.createdAt,
-  }));
-
   const sortedCases = caseRows.sort((a, b) =>
     compareBySla(
       { slaDueAt: a.slaDueAt, slaStartedAt: a.slaStartedAt, createdAt: a.createdAt },
@@ -148,8 +113,7 @@ export async function listActiveServicios(
     ),
   );
 
-  const sortedIngress = ingressRows.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-  return [...sortedCases, ...sortedIngress];
+  return sortedCases;
 }
 
 export async function listActiveServiciosByTipo(

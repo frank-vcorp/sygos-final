@@ -67,7 +67,7 @@ export default async function ServiciosCatalogPage({
       <>
         <PageHeader
           title="Servicios"
-          subtitle="Diagnósticos, reparaciones y garantías activos en una sola bandeja. Vencidas y en espera de refacciones se resaltan en la lista."
+          subtitle="Solo operaciones con ingreso confirmado (folio de operación). Lo pendiente de entrada física se gestiona en ventas, custodia o almacén."
         />
         <SegmentedNav
           items={[
