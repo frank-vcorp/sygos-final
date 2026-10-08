@@ -41,6 +41,8 @@ const LABELS: Record<string, string | ((code: string | null) => string)> = {
   "/reportes": "Reportes",
   "/kiosco": "Kiosco",
   "/servicios": "Servicios",
+  "/servicios/activos": "Servicios activos",
+  "/servicios/historial": "Historial de servicio",
   "/servicios/diagnostico": "Diagnósticos",
   "/servicios/reparacion": "Reparaciones",
   "/servicios/garantia": "Garantías",

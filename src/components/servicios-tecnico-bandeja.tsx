@@ -12,7 +12,9 @@ import { ServiciosSupervisorList } from "@/components/servicios-supervisor-list"
 import {
   SERVICIO_TIPO_OPTIONS,
   SERVICIO_TIPO_PARAM,
-  serviciosListHref,
+  serviciosBandejaHref,
+  SERVICIOS_BANDEJA_ACTIVOS,
+  SERVICIOS_BANDEJA_HISTORIAL,
   type ServicioTipoParam,
   type ServiciosVista,
 } from "@/lib/servicios-catalog";
@@ -81,39 +83,26 @@ export async function ServiciosTecnicoBandeja({
         ? "Solo operaciones abiertas asignadas a ti. Vencidas y en espera de refacciones se resaltan."
         : "Solo operaciones abiertas con ingreso confirmado. Vencidas y en espera de refacciones se resaltan.";
 
+  const formAction = vista === "historial" ? SERVICIOS_BANDEJA_HISTORIAL : SERVICIOS_BANDEJA_ACTIVOS;
+
   return (
     <>
-      <PageHeader title="Servicios" subtitle={subtitle} />
+      <PageHeader title={title} subtitle={subtitle} />
       <SegmentedNav
         items={[
           {
-            href: serviciosListHref({ ...navBase, vista: "activos" }),
-            label: "Servicios activos",
-            active: vista === "activos",
-          },
-          {
-            href: serviciosListHref({ ...navBase, vista: "historial" }),
-            label: "Historial de servicio",
-            active: vista === "historial",
-          },
-        ]}
-      />
-      <SegmentedNav
-        items={[
-          {
-            href: serviciosListHref({ ...navBase, tipo: "todos" }),
+            href: serviciosBandejaHref({ ...navBase, vista: "activos", tipo: navBase.tipo }),
             label: "Todos los tipos",
             active: !tipo || tipo === "todos",
           },
           ...SERVICIO_TIPO_OPTIONS.map((opt) => ({
-            href: serviciosListHref({ ...navBase, tipo: opt.param }),
+            href: serviciosBandejaHref({ ...navBase, tipo: opt.param }),
             label: opt.label,
             active: tipo === opt.param,
           })),
         ]}
       />
-      <FilterBar action="/servicios">
-        <input type="hidden" name="vista" value={vista} />
+      <FilterBar action={formAction}>
         {tipo && tipo !== "todos" ? <input type="hidden" name="tipo" value={tipo} /> : null}
         <input name="q" defaultValue={query} placeholder="Folio, cliente, equipo o falla" className={`${controlClass} min-w-0 sm:flex-1`} />
         <input
@@ -142,8 +131,6 @@ export async function ServiciosTecnicoBandeja({
         <Button type="submit" tone="ghost">Buscar</Button>
       </FilterBar>
 
-      <h2 className="mb-2 text-sm font-medium text-[var(--muted)]">{title}</h2>
-
       {rows.length === 0 ? (
         <Empty
           title={query || desde || hasta ? "Sin coincidencias" : vista === "historial" ? "Sin historial" : "Sin servicios activos"}
@@ -160,7 +147,7 @@ export async function ServiciosTecnicoBandeja({
           }
           action={
             query || desde || hasta ? (
-              <TextLink href={serviciosListHref({ vista, tipo })}>Quitar filtros</TextLink>
+              <TextLink href={serviciosBandejaHref({ vista, tipo })}>Quitar filtros</TextLink>
             ) : undefined
           }
         />

@@ -52,16 +52,32 @@ export function parseServiciosDateBoundary(value: string | undefined, endOfDay: 
   return Number.isNaN(date.getTime()) ? null : date;
 }
 
-export function serviciosListHref(params: ServiciosListParams) {
+export const SERVICIOS_BANDEJA_ACTIVOS = "/servicios/activos";
+export const SERVICIOS_BANDEJA_HISTORIAL = "/servicios/historial";
+
+function serviciosSearchParams(params: ServiciosListParams) {
   const search = new URLSearchParams();
-  if (params.vista === "historial") search.set("vista", "historial");
   if (params.tipo && params.tipo !== "todos") search.set("tipo", params.tipo);
   if (params.estado && params.estado !== "todos") search.set("estado", params.estado);
   if (params.q?.trim()) search.set("q", params.q.trim());
   if (params.desde?.trim()) search.set("desde", params.desde.trim());
   if (params.hasta?.trim()) search.set("hasta", params.hasta.trim());
+  return search;
+}
+
+/** Catálogo comercial (gerente, ventas, etc.). */
+export function serviciosListHref(params: ServiciosListParams = {}) {
+  const search = serviciosSearchParams(params);
   const query = search.toString();
   return query ? `/servicios?${query}` : "/servicios";
+}
+
+/** Bandeja técnica (técnico y supervisor). */
+export function serviciosBandejaHref(params: ServiciosListParams = {}) {
+  const base = params.vista === "historial" ? SERVICIOS_BANDEJA_HISTORIAL : SERVICIOS_BANDEJA_ACTIVOS;
+  const search = serviciosSearchParams(params);
+  const query = search.toString();
+  return query ? `${base}?${query}` : base;
 }
 
 export function usesServiciosBandeja(role: string) {

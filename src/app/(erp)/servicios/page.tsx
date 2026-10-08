@@ -21,13 +21,13 @@ import {
 import { prisma } from "@/lib/db";
 import { homePath } from "@/lib/home";
 import { can } from "@/lib/permissions";
-import { ServiciosTecnicoBandeja } from "@/components/servicios-tecnico-bandeja";
 import {
   equipmentScopeForServicios,
   parseServicioTipo,
   parseServiciosVista,
   servicioTipoLabel,
   SERVICIO_TIPO_OPTIONS,
+  serviciosBandejaHref,
   serviciosListHref,
   usesServiciosBandeja,
 } from "@/lib/servicios-catalog";
@@ -54,18 +54,15 @@ export default async function ServiciosCatalogPage({
   if (tipo && tipo !== "todos" && !tipoFilter) redirect("/servicios");
 
   if (usesServiciosBandeja(session.role)) {
-    return (
-      <ServiciosTecnicoBandeja
-        companyId={session.activeCompanyId}
-        userId={session.userId}
-        technician={session.role === "TECNICO"}
-        vista={parseServiciosVista(vista)}
-        tipo={tipo}
-        estado={estado}
-        query={query}
-        desde={desde}
-        hasta={hasta}
-      />
+    redirect(
+      serviciosBandejaHref({
+        vista: parseServiciosVista(vista),
+        tipo,
+        estado,
+        q: query,
+        desde,
+        hasta,
+      }),
     );
   }
 
