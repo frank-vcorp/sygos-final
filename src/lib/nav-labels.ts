@@ -4,8 +4,6 @@ import type { Role } from "@/lib/roles";
 export function navLabel(href: string, role: Role, _companyCode: string | null): string | undefined {
   if (role !== "VENTAS") return undefined;
   switch (href) {
-    case "/panel":
-      return "Inicio";
     case "/ventas":
       return "Venta de equipos";
     default:
