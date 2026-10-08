@@ -15,8 +15,10 @@ export type NavGroupDef = {
 
 const ventas = (role: Role) => role === "VENTAS";
 const notVentas = (role: Role) => role !== "VENTAS";
+const serviciosPorTipoNav = (role: Role) => role === "SUPERVISOR_TECNICO" || role === "TECNICO";
+
 /** Operación vía Servicios + detalle; sin acordeón Taller en menú. */
-const showTallerNav = (role: Role) => role !== "SUPERVISOR_TECNICO";
+const showTallerNav = (role: Role) => !serviciosPorTipoNav(role);
 
 /** Catálogo EQUI: SYSTRON y roles con bandeja; nunca Servomotores (sin equi.view allí). */
 function showEquiCatalog(role: Role, companyCode: string | null) {
@@ -54,7 +56,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
     links: [
       {
         href: "/servicios",
-        show: (role, code) => can(role, "attention.catalog", code) && role !== "SUPERVISOR_TECNICO",
+        show: (role, code) => can(role, "attention.catalog", code) && !serviciosPorTipoNav(role),
       },
     ],
   },
@@ -63,15 +65,15 @@ export const NAV_GROUPS: NavGroupDef[] = [
     links: [
       {
         href: "/servicios/diagnostico",
-        show: (role, code) => role === "SUPERVISOR_TECNICO" && can(role, "attention.catalog", code),
+        show: (role, code) => serviciosPorTipoNav(role) && can(role, "attention.catalog", code),
       },
       {
         href: "/servicios/reparacion",
-        show: (role, code) => role === "SUPERVISOR_TECNICO" && can(role, "attention.catalog", code),
+        show: (role, code) => serviciosPorTipoNav(role) && can(role, "attention.catalog", code),
       },
       {
         href: "/servicios/garantia",
-        show: (role, code) => role === "SUPERVISOR_TECNICO" && can(role, "attention.catalog", code),
+        show: (role, code) => serviciosPorTipoNav(role) && can(role, "attention.catalog", code),
       },
     ],
   },

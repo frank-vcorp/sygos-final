@@ -51,18 +51,21 @@ export function servicioRowHighlight(row: SupervisorServicioRow, now = Date.now(
   return { wrapClass, statusTone, markers };
 }
 
-export async function listSupervisorActiveServicios(
+export async function listActiveServiciosByTipo(
   companyId: string,
   tipo: ServicioTipoParam,
   query: string,
+  options?: { assigneeUserId?: string },
 ): Promise<SupervisorServicioRow[]> {
   const attentionType = SERVICIO_TIPO_PARAM[tipo] as AttentionType;
   const q = query.trim();
+  const assigneeOnly = options?.assigneeUserId;
 
   const cases = await prisma.technicalCase.findMany({
     where: {
       serviceCompanyId: companyId,
       status: { notIn: [...CLOSED_CASE] },
+      ...(assigneeOnly ? { assigneeUserId: assigneeOnly } : {}),
       attention: { attentionType },
       ...(q
         ? {
@@ -83,26 +86,28 @@ export async function listSupervisorActiveServicios(
     take: 200,
   });
 
-  const ingress = await prisma.attention.findMany({
-    where: {
-      serviceCompanyId: companyId,
-      attentionType,
-      status: "ABIERTA",
-      technicalCases: { none: { status: { notIn: [...CLOSED_CASE] } } },
-      ...(q
-        ? {
-            OR: [
-              { equipment: { folio: { contains: q } } },
-              { equipment: { client: { name: { contains: q } } } },
-              { reportedFault: { contains: q } },
-            ],
-          }
-        : {}),
-    },
-    include: { equipment: { include: { client: true } } },
-    orderBy: { createdAt: "desc" },
-    take: 80,
-  });
+  const ingress = assigneeOnly
+    ? []
+    : await prisma.attention.findMany({
+        where: {
+          serviceCompanyId: companyId,
+          attentionType,
+          status: "ABIERTA",
+          technicalCases: { none: { status: { notIn: [...CLOSED_CASE] } } },
+          ...(q
+            ? {
+                OR: [
+                  { equipment: { folio: { contains: q } } },
+                  { equipment: { client: { name: { contains: q } } } },
+                  { reportedFault: { contains: q } },
+                ],
+              }
+            : {}),
+        },
+        include: { equipment: { include: { client: true } } },
+        orderBy: { createdAt: "desc" },
+        take: 80,
+      });
 
   const caseRows: ActiveCaseRow[] = cases.map((row) => ({
     kind: "operacion",
@@ -140,4 +145,13 @@ export async function listSupervisorActiveServicios(
   );
 
   return [...sortedCases, ...ingressRows];
+}
+
+/** @deprecated use listActiveServiciosByTipo */
+export async function listSupervisorActiveServicios(
+  companyId: string,
+  tipo: ServicioTipoParam,
+  query: string,
+): Promise<SupervisorServicioRow[]> {
+  return listActiveServiciosByTipo(companyId, tipo, query);
 }

@@ -16,7 +16,7 @@ function Markers({ markers }: { markers: string[] }) {
   );
 }
 
-export function ServiciosSupervisorList({ rows }: { rows: SupervisorServicioRow[] }) {
+export function ServiciosSupervisorList({ rows, hideAssignee = false }: { rows: SupervisorServicioRow[]; hideAssignee?: boolean }) {
   return (
     <ResponsiveData
       table={
@@ -27,7 +27,7 @@ export function ServiciosSupervisorList({ rows }: { rows: SupervisorServicioRow[
               <Th>Cliente</Th>
               <Th>Prioridad</Th>
               <Th>Estado</Th>
-              <Th>Responsable</Th>
+              {hideAssignee ? null : <Th>Responsable</Th>}
               <Th>SLA</Th>
             </tr>
           </thead>
@@ -48,7 +48,7 @@ export function ServiciosSupervisorList({ rows }: { rows: SupervisorServicioRow[
                     <Td>
                       <Badge tone="neutral">Espera ingreso</Badge>
                     </Td>
-                    <Td>—</Td>
+                    {hideAssignee ? null : <Td>—</Td>}
                     <Td>
                       <span className="text-[var(--muted)]">Pendiente entrada</span>
                     </Td>
@@ -69,7 +69,9 @@ export function ServiciosSupervisorList({ rows }: { rows: SupervisorServicioRow[
                   <Td>
                     <Badge tone={statusTone}>{CASE_STATUS_LABEL[row.status] ?? row.status}</Badge>
                   </Td>
-                  <Td>{row.externalSupplier ? "Proveedor externo" : row.assigneeName ?? "Sin asignar"}</Td>
+                  {hideAssignee ? null : (
+                    <Td>{row.externalSupplier ? "Proveedor externo" : row.assigneeName ?? "Sin asignar"}</Td>
+                  )}
                   <Td>
                     {row.slaDueAt
                       ? row.slaDueAt.toLocaleString("es-MX", {
@@ -119,9 +121,9 @@ export function ServiciosSupervisorList({ rows }: { rows: SupervisorServicioRow[
               </p>
               <p>{row.clientName}</p>
               <p>{row.priorityName}</p>
-              <p>
-                {row.externalSupplier ? "Proveedor externo" : row.assigneeName ?? "Sin asignar"}
-              </p>
+              {hideAssignee ? null : (
+                <p>{row.externalSupplier ? "Proveedor externo" : row.assigneeName ?? "Sin asignar"}</p>
+              )}
               <p>
                 SLA:{" "}
                 {row.slaDueAt

@@ -45,7 +45,7 @@ export default async function ServiciosCatalogPage({
   if (!can(session.role, "attention.catalog", session.activeCompanyCode)) {
     redirect(homePath(session.role, session.activeCompanyCode));
   }
-  if (session.role === "SUPERVISOR_TECNICO") {
+  if (session.role === "SUPERVISOR_TECNICO" || session.role === "TECNICO") {
     redirect("/servicios/diagnostico");
   }
   const { tipo, estado, q } = await searchParams;

@@ -19,8 +19,12 @@ import {
   serviciosTipoHref,
   type ServicioTipoParam,
 } from "@/lib/servicios-catalog";
-import { listSupervisorActiveServicios } from "@/lib/servicios-supervisor";
+import { listActiveServiciosByTipo } from "@/lib/servicios-supervisor";
 import { requireCompany } from "@/lib/session";
+
+function usesServiciosPorTipo(role: string) {
+  return role === "SUPERVISOR_TECNICO" || role === "TECNICO";
+}
 
 export default async function ServiciosTipoPage({
   params,
@@ -38,20 +42,24 @@ export default async function ServiciosTipoPage({
     redirect(homePath(session.role, session.activeCompanyCode));
   }
 
-  if (session.role !== "SUPERVISOR_TECNICO") {
+  if (!usesServiciosPorTipo(session.role)) {
     redirect(serviciosListHref({ tipo: tipoParam, q: q?.trim() }));
   }
 
   const query = (q ?? "").trim();
   const section = SUPERVISOR_SERVICIO_SECTIONS.find((row) => row.param === tipoParam)!;
-  const rows = await listSupervisorActiveServicios(session.activeCompanyId, tipoParam, query);
+  const technician = session.role === "TECNICO";
+  const rows = await listActiveServiciosByTipo(session.activeCompanyId, tipoParam, query, {
+    ...(technician ? { assigneeUserId: session.userId } : {}),
+  });
+
+  const subtitle = technician
+    ? "Solo activas asignadas a ti. Vencidas y en espera de refacciones se resaltan en la misma lista."
+    : "Solo activas. Las vencidas y las en espera de refacciones se resaltan en la misma lista.";
 
   return (
     <>
-      <PageHeader
-        title={section.title}
-        subtitle="Solo activas. Las vencidas y las en espera de refacciones se resaltan en la misma lista."
-      />
+      <PageHeader title={section.title} subtitle={subtitle} />
       <SegmentedNav
         items={SUPERVISOR_SERVICIO_SECTIONS.map((opt) => ({
           href: serviciosTipoHref(opt.param, query),
@@ -72,12 +80,14 @@ export default async function ServiciosTipoPage({
           body={
             query
               ? `Nada activo coincide con «${query}» en ${section.title.toLowerCase()}.`
-              : `No hay ${section.title.toLowerCase()} activos en este momento.`
+              : technician
+                ? `No tienes ${section.title.toLowerCase()} activos asignados.`
+                : `No hay ${section.title.toLowerCase()} activos en este momento.`
           }
           action={query ? <TextLink href={serviciosTipoHref(tipoParam)}>Quitar búsqueda</TextLink> : undefined}
         />
       ) : (
-        <ServiciosSupervisorList rows={rows} />
+        <ServiciosSupervisorList rows={rows} hideAssignee={technician} />
       )}
       <ListCap shown={rows.length} />
     </>

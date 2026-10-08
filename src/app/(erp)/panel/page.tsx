@@ -32,9 +32,9 @@ function panelClientLink(client: { id: string; name: string; isSystem: boolean }
 export default async function PanelPage({ searchParams }: { searchParams: Promise<{ vista?: string; filtro?: string }> }) {
   const session = await requireCompany();
   if (!can(session.role, "panel.view", session.activeCompanyCode)) redirect(homePath(session.role, session.activeCompanyCode));
-  const { vista, filtro } = await searchParams;
+  const { vista } = await searchParams;
   const companyId = session.activeCompanyId;
-  if (session.role === "TECNICO") return <Technician companyId={companyId} userId={session.userId} history={vista === "historial"} filter={filtro ?? "todos"} />;
+  if (session.role === "TECNICO") return <Technician companyId={companyId} userId={session.userId} history={vista === "historial"} />;
   if (session.role === "VENTAS") return <Sales companyId={companyId} userId={session.userId} />;
   if (session.role === "COORDINACION_ADMINISTRACION") return <Coordination companyId={companyId} code={session.activeCompanyCode} />;
   if (session.role === "GERENTE_OPERATIVO_SERVOMOTORES") return <Servomotores companyId={companyId} />;
@@ -47,39 +47,41 @@ export default async function PanelPage({ searchParams }: { searchParams: Promis
   return <Executive companyId={companyId} name={session.activeCompanyName} />;
 }
 
-async function Technician({ companyId, userId, history, filter }: { companyId: string; userId: string; history: boolean; filter: string }) {
+async function Technician({ companyId, userId, history }: { companyId: string; userId: string; history: boolean }) {
   const rows = await prisma.technicalCase.findMany({
     where: {
       serviceCompanyId: companyId,
-      OR: [{ assigneeUserId: userId }, { finishedByUserId: userId }],
-      ...(history ? { status: { in: CLOSED } } : { status: { notIn: CLOSED }, assigneeUserId: userId }),
+      ...(history
+        ? {
+            status: { in: CLOSED },
+            OR: [{ assigneeUserId: userId }, { finishedByUserId: userId }],
+          }
+        : { status: { notIn: CLOSED }, assigneeUserId: userId }),
     },
-    include: { equipment: true, attention: true },
+    include: { equipment: { include: { client: true } }, attention: true },
     orderBy: { slaDueAt: "asc" },
     take: 80,
   });
-  const mine = rows.filter((row) => history || row.assigneeUserId === userId);
-  const now = Date.now();
-  const filtered = mine.filter((row) => {
-    if (filter === "vencidos") return row.slaDueAt != null && row.slaDueAt.getTime() < now;
-    if (filter === "refacciones") return row.status === "EN_ESPERA_REFACCIONES";
-    if (filter === "diagnosticos") return row.kind === "DIAGNOSTICO";
-    if (filter === "reparaciones") return row.kind === "OS";
-    return true;
-  });
-  const diagnoses = mine.filter((row) => row.kind === "DIAGNOSTICO" && !CLOSED.includes(row.status)).length;
-  const repairs = mine.filter((row) => row.kind === "OS" && !CLOSED.includes(row.status)).length;
   return (
     <>
-      <PageHeader title="Panel técnico" subtitle="Solo trabajos asignados. El folio abre la operación." />
-      <div className="mb-4 flex flex-wrap gap-2 text-sm">
-        <Filter href="/panel?filtro=diagnosticos" label={`Diagnósticos ${diagnoses}`} />
-        <Filter href="/panel?filtro=reparaciones" label={`Reparaciones ${repairs}`} />
-        <Filter href="/panel?filtro=vencidos" label="Vencidos" />
-        <Filter href="/panel?filtro=refacciones" label="En espera de refacciones" />
-        <Filter href={history ? "/panel" : "/panel?vista=historial"} label={history ? "Activos" : "Historial"} />
-      </div>
-      <Block title={history ? "Historial" : "Asignados"} empty="No hay trabajos en este filtro." rows={filtered.map((row) => ({ href: `/operacion/${row.id}`, label: row.folio, detail: `${row.equipment.folio} · ${row.status}` }))} />
+      <PageHeader
+        title="Inicio"
+        subtitle="Trabajos asignados a ti. Por tipo usa Servicios; el folio abre la operación."
+        action={
+          <Link href={history ? "/panel" : "/panel?vista=historial"} className="text-sm text-[var(--accent)]">
+            {history ? "Ver activos" : "Ver historial"}
+          </Link>
+        }
+      />
+      <Block
+        title={history ? "Historial" : "Asignados a ti"}
+        empty={history ? "No hay trabajos cerrados en tu historial." : "No tienes operaciones activas asignadas."}
+        rows={rows.map((row) => ({
+          href: `/operacion/${row.id}`,
+          label: row.folio,
+          detail: `${row.equipment.client?.name ?? "Equipo"} · ${row.equipment.folio} · ${row.attention.priorityName} · ${row.status}`,
+        }))}
+      />
     </>
   );
 }
@@ -318,6 +320,3 @@ async function Executive({ companyId, name }: { companyId: string; name: string 
   );
 }
 
-function Filter({ href, label }: { href: string; label: string }) {
-  return <Link href={href} className="rounded-md border border-[var(--line)] bg-white px-3 py-2">{label}</Link>;
-}

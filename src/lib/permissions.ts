@@ -106,7 +106,7 @@ export function can(role: Role, action: Action, companyCode?: string | null): bo
       return can(role, "equi.create", companyCode) || can(role, "mot.create", companyCode);
     case "attention.catalog":
       if (admin || ceo) return true;
-      if (companyCode === "SYSTRON") return sales || gerenteSy || role === "SUPERVISOR_TECNICO";
+      if (companyCode === "SYSTRON") return sales || gerenteSy || role === "SUPERVISOR_TECNICO" || role === "TECNICO";
       if (companyCode === "SERVOMOTORES") return gerenteSm;
       return false;
     case "equipment.catalog":

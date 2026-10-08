@@ -55,8 +55,8 @@ describe("permisos de fase 1", () => {
     assert.equal(can("COORDINACION_ADMINISTRACION", "operation.queue", "SYSTRON"), false);
   });
 
-  it("deja al técnico fuera de bandejas de servicio y catálogo de equipos", () => {
-    assert.equal(can("TECNICO", "attention.catalog", "SYSTRON"), false);
+  it("deja al técnico fuera del catálogo de equipos; servicios solo asignados en bandeja", () => {
+    assert.equal(can("TECNICO", "attention.catalog", "SYSTRON"), true);
     assert.equal(can("TECNICO", "equipment.catalog", "SYSTRON"), false);
     assert.equal(can("VENTAS", "attention.catalog", "SYSTRON"), true);
     assert.equal(can("SUPERVISOR_TECNICO", "attention.catalog", "SYSTRON"), true);
