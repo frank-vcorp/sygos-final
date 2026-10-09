@@ -1,9 +1,8 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { cancelOrderAction, changeOrderAction, decideOrderAction, discardDirectAction, editDirectAction, processPurchaseAction } from "../actions";
 import { HistoryTimeline } from "@/components/history-timeline";
 import { SupplierPicker } from "@/components/supplier-picker";
-import { Badge, controlClass, Field, PageHeader } from "@/components/ui";
+import { Badge, controlClass, Field, PageHeader, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { historyFor } from "@/lib/history";
 import { money } from "@/lib/money";
@@ -29,7 +28,7 @@ export default async function CompraPage({ params }: { params: Promise<{ id: str
     <>
       <PageHeader back={{ href: "/compras", label: "Compras" }} title={row.folio} subtitle={row.kind === "OC" ? "Orden de compra" : "Compra directa"} action={<Badge>{row.status}</Badge>} />
       <section className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
-        <p>Proveedor: {row.supplier ? <Link href={`/proveedores/${row.supplier.id}`} className="text-[var(--accent)]">{row.supplier.name}</Link> : "Sin proveedor"}</p>
+        <p>Proveedor: {row.supplier ? <TextLink href={`/proveedores/${row.supplier.id}`}>{row.supplier.name}</TextLink> : "Sin proveedor"}</p>
         <p className="mt-1">Solicitante: {requester?.name ?? "—"}</p>
         <p className="mt-1">{row.concept} · cantidad {row.quantity} · {money(row.amount)}</p>
         {row.authorizedAmount != null ? <p className="mt-1">Importe autorizado: {money(row.authorizedAmount)}</p> : null}

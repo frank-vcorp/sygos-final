@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ClientNameLink } from "@/components/client-entity-links";
-import { Badge, Empty, MobileCard, PageHeader, ResponsiveData, SegmentedNav, Table, Td, Th } from "@/components/ui";
+import { Badge, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, SegmentedNav, Table, Td, Th } from "@/components/ui";
 import { homePath } from "@/lib/home";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
@@ -57,7 +56,7 @@ export default async function CobranzaPage({ searchParams }: { searchParams: Pro
                   const statusLabel = overdue ? "Vencida" : row.status === "SALDADA" ? "Saldada" : row.status === "PARCIAL" ? "Parcial" : "Abierta";
                   return (
                     <tr key={row.id}>
-                      <Td><Link href={`/cobranza/${row.id}`} className="font-medium text-[var(--accent)]">{row.document.folio}</Link></Td>
+                      <Td><RecordLink href={`/cobranza/${row.id}`}>{row.document.folio}</RecordLink></Td>
                       <Td><ClientNameLink clientId={row.client.id} name={row.client.name} isSystem={row.client.isSystem} canEdit={canEditClient} /></Td>
                       <Td>{money(row.balance)}</Td>
                       <Td>{formatWhen(row.dueAt)}</Td>

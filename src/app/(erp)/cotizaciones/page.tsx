@@ -1,7 +1,7 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ClientNameLink } from "@/components/client-entity-links";
-import { ActionLink, Badge, Button, controlClass, Empty, FilterBar, ListCap, MobileCard, PageHeader, ResponsiveData, SegmentedNav, Table, Td, Th, TextLink } from "@/components/ui";
+import { ActionLink, ActiveFilters, Badge, Button, controlClass, Empty, FilterBar, ListCap, MobileCard, PageHeader, RecordLink, ResponsiveData, SegmentedNav, Table, Td, Th, TextLink } from "@/components/ui";
+import { listHref, listHrefWithout } from "@/lib/list-url";
 import { homePath } from "@/lib/home";
 import { prisma } from "@/lib/db";
 import { linesForTotal, money, quoteTotals } from "@/lib/money";
@@ -66,12 +66,18 @@ export default async function CotizacionesPage({ searchParams }: { searchParams:
           <input name="q" defaultValue={query} placeholder="Folio o cliente" className={`${controlClass} sm:flex-1`} />
           <Button type="submit" tone="ghost">Buscar</Button>
         </FilterBar>
+      <ActiveFilters
+        items={[
+          ...(pending ? [{ label: "Pendientes de cotizar", clearHref: listHref("/cotizaciones", { q: query || undefined }) }] : []),
+          ...(query ? [{ label: `Búsqueda: ${query}`, clearHref: listHref("/cotizaciones", { vista: pending ? "pendientes" : undefined }) }] : []),
+        ]}
+      />
       {cases.length > 0 ? (
         <ul className="mb-4 divide-y divide-[var(--line)] rounded-lg border border-[var(--line)] bg-white">
           {cases.map((row) => (
-            <li key={row.id} className="flex flex-wrap items-center justify-between gap-2 px-4 py-3 text-sm">
-              <span>{row.folio} · {row.equipment.folio} aún no tiene cotización</span>
-              <Link href={`/operacion/${row.id}`} className="text-[var(--accent)]">Abrir operación</Link>
+            <li key={row.id} className="px-4 py-3 text-sm">
+              <RecordLink href={`/operacion/${row.id}`}>{row.folio}</RecordLink>
+              <span className="text-[var(--muted)]"> · {row.equipment.folio} aún no tiene cotización</span>
             </li>
           ))}
         </ul>
@@ -91,7 +97,7 @@ export default async function CotizacionesPage({ searchParams }: { searchParams:
               const totals = hidePrice ? null : quoteTotals(linesForTotal(quote.lines, quote.quoteType, quote.status), quote.discountPct);
               return (
                 <tr key={quote.id}>
-                  <Td><Link href={`/cotizaciones/${quote.id}`} className="font-medium text-[var(--accent)]">{quote.folio}</Link></Td>
+                  <Td><RecordLink href={`/cotizaciones/${quote.id}`}>{quote.folio}</RecordLink></Td>
                   <Td><ClientNameLink clientId={quote.client.id} name={quote.client.name} isSystem={quote.client.isSystem} canEdit={canEditClient} /></Td>
                   <Td>{QUOTE_TYPE_LABEL[quote.quoteType as QuoteType] ?? quote.quoteType}</Td>
                   <Td><Badge>{QUOTE_STATUS_LABEL[quote.status] ?? quote.status}</Badge></Td>

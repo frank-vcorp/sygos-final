@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ClientNameLink } from "@/components/client-entity-links";
-import { Badge, Empty, MobileCard, PageHeader, ResponsiveData, SegmentedNav, Table, Td, Th } from "@/components/ui";
+import { ActionLink, Badge, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, SegmentedNav, Table, Td, Th } from "@/components/ui";
 import { homePath } from "@/lib/home";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
@@ -57,7 +56,7 @@ export default async function FacturacionPage({ searchParams }: { searchParams: 
   ];
   return (
     <>
-      <PageHeader title="Facturación" subtitle="Solicitud, emisión y remisión de esta empresa. El timbrado no se duplica." action={can(session.role, "invoice.issue", session.activeCompanyCode) ? <Link href="/facturacion/nuevo" className="rounded-md bg-[var(--accent)] px-3 py-2 text-sm font-medium text-white">Factura libre</Link> : null} />
+      <PageHeader title="Facturación" subtitle="Solicitud, emisión y remisión de esta empresa. El timbrado no se duplica." action={can(session.role, "invoice.issue", session.activeCompanyCode) ? <ActionLink href="/facturacion/nuevo">Factura libre</ActionLink> : null} />
       <SegmentedNav items={tabs} />
       {rows.length === 0 ? <Empty title="Sin documentos" body="Una factura nace de una operación autorizada o de una factura libre." /> : (
         <ResponsiveData
@@ -69,7 +68,7 @@ export default async function FacturacionPage({ searchParams }: { searchParams: 
                   const statusLabel = row.status === "SOLICITADA" ? "Solicitada" : row.status === "EMITIDA" ? "Emitida" : row.status;
                   return (
                     <tr key={row.id}>
-                      <Td><Link href={`/facturacion/${row.id}`} className="font-medium text-[var(--accent)]">{row.folio}</Link></Td>
+                      <Td><RecordLink href={`/facturacion/${row.id}`}>{row.folio}</RecordLink></Td>
                       <Td>{KIND[row.kind] ?? row.kind}</Td>
                       <Td><ClientNameLink clientId={row.client.id} name={row.client.name} isSystem={row.client.isSystem} canEdit={canEditClient} /></Td>
                       <Td><Badge>{statusLabel}</Badge></Td>

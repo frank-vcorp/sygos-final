@@ -28,7 +28,8 @@ body {
   line-height: 1.5;
 }
 
-a {
+/* Enlaces sin clase explícita heredan color (nav, chrome). Registros y relaciones usan RecordLink / TextLink. */
+a:not([class]) {
   color: inherit;
 }
 

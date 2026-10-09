@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Button, Empty, PageHeader, Table, Td, Th } from "@/components/ui";
+import { ActionLink, ActiveFilters, Button, controlClass, Empty, FilterBar, PageHeader, RecordLink, Table, Td, Th } from "@/components/ui";
+import { listHref } from "@/lib/list-url";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
@@ -10,32 +10,39 @@ export default async function ProveedoresPage({ searchParams }: { searchParams: 
   if (!can(session.role, "supplier.operate", session.activeCompanyCode)) redirect("/inicio");
   const { q, estado } = await searchParams;
   const query = (q ?? "").trim();
+  const estadoFilter = estado === "inactivos" ? "inactivos" : "activos";
   const suppliers = await prisma.supplier.findMany({
     where: {
       companyId: session.activeCompanyId,
-      ...(estado === "inactivos" ? { active: false } : { active: true }),
+      ...(estadoFilter === "inactivos" ? { active: false } : { active: true }),
       ...(query ? { name: { contains: query } } : {}),
     },
     orderBy: { name: "asc" },
   });
   return (
     <>
-      <PageHeader title="Proveedores" subtitle={session.activeCompanyName ?? ""} action={<Link href="/proveedores/nuevo" className="rounded-md bg-[var(--accent)] px-3 py-2 text-sm font-medium text-white">Nuevo proveedor</Link>} />
-      <form className="mb-4 flex flex-wrap gap-2" action="/proveedores">
-        <input name="q" defaultValue={query} placeholder="Nombre o razón social" className="rounded-md border border-[var(--line)] px-3 py-2 text-sm" />
-        <select name="estado" defaultValue={estado ?? "activos"} className="rounded-md border border-[var(--line)] px-3 py-2 text-sm">
+      <PageHeader title="Proveedores" subtitle={session.activeCompanyName ?? ""} action={<ActionLink href="/proveedores/nuevo">Nuevo proveedor</ActionLink>} />
+      <FilterBar action="/proveedores">
+        <input name="q" defaultValue={query} placeholder="Nombre o razón social" className={`${controlClass} sm:min-w-[12rem] sm:flex-1`} />
+        <select name="estado" defaultValue={estadoFilter} className={`${controlClass} sm:w-auto`}>
           <option value="activos">Activos</option>
           <option value="inactivos">Inactivos</option>
         </select>
-        <Button type="submit" tone="ghost">Filtrar</Button>
-      </form>
+        <Button type="submit" tone="ghost">Buscar</Button>
+      </FilterBar>
+      <ActiveFilters
+        items={[
+          ...(estadoFilter === "inactivos" ? [{ label: "Inactivos", clearHref: listHref("/proveedores", { q: query || undefined }) }] : []),
+          ...(query ? [{ label: `Búsqueda: ${query}`, clearHref: listHref("/proveedores", { estado: estadoFilter === "inactivos" ? "inactivos" : undefined }) }] : []),
+        ]}
+      />
       {suppliers.length === 0 ? <Empty title="No hay proveedores" body="Cada empresa mantiene su propio catálogo." /> : (
         <Table>
           <thead><tr><Th>Proveedor</Th><Th>Contacto</Th><Th>Factura</Th></tr></thead>
           <tbody>
             {suppliers.map((supplier) => (
               <tr key={supplier.id}>
-                <Td><Link className="font-medium text-[var(--accent)]" href={`/proveedores/${supplier.id}`}>{supplier.name}</Link>{supplier.isSystem ? " · intercompañía" : ""}</Td>
+                <Td><RecordLink href={`/proveedores/${supplier.id}`}>{supplier.name}</RecordLink>{supplier.isSystem ? " · intercompañía" : ""}</Td>
                 <Td>{supplier.contactName ?? "—"}</Td>
                 <Td>{supplier.issuesInvoice == null ? "Sin definir" : supplier.issuesInvoice ? "Sí" : "No"}</Td>
               </tr>

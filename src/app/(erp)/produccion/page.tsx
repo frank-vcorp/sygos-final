@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { PageHeader } from "@/components/ui";
+import { PageHeader, RecordLink } from "@/components/ui";
 import { money } from "@/lib/money";
 import { can } from "@/lib/permissions";
 import { productionForCompany } from "@/lib/reports";
@@ -24,7 +23,7 @@ export default async function ProduccionPage() {
       <ul className="space-y-2 text-sm">
         {rows.map((row) => (
           <li key={row.userId} className="rounded-lg border border-[var(--line)] bg-white p-4">
-            <Link href={`/reportes/produccion`} className="font-medium text-[var(--accent)]">{row.name}</Link>
+            <RecordLink href="/reportes/produccion">{row.name}</RecordLink>
             <p className="mt-1">{row.jobs} trabajos · {row.diagnoses} diagnósticos · {row.repairs} reparaciones · {row.warranties} garantías · {money(row.value)}</p>
             <p>Efectividad {row.effectiveness == null ? "sin reparaciones de origen" : `${Math.round(row.effectiveness * 100)}%`}</p>
           </li>

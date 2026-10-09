@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ClientNameLink } from "@/components/client-entity-links";
-import { ActionLink, Badge, Empty, MobileCard, PageHeader, ResponsiveData, Table, Td, Th, TextLink } from "@/components/ui";
+import { ActionLink, Badge, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, Table, Td, Th, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { homePath } from "@/lib/home";
@@ -46,9 +45,9 @@ export default async function VentasPage() {
                   const pending = pendingReceive > 0 ? `Recibir ${pendingReceive}` : pendingDeliver > 0 ? `Entregar ${pendingDeliver}` : "Al día";
                   return (
                     <tr key={sale.id}>
-                      <Td><Link href={`/ventas/${sale.id}`} className="font-medium text-[var(--accent)]">{sale.folio}</Link></Td>
+                      <Td><RecordLink href={`/ventas/${sale.id}`}>{sale.folio}</RecordLink></Td>
                       <Td><ClientNameLink clientId={sale.client.id} name={sale.client.name} isSystem={sale.client.isSystem} canEdit={canEditClient} /></Td>
-                      <Td><Link href={`/cotizaciones/${sale.quoteId}`} className="text-[var(--accent)]">{sale.quote.folio}</Link></Td>
+                      <Td><TextLink href={`/cotizaciones/${sale.quoteId}`}>{sale.quote.folio}</TextLink></Td>
                       <Td><Badge>{pending}</Badge></Td>
                     </tr>
                   );
@@ -69,7 +68,7 @@ export default async function VentasPage() {
                 footer={
                   <>
                     <p><ClientNameLink clientId={sale.client.id} name={sale.client.name} isSystem={sale.client.isSystem} canEdit={canEditClient} /></p>
-                    <p className="mt-1">Cotización <Link href={`/cotizaciones/${sale.quoteId}`} className="text-[var(--accent)]">{sale.quote.folio}</Link></p>
+                    <p className="mt-1">Cotización <TextLink href={`/cotizaciones/${sale.quoteId}`}>{sale.quote.folio}</TextLink></p>
                   </>
                 }
               />

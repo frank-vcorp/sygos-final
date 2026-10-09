@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { SlaCountdown } from "@/components/sla-countdown";
-import { Badge, MobileCard, ResponsiveData, Table, Td, Th } from "@/components/ui";
+import { Badge, MobileCard, RecordLink, ResponsiveData, Table, Td, Th } from "@/components/ui";
 import { CASE_STATUS_LABEL } from "@/lib/case-labels";
 import { servicioTipoLabel } from "@/lib/servicios-catalog";
 import { servicioRowHighlight, type SupervisorServicioRow } from "@/lib/servicios-supervisor";
@@ -73,9 +72,7 @@ export function ServiciosSupervisorList({
                       </Td>
                     ) : null}
                     <Td>
-                      <Link href={row.href} className="font-medium text-[var(--accent)]">
-                        {row.equipmentFolio}
-                      </Link>
+                      <RecordLink href={row.href}>{row.equipmentFolio}</RecordLink>
                       <span className="text-[var(--muted)]">
                         {row.kind === "espera_ingreso" ? " · pendiente de ingreso" : " · sin operación"}
                       </span>
@@ -100,9 +97,7 @@ export function ServiciosSupervisorList({
                     </Td>
                   ) : null}
                   <Td>
-                    <Link href={row.href} className="font-medium text-[var(--accent)]">
-                      {row.folio}
-                    </Link>
+                    <RecordLink href={row.href}>{row.folio}</RecordLink>
                     <span className="text-[var(--muted)]"> · {row.equipmentFolio}</span>
                     {historial ? null : <Markers markers={markers} />}
                   </Td>

@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
-import Link from "next/link";
-import { ActionLink, Button, controlClass, Empty, FilterBar, MobileCard, PageHeader, ResponsiveData, Table, Td, Th } from "@/components/ui";
+import { ActionLink, Button, controlClass, Empty, FilterBar, MobileCard, PageHeader, RecordLink, ResponsiveData, Table, Td, Th } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
@@ -41,7 +40,7 @@ export default async function ProspectosPage({ searchParams }: { searchParams: P
       </FilterBar>
       {prospects.length === 0 ? <Empty title="No hay prospectos" body="Nada coincide con el filtro en esta empresa." /> : (
         <ResponsiveData
-          table={<Table><thead><tr><Th>Prospecto</Th><Th>Estado</Th><Th>Fuente</Th></tr></thead><tbody>{prospects.map((prospect) => <tr key={prospect.id}><Td><Link className="font-medium text-[var(--accent)]" href={`/prospectos/${prospect.id}`}>{prospect.name}</Link></Td><Td>{LABEL[prospect.status] ?? prospect.status}</Td><Td>{prospect.source ?? "—"}</Td></tr>)}</tbody></Table>}
+          table={<Table><thead><tr><Th>Prospecto</Th><Th>Estado</Th><Th>Fuente</Th></tr></thead><tbody>{prospects.map((prospect) => <tr key={prospect.id}><Td><RecordLink href={`/prospectos/${prospect.id}`}>{prospect.name}</RecordLink></Td><Td>{LABEL[prospect.status] ?? prospect.status}</Td><Td>{prospect.source ?? "—"}</Td></tr>)}</tbody></Table>}
           cards={prospects.map((prospect) => <MobileCard key={prospect.id} href={`/prospectos/${prospect.id}`} title={prospect.name} meta={LABEL[prospect.status] ?? prospect.status}><p>Fuente: {prospect.source ?? "—"}</p></MobileCard>)}
         />
       )}

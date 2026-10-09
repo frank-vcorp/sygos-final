@@ -64,11 +64,65 @@ export function ActionLink({
   return <Link href={href} className={`inline-flex min-h-11 items-center justify-center rounded-md px-3 py-2 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2 ${styles} ${className}`}>{children}</Link>;
 }
 
-export function TextLink({ href, children }: { href: string; children: React.ReactNode }) {
+/** Clase compartida: folio o nombre principal en listados (§3.1 guía UX). */
+export const recordLinkClass =
+  "font-semibold text-[var(--accent)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1 rounded-sm";
+
+/** Relaciones navegables en detalle o texto corrido. */
+export const inlineLinkClass =
+  "font-medium text-[var(--accent)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1 rounded-sm";
+
+export function RecordLink({
+  href,
+  children,
+  className = "",
+}: {
+  href: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
   return (
-    <Link href={href} className="font-medium text-[var(--accent)] underline-offset-2 hover:underline">
+    <Link href={href} className={`${recordLinkClass} ${className}`.trim()}>
       {children}
     </Link>
+  );
+}
+
+export function TextLink({
+  href,
+  children,
+  className = "",
+}: {
+  href: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <Link href={href} className={`${inlineLinkClass} ${className}`.trim()}>
+      {children}
+    </Link>
+  );
+}
+
+export function ActiveFilters({
+  items,
+}: {
+  items: Array<{ label: string; clearHref: string }>;
+}) {
+  if (items.length === 0) return null;
+  return (
+    <div className="mb-3 flex flex-wrap gap-2" aria-label="Filtros activos">
+      {items.map((item) => (
+        <Link
+          key={`${item.label}-${item.clearHref}`}
+          href={item.clearHref}
+          className="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-[var(--line)] bg-white px-3 py-1 text-xs font-medium text-[var(--ink)] transition-colors hover:border-[var(--accent)] hover:text-[var(--accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1"
+        >
+          <span>{item.label}</span>
+          <span className="text-[var(--muted)]" aria-hidden>×</span>
+        </Link>
+      ))}
+    </div>
   );
 }
 
@@ -185,7 +239,7 @@ export function MobileCard({
     <div className="overflow-hidden rounded-lg border border-[var(--line)] bg-white">
       <Link href={href} className="block p-4 outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]">
         <div className="flex min-h-6 items-start justify-between gap-3">
-          <p className="font-semibold text-[var(--accent)]">{title}</p>
+          <p className={recordLinkClass}>{title}</p>
           {meta}
         </div>
         {children ? <div className="mt-2 space-y-1 text-sm text-[var(--muted)]">{children}</div> : null}

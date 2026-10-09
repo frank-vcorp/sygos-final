@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ClientNameLink } from "@/components/client-entity-links";
-import { PageHeader } from "@/components/ui";
+import { PageHeader, RecordLink, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
 import { can } from "@/lib/permissions";
@@ -21,7 +21,7 @@ function Block({ title, empty, rows }: { title: string; empty: string; rows: Arr
       <h2 className="font-medium">{title}</h2>
       {rows.length === 0 ? <p className="mt-2 text-sm text-[var(--muted)]">{empty}</p> : (
         <ul className="mt-2 space-y-2 text-sm">
-          {rows.map((row) => <li key={row.key ?? row.href + row.label}><Link href={row.href} className="font-medium text-[var(--accent)]">{row.label}</Link> · {row.detail}</li>)}
+          {rows.map((row) => <li key={row.key ?? row.href + row.label}><RecordLink href={row.href}>{row.label}</RecordLink> · {row.detail}</li>)}
         </ul>
       )}
     </section>

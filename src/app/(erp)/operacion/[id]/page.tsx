@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { prepareFromCaseAction } from "@/app/(erp)/cotizaciones/actions";
 import {
@@ -21,7 +20,7 @@ import {
 } from "../actions";
 import { HistoryTimeline } from "@/components/history-timeline";
 import { SupplierPicker } from "@/components/supplier-picker";
-import { Badge, Button, controlClass, DetailGrid, Field, PageHeader } from "@/components/ui";
+import { Badge, Button, controlClass, DetailGrid, Field, PageHeader, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
 import { historyFor } from "@/lib/history";
@@ -117,9 +116,9 @@ export default async function OperacionDetallePage({ params }: { params: Promise
       <DetailGrid>
         <div className="space-y-4">
           <section className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
-            <p>Equipo: <Link href={equipmentHref} className="text-[var(--accent)]">{row.equipment.folio}</Link> · {row.equipment.model}</p>
+            <p>Equipo: <TextLink href={equipmentHref}>{row.equipment.folio}</TextLink> · {row.equipment.model}</p>
             <p className="mt-1">Atención: {repairAfterDiagnosis ? "Reparación" : ATTENTION_LABEL[row.attention.attentionType as AttentionType] ?? row.attention.attentionType}</p>
-            {parent?.kind === "DIAGNOSTICO" ? <p className="mt-1">Diagnóstico de origen: <Link href={`/operacion/${parent.id}`} className="text-[var(--accent)]">{parent.folio}</Link></p> : null}
+            {parent?.kind === "DIAGNOSTICO" ? <p className="mt-1">Diagnóstico de origen: <TextLink href={`/operacion/${parent.id}`}>{parent.folio}</TextLink></p> : null}
             <p className="mt-1">{repairAfterDiagnosis ? "Prioridad del diagnóstico" : "Prioridad congelada"}: {row.attention.priorityName}{row.attention.priorityPrice != null ? ` · $${row.attention.priorityPrice.toLocaleString("es-MX")}` : ""}{row.attention.priorityIncrementPct != null ? ` · incremento ${row.attention.priorityIncrementPct}%` : ""}</p>
             <p className="mt-1">Falla: {row.attention.reportedFault}</p>
             <p className="mt-1">SLA: {row.slaDueAt ? formatWhen(row.slaDueAt) : "Aún no inicia"}</p>
@@ -129,8 +128,8 @@ export default async function OperacionDetallePage({ params }: { params: Promise
             {row.warrantyDecision ? <p className="mt-1">Decisión técnica de garantía: {row.warrantyDecision === "VALIDA" ? "Válida" : "No procedente"}</p> : null}
             {row.commercialDecision ? <p className="mt-1">Decisión comercial: {row.commercialDecision === "VALIDA" ? "Aceptada como garantía" : "A cotización"} · {row.commercialReason}</p> : null}
             {row.externalDocument ? <p className="mt-1">Documento externo: {row.externalDocument}</p> : null}
-            {original ? <p className="mt-1">Reparación de origen: <Link href={`/operacion/${original.id}`} className="text-[var(--accent)]">{original.folio}</Link></p> : null}
-            {derived ? <p className="mt-1">Reparación en garantía: <Link href={`/operacion/${derived.id}`} className="text-[var(--accent)]">{derived.folio}</Link></p> : null}
+            {original ? <p className="mt-1">Reparación de origen: <TextLink href={`/operacion/${original.id}`}>{original.folio}</TextLink></p> : null}
+            {derived ? <p className="mt-1">Reparación en garantía: <TextLink href={`/operacion/${derived.id}`}>{derived.folio}</TextLink></p> : null}
             {row.quotePending && can(session.role, "quote.price", session.activeCompanyCode) ? (
               <form action={prepareFromCaseAction} className="mt-3">
                 <input type="hidden" name="caseId" value={row.id} />

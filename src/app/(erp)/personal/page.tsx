@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Badge, Empty, PageHeader, Table, Td, Th } from "@/components/ui";
+import { ActionLink, Badge, Empty, PageHeader, RecordLink, Table, Td, Th } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
 import { can } from "@/lib/permissions";
@@ -20,7 +19,7 @@ export default async function PersonalPage({ searchParams }: { searchParams: Pro
       <PageHeader
         title="Personal"
         subtitle={vista === "documentos" ? "Abre cada colaborador para ver y cargar documentos laborales." : "Cada empresa tiene sus colaboradores. No hay alta rápida."}
-        action={<Link href="/personal/nuevo" className="rounded-md bg-[var(--accent)] px-3 py-2 text-sm font-medium text-white">Alta</Link>}
+        action={<ActionLink href="/personal/nuevo">Alta de colaborador</ActionLink>}
       />
       {rows.length === 0 ? <Empty title="Sin colaboradores" body="El alta pide empresa, tipo, ingreso, jefe y salario." /> : (
         <Table>
@@ -28,7 +27,7 @@ export default async function PersonalPage({ searchParams }: { searchParams: Pro
           <tbody>
             {rows.map((row) => (
               <tr key={row.id}>
-                <Td><Link href={`/personal/${row.id}`} className="font-medium text-[var(--accent)]">{row.user.name}</Link></Td>
+                <Td><RecordLink href={`/personal/${row.id}`}>{row.user.name}</RecordLink></Td>
                 <Td>{row.user.role}</Td>
                 <Td>{row.boss?.name ?? "—"}</Td>
                 <Td>{money(row.dailyStamped + row.dailyCash)}</Td>

@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { commissionAction } from "./actions";
-import { Badge, controlClass, Empty, Field, PageHeader, Table, Td, Th } from "@/components/ui";
+import { Badge, controlClass, Empty, Field, PageHeader, RecordLink, Table, Td, Th } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
@@ -20,7 +19,7 @@ export default async function ComisionesPage() {
       {rows.length === 0 ? <Empty title="Sin comisiones" body="El corte conserva la facturación, el porcentaje, el cálculo original y el ajuste." /> : (
         <Table>
           <thead><tr><Th>Mes</Th><Th>Estado</Th></tr></thead>
-          <tbody>{rows.map((row) => <tr key={row.id}><Td><Link href={`/comisiones/${row.id}`} className="font-medium text-[var(--accent)]">{row.month}</Link></Td><Td><Badge>{row.status}</Badge></Td></tr>)}</tbody>
+          <tbody>{rows.map((row) => <tr key={row.id}><Td><RecordLink href={`/comisiones/${row.id}`}>{row.month}</RecordLink></Td><Td><Badge>{row.status}</Badge></Td></tr>)}</tbody>
         </Table>
       )}
     </>

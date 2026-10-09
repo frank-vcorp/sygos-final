@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useState } from "react";
 import { ClientInvoiceFields } from "@/components/client-invoice-fields";
 import { ConfirmSubmit } from "@/components/submit-button";
@@ -16,6 +15,8 @@ import {
   Th,
   controlClass,
   Field,
+  RecordLink,
+  TextLink,
 } from "@/components/ui";
 import { CUSTODY_LABEL, type Custody } from "@/lib/custody";
 import { ATTENTION_LABEL, type AttentionType } from "@/lib/priorities";
@@ -431,7 +432,7 @@ export function ClientDataAccordion({
       {prospects.length > 0 ? (
         <ul className="border-t border-[var(--line)] px-3 py-2 text-xs">
           {prospects.map((p) => (
-            <li key={p.id}><Link href={`/prospectos/${p.id}`} className="text-[var(--accent)]">Prospecto: {p.name}</Link></li>
+            <li key={p.id}><TextLink href={`/prospectos/${p.id}`}>Prospecto: {p.name}</TextLink></li>
           ))}
         </ul>
       ) : null}
@@ -513,13 +514,13 @@ export function ClientRelationsHub({
                             <span className="mt-0.5 block text-[var(--muted)]">{row.priorityName}</span>
                           </Td>
                           <Td>
-                            <Link href={equipHref} className="font-medium text-[var(--accent)]">{row.equipment.folio}</Link>
+                            <RecordLink href={equipHref}>{row.equipment.folio}</RecordLink>
                             <span className="block truncate text-[var(--muted)]" title={row.reportedFault}>{row.equipment.model}</span>
                           </Td>
                           <Td><Badge tone={st.tone}>{st.label}</Badge></Td>
                           <Td>
                             {caseRow ? (
-                              <Link href={`/operacion/${caseRow.id}`} className="font-medium text-[var(--accent)]">{caseRow.folio}</Link>
+                              <RecordLink href={`/operacion/${caseRow.id}`}>{caseRow.folio}</RecordLink>
                             ) : (
                               <span className="text-[var(--muted)]">—</span>
                             )}
@@ -567,7 +568,7 @@ export function ClientRelationsHub({
                   <tbody>
                     {quotes.map((quote) => (
                       <tr key={quote.id}>
-                        <Td><Link href={`/cotizaciones/${quote.id}`} className="font-medium text-[var(--accent)]">{quote.folio}</Link></Td>
+                        <Td><RecordLink href={`/cotizaciones/${quote.id}`}>{quote.folio}</RecordLink></Td>
                         <Td>{QUOTE_TYPE_LABEL[quote.quoteType as QuoteType] ?? quote.quoteType}</Td>
                         <Td><Badge>{QUOTE_STATUS_LABEL[quote.status] ?? quote.status}</Badge></Td>
                         <Td><span className="text-[var(--muted)]">{formatWhen(quote.updatedAt)}</span></Td>
@@ -606,9 +607,9 @@ export function ClientRelationsHub({
                     {equipments.map((equipment) => (
                       <tr key={equipment.id}>
                         <Td>
-                          <Link href={equipment.kind === "MOT" ? `/motores/${equipment.id}` : `/equipos/${equipment.id}`} className="font-medium text-[var(--accent)]">
+                          <RecordLink href={equipment.kind === "MOT" ? `/motores/${equipment.id}` : `/equipos/${equipment.id}`}>
                             {equipment.folio}
-                          </Link>
+                          </RecordLink>
                         </Td>
                         <Td>{equipment.kind}</Td>
                         <Td>{equipment.model}</Td>

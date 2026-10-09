@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { aguinaldoAction, payrollAction } from "./actions";
-import { Badge, controlClass, Empty, Field, PageHeader, SegmentedNav, Table, Td, Th } from "@/components/ui";
+import { Badge, controlClass, Empty, Field, PageHeader, RecordLink, SegmentedNav, Table, Td, Th } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
@@ -58,7 +57,7 @@ export default async function NominaPage({ searchParams }: { searchParams: Promi
           <tbody>
             {displayed.map((row) => (
               <tr key={row.id}>
-                <Td><Link href={`/nomina/${row.id}`} className="font-medium text-[var(--accent)]">{row.folio}</Link></Td>
+                <Td><RecordLink href={`/nomina/${row.id}`}>{row.folio}</RecordLink></Td>
                 <Td>{row.kind} · {row.periodStart}</Td>
                 <Td><Badge>{row.status}</Badge></Td>
               </tr>

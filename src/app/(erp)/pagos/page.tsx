@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ClientNameLink } from "@/components/client-entity-links";
-import { Badge, Empty, MobileCard, PageHeader, ResponsiveData, SegmentedNav, Table, Td, Th } from "@/components/ui";
+import { ActionLink, Badge, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, SegmentedNav, Table, Td, Th } from "@/components/ui";
 import { homePath } from "@/lib/home";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
@@ -30,7 +29,7 @@ export default async function PagosPage({ searchParams }: { searchParams: Promis
   ];
   return (
     <>
-      <PageHeader title="Pagos" subtitle="Un pago pendiente no reduce saldos. Validarlo sí." action={can(session.role, "payment.register", session.activeCompanyCode) ? <Link href="/pagos/nuevo" className="rounded-md bg-[var(--accent)] px-3 py-2 text-sm font-medium text-white">Registrar pago</Link> : null} />
+      <PageHeader title="Pagos" subtitle="Un pago pendiente no reduce saldos. Validarlo sí." action={can(session.role, "payment.register", session.activeCompanyCode) ? <ActionLink href="/pagos/nuevo">Registrar pago</ActionLink> : null} />
       <SegmentedNav items={tabs} />
       {rows.length === 0 ? <Empty title="Sin pagos" body="El comprobante, el importe y el destino se capturan al registrar." /> : (
         <ResponsiveData
@@ -40,7 +39,7 @@ export default async function PagosPage({ searchParams }: { searchParams: Promis
               <tbody>
                 {rows.map((row) => (
                   <tr key={row.id}>
-                    <Td><Link href={`/pagos/${row.id}`} className="font-medium text-[var(--accent)]">{row.folio}</Link></Td>
+                    <Td><RecordLink href={`/pagos/${row.id}`}>{row.folio}</RecordLink></Td>
                     <Td>
                       {row.kind === "INTERCOMPANIA" || !row.client ? "—" : (
                         <ClientNameLink clientId={row.client.id} name={row.client.name} isSystem={row.client.isSystem} canEdit={canEditClient} />

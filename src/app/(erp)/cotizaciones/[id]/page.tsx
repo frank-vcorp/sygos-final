@@ -1,11 +1,10 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { requestDocumentAction, requestIntercompanyAction } from "@/app/(erp)/facturacion/actions";
 import { decideAction, discountAction, linkBaseAction, relateEquipmentAction, sendQuoteMailAction, setPricesAction } from "../actions";
 import { RelateEquipmentForm } from "@/components/relate-equipment-form";
 import { HistoryTimeline } from "@/components/history-timeline";
 import { ConfirmSubmit, SubmitButton } from "@/components/submit-button";
-import { Badge, controlClass, DetailGrid, Field, PageHeader } from "@/components/ui";
+import { Badge, controlClass, DetailGrid, Field, PageHeader, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
 import { historyFor } from "@/lib/history";
@@ -64,7 +63,7 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
   return (
     <>
       <PageHeader back={{ href: "/cotizaciones", label: "Cotizaciones" }} title={quote.folio} subtitle={QUOTE_TYPE_LABEL[quote.quoteType as QuoteType] ?? quote.quoteType} action={<Badge>{QUOTE_STATUS_LABEL[quote.status] ?? quote.status}</Badge>} />
-      <p className="mb-4 text-sm"><a href={`/documentos/cotizacion/${quote.id}`} className="text-[var(--accent)]">Documento para imprimir</a></p>
+      <p className="mb-4 text-sm"><TextLink href={`/documentos/cotizacion/${quote.id}`}>Documento para imprimir</TextLink></p>
       <form action={sendQuoteMailAction} className="mb-4 text-sm">
         <input type="hidden" name="quoteId" value={quote.id} />
         <button className="text-[var(--accent)]">Enviar por correo{quote.client.contacts.find((contact) => contact.email)?.email ? ` a ${quote.client.contacts.find((contact) => contact.email)?.email}` : ""}</button>
@@ -72,9 +71,9 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
       <DetailGrid>
         <section className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
           <p>Cliente: <ClientNameLink clientId={quote.client.id} name={quote.client.name} isSystem={quote.client.isSystem} canEdit={canEditClient} /></p>
-          <p className="mt-1">Equipo: {quote.equipment ? <Link href={quote.equipment.kind === "MOT" ? `/motores/${quote.equipment.id}` : `/equipos/${quote.equipment.id}`} className="text-[var(--accent)]">{quote.equipment.folio}</Link> : [quote.preliminaryType, quote.preliminaryBrand, quote.preliminaryModel, quote.preliminarySerial].filter(Boolean).join(" · ") || "Sin equipo físico"}</p>
-          {source ? <p className="mt-1">{source.kind === "OS" ? "Orden de servicio" : "Diagnóstico de origen"}: <Link href={`/operacion/${source.id}`} className="text-[var(--accent)]">{source.folio}</Link></p> : null}
-          {repairOrder ? <p className="mt-1">Orden de servicio: <Link href={`/operacion/${repairOrder.id}`} className="text-[var(--accent)]">{repairOrder.folio}</Link></p> : null}
+          <p className="mt-1">Equipo: {quote.equipment ? <TextLink href={quote.equipment.kind === "MOT" ? `/motores/${quote.equipment.id}` : `/equipos/${quote.equipment.id}`}>{quote.equipment.folio}</TextLink> : [quote.preliminaryType, quote.preliminaryBrand, quote.preliminaryModel, quote.preliminarySerial].filter(Boolean).join(" · ") || "Sin equipo físico"}</p>
+          {source ? <p className="mt-1">{source.kind === "OS" ? "Orden de servicio" : "Diagnóstico de origen"}: <TextLink href={`/operacion/${source.id}`}>{source.folio}</TextLink></p> : null}
+          {repairOrder ? <p className="mt-1">Orden de servicio: <TextLink href={`/operacion/${repairOrder.id}`}>{repairOrder.folio}</TextLink></p> : null}
           {quote.client.contacts.length > 0 ? (
             <p className="mt-1">
               Contactos:{" "}
@@ -105,7 +104,7 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
           {totals ? (
             <p className="mt-3">Subtotal {money(totals.subtotal)} · descuento {quote.discountPct}% · IVA {money(totals.iva)} · total {money(totals.total)}</p>
           ) : null}
-          {quote.sales.map((sale) => <p key={sale.id} className="mt-2">Venta <Link href={`/ventas/${sale.id}`} className="text-[var(--accent)]">{sale.folio}</Link></p>)}
+          {quote.sales.map((sale) => <p key={sale.id} className="mt-2">Venta <TextLink href={`/ventas/${sale.id}`}>{sale.folio}</TextLink></p>)}
           {quote.status === "AUTORIZADA" && can(session.role, "invoice.request", session.activeCompanyCode) ? (
             <div className="mt-3 flex flex-wrap gap-2">
               {quote.client.isSystem && session.activeCompanyCode === "SERVOMOTORES" ? (

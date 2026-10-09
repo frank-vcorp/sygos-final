@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ClientNameLink } from "@/components/client-entity-links";
-import { ActionLink, Badge, Button, controlClass, Empty, FilterBar, ListCap, MobileCard, PageHeader, ResponsiveData, Table, Td, Th, TextLink } from "@/components/ui";
+import { ActionLink, ActiveFilters, Badge, Button, controlClass, Empty, FilterBar, ListCap, MobileCard, PageHeader, RecordLink, ResponsiveData, Table, Td, Th, TextLink } from "@/components/ui";
 import { CUSTODY_LABEL, type Custody } from "@/lib/custody";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
@@ -42,6 +41,7 @@ export default async function MotoresPage({ searchParams }: { searchParams: Prom
         <input name="q" defaultValue={query} placeholder="Folio, modelo o serie" className={`${controlClass} sm:flex-1`} />
         <Button type="submit" tone="ghost">Buscar</Button>
       </FilterBar>
+      <ActiveFilters items={query ? [{ label: `Búsqueda: ${query}`, clearHref: "/motores" }] : []} />
       {rows.length === 0 ? (
         <Empty
           title={query ? "Sin coincidencias" : "No hay motores"}
@@ -56,7 +56,7 @@ export default async function MotoresPage({ searchParams }: { searchParams: Prom
               const intercompany = session.activeCompanyCode === "SERVOMOTORES" && row.originCompany.code === "SYSTRON";
               return (
                 <tr key={row.id}>
-                  <Td><Link href={`/motores/${row.id}`} className="font-medium text-[var(--accent)]">{row.folio}</Link></Td>
+                  <Td><RecordLink href={`/motores/${row.id}`}>{row.folio}</RecordLink></Td>
                   <Td>{row.originCompany.name}</Td>
                   <Td>{intercompany ? "SYSTRON · intercompañía" : <ClientNameLink clientId={row.client.id} name={row.client.name} isSystem={row.client.isSystem} canEdit={canEditClient} />}</Td>
                   <Td>{[row.brandName, row.model, row.serial].filter(Boolean).join(" · ")}</Td>

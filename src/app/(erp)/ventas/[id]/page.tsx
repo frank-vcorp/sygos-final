@@ -1,8 +1,7 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { deliverSaleAction, receiveSaleAction } from "./actions";
 import { ClientNameLink } from "@/components/client-entity-links";
-import { Button, PageHeader } from "@/components/ui";
+import { Button, PageHeader, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { redirectIfSalesNotAssigned } from "@/lib/sales-assignment";
@@ -23,7 +22,7 @@ export default async function VentaDetallePage({ params }: { params: Promise<{ i
     <>
       <PageHeader back={canMove && session.role === "ALMACEN" ? { href: "/custodia", label: "Almacén" } : { href: "/ventas", label: "Venta de equipos" }} title={sale.folio} subtitle="Venta de equipos" />
       <p className="mb-2 text-sm text-[var(--muted)]">Cliente: <ClientNameLink clientId={sale.client.id} name={sale.client.name} isSystem={sale.client.isSystem} canEdit={canEditClient} /></p>
-      <p className="mb-4 text-sm">Cotización <Link href={`/cotizaciones/${sale.quoteId}`} className="text-[var(--accent)]">{sale.quote.folio}</Link>. La mercancía no entra al inventario de refacciones. Factura y remisión llegan en la fase siguiente.</p>
+      <p className="mb-4 text-sm">Cotización <TextLink href={`/cotizaciones/${sale.quoteId}`}>{sale.quote.folio}</TextLink>. La mercancía no entra al inventario de refacciones. Factura y remisión llegan en la fase siguiente.</p>
       <ul className="space-y-3">
         {sale.lines.map((line) => (
           <li key={line.id} className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">

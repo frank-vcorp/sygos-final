@@ -1,8 +1,7 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { collectionNoteAction } from "../actions";
 import { ClientNameLink } from "@/components/client-entity-links";
-import { Badge, controlClass, Field, PageHeader } from "@/components/ui";
+import { Badge, controlClass, Field, PageHeader, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
 import { money } from "@/lib/money";
@@ -27,7 +26,7 @@ export default async function CuentaPage({ params }: { params: Promise<{ id: str
       <PageHeader back={{ href: "/cobranza", label: "Cobranza" }} title={row.document.folio} subtitle={row.client.isSystem ? "SYSTRON · intercompañía" : row.client.name} action={<Badge tone={overdue ? "warn" : "neutral"}>{overdue ? "Vencida" : row.status}</Badge>} />
       <section className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
         <p>Cliente: <ClientNameLink clientId={row.client.id} name={row.client.name} isSystem={row.client.isSystem} canEdit={canEditClient} /></p>
-        <p className="mt-1">Factura: <Link href={`/facturacion/${row.document.id}`} className="text-[var(--accent)]">{row.document.folio}</Link></p>
+        <p className="mt-1">Factura: <TextLink href={`/facturacion/${row.document.id}`}>{row.document.folio}</TextLink></p>
         <p className="mt-1">Saldo {money(row.balance)} de {money(row.amount)}. Vence {formatWhen(row.dueAt)}.</p>
         <h2 className="mt-4 font-medium">Pagos aplicados</h2>
         {row.applications.filter((item) => item.confirmedAt).length === 0 ? <p className="mt-1 text-[var(--muted)]">Todavía no hay un pago validado.</p> : (

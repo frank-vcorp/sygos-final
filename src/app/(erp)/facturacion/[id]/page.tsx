@@ -1,9 +1,8 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { issueDocumentAction, retryFiscalAction } from "../actions";
 import { HistoryTimeline } from "@/components/history-timeline";
 import { ClientNameLink } from "@/components/client-entity-links";
-import { Badge, PageHeader } from "@/components/ui";
+import { Badge, PageHeader, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
 import { historyFor } from "@/lib/history";
@@ -29,11 +28,11 @@ export default async function DocumentoPage({ params }: { params: Promise<{ id: 
       <PageHeader back={{ href: "/facturacion", label: "Facturación" }} title={row.folio} subtitle={row.kind === "REMISION" ? "Remisión" : "Factura"} action={<Badge>{row.status === "SOLICITADA" ? "Solicitada" : "Emitida"}</Badge>} />
       <section className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
         <p>Cliente: <ClientNameLink clientId={row.client.id} name={row.client.name} isSystem={row.client.isSystem} canEdit={canEditClient} /></p>
-        {row.quote ? <p className="mt-1">Cotización: <Link href={`/cotizaciones/${row.quote.id}`} className="text-[var(--accent)]">{row.quote.folio}</Link></p> : null}
+        {row.quote ? <p className="mt-1">Cotización: <TextLink href={`/cotizaciones/${row.quote.id}`}>{row.quote.folio}</TextLink></p> : null}
         {row.rfcSnapshot ? <p className="mt-1">RFC congelado: {row.rfcSnapshot}</p> : null}
         <p className="mt-1">Subtotal {money(row.subtotal)} · IVA {money(row.iva)} · total {money(row.total)}</p>
         {row.issuedAt ? <p className="mt-1">Emitida {formatWhen(row.issuedAt)}. Vence {row.dueAt ? formatWhen(row.dueAt) : "—"}.</p> : null}
-        {row.receivable ? <p className="mt-1">Cuenta por cobrar: <Link href={`/cobranza/${row.receivable.id}`} className="text-[var(--accent)]">{money(row.receivable.balance)}</Link></p> : null}
+        {row.receivable ? <p className="mt-1">Cuenta por cobrar: <TextLink href={`/cobranza/${row.receivable.id}`}>{money(row.receivable.balance)}</TextLink></p> : null}
         {row.fiscalError ? <p className="mt-3 rounded-md bg-[var(--warn-soft)] px-3 py-2">{row.fiscalError}</p> : null}
         <ul className="mt-3 space-y-1">{row.lines.map((line) => <li key={line.id}>{line.concept} · {money(line.amount)}</li>)}</ul>
         {row.status === "SOLICITADA" && can(session.role, "invoice.issue", session.activeCompanyCode) ? (

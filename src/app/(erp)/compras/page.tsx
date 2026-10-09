@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Badge, Empty, PageHeader, Table, Td, Th } from "@/components/ui";
+import { ActionLink, Badge, Empty, PageHeader, RecordLink, SegmentedNav, Table, Td, Th, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
 import { can } from "@/lib/permissions";
@@ -42,18 +41,16 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
   ];
   return (
     <>
-      <PageHeader title="Compras" subtitle="Cada compra termina en un egreso o en una cuenta por pagar, nunca en ambos." action={<Link href="/compras/nueva" className="rounded-md bg-[var(--accent)] px-3 py-2 text-sm font-medium text-white">Nueva</Link>} />
-      <div className="mb-4 flex gap-2">
-        {tabs.map(([key, label]) => <Link key={key} href={`/compras?vista=${key}`} className={`rounded-md px-3 py-2 text-sm ${view === key ? "bg-[var(--accent)] text-white" : "border border-[var(--line)] bg-white"}`}>{label}</Link>)}
-        <Link href="/compras/oc" className="rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm">Nueva orden</Link>
-      </div>
+      <PageHeader title="Compras" subtitle="Cada compra termina en un egreso o en una cuenta por pagar, nunca en ambos." action={<ActionLink href="/compras/nueva">Nueva compra</ActionLink>} />
+      <SegmentedNav items={tabs.map(([key, label]) => ({ href: `/compras?vista=${key}`, label, active: view === key }))} />
+      <p className="mb-4 text-sm"><TextLink href="/compras/oc">Nueva orden de compra</TextLink></p>
       {rows.length === 0 ? <Empty title="Sin compras en esta vista" body="La compra directa consume el presupuesto del mes desde que se registra." /> : (
         <Table>
           <thead><tr><Th>Folio</Th><Th>Proveedor</Th><Th>Importe</Th><Th>Estado</Th></tr></thead>
           <tbody>
             {rows.map((row) => (
               <tr key={row.id}>
-                <Td><Link href={`/compras/${row.id}`} className="font-medium text-[var(--accent)]">{row.folio}</Link></Td>
+                <Td><RecordLink href={`/compras/${row.id}`}>{row.folio}</RecordLink></Td>
                 <Td>{row.supplier?.name ?? "Sin proveedor"}</Td>
                 <Td>{money(row.amount)}</Td>
                 <Td><Badge>{STATUS[row.status] ?? row.status}</Badge></Td>

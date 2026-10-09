@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { PageHeader, Table, Td, Th } from "@/components/ui";
+import { PageHeader, RecordLink, Table, Td, TextLink, Th } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { reportTable, visibleReports } from "@/lib/reports";
@@ -15,7 +14,7 @@ export default async function ReportesPage() {
     <>
       <PageHeader title="Reportes" subtitle={`${session.activeCompanyName}. La consulta no mezcla empresas ni crea registros.`} />
       <ul className="space-y-2">
-        {reports.map((report) => <li key={report.id}><Link href={`/reportes/${report.id}`} className="font-medium text-[var(--accent)]">{report.label}</Link></li>)}
+        {reports.map((report) => <li key={report.id}><RecordLink href={`/reportes/${report.id}`}>{report.label}</RecordLink></li>)}
       </ul>
     </>
   );
@@ -35,7 +34,7 @@ export async function ReportView({ params, searchParams }: { params: Promise<{ t
   if (hasta) query.set("hasta", hasta);
   return (
     <>
-      <PageHeader back={{ href: "/reportes", label: "Reportes" }} title={table.title} subtitle="El folio abre el registro real." action={<a href={`/reportes/${tipo}/csv?${query.toString()}`} className="text-sm text-[var(--accent)]">Descargar CSV</a>} />
+      <PageHeader back={{ href: "/reportes", label: "Reportes" }} title={table.title} subtitle="El folio abre el registro real." action={<TextLink href={`/reportes/${tipo}/csv?${query.toString()}`}>Descargar CSV</TextLink>} />
       <form className="mb-4 flex flex-wrap items-end gap-2 text-sm">
         <label>Desde <input name="desde" type="date" defaultValue={desde} className="rounded-md border border-[var(--line)] px-2 py-2" /></label>
         <label>Hasta <input name="hasta" type="date" defaultValue={hasta} className="rounded-md border border-[var(--line)] px-2 py-2" /></label>
@@ -46,7 +45,7 @@ export async function ReportView({ params, searchParams }: { params: Promise<{ t
         <tbody>
           {table.rows.map((row, index) => (
             <tr key={index}>
-              {row.cells.map((cell, cellIndex) => <Td key={cellIndex}>{cellIndex === 0 && "href" in row && row.href ? <Link href={row.href} className="font-medium text-[var(--accent)]">{cell}</Link> : cell}</Td>)}
+              {row.cells.map((cell, cellIndex) => <Td key={cellIndex}>{cellIndex === 0 && "href" in row && row.href ? <RecordLink href={row.href}>{cell}</RecordLink> : cell}</Td>)}
             </tr>
           ))}
         </tbody>

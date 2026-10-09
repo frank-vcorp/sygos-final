@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Badge, Empty, PageHeader, Table, Td, Th } from "@/components/ui";
+import { Badge, Empty, PageHeader, RecordLink, SegmentedNav, Table, Td, Th } from "@/components/ui";
 import { CUSTODY_LABEL, type Custody } from "@/lib/custody";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
@@ -53,11 +52,7 @@ export default async function CustodiaPage({ searchParams }: { searchParams: Pro
           ? "EQUI de SYSTRON. Los MOT enviados a Servomotores no aparecen aquí."
           : "Ingreso, resguardo y salida a prueba de MOT. El egreso definitivo se confirma en el detalle."}
       />
-      <div className="mb-4 flex gap-2">
-        {tabs.map(([key, label]) => (
-          <Link key={key} href={`/custodia?vista=${key}`} className={`rounded-md px-3 py-2 text-sm ${view === key ? "bg-[var(--accent)] text-white" : "border border-[var(--line)] bg-white"}`}>{label}</Link>
-        ))}
-      </div>
+      <SegmentedNav items={tabs.map(([key, label]) => ({ href: `/custodia?vista=${key}`, label, active: view === key }))} />
       {systron && can(session.role, "sale.receive", session.activeCompanyCode) ? <SaleQueue companyId={session.activeCompanyId} /> : null}
       {rows.length === 0 ? (
         <Empty title="Sin equipos en esta vista" body="La custodia cambia solo cuando alguien confirma el movimiento." />
@@ -69,7 +64,7 @@ export default async function CustodiaPage({ searchParams }: { searchParams: Pro
               const hideClient = !systron && row.originCompany.code === "SYSTRON";
               return (
                 <tr key={row.id}>
-                  <Td><Link href={row.kind === "MOT" ? `/motores/${row.id}` : `/equipos/${row.id}`} className="font-medium text-[var(--accent)]">{row.folio}</Link></Td>
+                  <Td><RecordLink href={row.kind === "MOT" ? `/motores/${row.id}` : `/equipos/${row.id}`}>{row.folio}</RecordLink></Td>
                   <Td>{hideClient ? "SYSTRON · intercompañía" : row.client.name}</Td>
                   <Td><Badge>{CUSTODY_LABEL[row.custody as Custody]}</Badge></Td>
                 </tr>
@@ -101,7 +96,7 @@ async function SaleQueue({ companyId }: { companyId: string }) {
           const pendingDeliver = sale.lines.reduce((sum, line) => sum + Math.max(0, line.qtyReceived - line.qtyDelivered), 0);
           return (
             <li key={sale.id}>
-              <Link href={`/ventas/${sale.id}`} className="font-medium text-[var(--accent)]">{sale.folio}</Link>
+              <RecordLink href={`/ventas/${sale.id}`}>{sale.folio}</RecordLink>
               {" · "}{sale.client.name}
               {pendingReceive > 0 ? ` · por recibir ${pendingReceive}` : ""}
               {pendingDeliver > 0 ? ` · por entregar ${pendingDeliver}` : ""}

@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { SlaCountdown } from "@/components/sla-countdown";
-import { Badge, Empty, MobileCard, PageHeader, ResponsiveData, SegmentedNav, Table, Td, Th } from "@/components/ui";
+import { Badge, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, SegmentedNav, Table, Td, Th } from "@/components/ui";
 import { homePath } from "@/lib/home";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
@@ -63,7 +62,7 @@ export default async function OperacionPage({ searchParams }: { searchParams: Pr
               const overdue = row.slaDueAt != null && row.slaDueAt.getTime() < Date.now();
               return (
                 <tr key={row.id}>
-                  <Td><Link href={`/operacion/${row.id}`} className="font-medium text-[var(--accent)]">{row.folio}</Link>{readOnly ? " · lectura" : ""}</Td>
+                  <Td><RecordLink href={`/operacion/${row.id}`}>{row.folio}</RecordLink>{readOnly ? " · lectura" : ""}</Td>
                   <Td>{row.equipment.folio} · {row.equipment.model}</Td>
                   <Td><Badge tone={overdue ? "warn" : "neutral"}>{CASE_STATUS_LABEL[row.status] ?? row.status}</Badge></Td>
                   <Td>{row.attention.priorityName}</Td>
