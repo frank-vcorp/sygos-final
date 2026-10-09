@@ -134,8 +134,8 @@ async function SupervisorShop({ companyId, userId }: { companyId: string; userId
         subtitle="Pendientes de asignar en el taller y operaciones activas asignadas a ti. El resto está en Servicios."
       />
       <div className="grid gap-3">
-        <Block title="Pendientes de asignación" empty="Todo lo activo tiene responsable o proveedor." rows={caseRowMap(pending)} />
-        <Block title="Asignadas a ti" empty="No tienes operaciones activas asignadas." rows={caseRowMap(mine)} />
+        <Block title="Pendientes de asignación" empty="Todo lo activo tiene responsable o proveedor." bandejaHref="/operacion" rows={caseRowMap(pending)} />
+        <Block title="Asignadas a ti" empty="No tienes operaciones activas asignadas." bandejaHref="/operacion" rows={caseRowMap(mine)} />
       </div>
     </>
   );
@@ -190,16 +190,16 @@ async function Shop({ companyId, manager, history }: { companyId: string; manage
     <>
       <PageHeader title={manager ? "Panel del gerente" : "Panel de supervisión"} subtitle="Activos de esta empresa. Validar o devolver se hace en el detalle." action={<Link href={history ? "/panel" : "/panel?vista=historial"} className="text-sm text-[var(--accent)]">{history ? "Ver activos" : "Ver historial"}</Link>} />
       <div className="grid gap-3">
-        <Block title="Pendientes de asignación" empty="Todo lo activo tiene responsable o proveedor." rows={caseRowMap(rows.filter((row) => !row.assigneeUserId && !row.externalSupplierId))} />
-        <Block title="Diagnósticos activos" empty="Sin diagnósticos activos." rows={caseRowMap(rows.filter((row) => row.kind === "DIAGNOSTICO"))} />
-        <Block title="Reparaciones activas" empty="Sin reparaciones activas." rows={caseRowMap(rows.filter((row) => row.kind === "OS"))} />
-        <Block title="Vencidos" empty="Nada vencido." rows={caseRowMap(rows.filter((row) => row.slaDueAt != null && row.slaDueAt.getTime() < now))} />
-        <Block title="En espera de refacciones" empty="Ninguna orden espera refacción." rows={caseRowMap(rows.filter((row) => row.status === "EN_ESPERA_REFACCIONES"))} />
+        <Block title="Pendientes de asignación" empty="Todo lo activo tiene responsable o proveedor." bandejaHref="/operacion" rows={caseRowMap(rows.filter((row) => !row.assigneeUserId && !row.externalSupplierId))} />
+        <Block title="Diagnósticos activos" empty="Sin diagnósticos activos." bandejaHref="/operacion" rows={caseRowMap(rows.filter((row) => row.kind === "DIAGNOSTICO"))} />
+        <Block title="Reparaciones activas" empty="Sin reparaciones activas." bandejaHref="/operacion" rows={caseRowMap(rows.filter((row) => row.kind === "OS"))} />
+        <Block title="Vencidos" empty="Nada vencido." bandejaHref="/operacion" rows={caseRowMap(rows.filter((row) => row.slaDueAt != null && row.slaDueAt.getTime() < now))} />
+        <Block title="En espera de refacciones" empty="Ninguna orden espera refacción." bandejaHref="/operacion" rows={caseRowMap(rows.filter((row) => row.status === "EN_ESPERA_REFACCIONES"))} />
         {manager && !history ? (
-          <Block title="Refacciones solicitadas" empty="No hay solicitudes de refacción abiertas." rows={partRequestRowMap(openPartRequests)} />
+          <Block title="Refacciones solicitadas" empty="No hay solicitudes de refacción abiertas." bandejaHref="/produccion" rows={partRequestRowMap(openPartRequests)} />
         ) : null}
-        <Block title="Proveedor externo" empty="Nada está en proveedor externo." rows={caseRowMap(rows.filter((row) => row.externalSupplierId))} />
-        {manager ? <Block title="Diagnósticos pendientes de validación" empty="No hay diagnósticos por validar." rows={caseRowMap(rows.filter((row) => row.status === "PENDIENTE_VALIDACION"))} /> : null}
+        <Block title="Proveedor externo" empty="Nada está en proveedor externo." bandejaHref="/operacion" rows={caseRowMap(rows.filter((row) => row.externalSupplierId))} />
+        {manager ? <Block title="Diagnósticos pendientes de validación" empty="No hay diagnósticos por validar." bandejaHref="/operacion?vista=validacion" rows={caseRowMap(rows.filter((row) => row.status === "PENDIENTE_VALIDACION"))} /> : null}
       </div>
     </>
   );

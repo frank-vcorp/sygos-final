@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import {
   addContactAction,
@@ -9,11 +8,10 @@ import {
 } from "../actions";
 import {
   ClientDataAccordion,
-  ClientQuickActionBar,
   ClientRelationsHub,
 } from "@/components/client-detail-panels";
 import { HistoryTimeline } from "@/components/history-timeline";
-import { Badge, PageHeader } from "@/components/ui";
+import { ActionLink, Badge, EntityDetailHeader, EntityMetaItem, RecordLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { historyFor } from "@/lib/history";
 import { can } from "@/lib/permissions";
@@ -45,7 +43,12 @@ export default async function ClienteDetallePage({ params }: { params: Promise<{
     });
     return (
       <>
-        <PageHeader back={{ href: "/clientes", label: "Clientes" }} title={client.name} subtitle="Cliente intercompañía fijo" action={<Badge>Intercompañía</Badge>} />
+        <EntityDetailHeader
+          back={{ href: "/clientes", label: "Clientes" }}
+          title={client.name}
+          subtitle="Cliente intercompañía fijo"
+          status={<Badge>Intercompañía</Badge>}
+        />
         <section className="max-w-xl rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
           <p>Las operaciones que SYSTRON envía a Servomotores usan este cliente. No se edita ni se inactiva.</p>
           <p className="mt-3">Régimen fiscal: {regimenLabel(client.taxRegime)}</p>
@@ -55,7 +58,7 @@ export default async function ClienteDetallePage({ params }: { params: Promise<{
           <h2 className="mb-2 font-medium">MOT intercompañía</h2>
           {motors.length === 0 ? <p className="text-sm text-[var(--muted)]">Sin motores enviados por SYSTRON.</p> : (
             <ul className="space-y-1 text-sm">
-              {motors.map((motor) => <li key={motor.id}><Link href={`/motores/${motor.id}`} className="text-[var(--accent)]">{motor.folio}</Link> · {motor.model}</li>)}
+              {motors.map((motor) => <li key={motor.id}><RecordLink href={`/motores/${motor.id}`}>{motor.folio}</RecordLink> · {motor.model}</li>)}
             </ul>
           )}
         </section>
@@ -120,16 +123,39 @@ export default async function ClienteDetallePage({ params }: { params: Promise<{
   const canService = can(session.role, "attention.create", session.activeCompanyCode);
   const ownerLabel = owner?.name ?? null;
 
+  const primaryAction =
+    canQuote || canService ? (
+      <>
+        {canService ? <ActionLink href={`/servicios/diagnostico/nuevo?clientId=${client.id}`}>Nueva atención</ActionLink> : null}
+        {canQuote ? (
+          <ActionLink
+            href={`/cotizaciones/nuevo?clientId=${client.id}`}
+            tone="ghost"
+            className="border-[var(--accent)] font-semibold text-[var(--accent)]"
+          >
+            Nueva cotización
+          </ActionLink>
+        ) : null}
+      </>
+    ) : null;
+
   return (
     <>
-      <PageHeader
+      <EntityDetailHeader
         back={{ href: "/clientes", label: "Clientes" }}
         title={client.name}
-        subtitle={[client.active ? "Activo" : "Inactivo", ownerLabel ? `· ${ownerLabel}` : null].filter(Boolean).join(" ")}
-        action={client.active ? <Badge tone="ok">Activo</Badge> : <Badge tone="danger">Inactivo</Badge>}
+        subtitle={client.classification ?? "Cliente"}
+        status={client.active ? <Badge tone="ok">Activo</Badge> : <Badge tone="danger">Inactivo</Badge>}
+        meta={
+          <>
+            {ownerLabel ? <EntityMetaItem label="Ejecutivo">{ownerLabel}</EntityMetaItem> : null}
+            {client.rfc ? <EntityMetaItem label="RFC">{client.rfc}</EntityMetaItem> : null}
+            <EntityMetaItem label="Factura">{client.requiresInvoice ? "Requiere CFDI" : "Sin factura obligatoria"}</EntityMetaItem>
+            {client.creditDays != null ? <EntityMetaItem label="Crédito">{client.creditDays} días</EntityMetaItem> : null}
+          </>
+        }
+        primaryAction={primaryAction}
       />
-
-      <ClientQuickActionBar clientId={client.id} canQuote={canQuote} canService={canService} />
 
       <ClientRelationsHub
         clientId={client.id}

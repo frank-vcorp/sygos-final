@@ -1,8 +1,7 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { bajaAction, bossAction, documentAction, laborIdAction, salaryAction, scheduleAction, vacationBalanceAction, vacationDecisionAction, vacationRequestAction } from "../actions";
 import { HistoryTimeline } from "@/components/history-timeline";
-import { Badge, controlClass, Field, PageHeader } from "@/components/ui";
+import { Badge, Button, controlClass, DetailAnchorButton, EntityDetailHeader, EntityMetaItem, Field, RecordLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { historyFor } from "@/lib/history";
 import { formatWhen } from "@/lib/form";
@@ -22,13 +21,36 @@ export default async function ColaboradorPage({ params }: { params: Promise<{ id
   const bosses = await prisma.user.findMany({ where: { active: true, role: { in: ["CEO", "GERENTE_OPERATIVO_SYSTRON", "GERENTE_OPERATIVO_SERVOMOTORES", "SUPERVISOR_TECNICO"] } }, orderBy: { name: "asc" } });
   const history = await historyFor("COLABORADOR", row.id);
   const ceo = can(session.role, "personnel.authorize");
+  const pendingVacation = row.vacations.find((vacation) => vacation.status === "PENDIENTE");
+  const statusLabel = row.status === "ACTIVO" ? "Activo" : "Baja";
+
+  let primaryAction: React.ReactNode = null;
+  if (ceo && pendingVacation) {
+    primaryAction = <DetailAnchorButton href="#vacaciones-pendientes">Autorizar vacaciones</DetailAnchorButton>;
+  } else if (ceo && row.status === "ACTIVO") {
+    primaryAction = <DetailAnchorButton href="#salario">Actualizar salario</DetailAnchorButton>;
+  }
+
   return (
     <>
-      <PageHeader back={{ href: "/personal", label: "Personal" }} title={row.user.name} subtitle={row.exemptBenefits ? "Salario fijo. Sin asistencia, vacaciones, prima, horas extra, aguinaldo ni bonos." : row.user.role} action={<Badge>{row.status}</Badge>} />
-      <section className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
-        <p>Ingreso: {formatWhen(row.hiredAt)} · {row.hireKind === "MIGRADO" ? "Migrado" : "Nuevo"}</p>
-        <p className="mt-1">Jefe: {row.boss?.name ?? "Sin jefe"}</p>
-        <p className="mt-1">Timbrado {money(row.dailyStamped)} · Efectivo {money(row.dailyCash)} · Hora extra {money(row.overtimeRate)}</p>
+      <EntityDetailHeader
+        back={{ href: "/personal", label: "Personal" }}
+        title={row.user.name}
+        subtitle={row.exemptBenefits ? "Salario fijo · sin prestaciones de ley en el sistema" : row.user.role}
+        status={<Badge tone={row.status === "ACTIVO" ? "neutral" : "warn"}>{statusLabel}</Badge>}
+        meta={
+          <>
+            <EntityMetaItem label="Ingreso">{formatWhen(row.hiredAt)} · {row.hireKind === "MIGRADO" ? "Migrado" : "Nuevo"}</EntityMetaItem>
+            <EntityMetaItem label="Jefe">{row.boss?.name ?? "Sin jefe"}</EntityMetaItem>
+            <EntityMetaItem label="Salario diario">{money(row.dailyStamped + row.dailyCash)}</EntityMetaItem>
+            {row.exemptBenefits ? null : <EntityMetaItem label="Vacaciones">{row.vacationBalance} días hábiles</EntityMetaItem>}
+            <EntityMetaItem label="Horario">{row.scheduleStart} · tolerancia {row.toleranceMinutes} min</EntityMetaItem>
+          </>
+        }
+        primaryAction={primaryAction}
+      />
+      <section className="mb-4 rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
+        <p>Timbrado {money(row.dailyStamped)} · Efectivo {money(row.dailyCash)} · Hora extra {money(row.overtimeRate)}</p>
         <form action={laborIdAction} className="mt-3 grid gap-2 sm:grid-cols-2">
           <input type="hidden" name="collaboratorId" value={row.id} />
           <Field label="RFC"><input name="rfc" defaultValue={row.rfc ?? ""} className={controlClass} /></Field>
@@ -37,19 +59,17 @@ export default async function ColaboradorPage({ params }: { params: Promise<{ id
           <Field label="Código postal"><input name="fiscalZip" defaultValue={row.fiscalZip ?? ""} className={controlClass} /></Field>
           <button className="w-fit rounded-md border border-[var(--line)] px-3 py-2 text-sm">Guardar datos fiscales</button>
         </form>
-        {row.exemptBenefits ? null : <p className="mt-1">Vacaciones disponibles: {row.vacationBalance} días hábiles</p>}
-        <p className="mt-1">Horario vigente {row.scheduleStart}, tolerancia {row.toleranceMinutes} min. Un cambio no recalcula días anteriores.</p>
         <p className="mt-1">Huella: {row.fingerprintNote || "Sin enrolar"}</p>
       </section>
       {ceo && row.status === "ACTIVO" ? (
-        <form action={salaryAction} className="mt-4 grid max-w-xl gap-2 rounded-lg border border-[var(--line)] bg-white p-4">
+        <form id="salario" action={salaryAction} className="scroll-mt-24 grid max-w-xl gap-2 rounded-lg border border-[var(--line)] bg-white p-4">
           <h2 className="font-medium">Salario</h2>
           <input type="hidden" name="collaboratorId" value={row.id} />
           <input type="hidden" name="version" value={row.version} />
           <Field label="Timbrado"><input name="dailyStamped" type="number" step="0.01" defaultValue={row.dailyStamped} className={controlClass} /></Field>
           <Field label="Efectivo"><input name="dailyCash" type="number" step="0.01" defaultValue={row.dailyCash} className={controlClass} /></Field>
           <Field label="Tarifa de hora extra"><input name="overtimeRate" type="number" step="0.01" defaultValue={row.overtimeRate} className={controlClass} /></Field>
-          <button className="w-fit rounded-md border border-[var(--line)] px-3 py-2 text-sm">Guardar salario</button>
+          <Button type="submit" tone="ghost">Guardar salario</Button>
         </form>
       ) : null}
       {ceo && row.status === "ACTIVO" ? (
@@ -61,7 +81,7 @@ export default async function ColaboradorPage({ params }: { params: Promise<{ id
         </form>
       ) : null}
       {row.exemptBenefits ? null : (
-        <section className="mt-4 rounded-lg border border-[var(--line)] bg-white p-4">
+        <section id="vacaciones-pendientes" className="mt-4 scroll-mt-24 rounded-lg border border-[var(--line)] bg-white p-4">
           <h2 className="font-medium">Vacaciones</h2>
           <form action={vacationRequestAction} className="mt-2 flex flex-wrap items-end gap-2">
             <input type="hidden" name="collaboratorId" value={row.id} />
@@ -103,7 +123,7 @@ export default async function ColaboradorPage({ params }: { params: Promise<{ id
         <h2 className="mt-3 font-medium">Horas extra</h2>
         <ul className="mt-2 space-y-1">{row.overtime.map((item) => <li key={item.id}>{item.workDate} · {item.hours} h · {item.status}{item.frozenRate != null ? ` · doble ${item.doubleHours} triple ${item.tripleHours}` : ""}</li>)}</ul>
         <h2 className="mt-3 font-medium">Nóminas</h2>
-        <ul className="mt-2 space-y-1">{row.payrollLines.map((line) => <li key={line.id}><Link href={`/nomina/${line.periodId}`} className="text-[var(--accent)]">{line.period.folio}</Link> · {money(line.transferTotal + line.cashTotal)}</li>)}</ul>
+        <ul className="mt-2 space-y-1">{row.payrollLines.map((line) => <li key={line.id}><RecordLink href={`/nomina/${line.periodId}`}>{line.period.folio}</RecordLink> · {money(line.transferTotal + line.cashTotal)}</li>)}</ul>
       </section>
       <form action={scheduleAction} className="mt-4 grid max-w-xl gap-2 rounded-lg border border-[var(--line)] bg-white p-4">
         <h2 className="font-medium">Horario y huella</h2>

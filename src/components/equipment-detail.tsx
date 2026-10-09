@@ -1,10 +1,9 @@
-import Link from "next/link";
 import { ClientNameLink } from "@/components/client-entity-links";
 import { notFound } from "next/navigation";
 import { AttentionForm, CancelMovementForm, MovementForm } from "@/components/custody-forms";
 import { EquipmentCustodyActions } from "@/components/equipment-custody-actions";
 import { HistoryTimeline } from "@/components/history-timeline";
-import { Badge, PageHeader, Table, Td, Th } from "@/components/ui";
+import { Badge, DetailAnchorButton, EntityDetailHeader, EntityMetaItem, Table, Td, TextLink, Th } from "@/components/ui";
 import { allowedMovements, CUSTODY_LABEL, isInitialWarehouseReceipt, isReceipt, MOVEMENT_LABEL, receiptReasonFromAttention, type Custody, type MovementKind } from "@/lib/custody";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
@@ -100,32 +99,50 @@ export async function EquipmentDetail({ id, expectedKind }: { id: string; expect
     && isInitialWarehouseReceipt(expectedKind, equipment.custody as Custody, receiptMovement)
     && !openAttention;
 
+  const backLabel = listHref === "/custodia" ? "Almacén" : expectedKind === "EQUI" ? "Equipos" : "Motores";
+  let primaryAction: React.ReactNode = null;
+  if (awaitingAttentionForReceipt && canAttend) {
+    primaryAction = <DetailAnchorButton href="#custodia-equipo">Crear atención</DetailAnchorButton>;
+  } else if (canMove && simplifiedReceipt && !awaitingAttentionForReceipt) {
+    primaryAction = <DetailAnchorButton href="#custodia-equipo">Confirmar entrada física</DetailAnchorButton>;
+  } else if (canMove && movementOptions.length > 0 && !awaitingAttentionForReceipt) {
+    primaryAction = <DetailAnchorButton href="#custodia-equipo">Registrar movimiento</DetailAnchorButton>;
+  }
+
   return (
     <>
-      <PageHeader
-        back={{ href: listHref, label: listHref === "/custodia" ? "Almacén" : expectedKind === "EQUI" ? "Equipos" : "Motores" }}
+      <EntityDetailHeader
+        back={{ href: listHref, label: backLabel }}
         title={equipment.folio}
         subtitle={expectedKind === "EQUI" ? "Identidad física EQUI" : "Identidad física MOT"}
-        action={<Badge>{CUSTODY_LABEL[equipment.custody as Custody] ?? equipment.custody}</Badge>}
+        status={<Badge>{CUSTODY_LABEL[equipment.custody as Custody] ?? equipment.custody}</Badge>}
+        meta={
+          <>
+            <EntityMetaItem label="Origen">{equipment.originCompany.name}</EntityMetaItem>
+            <EntityMetaItem label="Cliente">
+              {intercompany ? "SYSTRON · intercompañía" : (
+                <ClientNameLink clientId={equipment.client.id} name={equipment.client.name} isSystem={equipment.client.isSystem} canEdit={can(session.role, "client.edit", session.activeCompanyCode)} />
+              )}
+            </EntityMetaItem>
+            <EntityMetaItem label="Identificación">{[equipment.typeName, equipment.brandName, equipment.model].filter(Boolean).join(" · ") || "—"}</EntityMetaItem>
+            {equipment.serial ? <EntityMetaItem label="Serie">{equipment.serial}</EntityMetaItem> : null}
+            {intercompany && sellerUser ? <EntityMetaItem label="Contacto SYSTRON">{sellerUser.name}</EntityMetaItem> : null}
+          </>
+        }
+        primaryAction={primaryAction}
       />
       <div className="space-y-6">
-        <section className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
-          <p>Origen: {equipment.originCompany.name}</p>
-          <p className="mt-1">Cliente: {intercompany ? "SYSTRON, cliente administrativo. El cliente final no se muestra en Servomotores." : <ClientNameLink clientId={equipment.client.id} name={equipment.client.name} isSystem={equipment.client.isSystem} canEdit={can(session.role, "client.edit", session.activeCompanyCode)} />}</p>
-          {intercompany && sellerUser ? <p className="mt-1">Contacto operativo SYSTRON: {sellerUser.name}</p> : null}
-          <p className="mt-1">Identificación: {[equipment.typeName, equipment.brandName, equipment.model].filter(Boolean).join(" · ")}</p>
-          {equipment.serial ? <p className="mt-1">Serie: {equipment.serial}</p> : null}
-          {equipment.description ? <p className="mt-1">{equipment.description}</p> : null}
-          {expectedKind === "MOT" && session.activeCompanyCode === "SYSTRON" ? (
-            <p className="mt-3 text-[var(--muted)]">Este MOT no entra al almacén SYSTRON. El estado físico lo confirma Servomotores.</p>
-          ) : null}
-        </section>
+        {equipment.description ? <p className="text-sm text-[var(--muted)]">{equipment.description}</p> : null}
+        {expectedKind === "MOT" && session.activeCompanyCode === "SYSTRON" ? (
+          <p className="text-sm text-[var(--muted)]">Este MOT no entra al almacén SYSTRON. El estado físico lo confirma Servomotores.</p>
+        ) : null}
 
         {awaitingAttentionForReceipt ? (
           <p className="rounded-md border border-[#efd0d0] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]">
             Falta la atención de ventas (diagnóstico o reparación) antes de confirmar la entrada física.
           </p>
         ) : null}
+        <div id="custodia-equipo" className="scroll-mt-24">
         <EquipmentCustodyActions
           showMovement={canMove && movementOptions.length > 0 && !awaitingAttentionForReceipt}
           showAttention={canAttend}
@@ -161,6 +178,7 @@ export async function EquipmentDetail({ id, expectedKind }: { id: string; expect
             />
           }
         />
+        </div>
 
         <section>
             <h2 className="mb-2 font-medium">Atenciones</h2>
@@ -172,7 +190,7 @@ export async function EquipmentDetail({ id, expectedKind }: { id: string; expect
                       {ATTENTION_LABEL[attention.attentionType as AttentionType] ?? attention.attentionType} · {attention.priorityName}
                       {attention.technicalCases.map((item) => (
                         can(session.role, "operation.queue", session.activeCompanyCode)
-                          ? <Link key={item.id} href={`/operacion/${item.id}`} className="ml-2 text-[var(--accent)]">{item.folio}</Link>
+                          ? <TextLink key={item.id} href={`/operacion/${item.id}`} className="ml-2">{item.folio}</TextLink>
                           : <span key={item.id} className="ml-2 text-[var(--muted)]">{item.folio}</span>
                       ))}
                     </p>
@@ -210,7 +228,7 @@ export async function EquipmentDetail({ id, expectedKind }: { id: string; expect
                         {movement.cancelReason ? ` · ${movement.cancelReason}` : ""}
                         {!movement.cancelledAt && movement.folio && isReceipt(movement.kind as MovementKind) ? (
                           <span className="ml-2">
-                            <Link href={`/documentos/entrada/${movement.id}`} className="text-[var(--accent)]">Documento de recepción</Link>
+                            <TextLink href={`/documentos/entrada/${movement.id}`}>Documento de recepción</TextLink>
                           </span>
                         ) : null}
                         {canMove && latestOpen?.id === movement.id && movement.kind !== "ENTRADA" && movement.kind !== "INGRESO" && !movement.cancelledAt ? (

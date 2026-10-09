@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { ClientPicker } from "@/components/client-picker";
 import { ServiceEquipmentPicker, type ServiceEquipmentOption } from "@/components/service-equipment-picker";
-import { Button, controlClass, Field } from "@/components/ui";
+import { Button, controlClass, Field, FormActions, FormPanel, FormSection } from "@/components/ui";
 
 type PriorityOption = { id: string; name: string };
 type RepairOption = { id: string; folio: string };
@@ -42,48 +42,62 @@ export function ServiceStartForm({
   const [clientId, setClientId] = useState(defaultClientId);
 
   return (
-    <form action={action} className="grid max-w-2xl gap-4 rounded-lg border border-[var(--line)] bg-white p-4">
+    <FormPanel action={action} className="max-w-3xl">
       <input type="hidden" name="attentionType" value={attentionType} />
-      {warranty ? null : (
-        <ClientPicker
-          label="Cliente"
-          clients={clients}
-          defaultClientId={defaultClientId}
-          allowQuickClient={allowQuickClient}
-          extendedContact={false}
-          onClientChange={setClientId}
+      <FormSection
+        title={warranty ? "Equipo" : "Cliente y equipo"}
+        description={warranty ? "El cliente se infiere de la reparación de origen." : "Busca en catálogo o crea un registro mínimo sin salir del flujo."}
+        columns={1}
+      >
+        {warranty ? null : (
+          <ClientPicker
+            label="Cliente"
+            clients={clients}
+            defaultClientId={defaultClientId}
+            allowQuickClient={allowQuickClient}
+            extendedContact={false}
+            onClientChange={setClientId}
+          />
+        )}
+        <ServiceEquipmentPicker
+          equipment={equipment}
+          clientId={clientId}
+          companyCode={companyCode}
+          types={types}
+          brands={brands}
+          models={models}
+          warranty={warranty}
+          allowQuickEquipment={allowQuickEquipment}
         />
-      )}
-      <ServiceEquipmentPicker
-        equipment={equipment}
-        clientId={clientId}
-        companyCode={companyCode}
-        types={types}
-        brands={brands}
-        models={models}
-        warranty={warranty}
-        allowQuickEquipment={allowQuickEquipment}
-      />
-      <Field label="Prioridad">
-        <select name="priorityId" required className={controlClass}>
-          <option value="">Selecciona</option>
-          {priorities.map((priority) => <option key={priority.id} value={priority.id}>{priority.name}</option>)}
-        </select>
-      </Field>
-      <Field label="Falla reportada"><textarea name="reportedFault" required rows={3} className={controlClass} /></Field>
-      {warranty ? (
-        <>
-          <Field label="Reparación pagada de origen">
-            <select name="originalCaseId" required className={controlClass}>
-              <option value="">Selecciona</option>
-              {repairs.map((repair) => <option key={repair.id} value={repair.id}>{repair.folio}</option>)}
-            </select>
-          </Field>
-          <Field label="Antecedente"><input name="antecedent" required className={controlClass} /></Field>
-        </>
-      ) : null}
-      <Field label="Instrucciones de entrega"><textarea name="deliveryInstructions" rows={2} className={controlClass} /></Field>
-      <Button type="submit">Abrir servicio</Button>
-    </form>
+      </FormSection>
+      <FormSection title="Servicio" description="La prioridad define el SLA cuando el equipo tenga entrada física.">
+        <Field label="Prioridad">
+          <select name="priorityId" required className={controlClass}>
+            <option value="">Selecciona</option>
+            {priorities.map((priority) => <option key={priority.id} value={priority.id}>{priority.name}</option>)}
+          </select>
+        </Field>
+        <Field label="Falla reportada"><textarea name="reportedFault" required rows={3} className={controlClass} /></Field>
+        {warranty ? (
+          <>
+            <Field label="Reparación pagada de origen">
+              <select name="originalCaseId" required className={controlClass}>
+                <option value="">Selecciona</option>
+                {repairs.map((repair) => <option key={repair.id} value={repair.id}>{repair.folio}</option>)}
+              </select>
+            </Field>
+            <Field label="Antecedente"><input name="antecedent" required className={controlClass} /></Field>
+          </>
+        ) : null}
+      </FormSection>
+      <FormSection title="Información adicional" columns={1}>
+        <Field label="Instrucciones de entrega" hint="Opcional. Quién recibe o cómo entregar el equipo.">
+          <textarea name="deliveryInstructions" rows={2} className={controlClass} />
+        </Field>
+      </FormSection>
+      <FormActions note="El SLA inicia con la entrada física en taller, no con este alta.">
+        <Button type="submit">Crear atención</Button>
+      </FormActions>
+    </FormPanel>
   );
 }

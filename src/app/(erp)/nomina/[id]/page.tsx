@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { aguinaldoAdjustAction, authorizePayrollAction, editExtraAction, extraAction, retryPayrollAction } from "../actions";
-import { Badge, controlClass, Field, PageHeader } from "@/components/ui";
+import { Badge, Button, controlClass, DetailAnchorButton, EntityDetailHeader, EntityMetaItem, Field, RecordLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
 import { can } from "@/lib/permissions";
@@ -18,14 +17,55 @@ export default async function NominaDetallePage({ params }: { params: Promise<{ 
   if (!row) notFound();
   const open = row.status === "PRELIMINAR";
   const ceo = can(session.role, "personnel.authorize");
+  const hasMissing = row.lines.some((line) => line.missing);
+  const transferTotal = row.lines.reduce((sum, line) => sum + line.transferTotal, 0);
+  const cashTotal = row.lines.reduce((sum, line) => sum + line.cashTotal, 0);
+
+  let primaryAction: React.ReactNode = null;
+  if (open && ceo && !hasMissing) {
+    primaryAction = (
+      <form action={authorizePayrollAction} className="inline">
+        <input type="hidden" name="periodId" value={row.id} />
+        <input type="hidden" name="version" value={row.version} />
+        <Button type="submit">Autorizar nómina</Button>
+      </form>
+    );
+  } else if (open && ceo && hasMissing) {
+    primaryAction = <DetailAnchorButton href="#lineas-nomina">Revisar incidencias</DetailAnchorButton>;
+  } else if (row.status === "AUTORIZADA") {
+    primaryAction = (
+      <form action={retryPayrollAction} className="inline">
+        <input type="hidden" name="periodId" value={row.id} />
+        <Button type="submit" tone="ghost">Reintentar timbrado</Button>
+      </form>
+    );
+  }
+
   return (
     <>
-      <PageHeader back={{ href: "/nomina", label: "Nómina" }} title={row.folio} subtitle={`${row.kind} · ${row.periodStart} a ${row.periodEnd}`} action={<Badge>{row.status}</Badge>} />
+      <EntityDetailHeader
+        back={{ href: "/nomina", label: "Nómina" }}
+        title={row.folio}
+        subtitle={`${row.kind} · ${row.periodStart} a ${row.periodEnd}`}
+        status={<Badge tone={open ? "warn" : "neutral"}>{row.status}</Badge>}
+        meta={
+          <>
+            <EntityMetaItem label="Colaboradores">{row.lines.length}</EntityMetaItem>
+            <EntityMetaItem label="Transferencia">{money(transferTotal)}</EntityMetaItem>
+            <EntityMetaItem label="Efectivo">{money(cashTotal)}</EntityMetaItem>
+            <EntityMetaItem label="Total">{money(transferTotal + cashTotal)}</EntityMetaItem>
+          </>
+        }
+        primaryAction={primaryAction}
+      />
       {row.fiscalError ? <p className="mb-4 rounded-md border border-[#efd0d0] bg-[var(--danger-soft)] px-3 py-2 text-sm">{row.fiscalError}</p> : null}
-      <ul className="space-y-3">
+      {hasMissing ? (
+        <p className="mb-4 rounded-md bg-[var(--warn-soft)] px-3 py-2 text-sm">Hay colaboradores con datos faltantes. Corrige antes de autorizar.</p>
+      ) : null}
+      <ul id="lineas-nomina" className="scroll-mt-24 space-y-3">
         {row.lines.map((line) => (
           <li key={line.id} className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
-            <Link href={`/personal/${line.collaboratorId}`} className="font-medium text-[var(--accent)]">{line.collaborator.user.name}</Link>
+            <RecordLink href={`/personal/${line.collaboratorId}`}>{line.collaborator.user.name}</RecordLink>
             {line.collaborator.exemptBenefits ? <span> · solo salario fijo</span> : null}
             {line.missing ? <p className="text-[var(--danger)]">Falta {line.missing}. No se puede autorizar.</p> : null}
             <p className="mt-1">Timbrado {money(line.stampedBase)} · Efectivo {money(line.cashBase)} · Descuento {money(line.discountStamped + line.discountCash)}</p>
@@ -37,7 +77,7 @@ export default async function NominaDetallePage({ params }: { params: Promise<{ 
                 <input type="hidden" name="lineId" value={line.id} />
                 <input name="stamped" type="number" step="0.01" defaultValue={line.aguinaldoStamped} className="w-28 rounded-md border border-[var(--line)] px-2 py-2" />
                 <input name="cash" type="number" step="0.01" defaultValue={line.aguinaldoCash} className="w-28 rounded-md border border-[var(--line)] px-2 py-2" />
-                <button className="rounded-md border border-[var(--line)] px-3 py-2">Ajustar</button>
+                <Button type="submit" tone="ghost">Ajustar aguinaldo</Button>
               </form>
             ) : null}
           </li>
@@ -52,7 +92,7 @@ export default async function NominaDetallePage({ params }: { params: Promise<{ 
           <Field label="Componente"><select name="component" className={controlClass}><option value="TIMBRADO">Timbrado</option><option value="EFECTIVO">Efectivo</option></select></Field>
           <Field label="Importe"><input name="amount" type="number" min="0.01" step="0.01" required className={controlClass} /></Field>
           <Field label="Nota"><input name="note" required className={controlClass} /></Field>
-          <button className="w-fit rounded-md border border-[var(--line)] px-3 py-2 text-sm">Agregar</button>
+          <Button type="submit" tone="ghost">Agregar movimiento</Button>
         </form>
       ) : null}
       <ul className="mt-3 text-sm">
@@ -64,25 +104,12 @@ export default async function NominaDetallePage({ params }: { params: Promise<{ 
                 <input type="hidden" name="periodId" value={row.id} />
                 <input type="hidden" name="adjustmentId" value={item.id} />
                 <input name="amount" type="number" step="0.01" defaultValue={item.amount} className="w-28 rounded-md border border-[var(--line)] px-2 py-2" />
-                <button className="text-sm">Corregir</button>
+                <Button type="submit" tone="ghost">Corregir</Button>
               </form>
             ) : null}
           </li>
         ))}
       </ul>
-      {open && ceo ? (
-        <form action={authorizePayrollAction} className="mt-4">
-          <input type="hidden" name="periodId" value={row.id} />
-          <input type="hidden" name="version" value={row.version} />
-          <button className="rounded-md bg-[var(--accent)] px-3 py-2 text-sm font-medium text-white">Autorizar y pagar</button>
-        </form>
-      ) : null}
-      {row.status === "AUTORIZADA" ? (
-        <form action={retryPayrollAction} className="mt-4">
-          <input type="hidden" name="periodId" value={row.id} />
-          <button className="rounded-md border border-[var(--line)] px-3 py-2 text-sm">Reintentar timbrado</button>
-        </form>
-      ) : null}
     </>
   );
 }

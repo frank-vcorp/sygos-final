@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { deliverSaleAction, receiveSaleAction } from "./actions";
 import { ClientNameLink } from "@/components/client-entity-links";
-import { Button, PageHeader, TextLink } from "@/components/ui";
+import { Button, DetailAnchorButton, EntityDetailHeader, EntityMetaItem, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { redirectIfSalesNotAssigned } from "@/lib/sales-assignment";
@@ -18,12 +18,31 @@ export default async function VentaDetallePage({ params }: { params: Promise<{ i
   await redirectIfSalesNotAssigned(session, sale.quote.sellerUserId, "/ventas");
   const canMove = can(session.role, "sale.receive", session.activeCompanyCode);
   const canEditClient = can(session.role, "client.edit", session.activeCompanyCode);
+  const pendingReceive = sale.lines.reduce((sum, line) => sum + Math.max(0, line.qtySold - line.qtyReceived), 0);
+  const pendingDeliver = sale.lines.reduce((sum, line) => sum + Math.max(0, line.qtyReceived - line.qtyDelivered), 0);
+  const movementHint =
+    pendingReceive > 0 ? `${pendingReceive} por recibir en almacén` : pendingDeliver > 0 ? `${pendingDeliver} por entregar` : "Mercancía surtida";
+
   return (
     <>
-      <PageHeader back={canMove && session.role === "ALMACEN" ? { href: "/custodia", label: "Almacén" } : { href: "/ventas", label: "Venta de equipos" }} title={sale.folio} subtitle="Venta de equipos" />
-      <p className="mb-2 text-sm text-[var(--muted)]">Cliente: <ClientNameLink clientId={sale.client.id} name={sale.client.name} isSystem={sale.client.isSystem} canEdit={canEditClient} /></p>
-      <p className="mb-4 text-sm">Cotización <TextLink href={`/cotizaciones/${sale.quoteId}`}>{sale.quote.folio}</TextLink>. La mercancía no entra al inventario de refacciones. Factura y remisión llegan en la fase siguiente.</p>
-      <ul className="space-y-3">
+      <EntityDetailHeader
+        back={canMove && session.role === "ALMACEN" ? { href: "/custodia", label: "Almacén" } : { href: "/ventas", label: "Venta de equipos" }}
+        title={sale.folio}
+        subtitle="Venta de equipos · sin entrada a inventario de refacciones"
+        meta={
+          <>
+            <EntityMetaItem label="Cliente">
+              <ClientNameLink clientId={sale.client.id} name={sale.client.name} isSystem={sale.client.isSystem} canEdit={canEditClient} />
+            </EntityMetaItem>
+            <EntityMetaItem label="Cotización">
+              <TextLink href={`/cotizaciones/${sale.quoteId}`}>{sale.quote.folio}</TextLink>
+            </EntityMetaItem>
+            <EntityMetaItem label="Movimiento">{movementHint}</EntityMetaItem>
+          </>
+        }
+        primaryAction={canMove && (pendingReceive > 0 || pendingDeliver > 0) ? <DetailAnchorButton href="#lineas-venta">Registrar recepción o entrega</DetailAnchorButton> : null}
+      />
+      <ul id="lineas-venta" className="scroll-mt-24 space-y-3">
         {sale.lines.map((line) => (
           <li key={line.id} className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
             <p className="font-medium">{line.concept}</p>
