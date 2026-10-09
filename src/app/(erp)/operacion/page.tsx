@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { SlaCountdown } from "@/components/sla-countdown";
-import { Badge, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, SegmentedNav, Table, Td, Th } from "@/components/ui";
+import { ActiveFilters, Badge, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, SegmentedNav, Table, Td, Th } from "@/components/ui";
 import { homePath } from "@/lib/home";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
@@ -51,6 +51,12 @@ export default async function OperacionPage({ searchParams }: { searchParams: Pr
     <>
       <PageHeader title="Operación técnica" subtitle="Diagnósticos, garantías y órdenes de servicio. El orden sigue el SLA: vencidos primero." />
       <SegmentedNav items={tabs.map(([key, label]) => ({ href: `/operacion?vista=${key}`, label, active: view === key }))} />
+      <ActiveFilters
+        items={[
+          ...(view === "validacion" ? [{ label: "Por validar", clearHref: "/operacion" }] : []),
+          ...(view === "cotizar" ? [{ label: "Pendientes de cotizar", clearHref: "/operacion" }] : []),
+        ]}
+      />
       {ordered.length === 0 ? (
         <Empty title="Sin operaciones en esta vista" body="El trabajo técnico aparece cuando el equipo ya tuvo entrada o ingreso físico." />
       ) : (

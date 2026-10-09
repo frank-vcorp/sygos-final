@@ -8,7 +8,20 @@ import {
 } from "../actions";
 import { ConvertProspect } from "@/components/convert-prospect";
 import { HistoryTimeline } from "@/components/history-timeline";
-import { Badge, Button, controlClass, Field, PageHeader } from "@/components/ui";
+import {
+  ActionLink,
+  Badge,
+  Button,
+  controlClass,
+  DetailAnchorButton,
+  EntityDetailHeader,
+  EntityMetaItem,
+  Field,
+  FormActions,
+  FormPanel,
+  FormSection,
+  RecordLink,
+} from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
 import { historyFor } from "@/lib/history";
@@ -47,28 +60,57 @@ export default async function ProspectoDetallePage({ params }: { params: Promise
     select: { id: true, name: true },
   });
   const authorName = new Map(authors.map((author) => [author.id, author.name]));
+  const nextFollowUp = prospect.activities.find((activity) => activity.nextFollowUp)?.nextFollowUp;
+
+  let primaryAction: React.ReactNode = null;
+  if (open) {
+    primaryAction = (
+      <>
+        <DetailAnchorButton href="#seguimiento-prospecto">Registrar seguimiento</DetailAnchorButton>
+        <ActionLink href="#conversion-prospecto" tone="ghost">Convertir o descartar</ActionLink>
+      </>
+    );
+  }
 
   return (
     <>
-      <PageHeader back={{ href: "/prospectos", label: "Prospectos" }} title={prospect.name} action={<Badge>{LABEL[prospect.status] ?? prospect.status}</Badge>} />
+      <EntityDetailHeader
+        back={{ href: "/prospectos", label: "Prospectos" }}
+        title={prospect.name}
+        subtitle={prospect.source ? `Fuente: ${prospect.source}` : "Prospecto comercial"}
+        status={<Badge tone={open ? "warn" : "neutral"}>{LABEL[prospect.status] ?? prospect.status}</Badge>}
+        meta={
+          <>
+            {prospect.note ? <EntityMetaItem label="Nota">{prospect.note}</EntityMetaItem> : null}
+            {nextFollowUp ? <EntityMetaItem label="Siguiente seguimiento">{formatWhen(nextFollowUp)}</EntityMetaItem> : null}
+            {prospect.client ? (
+              <EntityMetaItem label="Cliente">
+                <RecordLink href={`/clientes/${prospect.client.id}`}>{prospect.client.name}</RecordLink>
+              </EntityMetaItem>
+            ) : null}
+          </>
+        }
+        primaryAction={primaryAction}
+      />
+
       {open ? (
-        <form action={updateProspectAction} className="mb-4 grid max-w-xl gap-3 rounded-lg border border-[var(--line)] bg-white p-4">
+        <FormPanel id="datos-prospecto" action={updateProspectAction} className="mb-4 scroll-mt-24">
           <input type="hidden" name="id" value={prospect.id} />
           <input type="hidden" name="version" value={prospect.version} />
-          <Field label="Empresa o nombre"><input name="name" defaultValue={prospect.name} className={controlClass} /></Field>
-          <Field label="Fuente"><input name="source" defaultValue={prospect.source ?? ""} className={controlClass} /></Field>
-          <Field label="Nota"><textarea name="note" defaultValue={prospect.note ?? ""} rows={3} className={controlClass} /></Field>
-          <Button type="submit" tone="ghost">Guardar datos</Button>
-        </form>
-      ) : (
+          <FormSection title="Datos del prospecto" description="Actualiza nombre, fuente y nota general.">
+            <Field label="Empresa o nombre"><input name="name" defaultValue={prospect.name} className={controlClass} /></Field>
+            <Field label="Fuente"><input name="source" defaultValue={prospect.source ?? ""} className={controlClass} /></Field>
+            <div className="md:col-span-2">
+              <Field label="Nota"><textarea name="note" defaultValue={prospect.note ?? ""} rows={3} className={controlClass} /></Field>
+            </div>
+          </FormSection>
+          <FormActions><Button type="submit" tone="ghost">Guardar datos</Button></FormActions>
+        </FormPanel>
+      ) : prospect.note ? (
         <p className="mb-4 text-sm text-[var(--muted)]">{prospect.note}</p>
-      )}
-
-      {prospect.client ? (
-        <p className="mb-4 text-sm">Cliente resultante: <a className="font-medium text-[var(--accent)]" href={`/clientes/${prospect.client.id}`}>{prospect.client.name}</a></p>
       ) : null}
 
-      <section className="rounded-lg border border-[var(--line)] bg-white p-4">
+      <section id="seguimiento-prospecto" className="scroll-mt-24 rounded-lg border border-[var(--line)] bg-white p-4">
         <h2 className="font-medium">Seguimiento</h2>
         <p className="mt-1 text-xs text-[var(--muted)]">La fecha siguiente es informativa. No genera recordatorios.</p>
         <ul className="mt-3 space-y-2 text-sm">
@@ -91,13 +133,15 @@ export default async function ProspectoDetallePage({ params }: { params: Promise
       </section>
 
       {open ? (
-        <ConvertProspect
-          prospectId={prospect.id}
-          version={prospect.version}
-          clients={clients.map((client) => ({ id: client.id, name: client.name }))}
-          convertAction={convertProspectAction}
-          discardAction={discardProspectAction}
-        />
+        <div id="conversion-prospecto" className="scroll-mt-24">
+          <ConvertProspect
+            prospectId={prospect.id}
+            version={prospect.version}
+            clients={clients.map((client) => ({ id: client.id, name: client.name }))}
+            convertAction={convertProspectAction}
+            discardAction={discardProspectAction}
+          />
+        </div>
       ) : null}
 
       {prospect.status === "DESCARTADO" && (session.role === "CEO" || session.role === "ADMINISTRADOR") ? (

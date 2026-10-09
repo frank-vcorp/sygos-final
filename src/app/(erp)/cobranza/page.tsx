@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { ClientNameLink } from "@/components/client-entity-links";
-import { Badge, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, SegmentedNav, Table, Td, Th } from "@/components/ui";
+import { ActiveFilters, Badge, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, SegmentedNav, Table, Td, Th } from "@/components/ui";
 import { homePath } from "@/lib/home";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
@@ -45,6 +45,12 @@ export default async function CobranzaPage({ searchParams }: { searchParams: Pro
     <>
       <PageHeader title={session.role === "VENTAS" ? "Mi cobranza" : "Cobranza"} subtitle="Saldos de esta empresa. Vencida es saldo después de la fecha." />
       {tabs.length > 0 ? <SegmentedNav items={tabs} /> : null}
+      <ActiveFilters
+        items={[
+          ...(vista === "cxc" ? [{ label: "Con saldo", clearHref: "/cobranza" }] : []),
+          ...(vista === "vencidas" ? [{ label: "Vencidas", clearHref: "/cobranza" }] : []),
+        ]}
+      />
       {ordered.length === 0 ? <Empty title="Sin cuentas por cobrar" body="Aparecen cuando Coordinación emite una factura." /> : (
         <ResponsiveData
           table={

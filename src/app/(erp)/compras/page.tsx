@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { ActionLink, Badge, Empty, PageHeader, RecordLink, SegmentedNav, Table, Td, Th, TextLink } from "@/components/ui";
+import { ActionLink, ActiveFilters, Badge, Empty, PageHeader, RecordLink, SegmentedNav, Table, Td, Th, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
 import { can } from "@/lib/permissions";
@@ -39,10 +39,14 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
     ["procesar", "Por procesar"],
     ...(session.role === "CEO" || session.role === "ADMINISTRADOR" ? [["autorizar", "Por autorizar"] as const] : []),
   ];
+  const viewLabel = tabs.find(([key]) => key === view)?.[1] ?? view;
   return (
     <>
       <PageHeader title="Compras" subtitle="Cada compra termina en un egreso o en una cuenta por pagar, nunca en ambos." action={<ActionLink href="/compras/nueva">Nueva compra</ActionLink>} />
       <SegmentedNav items={tabs.map(([key, label]) => ({ href: `/compras?vista=${key}`, label, active: view === key }))} />
+      <ActiveFilters
+        items={view !== "directas" ? [{ label: viewLabel, clearHref: "/compras" }] : []}
+      />
       <p className="mb-4 text-sm"><TextLink href="/compras/oc">Nueva orden de compra</TextLink></p>
       {rows.length === 0 ? <Empty title="Sin compras en esta vista" body="La compra directa consume el presupuesto del mes desde que se registra." /> : (
         <Table>

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { ActionLink, Button, controlClass, Empty, FilterBar, MobileCard, PageHeader, RecordLink, ResponsiveData, Table, Td, Th } from "@/components/ui";
+import { ActionLink, ActiveFilters, Button, controlClass, Empty, FilterBar, MobileCard, PageHeader, RecordLink, ResponsiveData, Table, Td, Th } from "@/components/ui";
+import { listHref } from "@/lib/list-url";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
@@ -38,6 +39,12 @@ export default async function ProspectosPage({ searchParams }: { searchParams: P
         </select>
         <Button type="submit" tone="ghost">Filtrar</Button>
       </FilterBar>
+      <ActiveFilters
+        items={[
+          ...(status !== "ABIERTOS" ? [{ label: LABEL[status] ?? status, clearHref: listHref("/prospectos", { q: query || undefined }) }] : []),
+          ...(query ? [{ label: `Búsqueda: ${query}`, clearHref: listHref("/prospectos", { estado: status !== "ABIERTOS" ? status : undefined }) }] : []),
+        ]}
+      />
       {prospects.length === 0 ? <Empty title="No hay prospectos" body="Nada coincide con el filtro en esta empresa." /> : (
         <ResponsiveData
           table={<Table><thead><tr><Th>Prospecto</Th><Th>Estado</Th><Th>Fuente</Th></tr></thead><tbody>{prospects.map((prospect) => <tr key={prospect.id}><Td><RecordLink href={`/prospectos/${prospect.id}`}>{prospect.name}</RecordLink></Td><Td>{LABEL[prospect.status] ?? prospect.status}</Td><Td>{prospect.source ?? "—"}</Td></tr>)}</tbody></Table>}

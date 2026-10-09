@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { ClientNameLink } from "@/components/client-entity-links";
-import { ActionLink, Badge, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, SegmentedNav, Table, Td, Th } from "@/components/ui";
+import { ActionLink, ActiveFilters, Badge, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, SegmentedNav, Table, Td, Th } from "@/components/ui";
 import { homePath } from "@/lib/home";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
@@ -31,6 +31,12 @@ export default async function PagosPage({ searchParams }: { searchParams: Promis
     <>
       <PageHeader title="Pagos" subtitle="Un pago pendiente no reduce saldos. Validarlo sí." action={can(session.role, "payment.register", session.activeCompanyCode) ? <ActionLink href="/pagos/nuevo">Registrar pago</ActionLink> : null} />
       <SegmentedNav items={tabs} />
+      <ActiveFilters
+        items={[
+          ...(filter === "PENDIENTE" ? [{ label: "Por validar", clearHref: "/pagos" }] : []),
+          ...(filter === "VALIDADO" ? [{ label: "Validados", clearHref: "/pagos" }] : []),
+        ]}
+      />
       {rows.length === 0 ? <Empty title="Sin pagos" body="El comprobante, el importe y el destino se capturan al registrar." /> : (
         <ResponsiveData
           table={

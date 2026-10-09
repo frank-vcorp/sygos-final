@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { ClientNameLink } from "@/components/client-entity-links";
-import { ActionLink, Badge, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, SegmentedNav, Table, Td, Th } from "@/components/ui";
+import { ActionLink, ActiveFilters, Badge, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, SegmentedNav, Table, Td, Th } from "@/components/ui";
 import { homePath } from "@/lib/home";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
@@ -47,17 +47,21 @@ export default async function FacturacionPage({ searchParams }: { searchParams: 
     orderBy: { createdAt: "desc" },
     take: 100,
   });
-  const tabs: Array<{ href: string; label: string; active: boolean }> = [
-    { href: "/facturacion", label: "Todas", active: vista === "todas" },
-    { href: "/facturacion?vista=solicitudes", label: "Solicitudes", active: vista === "solicitudes" },
-    { href: "/facturacion?vista=facturas", label: "Facturas", active: vista === "facturas" },
-    { href: "/facturacion?vista=remisiones", label: "Remisiones", active: vista === "remisiones" },
-    { href: "/facturacion?vista=canceladas", label: "Canceladas", active: vista === "canceladas" },
+  const tabs: Array<{ href: string; label: string; active: boolean; key: Vista }> = [
+    { href: "/facturacion", label: "Todas", active: vista === "todas", key: "todas" },
+    { href: "/facturacion?vista=solicitudes", label: "Solicitudes", active: vista === "solicitudes", key: "solicitudes" },
+    { href: "/facturacion?vista=facturas", label: "Facturas", active: vista === "facturas", key: "facturas" },
+    { href: "/facturacion?vista=remisiones", label: "Remisiones", active: vista === "remisiones", key: "remisiones" },
+    { href: "/facturacion?vista=canceladas", label: "Canceladas", active: vista === "canceladas", key: "canceladas" },
   ];
+  const vistaLabel = tabs.find((tab) => tab.key === vista)?.label;
   return (
     <>
       <PageHeader title="Facturación" subtitle="Solicitud, emisión y remisión de esta empresa. El timbrado no se duplica." action={can(session.role, "invoice.issue", session.activeCompanyCode) ? <ActionLink href="/facturacion/nuevo">Factura libre</ActionLink> : null} />
       <SegmentedNav items={tabs} />
+      <ActiveFilters
+        items={vista !== "todas" && vistaLabel ? [{ label: vistaLabel, clearHref: "/facturacion" }] : []}
+      />
       {rows.length === 0 ? <Empty title="Sin documentos" body="Una factura nace de una operación autorizada o de una factura libre." /> : (
         <ResponsiveData
           table={
