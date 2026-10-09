@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { CompanyLogo } from "@/components/brand-logo";
 import { PrintButton } from "@/components/print-button";
+import { TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { linesForTotal, money, quoteTotals } from "@/lib/money";
 import { QUOTE_STATUS_LABEL, QUOTE_TYPE_LABEL, type QuoteType } from "@/lib/quotes";
@@ -16,7 +17,12 @@ export default async function CotizacionDocumentoPage({ params }: { params: Prom
   const seller = quote.sellerUserId ? await prisma.user.findUnique({ where: { id: quote.sellerUserId }, select: { name: true } }) : null;
   const issued = quote.createdAt.toLocaleDateString("es-MX", { timeZone: "America/Mexico_City", dateStyle: "long" });
   return (
-    <article className="quote-document mx-auto max-w-4xl overflow-hidden rounded-lg border border-[var(--line)] bg-white text-sm print:max-w-none print:rounded-none print:border-0">
+    <div className="mx-auto max-w-4xl space-y-4 print:max-w-none">
+      <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
+        <TextLink href={`/cotizaciones/${quote.id}`}>Volver a la cotización</TextLink>
+        <PrintButton />
+      </div>
+      <article className="quote-document overflow-hidden rounded-lg border border-[var(--line)] bg-white text-sm print:rounded-none print:border-0">
       <header className="border-b-4 border-[var(--accent)] px-6 py-6 sm:px-10">
         <div className="flex flex-wrap items-start justify-between gap-6">
           <div>
@@ -90,8 +96,8 @@ export default async function CotizacionDocumentoPage({ params }: { params: Prom
         <footer className="mt-10 border-t border-[var(--line)] pt-4 text-center text-xs text-[var(--muted)]">
           Documento emitido por {quote.company.legalName || quote.company.name} · {quote.folio}
         </footer>
-        <PrintButton />
       </div>
     </article>
+    </div>
   );
 }

@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { ActionLink, Badge, Empty, PageHeader, RecordLink, Table, Td, Th } from "@/components/ui";
+import { ActionLink, ActiveFilters, Badge, Empty, PageHeader, RecordLink, SegmentedNav, Table, Td, Th, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
 import { can } from "@/lib/permissions";
@@ -21,6 +21,20 @@ export default async function PersonalPage({ searchParams }: { searchParams: Pro
         subtitle={vista === "documentos" ? "Abre cada colaborador para ver y cargar documentos laborales." : "Cada empresa tiene sus colaboradores. No hay alta rápida."}
         action={<ActionLink href="/personal/nuevo">Alta de colaborador</ActionLink>}
       />
+      <SegmentedNav
+        items={[
+          { href: "/personal", label: "Colaboradores", active: vista !== "documentos" },
+          { href: "/personal?vista=documentos", label: "Documentos", active: vista === "documentos" },
+        ]}
+      />
+      <div className="mb-4 flex flex-wrap gap-2 text-sm">
+        <TextLink href="/personal/asistencia">Asistencia</TextLink>
+        <span className="text-[var(--muted)]">·</span>
+        <TextLink href="/personal/horas">Horas extra</TextLink>
+        <span className="text-[var(--muted)]">·</span>
+        <TextLink href="/nomina">Nómina</TextLink>
+      </div>
+      <ActiveFilters items={vista === "documentos" ? [{ label: "Vista documentos", clearHref: "/personal" }] : []} />
       {rows.length === 0 ? <Empty title="Sin colaboradores" body="El alta pide empresa, tipo, ingreso, jefe y salario." /> : (
         <Table>
           <thead><tr><Th>Nombre</Th><Th>Puesto</Th><Th>Jefe</Th><Th>Salario diario</Th><Th>Estado</Th></tr></thead>
