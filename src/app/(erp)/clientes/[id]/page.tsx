@@ -5,6 +5,7 @@ import {
   inactivateContactAction,
   reassignClientAction,
   updateClientAction,
+  updateContactAction,
 } from "../actions";
 import {
   ClientDataAccordion,
@@ -205,6 +206,7 @@ export default async function ClienteDetallePage({ params }: { params: Promise<{
           prospects={client.prospects.map((prospect) => ({ id: prospect.id, name: prospect.name }))}
           updateAction={updateClientAction}
           addContactAction={addContactAction}
+          updateContactAction={updateContactAction}
           inactivateContactAction={inactivateContactAction}
           reassignAction={reassignClientAction}
           inactivateAction={inactivateClientAction}

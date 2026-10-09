@@ -305,20 +305,56 @@ export function ClientAdminAside({
   );
 }
 
+function ContactFieldsForm({
+  contact,
+  clientId,
+  action,
+  onCancel,
+  submitLabel,
+}: {
+  contact?: ContactRow;
+  clientId: string;
+  action: (formData: FormData) => void | Promise<void>;
+  onCancel: () => void;
+  submitLabel: string;
+}) {
+  return (
+    <form action={action} className="grid gap-2 sm:grid-cols-2">
+      <input type="hidden" name="clientId" value={clientId} />
+      {contact ? <input type="hidden" name="contactId" value={contact.id} /> : null}
+      <Field label="Nombre"><input name="name" required className={controlClass} defaultValue={contact?.name ?? ""} /></Field>
+      <Field label="Teléfono"><input name="phone" required className={controlClass} defaultValue={contact?.phone ?? ""} /></Field>
+      <Field label="Correo"><input name="email" className={controlClass} defaultValue={contact?.email ?? ""} /></Field>
+      <Field label="Puesto"><input name="roleTitle" className={controlClass} defaultValue={contact?.roleTitle ?? ""} /></Field>
+      <label className="flex items-center gap-2 text-xs sm:col-span-2">
+        <input type="checkbox" name="isPrimary" value="si" defaultChecked={contact?.isPrimary ?? false} />
+        Principal
+      </label>
+      <div className="flex gap-2 sm:col-span-2">
+        <Button type="submit" className="min-h-9 text-xs">{submitLabel}</Button>
+        <Button type="button" tone="ghost" className="min-h-9 text-xs" onClick={onCancel}>Cancelar</Button>
+      </div>
+    </form>
+  );
+}
+
 export function ClientContactsPanel({
   clientId,
   contacts,
   addAction,
+  updateAction,
   inactivateAction,
   embedded = false,
 }: {
   clientId: string;
   contacts: ContactRow[];
   addAction: (formData: FormData) => void | Promise<void>;
+  updateAction: (formData: FormData) => void | Promise<void>;
   inactivateAction: (formData: FormData) => void | Promise<void>;
   embedded?: boolean;
 }) {
   const [adding, setAdding] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
 
   const body = (
     <>
@@ -338,30 +374,82 @@ export function ClientContactsPanel({
                 </thead>
                 <tbody>
                   {contacts.map((contact) => (
-                    <tr key={contact.id}>
-                      <Td>
-                        <span className="font-medium">{contact.name}</span>
-                        {contact.isPrimary ? <Badge tone="ok">Principal</Badge> : null}
-                        {contact.roleTitle ? <span className="block text-[var(--muted)]">{contact.roleTitle}</span> : null}
-                      </Td>
-                      <Td>{[contact.phone, contact.email].filter(Boolean).join(" · ") || "—"}</Td>
-                      <Td>
-                        <form action={inactivateAction}>
-                          <input type="hidden" name="contactId" value={contact.id} />
-                          <ConfirmSubmit message="¿Inactivar contacto?" tone="ghost">
-                            <span className="text-xs">Inactivar</span>
-                          </ConfirmSubmit>
-                        </form>
-                      </Td>
-                    </tr>
+                    editingId === contact.id ? (
+                      <tr key={contact.id}>
+                        <Td colSpan={3} className="!whitespace-normal">
+                          <ContactFieldsForm
+                            contact={contact}
+                            clientId={clientId}
+                            action={updateAction}
+                            submitLabel="Guardar cambios"
+                            onCancel={() => setEditingId(null)}
+                          />
+                        </Td>
+                      </tr>
+                    ) : (
+                      <tr key={contact.id}>
+                        <Td>
+                          <span className="font-medium">{contact.name}</span>
+                          {contact.isPrimary ? <Badge tone="ok">Principal</Badge> : null}
+                          {contact.roleTitle ? <span className="block text-[var(--muted)]">{contact.roleTitle}</span> : null}
+                        </Td>
+                        <Td>{[contact.phone, contact.email].filter(Boolean).join(" · ") || "—"}</Td>
+                        <Td>
+                          <div className="flex flex-wrap gap-2">
+                            <Button
+                              type="button"
+                              tone="ghost"
+                              className="min-h-9 px-2 text-xs"
+                              onClick={() => {
+                                setAdding(false);
+                                setEditingId(contact.id);
+                              }}
+                            >
+                              Editar
+                            </Button>
+                            <form action={inactivateAction}>
+                              <input type="hidden" name="contactId" value={contact.id} />
+                              <ConfirmSubmit message="¿Inactivar contacto?" tone="ghost">
+                                <span className="text-xs">Inactivar</span>
+                              </ConfirmSubmit>
+                            </form>
+                          </div>
+                        </Td>
+                      </tr>
+                    )
                   ))}
                 </tbody>
               </Table>
             }
             cards={contacts.map((contact) => (
               <div key={contact.id} className="border-b border-[var(--line)] px-3 py-2 text-xs last:border-0">
-                <p className="font-medium">{contact.name}</p>
-                <p className="text-[var(--muted)]">{[contact.phone, contact.email].filter(Boolean).join(" · ")}</p>
+                {editingId === contact.id ? (
+                  <ContactFieldsForm
+                    contact={contact}
+                    clientId={clientId}
+                    action={updateAction}
+                    submitLabel="Guardar"
+                    onCancel={() => setEditingId(null)}
+                  />
+                ) : (
+                  <>
+                    <p className="font-medium">{contact.name}</p>
+                    <p className="text-[var(--muted)]">{[contact.phone, contact.email].filter(Boolean).join(" · ")}</p>
+                    <div className="mt-2 flex gap-2">
+                      <Button
+                        type="button"
+                        tone="ghost"
+                        className="min-h-9 px-2 text-xs"
+                        onClick={() => {
+                          setAdding(false);
+                          setEditingId(contact.id);
+                        }}
+                      >
+                        Editar
+                      </Button>
+                    </div>
+                  </>
+                )}
               </div>
             ))}
           />
@@ -369,20 +457,24 @@ export function ClientContactsPanel({
       )}
       <div className="border-t border-[var(--line)] px-3 py-2">
         {adding ? (
-          <form action={addAction} className="grid gap-2 sm:grid-cols-2">
-            <input type="hidden" name="clientId" value={clientId} />
-            <Field label="Nombre"><input name="name" required className={controlClass} /></Field>
-            <Field label="Teléfono"><input name="phone" required className={controlClass} /></Field>
-            <Field label="Correo"><input name="email" className={controlClass} /></Field>
-            <Field label="Puesto"><input name="roleTitle" className={controlClass} /></Field>
-            <label className="flex items-center gap-2 text-xs sm:col-span-2"><input type="checkbox" name="isPrimary" value="si" /> Principal</label>
-            <div className="flex gap-2 sm:col-span-2">
-              <Button type="submit" className="min-h-9 text-xs">Guardar</Button>
-              <Button type="button" tone="ghost" className="min-h-9 text-xs" onClick={() => setAdding(false)}>Cancelar</Button>
-            </div>
-          </form>
+          <ContactFieldsForm
+            clientId={clientId}
+            action={addAction}
+            submitLabel="Guardar"
+            onCancel={() => setAdding(false)}
+          />
         ) : (
-          <Button type="button" tone="ghost" className="min-h-9 text-xs" onClick={() => setAdding(true)}>+ Contacto</Button>
+          <Button
+            type="button"
+            tone="ghost"
+            className="min-h-9 text-xs"
+            onClick={() => {
+              setEditingId(null);
+              setAdding(true);
+            }}
+          >
+            + Contacto
+          </Button>
         )}
       </div>
     </>
@@ -402,6 +494,7 @@ export function ClientDataAccordion({
   prospects,
   updateAction,
   addContactAction,
+  updateContactAction,
   inactivateContactAction,
   reassignAction,
   inactivateAction,
@@ -418,6 +511,7 @@ export function ClientDataAccordion({
   prospects: ProspectRow[];
   updateAction: (formData: FormData) => void | Promise<void>;
   addContactAction: (formData: FormData) => void | Promise<void>;
+  updateContactAction: (formData: FormData) => void | Promise<void>;
   inactivateContactAction: (formData: FormData) => void | Promise<void>;
   reassignAction: (formData: FormData) => void | Promise<void>;
   inactivateAction: (formData: FormData) => void | Promise<void>;
@@ -428,7 +522,14 @@ export function ClientDataAccordion({
   return (
     <CollapseBlock id="contactos" title="Datos del cliente y contactos" count={contacts.length}>
       <ClientProfileSection client={client} ownerName={ownerName} updateAction={updateAction} compact />
-      <ClientContactsPanel clientId={clientId} contacts={contacts} addAction={addContactAction} inactivateAction={inactivateContactAction} embedded />
+      <ClientContactsPanel
+        clientId={clientId}
+        contacts={contacts}
+        addAction={addContactAction}
+        updateAction={updateContactAction}
+        inactivateAction={inactivateContactAction}
+        embedded
+      />
       {prospects.length > 0 ? (
         <ul className="border-t border-[var(--line)] px-3 py-2 text-xs">
           {prospects.map((p) => (

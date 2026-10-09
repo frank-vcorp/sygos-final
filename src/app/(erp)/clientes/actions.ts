@@ -251,6 +251,54 @@ export async function addContactAction(formData: FormData) {
   }
 }
 
+export async function updateContactAction(formData: FormData) {
+  "use server";
+  const contactId = requiredText(formData.get("contactId"), "Contacto");
+  try {
+    const session = await guard("client.edit");
+    const contact = await prisma.contact.findFirst({
+      where: { id: contactId, active: true, client: { companyId: session.activeCompanyId, isSystem: false } },
+    });
+    if (!contact) redirect("/clientes");
+    await assertOwn(session, contact.clientId);
+    const name = requiredText(formData.get("name"), "Nombre del contacto");
+    const phone = requiredText(formData.get("phone"), "Teléfono del contacto");
+    const makePrimary = formData.get("isPrimary") === "si";
+    const activeOthers = await prisma.contact.count({
+      where: { clientId: contact.clientId, active: true, id: { not: contact.id } },
+    });
+    let isPrimary = contact.isPrimary;
+    if (makePrimary) {
+      await prisma.contact.updateMany({ where: { clientId: contact.clientId }, data: { isPrimary: false } });
+      isPrimary = true;
+    } else if (contact.isPrimary && activeOthers > 0) {
+      isPrimary = false;
+      const next = await prisma.contact.findFirst({
+        where: { clientId: contact.clientId, active: true, id: { not: contact.id } },
+        orderBy: { name: "asc" },
+      });
+      if (next) await prisma.contact.update({ where: { id: next.id }, data: { isPrimary: true } });
+    }
+    await prisma.contact.update({
+      where: { id: contact.id },
+      data: {
+        name,
+        phone,
+        roleTitle: optionalText(formData.get("roleTitle")),
+        email: optionalText(formData.get("email")),
+        isPrimary,
+      },
+    });
+    await setFlash({ tone: "ok", message: "Contacto actualizado." });
+    redirect(`/clientes/${contact.clientId}`);
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    await setFlash({ tone: "error", message: messageOf(error) });
+    const fallback = optionalText(formData.get("clientId"));
+    redirect(fallback ? `/clientes/${fallback}` : "/clientes");
+  }
+}
+
 export async function inactivateContactAction(formData: FormData) {
   "use server";
   const session = await guard("client.edit");
