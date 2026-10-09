@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ClientNameLink } from "@/components/client-entity-links";
-import { PageHeader, RecordLink, TextLink } from "@/components/ui";
+import { KpiCard, PageHeader, RecordLink, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
 import { can } from "@/lib/permissions";
@@ -15,10 +15,23 @@ import { requireCompany } from "@/lib/session";
 
 const CLOSED = ["VALIDADO", "TERMINADA", "SIN_REPARACION"];
 
-function Block({ title, empty, rows }: { title: string; empty: string; rows: Array<{ key?: string; href: string; label: string; detail: ReactNode }> }) {
+function Block({
+  title,
+  empty,
+  rows,
+  bandejaHref,
+}: {
+  title: string;
+  empty: string;
+  rows: Array<{ key?: string; href: string; label: string; detail: ReactNode }>;
+  bandejaHref?: string;
+}) {
   return (
     <section className="rounded-lg border border-[var(--line)] bg-white p-4">
-      <h2 className="font-medium">{title}</h2>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="font-medium">{title}</h2>
+        {bandejaHref ? <TextLink href={bandejaHref}>Ver bandeja</TextLink> : null}
+      </div>
       {rows.length === 0 ? <p className="mt-2 text-sm text-[var(--muted)]">{empty}</p> : (
         <ul className="mt-2 space-y-2 text-sm">
           {rows.map((row) => <li key={row.key ?? row.href + row.label}><RecordLink href={row.href}>{row.label}</RecordLink> · {row.detail}</li>)}
@@ -245,9 +258,9 @@ async function Sales({ companyId, userId }: { companyId: string; userId: string 
     <>
       <PageHeader title="Inicio" subtitle="Tus pendientes comerciales y tu desempeño. Solo clientes asignados a ti en cartera; sin costos internos ni base Servomotores." />
       <section className="mb-4 grid gap-3 sm:grid-cols-3">
-        <MetricCard label="Cotizaciones autorizadas (mes)" value={String(authorizedMonth)} />
-        <MetricCard label="Esperando decisión del cliente" value={String(pendingDecision)} />
-        <MetricCard label="Saldo en cobranza" value={money(receivables.reduce((sum, row) => sum + row.balance, 0))} />
+        <KpiCard label="Cotizaciones autorizadas (mes)" value={String(authorizedMonth)} href="/cotizaciones" />
+        <KpiCard label="Esperando decisión del cliente" value={String(pendingDecision)} href="/cotizaciones?vista=decision" />
+        <KpiCard label="Saldo en cobranza" value={money(receivables.reduce((sum, row) => sum + row.balance, 0))} href="/cobranza?vista=cxc" />
       </section>
       {goals.length > 0 ? (
         <section className="mb-4 rounded-lg border border-[var(--line)] bg-white p-4">
@@ -258,44 +271,37 @@ async function Sales({ companyId, userId }: { companyId: string; userId: string 
         </section>
       ) : null}
       <div className="grid gap-3">
-        <Block
-          title="Servicios de tu cartera"
-          empty="No hay servicios activos ni atenciones en espera de ingreso para tus clientes."
-          rows={serviciosCartera.slice(0, 10).map((row) => {
-            if (row.kind === "operacion") {
-              return {
-                key: row.id,
-                href: row.href,
-                label: row.folio,
-                detail: `${row.clientName} · ${row.equipmentFolio} · ${row.status}`,
-              };
-            }
+        <Block title="Servicios de tu cartera" empty="No hay servicios activos ni atenciones en espera de ingreso para tus clientes." bandejaHref="/servicios/activos" rows={serviciosCartera.slice(0, 10).map((row) => {
+          if (row.kind === "operacion") {
             return {
               key: row.id,
               href: row.href,
-              label: row.equipmentFolio,
-              detail: (
-                <>
-                  {row.clientName} · {row.kind === "espera_ingreso" ? "Espera ingreso físico" : "Cancelada"}
-                </>
-              ),
+              label: row.folio,
+              detail: `${row.clientName} · ${row.equipmentFolio} · ${row.status}`,
             };
-          })}
-        />
-        <p className="text-sm">
-          <Link href="/servicios/activos" className="text-[var(--accent)]">Ver todos en Servicios</Link>
-        </p>
-        <Block title="Cotizaciones por seguimiento" empty="Nada por seguir." rows={quotes.map((row) => ({ href: `/cotizaciones/${row.id}`, label: row.folio, detail: <>{QUOTE_STATUS_LABEL[row.status] ?? row.status} · {panelClientLink(row.client)}</> }))} />
-        <Block title="Esperando precio (CEO/Administrador)" empty="No hay cotizaciones sin precio." rows={waitingPrice.map((row) => ({ href: `/cotizaciones/${row.id}`, label: row.folio, detail: panelClientLink(row.client) }))} />
-        <Block title="Entregas pendientes" empty="Sin mercancía ni entregas por cerrar." rows={deliveries.map((row) => {
+          }
+          return {
+            key: row.id,
+            href: row.href,
+            label: row.equipmentFolio,
+            detail: (
+              <>
+                {row.clientName} · {row.kind === "espera_ingreso" ? "Espera ingreso físico" : "Cancelada"}
+              </>
+            ),
+          };
+        })} />
+        <Block title="Cotizaciones por seguimiento" empty="Nada por seguir." bandejaHref="/cotizaciones" rows={quotes.map((row) => ({ href: `/cotizaciones/${row.id}`, label: row.folio, detail: <>{QUOTE_STATUS_LABEL[row.status] ?? row.status} · {panelClientLink(row.client)}</> }))} />
+        <Block title="Esperando precio (CEO/Administrador)" empty="No hay cotizaciones sin precio." bandejaHref="/cotizaciones?vista=pendientes" rows={waitingPrice.map((row) => ({ href: `/cotizaciones/${row.id}`, label: row.folio, detail: panelClientLink(row.client) }))} />
+        <Block title="Entregas pendientes" empty="Sin mercancía ni entregas por cerrar." bandejaHref="/ventas" rows={deliveries.map((row) => {
           const pendingReceive = row.lines.reduce((sum, line) => sum + Math.max(0, line.qtySold - line.qtyReceived), 0);
           const pendingDeliver = row.lines.reduce((sum, line) => sum + Math.max(0, line.qtyReceived - line.qtyDelivered), 0);
           const detail = pendingReceive > 0 ? `por recibir ${pendingReceive}` : `por entregar ${pendingDeliver}`;
           return { href: `/ventas/${row.id}`, label: row.folio, detail: <>{panelClientLink(row.client)} · {detail}</> };
         })} />
-        <Block title="Cobranza" empty="Sin saldos propios." rows={receivables.map((row) => ({ href: `/cobranza/${row.id}`, label: row.document.folio, detail: <>{panelClientLink(row.client)} · {money(row.balance)}</> }))} />
-        <Block title="Facturación pendiente" empty="No hay operaciones con factura obligatoria sin emitir." rows={invoices.map((row) => ({ href: `/cotizaciones/${row.id}`, label: row.folio, detail: panelClientLink(row.client) }))} />
-        <Block title="Agenda / próximas actividades" empty="Sin actividades próximas." rows={activities.map((row) => {
+        <Block title="Cobranza" empty="Sin saldos propios." bandejaHref="/cobranza?vista=cxc" rows={receivables.map((row) => ({ href: `/cobranza/${row.id}`, label: row.document.folio, detail: <>{panelClientLink(row.client)} · {money(row.balance)}</> }))} />
+        <Block title="Facturación pendiente" empty="No hay operaciones con factura obligatoria sin emitir." bandejaHref="/facturacion?vista=solicitudes" rows={invoices.map((row) => ({ href: `/cotizaciones/${row.id}`, label: row.folio, detail: panelClientLink(row.client) }))} />
+        <Block title="Agenda / próximas actividades" empty="Sin actividades próximas." bandejaHref="/agenda" rows={activities.map((row) => {
           const when = row.scheduledAt.toLocaleDateString("es-MX", { timeZone: "America/Mexico_City" });
           const href = row.clientId ? `/clientes/${row.clientId}` : row.prospectId ? `/prospectos/${row.prospectId}` : "/agenda";
           const detail = row.client
@@ -305,18 +311,8 @@ async function Sales({ companyId, userId }: { companyId: string; userId: string 
               : when;
           return { href, label: row.note, detail };
         })} />
-        <p className="text-sm"><Link href="/agenda" className="text-[var(--accent)]">Abrir agenda comercial</Link></p>
       </div>
     </>
-  );
-}
-
-function MetricCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-lg border border-[var(--line)] bg-white p-4">
-      <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">{label}</p>
-      <p className="mt-1 text-2xl font-semibold text-[#0b1f3a]">{value}</p>
-    </div>
   );
 }
 
@@ -358,13 +354,13 @@ async function Coordination({ companyId, code, vista }: { companyId: string; cod
         </section>
       ) : null}
       <div className="grid gap-3">
-        <Block title="Facturas solicitadas" empty="Sin solicitudes." rows={invoices.map((row) => ({ href: `/facturacion/${row.id}`, label: row.folio, detail: row.kind }))} />
-        <Block title="Remisiones solicitadas" empty="Sin remisiones por generar." rows={remissions.map((row) => ({ href: `/facturacion/${row.id}`, label: row.folio, detail: "Remisión" }))} />
-        <Block title="Pagos por validar" empty="Sin pagos pendientes." rows={payments.map((row) => ({ href: `/pagos/${row.id}`, label: row.folio, detail: money(row.amount) }))} />
-        <Block title="Compras directas" empty="Nada por cuadrar." rows={purchases.map((row) => ({ href: `/compras/${row.id}`, label: row.folio, detail: money(row.amount) }))} />
-        <Block title="Órdenes autorizadas" empty="Nada por procesar." rows={orders.map((row) => ({ href: `/compras/${row.id}`, label: row.folio, detail: money(row.amount) }))} />
-        <Block title="Cobranza vencida" empty="Sin cuentas vencidas." rows={dueReceivables.map((row) => ({ href: `/cobranza/${row.id}`, label: row.document.folio, detail: money(row.balance) }))} />
-        <Block title="Nómina preliminar" empty="No hay una semana abierta." rows={payrolls.map((row) => ({ href: `/nomina/${row.id}`, label: row.folio, detail: row.lines.some((line) => line.missing) ? "Falta un dato para timbrar" : row.status }))} />
+        <Block title="Facturas solicitadas" empty="Sin solicitudes." bandejaHref="/facturacion?vista=solicitudes" rows={invoices.map((row) => ({ href: `/facturacion/${row.id}`, label: row.folio, detail: row.kind }))} />
+        <Block title="Remisiones solicitadas" empty="Sin remisiones por generar." bandejaHref="/facturacion?vista=remisiones" rows={remissions.map((row) => ({ href: `/facturacion/${row.id}`, label: row.folio, detail: "Remisión" }))} />
+        <Block title="Pagos por validar" empty="Sin pagos pendientes." bandejaHref="/pagos?vista=pendientes" rows={payments.map((row) => ({ href: `/pagos/${row.id}`, label: row.folio, detail: money(row.amount) }))} />
+        <Block title="Compras directas" empty="Nada por cuadrar." bandejaHref="/compras?vista=procesar" rows={purchases.map((row) => ({ href: `/compras/${row.id}`, label: row.folio, detail: money(row.amount) }))} />
+        <Block title="Órdenes autorizadas" empty="Nada por procesar." bandejaHref="/compras?vista=procesar" rows={orders.map((row) => ({ href: `/compras/${row.id}`, label: row.folio, detail: money(row.amount) }))} />
+        <Block title="Cobranza vencida" empty="Sin cuentas vencidas." bandejaHref="/cobranza?vista=vencidas" rows={dueReceivables.map((row) => ({ href: `/cobranza/${row.id}`, label: row.document.folio, detail: money(row.balance) }))} />
+        <Block title="Nómina preliminar" empty="No hay una semana abierta." bandejaHref="/nomina" rows={payrolls.map((row) => ({ href: `/nomina/${row.id}`, label: row.folio, detail: row.lines.some((line) => line.missing) ? "Falta un dato para timbrar" : row.status }))} />
         {code === "SERVOMOTORES" || proofs.length > 0 ? <Block title="Pendientes de comprobación" empty="Sin comprobantes pendientes." rows={proofs.map((row) => ({ href: "/finanzas", label: money(row.amount), detail: row.note ?? "Egreso" }))} /> : null}
       </div>
     </>
@@ -429,40 +425,44 @@ async function CeoExecutive({ companyId, name, vista }: { companyId: string; nam
       <div className="grid gap-3">
         {show("comercial") ? (
           <>
-            <Block title="Pendientes de cotizar" empty="Nada por cotizar." rows={quotes.map((row) => ({ href: `/cotizaciones/${row.id}`, label: row.folio, detail: "Asignar precio" }))} />
-            <Block title="Garantías no procedentes" empty="Sin decisión comercial pendiente." rows={warranties.map((row) => ({ href: `/operacion/${row.id}`, label: row.folio, detail: "Decidir comercialmente" }))} />
+            <Block title="Pendientes de cotizar" empty="Nada por cotizar." bandejaHref="/cotizaciones?vista=pendientes" rows={quotes.map((row) => ({ href: `/cotizaciones/${row.id}`, label: row.folio, detail: "Asignar precio" }))} />
+            <Block title="Garantías no procedentes" empty="Sin decisión comercial pendiente." bandejaHref="/operacion" rows={warranties.map((row) => ({ href: `/operacion/${row.id}`, label: row.folio, detail: "Decidir comercialmente" }))} />
           </>
         ) : null}
         {show("autorizacion") ? (
           <>
-            <Block title="Órdenes por autorizar" empty="Sin órdenes pendientes." rows={orders.map((row) => ({ href: `/compras/${row.id}`, label: row.folio, detail: money(row.amount) }))} />
-            <Block title="Nómina" empty="Sin preliminar." rows={payrolls.map((row) => ({ href: `/nomina/${row.id}`, label: row.folio, detail: "Autorizar" }))} />
-            <Block title="Comisiones" empty="Sin preliminar." rows={commissions.map((row) => ({ href: `/comisiones/${row.id}`, label: row.month, detail: "Validar" }))} />
-            <Block title="Horas extra" empty="Nada espera autorización final." rows={overtime.map((row) => ({ href: "/personal/horas", label: row.collaborator.user.name, detail: `${row.hours} h` }))} />
+            <Block title="Órdenes por autorizar" empty="Sin órdenes pendientes." bandejaHref="/compras?vista=autorizar" rows={orders.map((row) => ({ href: `/compras/${row.id}`, label: row.folio, detail: money(row.amount) }))} />
+            <Block title="Nómina" empty="Sin preliminar." bandejaHref="/nomina" rows={payrolls.map((row) => ({ href: `/nomina/${row.id}`, label: row.folio, detail: "Autorizar" }))} />
+            <Block title="Comisiones" empty="Sin preliminar." bandejaHref="/comisiones" rows={commissions.map((row) => ({ href: `/comisiones/${row.id}`, label: row.month, detail: "Validar" }))} />
+            <Block title="Horas extra" empty="Nada espera autorización final." bandejaHref="/personal/horas" rows={overtime.map((row) => ({ href: "/personal/horas", label: row.collaborator.user.name, detail: `${row.hours} h` }))} />
           </>
         ) : null}
         {show("tecnico") ? (
           <>
-            <Block title="Diagnósticos por validar" empty="Sin validaciones pendientes." rows={validations.map((row) => ({ href: `/operacion/${row.id}`, label: row.folio, detail: "Revisar" }))} />
+            <Block title="Diagnósticos por validar" empty="Sin validaciones pendientes." bandejaHref="/operacion?vista=validacion" rows={validations.map((row) => ({ href: `/operacion/${row.id}`, label: row.folio, detail: "Revisar" }))} />
             <section className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
               <h2 className="font-medium">Operación técnica</h2>
-              <p className="mt-2"><Link href="/operacion" className="text-[var(--accent)]">Cola de operación</Link> · {overdue} con SLA vencido</p>
-              <p className="mt-1"><Link href="/produccion" className="text-[var(--accent)]">Producción técnica</Link></p>
+              <p className="mt-2"><TextLink href="/operacion">Cola de operación</TextLink> · {overdue} con SLA vencido</p>
+              <p className="mt-1"><TextLink href="/produccion">Producción técnica</TextLink></p>
             </section>
           </>
         ) : null}
         {show("admin") ? (
           <>
-            <Block title="Facturas solicitadas" empty="Sin solicitudes." rows={invoices.map((row) => ({ href: `/facturacion/${row.id}`, label: row.folio, detail: row.kind }))} />
-            <Block title="Pagos por validar" empty="Sin pagos pendientes." rows={payments.map((row) => ({ href: `/pagos/${row.id}`, label: row.folio, detail: money(row.amount) }))} />
-            <Block title="Cobranza vencida" empty="Sin cuentas vencidas." rows={dueReceivables.map((row) => ({ href: `/cobranza/${row.id}`, label: row.document.folio, detail: money(row.balance) }))} />
+            <Block title="Facturas solicitadas" empty="Sin solicitudes." bandejaHref="/facturacion?vista=solicitudes" rows={invoices.map((row) => ({ href: `/facturacion/${row.id}`, label: row.folio, detail: row.kind }))} />
+            <Block title="Pagos por validar" empty="Sin pagos pendientes." bandejaHref="/pagos?vista=pendientes" rows={payments.map((row) => ({ href: `/pagos/${row.id}`, label: row.folio, detail: money(row.amount) }))} />
+            <Block title="Cobranza vencida" empty="Sin cuentas vencidas." bandejaHref="/cobranza?vista=vencidas" rows={dueReceivables.map((row) => ({ href: `/cobranza/${row.id}`, label: row.document.folio, detail: money(row.balance) }))} />
           </>
         ) : null}
         {show("finanzas") ? (
           <section className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
             <h2 className="font-medium">Indicadores financieros</h2>
-            <p className="mt-2"><Link href="/finanzas" className="text-[var(--accent)]">Finanzas</Link> · facturado {money(invoiced._sum.total ?? 0)}</p>
-            <p className="mt-1">CxC abierta {money(receivableSum._sum.balance ?? 0)} · CxP {money(payableSum._sum.balance ?? 0)}</p>
+            <p className="mt-2"><TextLink href="/finanzas">Finanzas</TextLink> · facturado {money(invoiced._sum.total ?? 0)}</p>
+            <p className="mt-1">
+              CxC abierta <TextLink href="/cobranza?vista=cxc">{money(receivableSum._sum.balance ?? 0)}</TextLink>
+              {" · "}
+              CxP <TextLink href="/cobranza">{money(payableSum._sum.balance ?? 0)}</TextLink>
+            </p>
           </section>
         ) : null}
       </div>
@@ -485,17 +485,17 @@ async function Executive({ companyId, name }: { companyId: string; name: string 
     <>
       <PageHeader title={`Panel ${name}`} subtitle="Solo esta empresa. No hay suma con la otra." />
       <div className="grid gap-3">
-        <Block title="Pendientes de cotizar" empty="Nada por cotizar." rows={quotes.map((row) => ({ href: `/cotizaciones/${row.id}`, label: row.folio, detail: "Asignar precio" }))} />
-        <Block title="Órdenes por autorizar" empty="Sin órdenes pendientes." rows={orders.map((row) => ({ href: `/compras/${row.id}`, label: row.folio, detail: money(row.amount) }))} />
-        <Block title="Garantías no procedentes" empty="Sin decisión comercial pendiente." rows={warranties.map((row) => ({ href: `/operacion/${row.id}`, label: row.folio, detail: "Decidir comercialmente" }))} />
-        <Block title="Nómina" empty="Sin preliminar." rows={payrolls.map((row) => ({ href: `/nomina/${row.id}`, label: row.folio, detail: "Autorizar" }))} />
-        <Block title="Comisiones" empty="Sin preliminar." rows={commissions.map((row) => ({ href: `/comisiones/${row.id}`, label: row.month, detail: "Validar" }))} />
-        <Block title="Horas extra" empty="Nada espera autorización final." rows={overtime.map((row) => ({ href: "/personal/horas", label: row.collaborator.user.name, detail: `${row.hours} h` }))} />
+        <Block title="Pendientes de cotizar" empty="Nada por cotizar." bandejaHref="/cotizaciones?vista=pendientes" rows={quotes.map((row) => ({ href: `/cotizaciones/${row.id}`, label: row.folio, detail: "Asignar precio" }))} />
+        <Block title="Órdenes por autorizar" empty="Sin órdenes pendientes." bandejaHref="/compras?vista=autorizar" rows={orders.map((row) => ({ href: `/compras/${row.id}`, label: row.folio, detail: money(row.amount) }))} />
+        <Block title="Garantías no procedentes" empty="Sin decisión comercial pendiente." bandejaHref="/operacion" rows={warranties.map((row) => ({ href: `/operacion/${row.id}`, label: row.folio, detail: "Decidir comercialmente" }))} />
+        <Block title="Nómina" empty="Sin preliminar." bandejaHref="/nomina" rows={payrolls.map((row) => ({ href: `/nomina/${row.id}`, label: row.folio, detail: "Autorizar" }))} />
+        <Block title="Comisiones" empty="Sin preliminar." bandejaHref="/comisiones" rows={commissions.map((row) => ({ href: `/comisiones/${row.id}`, label: row.month, detail: "Validar" }))} />
+        <Block title="Horas extra" empty="Nada espera autorización final." bandejaHref="/personal/horas" rows={overtime.map((row) => ({ href: "/personal/horas", label: row.collaborator.user.name, detail: `${row.hours} h` }))} />
         <section className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
           <h2 className="font-medium">Resúmenes</h2>
-          <p className="mt-2"><Link href="/operacion" className="text-[var(--accent)]">Operación</Link> · {overdue} vencidos</p>
-          <p className="mt-1"><Link href="/produccion" className="text-[var(--accent)]">Producción técnica</Link></p>
-          <p className="mt-1"><Link href="/finanzas" className="text-[var(--accent)]">Finanzas</Link> · facturado {money(invoiced._sum.total ?? 0)}</p>
+          <p className="mt-2"><TextLink href="/operacion">Operación</TextLink> · {overdue} vencidos</p>
+          <p className="mt-1"><TextLink href="/produccion">Producción técnica</TextLink></p>
+          <p className="mt-1"><TextLink href="/finanzas">Finanzas</TextLink> · facturado {money(invoiced._sum.total ?? 0)}</p>
         </section>
       </div>
     </>

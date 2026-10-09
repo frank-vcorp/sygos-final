@@ -4,7 +4,17 @@ import { decideAction, discountAction, linkBaseAction, relateEquipmentAction, se
 import { RelateEquipmentForm } from "@/components/relate-equipment-form";
 import { HistoryTimeline } from "@/components/history-timeline";
 import { ConfirmSubmit, SubmitButton } from "@/components/submit-button";
-import { Badge, controlClass, DetailGrid, Field, PageHeader, TextLink } from "@/components/ui";
+import {
+  Badge,
+  controlClass,
+  DetailAnchorButton,
+  DetailGrid,
+  EntityDetailHeader,
+  EntityMetaItem,
+  Field,
+  inlineLinkClass,
+  TextLink,
+} from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
 import { historyFor } from "@/lib/history";
@@ -60,18 +70,55 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
           ? "El equipo ya está relacionado. La operación arranca con la entrada física. Todavía no hay orden de servicio."
           : "Falta crear o relacionar el equipo y confirmar su ingreso. Todavía no hay orden de servicio."
         : null;
+
+  let primaryAction: React.ReactNode = null;
+  if (quote.status === "PENDIENTE_COTIZAR" && can(session.role, "quote.price", session.activeCompanyCode)) {
+    primaryAction = <DetailAnchorButton href="#asignar-precio">Asignar precio</DetailAnchorButton>;
+  } else if (quote.status === "PENDIENTE_DECISION" && can(session.role, "quote.follow", session.activeCompanyCode)) {
+    primaryAction = <DetailAnchorButton href="#decision-cliente">Registrar decisión del cliente</DetailAnchorButton>;
+  } else if (waitingEquipment && can(session.role, "quote.follow", session.activeCompanyCode)) {
+    primaryAction = <DetailAnchorButton href="#relacionar-equipo">Relacionar equipo</DetailAnchorButton>;
+  }
+
+  const equipmentLabel = quote.equipment
+    ? quote.equipment.folio
+    : [quote.preliminaryType, quote.preliminaryBrand, quote.preliminaryModel, quote.preliminarySerial].filter(Boolean).join(" · ") || "Sin equipo físico";
+
   return (
     <>
-      <PageHeader back={{ href: "/cotizaciones", label: "Cotizaciones" }} title={quote.folio} subtitle={QUOTE_TYPE_LABEL[quote.quoteType as QuoteType] ?? quote.quoteType} action={<Badge>{QUOTE_STATUS_LABEL[quote.status] ?? quote.status}</Badge>} />
-      <p className="mb-4 text-sm"><TextLink href={`/documentos/cotizacion/${quote.id}`}>Documento para imprimir</TextLink></p>
-      <form action={sendQuoteMailAction} className="mb-4 text-sm">
-        <input type="hidden" name="quoteId" value={quote.id} />
-        <button className="text-[var(--accent)]">Enviar por correo{quote.client.contacts.find((contact) => contact.email)?.email ? ` a ${quote.client.contacts.find((contact) => contact.email)?.email}` : ""}</button>
-      </form>
+      <EntityDetailHeader
+        back={{ href: "/cotizaciones", label: "Cotizaciones" }}
+        title={quote.folio}
+        subtitle={QUOTE_TYPE_LABEL[quote.quoteType as QuoteType] ?? quote.quoteType}
+        status={<Badge>{QUOTE_STATUS_LABEL[quote.status] ?? quote.status}</Badge>}
+        meta={
+          <>
+            <EntityMetaItem label="Cliente">
+              <ClientNameLink clientId={quote.client.id} name={quote.client.name} isSystem={quote.client.isSystem} canEdit={canEditClient} />
+            </EntityMetaItem>
+            <EntityMetaItem label="Equipo">
+              {quote.equipment ? (
+                <TextLink href={quote.equipment.kind === "MOT" ? `/motores/${quote.equipment.id}` : `/equipos/${quote.equipment.id}`}>{equipmentLabel}</TextLink>
+              ) : (
+                equipmentLabel
+              )}
+            </EntityMetaItem>
+            {totals ? <EntityMetaItem label="Total">{money(totals.total)}</EntityMetaItem> : <EntityMetaItem label="Total">Sin precio</EntityMetaItem>}
+          </>
+        }
+        primaryAction={primaryAction}
+        secondaryActions={
+          <>
+            <TextLink href={`/documentos/cotizacion/${quote.id}`}>Imprimir</TextLink>
+            <form action={sendQuoteMailAction} className="inline">
+              <input type="hidden" name="quoteId" value={quote.id} />
+              <button type="submit" className={inlineLinkClass}>Enviar por correo</button>
+            </form>
+          </>
+        }
+      />
       <DetailGrid>
         <section className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
-          <p>Cliente: <ClientNameLink clientId={quote.client.id} name={quote.client.name} isSystem={quote.client.isSystem} canEdit={canEditClient} /></p>
-          <p className="mt-1">Equipo: {quote.equipment ? <TextLink href={quote.equipment.kind === "MOT" ? `/motores/${quote.equipment.id}` : `/equipos/${quote.equipment.id}`}>{quote.equipment.folio}</TextLink> : [quote.preliminaryType, quote.preliminaryBrand, quote.preliminaryModel, quote.preliminarySerial].filter(Boolean).join(" · ") || "Sin equipo físico"}</p>
           {source ? <p className="mt-1">{source.kind === "OS" ? "Orden de servicio" : "Diagnóstico de origen"}: <TextLink href={`/operacion/${source.id}`}>{source.folio}</TextLink></p> : null}
           {repairOrder ? <p className="mt-1">Orden de servicio: <TextLink href={`/operacion/${repairOrder.id}`}>{repairOrder.folio}</TextLink></p> : null}
           {quote.client.contacts.length > 0 ? (
@@ -132,7 +179,7 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
         </section>
         <div className="space-y-4">
           {quote.status === "PENDIENTE_COTIZAR" && can(session.role, "quote.price", session.activeCompanyCode) ? (
-            <form action={setPricesAction} className="grid gap-2 rounded-lg border border-[var(--line)] bg-white p-4">
+            <form id="asignar-precio" action={setPricesAction} className="grid scroll-mt-24 gap-2 rounded-lg border border-[var(--line)] bg-white p-4">
               <h2 className="font-medium">Asignar precio</h2>
               <input type="hidden" name="quoteId" value={quote.id} />
               <input type="hidden" name="version" value={quote.version} />
@@ -156,7 +203,7 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
                 </Field>
                 <SubmitButton tone="ghost">Aplicar</SubmitButton>
               </form>
-              <form action={decideAction} className="grid gap-2 rounded-lg border border-[var(--line)] bg-white p-4">
+              <form id="decision-cliente" action={decideAction} className="grid scroll-mt-24 gap-2 rounded-lg border border-[var(--line)] bg-white p-4">
                 <h2 className="font-medium">Decisión del cliente</h2>
                 <input type="hidden" name="quoteId" value={quote.id} />
                 <input type="hidden" name="version" value={quote.version} />
@@ -177,6 +224,7 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
             </>
           ) : null}
           {waitingEquipment && can(session.role, "quote.follow", session.activeCompanyCode) ? (
+            <div id="relacionar-equipo" className="scroll-mt-24">
             <RelateEquipmentForm
               quoteId={quote.id}
               version={quote.version}
@@ -190,6 +238,7 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
               models={models.map((row) => ({ type: row.type.name, brand: row.brand.name, model: row.name }))}
               relateAction={relateEquipmentAction}
             />
+            </div>
           ) : null}
           {session.activeCompanyCode === "SYSTRON" && quote.equipment?.kind === "MOT" && can(session.role, "quote.price", session.activeCompanyCode) ? (
             <form action={linkBaseAction} className="grid gap-2 rounded-lg border border-[var(--line)] bg-white p-4">

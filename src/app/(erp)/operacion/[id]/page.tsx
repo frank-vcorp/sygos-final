@@ -18,9 +18,20 @@ import {
   updatePresolicitudAction,
   validateAction,
 } from "../actions";
+import { ClientNameLink } from "@/components/client-entity-links";
 import { HistoryTimeline } from "@/components/history-timeline";
 import { SupplierPicker } from "@/components/supplier-picker";
-import { Badge, Button, controlClass, DetailGrid, Field, PageHeader, TextLink } from "@/components/ui";
+import {
+  Badge,
+  Button,
+  controlClass,
+  DetailAnchorButton,
+  DetailGrid,
+  EntityDetailHeader,
+  EntityMetaItem,
+  Field,
+  TextLink,
+} from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
 import { historyFor } from "@/lib/history";
@@ -96,33 +107,89 @@ export default async function OperacionDetallePage({ params }: { params: Promise
     (session.role === "SUPERVISOR_TECNICO" ||
       (session.role === "TECNICO" && row.assigneeUserId === session.userId));
   const canOperatePartRequests = canWork && !closed && !readOnly && !presolicitudOnly;
+  const canEditClient = can(session.role, "client.edit", session.activeCompanyCode);
+  const slaOverdue = row.slaDueAt != null && row.slaDueAt.getTime() < Date.now() && !closed;
+  const back = can(session.role, "attention.catalog", session.activeCompanyCode)
+    ? { href: serviciosBandejaHref({ vista: historial ? "historial" : "activos" }), label: "Servicios" }
+    : { href: "/operacion", label: "En proceso" };
+
+  let primaryAction: React.ReactNode = null;
+  if (!readOnly) {
+    if (canWork && (row.status === "EN_ESPERA" || row.status === "DEVUELTO")) {
+      primaryAction = (
+        <form action={startCaseAction} className="inline">
+          <input type="hidden" name="caseId" value={row.id} />
+          <input type="hidden" name="version" value={row.version} />
+          <Button type="submit">Iniciar trabajo</Button>
+        </form>
+      );
+    } else if (canWork && row.kind === "DIAGNOSTICO" && ["EN_DIAGNOSTICO", "DEVUELTO"].includes(row.status)) {
+      primaryAction = <DetailAnchorButton href="#terminar-diagnostico">Terminar diagnóstico</DetailAnchorButton>;
+    } else if (
+      canManage &&
+      row.kind === "DIAGNOSTICO" &&
+      (row.status === "PENDIENTE_VALIDACION" || (row.serviceCompany.code === "SERVOMOTORES" && row.status === "VALIDADO" && warranty && !row.warrantyDecision))
+    ) {
+      primaryAction = <DetailAnchorButton href="#validacion">Validar diagnóstico</DetailAnchorButton>;
+    } else if (canWork && row.kind === "OS" && ["EN_REPARACION", "EN_ESPERA_REFACCIONES"].includes(row.status)) {
+      primaryAction = <DetailAnchorButton href="#cerrar-reparacion">Terminar reparación</DetailAnchorButton>;
+    } else if (row.quotePending && can(session.role, "quote.price", session.activeCompanyCode)) {
+      primaryAction = (
+        <form action={prepareFromCaseAction} className="inline">
+          <input type="hidden" name="caseId" value={row.id} />
+          <Button type="submit">Preparar cotización</Button>
+        </form>
+      );
+    } else if (row.warrantyDecision === "NO_PROCEDENTE" && !row.commercialDecision && (session.role === "CEO" || session.role === "ADMINISTRADOR")) {
+      primaryAction = <DetailAnchorButton href="#decision-comercial">Decidir comercialmente</DetailAnchorButton>;
+    }
+  }
 
   return (
     <>
-      <PageHeader
-        back={
-          can(session.role, "attention.catalog", session.activeCompanyCode)
-            ? {
-                href: serviciosBandejaHref({ vista: historial ? "historial" : "activos" }),
-                label: "Servicios",
-              }
-            : { href: "/operacion", label: "En proceso" }
-        }
+      <EntityDetailHeader
+        back={back}
         title={row.folio}
         subtitle={`${row.kind === "OS" ? "Orden de servicio" : "Diagnóstico"} · ${row.serviceCompany.name}`}
-        action={<Badge tone={row.quotePending ? "warn" : "neutral"}>{CASE_STATUS_LABEL[row.status] ?? row.status}</Badge>}
+        status={<Badge tone={row.quotePending || slaOverdue ? "warn" : "neutral"}>{CASE_STATUS_LABEL[row.status] ?? row.status}</Badge>}
+        meta={
+          <>
+            <EntityMetaItem label="Cliente">
+              <ClientNameLink
+                clientId={row.equipment.client.id}
+                name={row.equipment.client.name}
+                isSystem={row.equipment.client.isSystem}
+                canEdit={canEditClient}
+              />
+            </EntityMetaItem>
+            <EntityMetaItem label="Equipo">
+              <TextLink href={equipmentHref}>{row.equipment.folio}</TextLink>
+              <span className="text-[var(--muted)]"> · {row.equipment.model}</span>
+            </EntityMetaItem>
+            <EntityMetaItem label="Responsable">
+              {row.externalSupplierId ? "Servicio externo" : row.assignee?.name ?? "Sin asignar"}
+            </EntityMetaItem>
+            <EntityMetaItem label="Prioridad">{row.attention.priorityName}</EntityMetaItem>
+            <EntityMetaItem label="SLA">{row.slaDueAt ? formatWhen(row.slaDueAt) : "Aún no inicia"}</EntityMetaItem>
+            <EntityMetaItem label="Atención">
+              {repairAfterDiagnosis ? "Reparación" : ATTENTION_LABEL[row.attention.attentionType as AttentionType] ?? row.attention.attentionType}
+            </EntityMetaItem>
+          </>
+        }
+        primaryAction={primaryAction}
       />
       {readOnly ? <p className="mb-4 text-sm text-[var(--muted)]">Consulta de solo lectura. SYSTRON no modifica el estado ni la bitácora de Servomotores.</p> : null}
       <DetailGrid>
         <div className="space-y-4">
           <section className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
-            <p>Equipo: <TextLink href={equipmentHref}>{row.equipment.folio}</TextLink> · {row.equipment.model}</p>
-            <p className="mt-1">Atención: {repairAfterDiagnosis ? "Reparación" : ATTENTION_LABEL[row.attention.attentionType as AttentionType] ?? row.attention.attentionType}</p>
+            <p className="font-medium text-[#0b1f3a]">Contexto del servicio</p>
             {parent?.kind === "DIAGNOSTICO" ? <p className="mt-1">Diagnóstico de origen: <TextLink href={`/operacion/${parent.id}`}>{parent.folio}</TextLink></p> : null}
-            <p className="mt-1">{repairAfterDiagnosis ? "Prioridad del diagnóstico" : "Prioridad congelada"}: {row.attention.priorityName}{row.attention.priorityPrice != null ? ` · $${row.attention.priorityPrice.toLocaleString("es-MX")}` : ""}{row.attention.priorityIncrementPct != null ? ` · incremento ${row.attention.priorityIncrementPct}%` : ""}</p>
-            <p className="mt-1">Falla: {row.attention.reportedFault}</p>
-            <p className="mt-1">SLA: {row.slaDueAt ? formatWhen(row.slaDueAt) : "Aún no inicia"}</p>
-            <p className="mt-1">Responsable: {row.externalSupplierId ? "Servicio externo" : row.assignee?.name ?? "Sin asignar"}</p>
+            <p className="mt-1">
+              {repairAfterDiagnosis ? "Prioridad del diagnóstico" : "Prioridad congelada"}: {row.attention.priorityName}
+              {row.attention.priorityPrice != null ? ` · $${row.attention.priorityPrice.toLocaleString("es-MX")}` : ""}
+              {row.attention.priorityIncrementPct != null ? ` · incremento ${row.attention.priorityIncrementPct}%` : ""}
+            </p>
+            <p className="mt-1">Falla reportada: {row.attention.reportedFault}</p>
             {row.resultText ? <p className="mt-1">Resultado: {row.resultText}</p> : null}
             {row.returnReason ? <p className="mt-1">Devolución: {row.returnReason}</p> : null}
             {row.warrantyDecision ? <p className="mt-1">Decisión técnica de garantía: {row.warrantyDecision === "VALIDA" ? "Válida" : "No procedente"}</p> : null}
@@ -130,16 +197,13 @@ export default async function OperacionDetallePage({ params }: { params: Promise
             {row.externalDocument ? <p className="mt-1">Documento externo: {row.externalDocument}</p> : null}
             {original ? <p className="mt-1">Reparación de origen: <TextLink href={`/operacion/${original.id}`}>{original.folio}</TextLink></p> : null}
             {derived ? <p className="mt-1">Reparación en garantía: <TextLink href={`/operacion/${derived.id}`}>{derived.folio}</TextLink></p> : null}
-            {row.quotePending && can(session.role, "quote.price", session.activeCompanyCode) ? (
-              <form action={prepareFromCaseAction} className="mt-3">
-                <input type="hidden" name="caseId" value={row.id} />
-                <Button type="submit">Preparar cotización</Button>
-              </form>
-            ) : row.quotePending ? <p className="mt-3 text-[var(--muted)]">Queda pendiente de cotizar.</p> : null}
+            {row.quotePending && !can(session.role, "quote.price", session.activeCompanyCode) ? (
+              <p className="mt-3 text-[var(--muted)]">Queda pendiente de cotizar.</p>
+            ) : null}
             {row.paidAt ? <p className="mt-1">Marcada como pagada {formatWhen(row.paidAt)}.</p> : null}
           </section>
           {canWork && row.kind === "DIAGNOSTICO" && ["EN_DIAGNOSTICO", "DEVUELTO"].includes(row.status) ? (
-            <form action={finishDiagnosisAction} className="grid gap-2 rounded-lg border border-[var(--line)] bg-white p-4">
+            <form id="terminar-diagnostico" action={finishDiagnosisAction} className="grid gap-2 rounded-lg border border-[var(--line)] bg-white p-4 scroll-mt-24">
               <h2 className="font-medium">Terminar diagnóstico</h2>
               <p className="text-sm text-[var(--muted)]">Resume el hallazgo técnico. La bitácora queda aparte para avances durante el trabajo.</p>
               <input type="hidden" name="caseId" value={row.id} />
@@ -327,15 +391,8 @@ export default async function OperacionDetallePage({ params }: { params: Promise
                 <Button type="submit" tone="ghost">Guardar asignación</Button>
               </form>
             ) : null}
-            {canWork && (row.status === "EN_ESPERA" || row.status === "DEVUELTO") ? (
-              <form action={startCaseAction}>
-                <input type="hidden" name="caseId" value={row.id} />
-                <input type="hidden" name="version" value={row.version} />
-                <Button type="submit">Iniciar trabajo</Button>
-              </form>
-            ) : null}
             {canManage && row.kind === "DIAGNOSTICO" && (row.status === "PENDIENTE_VALIDACION" || (row.serviceCompany.code === "SERVOMOTORES" && row.status === "VALIDADO" && warranty && !row.warrantyDecision)) ? (
-              <form action={validateAction} className="grid gap-2 rounded-lg border border-[var(--line)] bg-white p-4">
+              <form id="validacion" action={validateAction} className="grid gap-2 rounded-lg border border-[var(--line)] bg-white p-4 scroll-mt-24">
                 <h2 className="font-medium">Validación</h2>
                 <input type="hidden" name="caseId" value={row.id} />
                 <input type="hidden" name="version" value={row.version} />
@@ -349,7 +406,7 @@ export default async function OperacionDetallePage({ params }: { params: Promise
               </form>
             ) : null}
             {canWork && row.kind === "OS" && ["EN_REPARACION", "EN_ESPERA_REFACCIONES"].includes(row.status) ? (
-              <form action={finishRepairAction} className="grid gap-2 rounded-lg border border-[var(--line)] bg-white p-4">
+              <form id="cerrar-reparacion" action={finishRepairAction} className="grid gap-2 rounded-lg border border-[var(--line)] bg-white p-4 scroll-mt-24">
                 <h2 className="font-medium">Cierre técnico</h2>
                 <input type="hidden" name="caseId" value={row.id} />
                 <input type="hidden" name="version" value={row.version} />
@@ -387,7 +444,7 @@ export default async function OperacionDetallePage({ params }: { params: Promise
               </form>
             ) : null}
             {row.warrantyDecision === "NO_PROCEDENTE" && !row.commercialDecision && (session.role === "CEO" || session.role === "ADMINISTRADOR") ? (
-              <form action={overrideWarrantyAction} className="grid gap-2 rounded-lg border border-[var(--line)] bg-white p-4">
+              <form id="decision-comercial" action={overrideWarrantyAction} className="grid gap-2 rounded-lg border border-[var(--line)] bg-white p-4 scroll-mt-24">
                 <h2 className="font-medium">Decisión comercial</h2>
                 <input type="hidden" name="caseId" value={row.id} />
                 <input type="hidden" name="version" value={row.version} />

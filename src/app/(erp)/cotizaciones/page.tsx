@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { ClientNameLink } from "@/components/client-entity-links";
 import { ActionLink, ActiveFilters, Badge, Button, controlClass, Empty, FilterBar, ListCap, MobileCard, PageHeader, RecordLink, ResponsiveData, SegmentedNav, Table, Td, Th, TextLink } from "@/components/ui";
-import { listHref, listHrefWithout } from "@/lib/list-url";
+import { listHref } from "@/lib/list-url";
 import { homePath } from "@/lib/home";
 import { prisma } from "@/lib/db";
 import { linesForTotal, money, quoteTotals } from "@/lib/money";
@@ -18,6 +18,7 @@ export default async function CotizacionesPage({ searchParams }: { searchParams:
   const { vista, q } = await searchParams;
   const query = (q ?? "").trim();
   const pending = vista === "pendientes";
+  const decision = vista === "decision";
   if (pending && can(session.role, "quote.price", session.activeCompanyCode)) {
     const missing = await prisma.technicalCase.findMany({
       where: { serviceCompanyId: session.activeCompanyId, quotePending: true },
@@ -39,6 +40,7 @@ export default async function CotizacionesPage({ searchParams }: { searchParams:
     where: {
       companyId: session.activeCompanyId,
       ...(pending ? { status: "PENDIENTE_COTIZAR" } : {}),
+      ...(decision ? { status: "PENDIENTE_DECISION" } : {}),
       ...(session.role === "VENTAS" ? { sellerUserId: session.userId } : {}),
       ...(query ? { OR: [{ folio: { contains: query } }, { client: { name: { contains: query } } }] } : {}),
     },
@@ -56,20 +58,28 @@ export default async function CotizacionesPage({ searchParams }: { searchParams:
   return (
     <>
       <PageHeader
-        title={pending ? "Pendientes de cotizar" : "Cotizaciones"}
+        title={pending ? "Pendientes de cotizar" : decision ? "Esperando decisión del cliente" : "Cotizaciones"}
         subtitle="Una sola bandeja para lo que necesita precio. El vendedor no fija el precio."
         action={can(session.role, "quote.create", session.activeCompanyCode) ? <ActionLink href="/cotizaciones/nuevo">Nueva cotización</ActionLink> : null}
       />
-      <SegmentedNav items={[{ href: "/cotizaciones", label: "Todas", active: !pending }, { href: "/cotizaciones?vista=pendientes", label: "Pendientes de cotizar", active: pending }]} />
+      <SegmentedNav
+        items={[
+          { href: "/cotizaciones", label: "Todas", active: !pending && !decision },
+          { href: "/cotizaciones?vista=pendientes", label: "Pendientes de cotizar", active: pending },
+          { href: "/cotizaciones?vista=decision", label: "Decisión del cliente", active: decision },
+        ]}
+      />
         <FilterBar action="/cotizaciones">
           {pending ? <input type="hidden" name="vista" value="pendientes" /> : null}
+          {decision ? <input type="hidden" name="vista" value="decision" /> : null}
           <input name="q" defaultValue={query} placeholder="Folio o cliente" className={`${controlClass} sm:flex-1`} />
           <Button type="submit" tone="ghost">Buscar</Button>
         </FilterBar>
       <ActiveFilters
         items={[
           ...(pending ? [{ label: "Pendientes de cotizar", clearHref: listHref("/cotizaciones", { q: query || undefined }) }] : []),
-          ...(query ? [{ label: `Búsqueda: ${query}`, clearHref: listHref("/cotizaciones", { vista: pending ? "pendientes" : undefined }) }] : []),
+          ...(decision ? [{ label: "Decisión del cliente", clearHref: listHref("/cotizaciones", { q: query || undefined }) }] : []),
+          ...(query ? [{ label: `Búsqueda: ${query}`, clearHref: listHref("/cotizaciones", { vista: pending ? "pendientes" : decision ? "decision" : undefined }) }] : []),
         ]}
       />
       {cases.length > 0 ? (
