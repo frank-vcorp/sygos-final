@@ -1,7 +1,6 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
 import { logoutAction, switchCompanyAction, viewAsAction } from "@/app/auth-actions";
-import { CompanyLogo, SygosLogo } from "@/components/brand-logo";
 import { FlashBanner } from "@/components/flash-banner";
 import { ErpShell } from "@/components/erp-shell";
 import { SideNav } from "@/components/side-nav";
@@ -112,8 +111,8 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
   const sidebar = (
     <>
         <div className="mb-3 border-b border-[#dce4ed] px-5 pb-5 pt-6">
-          <SygosLogo />
-          <div className="mt-5 rounded-lg bg-white px-3 py-2.5 ring-1 ring-[#dce4ed]">
+          <p className="text-lg font-semibold tracking-tight text-[var(--accent)]">SYGOS</p>
+          <div className="mt-4 rounded-lg bg-white px-3 py-2.5 ring-1 ring-[#dce4ed]">
             <p className="text-sm font-semibold">{session.name}</p>
             <p className="mt-0.5 text-xs text-[var(--muted)]">{ROLE_LABEL[session.role]}</p>
           </div>
@@ -146,7 +145,6 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
     <header className="border-b border-[var(--line)] bg-white px-4 py-3 md:px-8 md:py-4">
       <div className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-4">
           <div className="flex min-w-0 flex-1 items-center gap-4">
-            <CompanyLogo code={session.activeCompanyCode} className="hidden lg:inline-flex" />
             <span className="hidden text-xs font-semibold uppercase tracking-wide text-[var(--muted)] xl:inline">Empresa activa</span>
             {companies.length > 1 ? (
               <form action={switchCompanyAction} className="flex min-w-0 items-center">

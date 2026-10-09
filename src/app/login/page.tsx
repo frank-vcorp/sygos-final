@@ -1,6 +1,5 @@
 import { redirect } from "next/navigation";
 import { loginAction } from "@/app/auth-actions";
-import { SygosLogo } from "@/components/brand-logo";
 import { FlashBanner } from "@/components/flash-banner";
 import { SubmitButton } from "@/components/submit-button";
 import { controlClass, Field, FormActions, FormPanel, FormSection } from "@/components/ui";
@@ -18,8 +17,8 @@ export default async function LoginPage() {
   const flash = await takeFlash();
   return (
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4">
-      <SygosLogo />
-      <h1 className="mt-5 text-3xl font-semibold tracking-tight">Entrar</h1>
+      <p className="text-sm font-semibold uppercase tracking-wide text-[var(--accent)]">SYGOS</p>
+      <h1 className="mt-3 text-3xl font-semibold tracking-tight">Entrar</h1>
       <p className="mt-2 text-sm text-[var(--muted)]">Operación de SYSTRON y Servomotores. Elige la empresa después de entrar si tu rol trabaja en ambas.</p>
       <FormPanel action={loginAction} className="mt-6 max-w-none">
         <FormSection title="Acceso" columns={1}>

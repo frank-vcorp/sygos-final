@@ -1,18 +1,5 @@
 import Image from "next/image";
 
-export function SygosLogo({ compact = false }: { compact?: boolean }) {
-  return (
-    <Image
-      src="/brand/sygos-3.png"
-      alt="SYGOS 3.0"
-      width={1983}
-      height={793}
-      priority
-      className={compact ? "h-8 w-auto object-contain" : "h-16 w-auto object-contain"}
-    />
-  );
-}
-
 export function CompanyLogo({
   code,
   className = "",
