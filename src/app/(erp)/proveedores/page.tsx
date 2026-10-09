@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { ActionLink, ActiveFilters, Button, controlClass, Empty, FilterBar, PageHeader, RecordLink, Table, Td, Th } from "@/components/ui";
+import { ActionLink, ActiveFilters, Button, controlClass, Empty, FilterBar, MobileCard, PageHeader, RecordLink, ResponsiveData, Table, Td, Th } from "@/components/ui";
 import { listHref } from "@/lib/list-url";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
@@ -37,18 +37,33 @@ export default async function ProveedoresPage({ searchParams }: { searchParams: 
         ]}
       />
       {suppliers.length === 0 ? <Empty title="No hay proveedores" body="Cada empresa mantiene su propio catálogo." /> : (
-        <Table>
-          <thead><tr><Th>Proveedor</Th><Th>Contacto</Th><Th>Factura</Th></tr></thead>
-          <tbody>
-            {suppliers.map((supplier) => (
-              <tr key={supplier.id}>
-                <Td><RecordLink href={`/proveedores/${supplier.id}`}>{supplier.name}</RecordLink>{supplier.isSystem ? " · intercompañía" : ""}</Td>
-                <Td>{supplier.contactName ?? "—"}</Td>
-                <Td>{supplier.issuesInvoice == null ? "Sin definir" : supplier.issuesInvoice ? "Sí" : "No"}</Td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
+        <ResponsiveData
+          table={
+            <Table>
+              <thead><tr><Th>Proveedor</Th><Th>Contacto</Th><Th>Factura</Th></tr></thead>
+              <tbody>
+                {suppliers.map((supplier) => (
+                  <tr key={supplier.id}>
+                    <Td><RecordLink href={`/proveedores/${supplier.id}`}>{supplier.name}</RecordLink>{supplier.isSystem ? " · intercompañía" : ""}</Td>
+                    <Td>{supplier.contactName ?? "—"}</Td>
+                    <Td>{supplier.issuesInvoice == null ? "Sin definir" : supplier.issuesInvoice ? "Sí" : "No"}</Td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          }
+          cards={suppliers.map((supplier) => (
+            <MobileCard
+              key={supplier.id}
+              href={`/proveedores/${supplier.id}`}
+              title={supplier.name}
+              meta={supplier.isSystem ? "Intercompañía" : undefined}
+            >
+              <p>Contacto: {supplier.contactName ?? "—"}</p>
+              <p className="mt-1">Factura: {supplier.issuesInvoice == null ? "Sin definir" : supplier.issuesInvoice ? "Sí" : "No"}</p>
+            </MobileCard>
+          ))}
+        />
       )}
     </>
   );

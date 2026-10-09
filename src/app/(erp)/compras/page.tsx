@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { ActionLink, ActiveFilters, Badge, Button, controlClass, Empty, FilterBar, PageHeader, RecordLink, SegmentedNav, Table, Td, Th, TextLink } from "@/components/ui";
+import { ActionLink, ActiveFilters, Badge, Button, controlClass, Empty, FilterBar, MobileCard, PageHeader, RecordLink, ResponsiveData, SegmentedNav, Table, Td, Th, TextLink } from "@/components/ui";
 import { listHref } from "@/lib/list-url";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
@@ -67,19 +67,34 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
       />
       <p className="mb-4 text-sm"><TextLink href="/compras/oc">Nueva orden de compra</TextLink></p>
       {rows.length === 0 ? <Empty title="Sin compras en esta vista" body="La compra directa consume el presupuesto del mes desde que se registra." /> : (
-        <Table>
-          <thead><tr><Th>Folio</Th><Th>Proveedor</Th><Th>Importe</Th><Th>Estado</Th></tr></thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.id}>
-                <Td><RecordLink href={`/compras/${row.id}`}>{row.folio}</RecordLink></Td>
-                <Td>{row.supplier?.name ?? "Sin proveedor"}</Td>
-                <Td>{money(row.amount)}</Td>
-                <Td><Badge>{STATUS[row.status] ?? row.status}</Badge></Td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
+        <ResponsiveData
+          table={
+            <Table>
+              <thead><tr><Th>Folio</Th><Th>Proveedor</Th><Th>Importe</Th><Th>Estado</Th></tr></thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={row.id}>
+                    <Td><RecordLink href={`/compras/${row.id}`}>{row.folio}</RecordLink></Td>
+                    <Td>{row.supplier?.name ?? "Sin proveedor"}</Td>
+                    <Td>{money(row.amount)}</Td>
+                    <Td><Badge>{STATUS[row.status] ?? row.status}</Badge></Td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          }
+          cards={rows.map((row) => (
+            <MobileCard
+              key={row.id}
+              href={`/compras/${row.id}`}
+              title={row.folio}
+              meta={<Badge>{STATUS[row.status] ?? row.status}</Badge>}
+            >
+              <p>{row.supplier?.name ?? "Sin proveedor"}</p>
+              <p className="mt-1 font-medium">{money(row.amount)}</p>
+            </MobileCard>
+          ))}
+        />
       )}
     </>
   );

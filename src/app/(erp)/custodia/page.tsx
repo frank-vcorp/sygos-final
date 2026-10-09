@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { ActiveFilters, Badge, Empty, PageHeader, RecordLink, SegmentedNav, Table, Td, Th } from "@/components/ui";
+import { ActiveFilters, Badge, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, SegmentedNav, Table, Td, Th } from "@/components/ui";
 import { CUSTODY_LABEL, type Custody } from "@/lib/custody";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
@@ -64,21 +64,40 @@ export default async function CustodiaPage({ searchParams }: { searchParams: Pro
       {rows.length === 0 ? (
         <Empty title="Sin equipos en esta vista" body="La custodia cambia solo cuando alguien confirma el movimiento." />
       ) : (
-        <Table>
-          <thead><tr><Th>Folio</Th><Th>Referencia</Th><Th>Custodia</Th></tr></thead>
-          <tbody>
-            {rows.map((row) => {
-              const hideClient = !systron && row.originCompany.code === "SYSTRON";
-              return (
-                <tr key={row.id}>
-                  <Td><RecordLink href={row.kind === "MOT" ? `/motores/${row.id}` : `/equipos/${row.id}`}>{row.folio}</RecordLink></Td>
-                  <Td>{hideClient ? "SYSTRON · intercompañía" : row.client.name}</Td>
-                  <Td><Badge>{CUSTODY_LABEL[row.custody as Custody]}</Badge></Td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </Table>
+        <ResponsiveData
+          table={
+            <Table>
+              <thead><tr><Th>Folio</Th><Th>Referencia</Th><Th>Custodia</Th></tr></thead>
+              <tbody>
+                {rows.map((row) => {
+                  const hideClient = !systron && row.originCompany.code === "SYSTRON";
+                  const ref = hideClient ? "SYSTRON · intercompañía" : row.client.name;
+                  return (
+                    <tr key={row.id}>
+                      <Td><RecordLink href={row.kind === "MOT" ? `/motores/${row.id}` : `/equipos/${row.id}`}>{row.folio}</RecordLink></Td>
+                      <Td>{ref}</Td>
+                      <Td><Badge>{CUSTODY_LABEL[row.custody as Custody]}</Badge></Td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </Table>
+          }
+          cards={rows.map((row) => {
+            const hideClient = !systron && row.originCompany.code === "SYSTRON";
+            const href = row.kind === "MOT" ? `/motores/${row.id}` : `/equipos/${row.id}`;
+            return (
+              <MobileCard
+                key={row.id}
+                href={href}
+                title={row.folio}
+                meta={<Badge>{CUSTODY_LABEL[row.custody as Custody]}</Badge>}
+              >
+                <p>{hideClient ? "SYSTRON · intercompañía" : row.client.name}</p>
+              </MobileCard>
+            );
+          })}
+        />
       )}
     </>
   );

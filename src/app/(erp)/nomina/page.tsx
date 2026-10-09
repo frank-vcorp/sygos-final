@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { aguinaldoAction, payrollAction } from "./actions";
-import { ActiveFilters, Badge, Button, controlClass, Empty, Field, FormActions, FormPanel, FormSection, PageHeader, RecordLink, SegmentedNav, Table, Td, Th } from "@/components/ui";
+import { ActiveFilters, Badge, Button, controlClass, Empty, Field, FormActions, FormPanel, FormSection, MobileCard, PageHeader, RecordLink, ResponsiveData, SegmentedNav, Table, Td, Th } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
@@ -70,18 +70,32 @@ export default async function NominaPage({ searchParams }: { searchParams: Promi
         </FormPanel>
       ) : null}
       {displayed.length === 0 ? <Empty title="Sin nóminas" body="El preliminar junta salario, descuentos, horas extra, prima y bonos." /> : (
-        <Table>
-          <thead><tr><Th>Folio</Th><Th>Periodo</Th><Th>Estado</Th></tr></thead>
-          <tbody>
-            {displayed.map((row) => (
-              <tr key={row.id}>
-                <Td><RecordLink href={`/nomina/${row.id}`}>{row.folio}</RecordLink></Td>
-                <Td>{row.kind} · {row.periodStart}</Td>
-                <Td><Badge>{row.status}</Badge></Td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
+        <ResponsiveData
+          table={
+            <Table>
+              <thead><tr><Th>Folio</Th><Th>Periodo</Th><Th>Estado</Th></tr></thead>
+              <tbody>
+                {displayed.map((row) => (
+                  <tr key={row.id}>
+                    <Td><RecordLink href={`/nomina/${row.id}`}>{row.folio}</RecordLink></Td>
+                    <Td>{row.kind} · {row.periodStart}</Td>
+                    <Td><Badge tone={row.status === "PRELIMINAR" ? "warn" : "neutral"}>{row.status}</Badge></Td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          }
+          cards={displayed.map((row) => (
+            <MobileCard
+              key={row.id}
+              href={`/nomina/${row.id}`}
+              title={row.folio}
+              meta={<Badge tone={row.status === "PRELIMINAR" ? "warn" : "neutral"}>{row.status}</Badge>}
+            >
+              <p>{row.kind} · {row.periodStart}</p>
+            </MobileCard>
+          ))}
+        />
       )}
     </>
   );

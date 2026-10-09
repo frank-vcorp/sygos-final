@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { ActionLink, ActiveFilters, Badge, Empty, PageHeader, RecordLink, SegmentedNav, Table, Td, Th, TextLink } from "@/components/ui";
+import { ActionLink, ActiveFilters, Badge, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, SegmentedNav, Table, Td, Th, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
 import { can } from "@/lib/permissions";
@@ -36,20 +36,35 @@ export default async function PersonalPage({ searchParams }: { searchParams: Pro
       </div>
       <ActiveFilters items={vista === "documentos" ? [{ label: "Vista documentos", clearHref: "/personal" }] : []} />
       {rows.length === 0 ? <Empty title="Sin colaboradores" body="El alta pide empresa, tipo, ingreso, jefe y salario." /> : (
-        <Table>
-          <thead><tr><Th>Nombre</Th><Th>Puesto</Th><Th>Jefe</Th><Th>Salario diario</Th><Th>Estado</Th></tr></thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.id}>
-                <Td><RecordLink href={`/personal/${row.id}`}>{row.user.name}</RecordLink></Td>
-                <Td>{row.user.role}</Td>
-                <Td>{row.boss?.name ?? "—"}</Td>
-                <Td>{money(row.dailyStamped + row.dailyCash)}</Td>
-                <Td><Badge>{row.status === "ACTIVO" ? "Activo" : "Baja"}</Badge></Td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
+        <ResponsiveData
+          table={
+            <Table>
+              <thead><tr><Th>Nombre</Th><Th>Puesto</Th><Th>Jefe</Th><Th>Salario diario</Th><Th>Estado</Th></tr></thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={row.id}>
+                    <Td><RecordLink href={`/personal/${row.id}`}>{row.user.name}</RecordLink></Td>
+                    <Td>{row.user.role}</Td>
+                    <Td>{row.boss?.name ?? "—"}</Td>
+                    <Td>{money(row.dailyStamped + row.dailyCash)}</Td>
+                    <Td><Badge tone={row.status === "ACTIVO" ? "ok" : "warn"}>{row.status === "ACTIVO" ? "Activo" : "Baja"}</Badge></Td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          }
+          cards={rows.map((row) => (
+            <MobileCard
+              key={row.id}
+              href={`/personal/${row.id}`}
+              title={row.user.name}
+              meta={<Badge tone={row.status === "ACTIVO" ? "ok" : "warn"}>{row.status === "ACTIVO" ? "Activo" : "Baja"}</Badge>}
+            >
+              <p>{row.user.role} · Jefe: {row.boss?.name ?? "—"}</p>
+              <p className="mt-1">Salario diario: {money(row.dailyStamped + row.dailyCash)}</p>
+            </MobileCard>
+          ))}
+        />
       )}
     </>
   );

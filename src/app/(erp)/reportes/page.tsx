@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { ActiveFilters, Button, Card, controlClass, Empty, Field, FilterBar, PageHeader, RecordLink, Table, Td, TextLink, Th } from "@/components/ui";
+import { ActiveFilters, Button, Card, controlClass, Empty, Field, FilterBar, MobileCard, PageHeader, RecordLink, ResponsiveData, Table, Td, TextLink, Th } from "@/components/ui";
 import { listHref } from "@/lib/list-url";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
@@ -58,16 +58,34 @@ export async function ReportView({ params, searchParams }: { params: Promise<{ t
           ...(hasta ? [{ label: `Hasta ${hasta}`, clearHref: listHref(`/reportes/${tipo}`, { desde }) }] : []),
         ]}
       />
-      <Table>
-        <thead><tr>{table.headers.map((header) => <Th key={header}>{header}</Th>)}</tr></thead>
-        <tbody>
-          {table.rows.map((row, index) => (
-            <tr key={index}>
-              {row.cells.map((cell, cellIndex) => <Td key={cellIndex}>{cellIndex === 0 && "href" in row && row.href ? <RecordLink href={row.href}>{cell}</RecordLink> : cell}</Td>)}
-            </tr>
-          ))}
-        </tbody>
-      </Table>
+      <ResponsiveData
+        table={
+          <Table>
+            <thead><tr>{table.headers.map((header) => <Th key={header}>{header}</Th>)}</tr></thead>
+            <tbody>
+              {table.rows.map((row, index) => (
+                <tr key={index}>
+                  {row.cells.map((cell, cellIndex) => <Td key={cellIndex}>{cellIndex === 0 && "href" in row && row.href ? <RecordLink href={row.href}>{cell}</RecordLink> : cell}</Td>)}
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        }
+        cards={table.rows.map((row, index) => {
+          const title = String(row.cells[0] ?? `Fila ${index + 1}`);
+          const href = "href" in row && row.href ? row.href : null;
+          const detail = row.cells.slice(1).join(" · ");
+          if (href) {
+            return <MobileCard key={index} href={href} title={title}><p>{detail}</p></MobileCard>;
+          }
+          return (
+            <article key={index} className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
+              <p className="font-medium">{title}</p>
+              <p className="mt-2 text-[var(--muted)]">{detail}</p>
+            </article>
+          );
+        })}
+      />
     </>
   );
 }
