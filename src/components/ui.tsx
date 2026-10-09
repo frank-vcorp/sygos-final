@@ -397,6 +397,19 @@ export function Th({ children }: { children: React.ReactNode }) {
   return <th className="border-b border-[var(--line)] px-3 py-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">{children}</th>;
 }
 
-export function Td({ children }: { children: React.ReactNode }) {
-  return <td className="border-b border-[var(--line)] px-3 py-2 align-middle">{children}</td>;
+export function Td({
+  children,
+  colSpan,
+  className,
+}: {
+  children: React.ReactNode;
+  colSpan?: number;
+  className?: string;
+}) {
+  const cellClass = ["border-b border-[var(--line)] px-3 py-2 align-middle", className].filter(Boolean).join(" ");
+  return (
+    <td colSpan={colSpan} className={cellClass}>
+      {children}
+    </td>
+  );
 }
