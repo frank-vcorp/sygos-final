@@ -26,11 +26,13 @@ export async function quickCreateClient(
   input: {
     name: string;
     contactName: string;
-    contactPhone?: string | null;
+    contactPhone: string;
     contactEmail?: string | null;
   },
 ) {
   const ownerUserId = await ownerForQuickClient(actor);
+  const phone = input.contactPhone.trim();
+  if (!phone) throw new Error("El teléfono del contacto es obligatorio.");
   const client = await prisma.client.create({
     data: {
       companyId: actor.activeCompanyId,
@@ -39,7 +41,7 @@ export async function quickCreateClient(
       contacts: {
         create: {
           name: input.contactName.trim(),
-          phone: input.contactPhone?.trim() || null,
+          phone,
           email: input.contactEmail?.trim() || null,
           isPrimary: true,
         },
@@ -71,13 +73,13 @@ export async function resolveClientIdForProcess(
   },
 ) {
   if (input.clientId) return { clientId: input.clientId, primaryContactId: null as string | null };
-  if (!input.newClientName?.trim() || !input.contactName?.trim()) {
-    throw new Error("Elige un cliente o abre el alta rápida e indica su nombre y un contacto.");
+  if (!input.newClientName?.trim() || !input.contactName?.trim() || !input.contactPhone?.trim()) {
+    throw new Error("Elige un cliente o abre el alta rápida e indica su nombre, el contacto y el teléfono.");
   }
   const created = await quickCreateClient(actor, {
     name: input.newClientName,
     contactName: input.contactName,
-    contactPhone: input.contactPhone,
+    contactPhone: input.contactPhone!,
     contactEmail: input.contactEmail,
   });
   return { clientId: created.clientId, primaryContactId: created.primaryContactId };

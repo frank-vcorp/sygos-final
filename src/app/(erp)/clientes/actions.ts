@@ -77,6 +77,7 @@ export async function createClientAction(formData: FormData) {
     const session = await guard("client.create");
     const data = clientData(formData);
     const contactName = requiredText(formData.get("contactName"), "Nombre del contacto");
+    const contactPhone = requiredText(formData.get("contactPhone"), "Teléfono del contacto");
     const ownerUserId = await ownerForCreator(session);
     const client = await prisma.client.create({
       data: {
@@ -86,7 +87,7 @@ export async function createClientAction(formData: FormData) {
         contacts: {
           create: {
             name: contactName,
-            phone: optionalText(formData.get("contactPhone")),
+            phone: contactPhone,
             roleTitle: optionalText(formData.get("contactRole")),
             email: optionalText(formData.get("contactEmail")),
             isPrimary: true,
@@ -224,6 +225,7 @@ export async function addContactAction(formData: FormData) {
     const client = await prisma.client.findFirst({ where: { id: clientId, companyId: session.activeCompanyId, isSystem: false } });
     if (!client) redirect("/clientes");
     const name = requiredText(formData.get("name"), "Nombre del contacto");
+    const phone = requiredText(formData.get("phone"), "Teléfono del contacto");
     const makePrimary = formData.get("isPrimary") === "si";
     const existing = await prisma.contact.count({ where: { clientId, active: true } });
     const isPrimary = makePrimary || existing === 0;
@@ -234,7 +236,7 @@ export async function addContactAction(formData: FormData) {
       data: {
         clientId,
         name,
-        phone: optionalText(formData.get("phone")),
+        phone,
         roleTitle: optionalText(formData.get("roleTitle")),
         email: optionalText(formData.get("email")),
         isPrimary,

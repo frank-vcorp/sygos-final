@@ -83,6 +83,11 @@ export default async function ProspectoDetallePage({ params }: { params: Promise
         status={<Badge tone={open ? "warn" : "neutral"}>{LABEL[prospect.status] ?? prospect.status}</Badge>}
         meta={
           <>
+            {prospect.contactName ? (
+              <EntityMetaItem label="Contacto">
+                {[prospect.contactName, prospect.contactPhone].filter(Boolean).join(" · ")}
+              </EntityMetaItem>
+            ) : null}
             {prospect.note ? <EntityMetaItem label="Nota">{prospect.note}</EntityMetaItem> : null}
             {nextFollowUp ? <EntityMetaItem label="Siguiente seguimiento">{formatWhen(nextFollowUp)}</EntityMetaItem> : null}
             {prospect.client ? (
@@ -99,9 +104,11 @@ export default async function ProspectoDetallePage({ params }: { params: Promise
         <FormPanel id="datos-prospecto" action={updateProspectAction} className="mb-4 scroll-mt-24">
           <input type="hidden" name="id" value={prospect.id} />
           <input type="hidden" name="version" value={prospect.version} />
-          <FormSection title="Datos del prospecto" description="Actualiza nombre, fuente y nota general.">
-            <Field label="Empresa o nombre"><input name="name" defaultValue={prospect.name} className={controlClass} /></Field>
+          <FormSection title="Datos del prospecto" description="Actualiza identidad, contacto, fuente y nota general.">
+            <Field label="Empresa o nombre"><input name="name" defaultValue={prospect.name} required className={controlClass} /></Field>
             <Field label="Fuente"><input name="source" defaultValue={prospect.source ?? ""} className={controlClass} /></Field>
+            <Field label="Nombre del contacto"><input name="contactName" defaultValue={prospect.contactName ?? ""} required className={controlClass} /></Field>
+            <Field label="Teléfono del contacto"><input name="contactPhone" defaultValue={prospect.contactPhone ?? ""} required className={controlClass} /></Field>
             <div className="md:col-span-2">
               <Field label="Nota"><textarea name="note" defaultValue={prospect.note ?? ""} rows={3} className={controlClass} /></Field>
             </div>
@@ -145,6 +152,8 @@ export default async function ProspectoDetallePage({ params }: { params: Promise
             prospectId={prospect.id}
             version={prospect.version}
             clients={clients.map((client) => ({ id: client.id, name: client.name }))}
+            defaultContactName={prospect.contactName ?? ""}
+            defaultContactPhone={prospect.contactPhone ?? ""}
             convertAction={convertProspectAction}
             discardAction={discardProspectAction}
           />

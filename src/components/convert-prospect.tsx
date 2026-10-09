@@ -8,12 +8,16 @@ export function ConvertProspect({
   prospectId,
   version,
   clients,
+  defaultContactName = "",
+  defaultContactPhone = "",
   convertAction,
   discardAction,
 }: {
   prospectId: string;
   version: number;
   clients: Array<{ id: string; name: string }>;
+  defaultContactName?: string;
+  defaultContactPhone?: string;
   convertAction: (formData: FormData) => void | Promise<void>;
   discardAction: (formData: FormData) => void | Promise<void>;
 }) {
@@ -31,9 +35,14 @@ export function ConvertProspect({
             </select>
           </Field>
           {mode === "nuevo" ? (
-            <Field label="Contacto del cliente nuevo" hint="Obligatorio al crear el cliente.">
-              <input name="contactName" required className={controlClass} />
-            </Field>
+            <>
+              <Field label="Nombre del contacto" hint="Obligatorio al crear el cliente.">
+                <input name="contactName" required className={controlClass} defaultValue={defaultContactName} />
+              </Field>
+              <Field label="Teléfono del contacto" hint="Obligatorio al crear el cliente.">
+                <input name="contactPhone" required className={controlClass} defaultValue={defaultContactPhone} />
+              </Field>
+            </>
           ) : (
             <Field label="Cliente existente">
               <select name="clientId" required className={controlClass} defaultValue="">

@@ -372,7 +372,7 @@ export function ClientContactsPanel({
           <form action={addAction} className="grid gap-2 sm:grid-cols-2">
             <input type="hidden" name="clientId" value={clientId} />
             <Field label="Nombre"><input name="name" required className={controlClass} /></Field>
-            <Field label="Teléfono"><input name="phone" className={controlClass} /></Field>
+            <Field label="Teléfono"><input name="phone" required className={controlClass} /></Field>
             <Field label="Correo"><input name="email" className={controlClass} /></Field>
             <Field label="Puesto"><input name="roleTitle" className={controlClass} /></Field>
             <label className="flex items-center gap-2 text-xs sm:col-span-2"><input type="checkbox" name="isPrimary" value="si" /> Principal</label>

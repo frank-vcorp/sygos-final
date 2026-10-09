@@ -152,6 +152,8 @@ model Prospect {
   companyId   String
   company     Company  @relation(fields: [companyId], references: [id])
   name        String
+  contactName String?
+  contactPhone String?
   ownerUserId String?
   source      String?
   note        String?

@@ -39,6 +39,8 @@ export async function createProspectAction(formData: FormData) {
       data: {
         companyId: session.activeCompanyId,
         name: requiredText(formData.get("name"), "Empresa o nombre"),
+        contactName: requiredText(formData.get("contactName"), "Nombre del contacto"),
+        contactPhone: requiredText(formData.get("contactPhone"), "Teléfono del contacto"),
         source: optionalText(formData.get("source")),
         note: optionalText(formData.get("note")),
         ownerUserId,
@@ -76,6 +78,8 @@ export async function updateProspectAction(formData: FormData) {
       where: { id, companyId: session.activeCompanyId, version: parseVersion(formData.get("version")), status: { in: OPEN } },
       data: {
         name: requiredText(formData.get("name"), "Empresa o nombre"),
+        contactName: requiredText(formData.get("contactName"), "Nombre del contacto"),
+        contactPhone: requiredText(formData.get("contactPhone"), "Teléfono del contacto"),
         source: optionalText(formData.get("source")),
         note: optionalText(formData.get("note")),
         version: { increment: 1 },
@@ -138,12 +142,13 @@ export async function convertProspectAction(formData: FormData) {
       if (!client) throw new Error("El cliente no pertenece a la empresa activa.");
     } else if (mode === "nuevo") {
       const contactName = requiredText(formData.get("contactName"), "Nombre del contacto");
+      const contactPhone = requiredText(formData.get("contactPhone"), "Teléfono del contacto");
       const client = await prisma.client.create({
         data: {
           companyId: session.activeCompanyId,
           name: prospect.name,
           ownerUserId: prospect.ownerUserId,
-          contacts: { create: { name: contactName, isPrimary: true } },
+          contacts: { create: { name: contactName, phone: contactPhone, isPrimary: true } },
         },
       });
       clientId = client.id;

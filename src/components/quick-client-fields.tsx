@@ -19,7 +19,9 @@ export function QuickClientFields({
       </Field>
       {extended ? (
         <>
-          <Field label="Teléfono del contacto"><input name="contactPhone" className={controlClass} /></Field>
+          <Field label="Teléfono del contacto" hint="Obligatorio en alta rápida.">
+            <input name="contactPhone" className={controlClass} required={required} />
+          </Field>
           <Field label="Correo del contacto"><input name="contactEmail" type="email" className={controlClass} /></Field>
         </>
       ) : null}

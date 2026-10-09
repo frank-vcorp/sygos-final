@@ -18,8 +18,8 @@ export function readNamedFormFields(root: HTMLElement): QuickFormFieldMap {
 }
 
 export function validateQuickClientDraft(fields: QuickFormFieldMap): string | null {
-  if (!fields.newClientName?.trim() || !fields.contactName?.trim()) {
-    return "Indica el nombre del cliente y del contacto.";
+  if (!fields.newClientName?.trim() || !fields.contactName?.trim() || !fields.contactPhone?.trim()) {
+    return "Indica el nombre del cliente, del contacto y su teléfono.";
   }
   return null;
 }
