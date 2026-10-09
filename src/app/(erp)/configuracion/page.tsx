@@ -64,40 +64,51 @@ export default async function ConfiguracionPage() {
       ) : null}
 
       {session.role === "ADMINISTRADOR" && company.code === "SERVOMOTORES" ? (
-        <form action={toggleInventoryAction} className="mt-4 max-w-xl rounded-lg border border-[var(--line)] bg-white p-4">
-          <h2 className="font-medium">Inventario de Servomotores</h2>
-          <p className="mt-1 text-sm text-[var(--muted)]">
-            {company.inventoryEnabled ? "Habilitado y separado de SYSTRON." : "Deshabilitado. Las operaciones pueden continuar sin existencias."} Habilitarlo no copia el inventario de SYSTRON.
-          </p>
-          <input type="hidden" name="enabled" value={company.inventoryEnabled ? "no" : "si"} />
-          <Button type="submit" tone="ghost" className="mt-3">{company.inventoryEnabled ? "Deshabilitar" : "Habilitar"}</Button>
-        </form>
+        <FormPanel action={toggleInventoryAction} className="mt-4 max-w-xl">
+          <FormSection title="Inventario de Servomotores" description="Habilitarlo no copia el inventario de SYSTRON. Las operaciones pueden continuar sin existencias si está deshabilitado." columns={1}>
+            <p className="text-sm text-[var(--muted)]">
+              {company.inventoryEnabled ? "Habilitado y separado de SYSTRON." : "Deshabilitado en este momento."}
+            </p>
+            <input type="hidden" name="enabled" value={company.inventoryEnabled ? "no" : "si"} />
+          </FormSection>
+          <FormActions>
+            <Button type="submit" tone="ghost">{company.inventoryEnabled ? "Deshabilitar inventario" : "Habilitar inventario"}</Button>
+          </FormActions>
+        </FormPanel>
       ) : null}
 
       {can(session.role, "config.integrations") ? (
         <section id="integraciones" className="mt-6 grid max-w-5xl scroll-mt-28 gap-4 lg:grid-cols-2">
-          <form action={saveFacturapiAction} className="grid gap-3 rounded-lg border border-[var(--line)] bg-white p-4">
-            <h2 className="font-medium">Facturapi · {company.name}</h2>
-            <p className="text-sm text-[var(--muted)]">{hint("FACTURAPI", true)?.secretHint ? `Llave ${hint("FACTURAPI", true)?.secretHint}. ` : "Sin llave. "}La llave es sk_test_ o sk_live_ de la organización de esta razón social. El certificado de sello se carga en Facturapi.</p>
-            <Field label="Llave secreta"><input name="secret" type="password" autoComplete="off" className={controlClass} placeholder="sk_test_… o sk_live_…" /></Field>
-            <Field label="Registro patronal"><input name="registroPatronal" defaultValue={company.registroPatronal ?? ""} className={controlClass} /></Field>
-            <Field label="CURP del patrón"><input name="employerCurp" defaultValue={company.employerCurp ?? ""} className={controlClass} /></Field>
-            <Field label="Entidad federativa"><input name="employerState" defaultValue={company.employerState ?? ""} className={controlClass} placeholder="MEX" /></Field>
-            <div className="flex gap-2">
+          <FormPanel action={saveFacturapiAction}>
+            <FormSection
+              title={`Facturapi · ${company.name}`}
+              description={`${hint("FACTURAPI", true)?.secretHint ? `Llave ${hint("FACTURAPI", true)?.secretHint}. ` : "Sin llave guardada. "}El certificado de sello se carga en Facturapi.`}
+              columns={1}
+            >
+              <Field label="Llave secreta"><input name="secret" type="password" autoComplete="off" className={controlClass} placeholder="sk_test_… o sk_live_…" /></Field>
+              <Field label="Registro patronal"><input name="registroPatronal" defaultValue={company.registroPatronal ?? ""} className={controlClass} /></Field>
+              <Field label="CURP del patrón"><input name="employerCurp" defaultValue={company.employerCurp ?? ""} className={controlClass} /></Field>
+              <Field label="Entidad federativa"><input name="employerState" defaultValue={company.employerState ?? ""} className={controlClass} placeholder="MEX" /></Field>
+            </FormSection>
+            <FormActions>
               <Button type="submit" tone="ghost">Guardar Facturapi</Button>
-              <button formAction={verifyFacturapiAction} className="rounded-md border border-[var(--line)] px-3 py-2 text-sm">Verificar llave</button>
-            </div>
-          </form>
-          <form action={saveSendgridAction} className="grid gap-3 rounded-lg border border-[var(--line)] bg-white p-4">
-            <h2 className="font-medium">SendGrid</h2>
-            <p className="text-sm text-[var(--muted)]">{hint("SENDGRID", false)?.secretHint ? `Llave ${hint("SENDGRID", false)?.secretHint}. ` : "Sin llave. "}Hace falta la llave SG.… y el correo remitente ya verificado en SendGrid.</p>
-            <Field label="Llave de API"><input name="secret" type="password" autoComplete="off" className={controlClass} placeholder="SG.…" /></Field>
-            <Field label="Correo remitente"><input name="fromEmail" type="email" defaultValue={sendgridFrom(hint("SENDGRID", false)?.extra)} className={controlClass} /></Field>
-            <div className="flex gap-2">
+              <Button type="submit" formAction={verifyFacturapiAction} tone="ghost">Verificar llave</Button>
+            </FormActions>
+          </FormPanel>
+          <FormPanel action={saveSendgridAction}>
+            <FormSection
+              title="SendGrid"
+              description={`${hint("SENDGRID", false)?.secretHint ? `Llave ${hint("SENDGRID", false)?.secretHint}. ` : "Sin llave. "}Correo remitente verificado en SendGrid.`}
+              columns={1}
+            >
+              <Field label="Llave de API"><input name="secret" type="password" autoComplete="off" className={controlClass} placeholder="SG.…" /></Field>
+              <Field label="Correo remitente"><input name="fromEmail" type="email" defaultValue={sendgridFrom(hint("SENDGRID", false)?.extra)} className={controlClass} /></Field>
+            </FormSection>
+            <FormActions>
               <Button type="submit" tone="ghost">Guardar SendGrid</Button>
-              <button formAction={verifySendgridAction} className="rounded-md border border-[var(--line)] px-3 py-2 text-sm">Verificar llave</button>
-            </div>
-          </form>
+              <Button type="submit" formAction={verifySendgridAction} tone="ghost">Verificar llave</Button>
+            </FormActions>
+          </FormPanel>
           <div className="lg:col-span-2"><WhatsAppPanel /></div>
         </section>
       ) : null}

@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ClientNameLink } from "@/components/client-entity-links";
 import { KpiCard, PageHeader, RecordLink, TextLink } from "@/components/ui";
@@ -84,11 +83,7 @@ async function Technician({ companyId, userId, history }: { companyId: string; u
       <PageHeader
         title="Inicio"
         subtitle="Trabajos asignados a ti. Por tipo usa Servicios; el folio abre la operación."
-        action={
-          <Link href={history ? "/panel" : "/panel?vista=historial"} className="text-sm text-[var(--accent)]">
-            {history ? "Ver activos" : "Ver historial"}
-          </Link>
-        }
+        action={<TextLink href={history ? "/panel" : "/panel?vista=historial"}>{history ? "Ver activos" : "Ver historial"}</TextLink>}
       />
       <Block
         title={history ? "Historial" : "Asignados a ti"}
@@ -188,7 +183,7 @@ async function Shop({ companyId, manager, history }: { companyId: string; manage
   const now = Date.now();
   return (
     <>
-      <PageHeader title={manager ? "Panel del gerente" : "Panel de supervisión"} subtitle="Activos de esta empresa. Validar o devolver se hace en el detalle." action={<Link href={history ? "/panel" : "/panel?vista=historial"} className="text-sm text-[var(--accent)]">{history ? "Ver activos" : "Ver historial"}</Link>} />
+      <PageHeader title={manager ? "Panel del gerente" : "Panel de supervisión"} subtitle="Activos de esta empresa. Validar o devolver se hace en el detalle." action={<TextLink href={history ? "/panel" : "/panel?vista=historial"}>{history ? "Ver activos" : "Ver historial"}</TextLink>} />
       <div className="grid gap-3">
         <Block title="Pendientes de asignación" empty="Todo lo activo tiene responsable o proveedor." bandejaHref="/operacion" rows={caseRowMap(rows.filter((row) => !row.assigneeUserId && !row.externalSupplierId))} />
         <Block title="Diagnósticos activos" empty="Sin diagnósticos activos." bandejaHref="/operacion" rows={caseRowMap(rows.filter((row) => row.kind === "DIAGNOSTICO"))} />
@@ -224,6 +219,13 @@ async function Servomotores({ companyId }: { companyId: string }) {
   return (
     <>
       <PageHeader title="Panel de Servomotores" subtitle="Cada bloque abre el módulo real. No hay una copia de los registros." />
+      <section className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <KpiCard label="Ingresos físicos pendientes" value={String(income)} href="/motores" />
+        <KpiCard label="Operación activa" value={String(active)} href="/operacion" />
+        <KpiCard label="Pendientes de cotizar" value={String(quotes)} href="/cotizaciones?vista=pendientes" />
+        <KpiCard label="Compras por procesar" value={String(purchases)} href="/compras?vista=procesar" />
+        <KpiCard label="En resguardo (egresos)" value={String(exits)} href="/custodia?vista=resguardo" />
+      </section>
       <Block title="Pendientes operativos" empty="Sin pendientes." rows={links} />
     </>
   );
@@ -307,7 +309,7 @@ async function Sales({ companyId, userId }: { companyId: string; userId: string 
           const detail = row.client
             ? <>{panelClientLink(row.client)} · {when}</>
             : row.prospectId
-              ? <><Link href={`/prospectos/${row.prospectId}`} className="text-[var(--accent)]">Prospecto</Link> · {when}</>
+              ? <><TextLink href={`/prospectos/${row.prospectId}`}>Prospecto</TextLink> · {when}</>
               : when;
           return { href, label: row.note, detail };
         })} />
@@ -345,14 +347,19 @@ async function Coordination({ companyId, code, vista }: { companyId: string; cod
     <>
       <PageHeader title="Panel de coordinación" subtitle={subtitle} />
       {vista === "accesos" ? (
-        <section className="mb-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+        <section className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {quickLinks.map((link) => (
-            <Link key={link.href} href={link.href} className="rounded-lg border border-[var(--line)] bg-white px-4 py-3 text-sm font-medium text-[var(--accent)]">
-              {link.label}
-            </Link>
+            <KpiCard key={link.href} label={link.label} value="Abrir" href={link.href} />
           ))}
         </section>
-      ) : null}
+      ) : (
+        <section className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <KpiCard label="Facturas solicitadas" value={String(invoices.length)} href="/facturacion?vista=solicitudes" />
+          <KpiCard label="Pagos por validar" value={String(payments.length)} href="/pagos?vista=pendientes" />
+          <KpiCard label="Cobranza vencida" value={String(dueReceivables.length)} href="/cobranza?vista=vencidas" />
+          <KpiCard label="Nómina preliminar" value={String(payrolls.length)} href="/nomina" />
+        </section>
+      )}
       <div className="grid gap-3">
         <Block title="Facturas solicitadas" empty="Sin solicitudes." bandejaHref="/facturacion?vista=solicitudes" rows={invoices.map((row) => ({ href: `/facturacion/${row.id}`, label: row.folio, detail: row.kind }))} />
         <Block title="Remisiones solicitadas" empty="Sin remisiones por generar." bandejaHref="/facturacion?vista=remisiones" rows={remissions.map((row) => ({ href: `/facturacion/${row.id}`, label: row.folio, detail: "Remisión" }))} />
@@ -422,6 +429,14 @@ async function CeoExecutive({ companyId, name, vista }: { companyId: string; nam
           El CEO y Coordinación trabajan en SYSTRON o Servomotores cambiando la empresa activa arriba. Todas las cifras y listas de esta pantalla corresponden solo a la empresa seleccionada.
         </p>
       ) : null}
+      {!vista ? (
+        <section className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <KpiCard label="Por cotizar" value={String(quotes.length)} href="/cotizaciones?vista=pendientes" />
+          <KpiCard label="O.C. por autorizar" value={String(orders.length)} href="/compras?vista=autorizar" />
+          <KpiCard label="SLA vencidos" value={String(overdue)} href="/operacion" />
+          <KpiCard label="Pagos por validar" value={String(payments.length)} href="/pagos?vista=pendientes" />
+        </section>
+      ) : null}
       <div className="grid gap-3">
         {show("comercial") ? (
           <>
@@ -440,10 +455,9 @@ async function CeoExecutive({ companyId, name, vista }: { companyId: string; nam
         {show("tecnico") ? (
           <>
             <Block title="Diagnósticos por validar" empty="Sin validaciones pendientes." bandejaHref="/operacion?vista=validacion" rows={validations.map((row) => ({ href: `/operacion/${row.id}`, label: row.folio, detail: "Revisar" }))} />
-            <section className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
-              <h2 className="font-medium">Operación técnica</h2>
-              <p className="mt-2"><TextLink href="/operacion">Cola de operación</TextLink> · {overdue} con SLA vencido</p>
-              <p className="mt-1"><TextLink href="/produccion">Producción técnica</TextLink></p>
+            <section className="grid gap-3 sm:grid-cols-2">
+              <KpiCard label="SLA vencidos" value={String(overdue)} href="/operacion" />
+              <KpiCard label="Producción técnica" value="Ver reporte" href="/produccion" />
             </section>
           </>
         ) : null}
@@ -455,14 +469,10 @@ async function CeoExecutive({ companyId, name, vista }: { companyId: string; nam
           </>
         ) : null}
         {show("finanzas") ? (
-          <section className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
-            <h2 className="font-medium">Indicadores financieros</h2>
-            <p className="mt-2"><TextLink href="/finanzas">Finanzas</TextLink> · facturado {money(invoiced._sum.total ?? 0)}</p>
-            <p className="mt-1">
-              CxC abierta <TextLink href="/cobranza?vista=cxc">{money(receivableSum._sum.balance ?? 0)}</TextLink>
-              {" · "}
-              CxP <TextLink href="/cobranza">{money(payableSum._sum.balance ?? 0)}</TextLink>
-            </p>
+          <section className="grid gap-3 sm:grid-cols-3">
+            <KpiCard label="Facturado (histórico)" value={money(invoiced._sum.total ?? 0)} href="/finanzas" />
+            <KpiCard label="CxC abierta" value={money(receivableSum._sum.balance ?? 0)} href="/cobranza?vista=cxc" />
+            <KpiCard label="CxP abierta" value={money(payableSum._sum.balance ?? 0)} href="/finanzas?vista=cxp" />
           </section>
         ) : null}
       </div>
@@ -484,6 +494,12 @@ async function Executive({ companyId, name }: { companyId: string; name: string 
   return (
     <>
       <PageHeader title={`Panel ${name}`} subtitle="Solo esta empresa. No hay suma con la otra." />
+      <section className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <KpiCard label="Por cotizar" value={String(quotes.length)} href="/cotizaciones?vista=pendientes" />
+        <KpiCard label="O.C. por autorizar" value={String(orders.length)} href="/compras?vista=autorizar" />
+        <KpiCard label="SLA vencidos" value={String(overdue)} href="/operacion" />
+        <KpiCard label="Facturado" value={money(invoiced._sum.total ?? 0)} href="/finanzas" />
+      </section>
       <div className="grid gap-3">
         <Block title="Pendientes de cotizar" empty="Nada por cotizar." bandejaHref="/cotizaciones?vista=pendientes" rows={quotes.map((row) => ({ href: `/cotizaciones/${row.id}`, label: row.folio, detail: "Asignar precio" }))} />
         <Block title="Órdenes por autorizar" empty="Sin órdenes pendientes." bandejaHref="/compras?vista=autorizar" rows={orders.map((row) => ({ href: `/compras/${row.id}`, label: row.folio, detail: money(row.amount) }))} />
@@ -491,11 +507,9 @@ async function Executive({ companyId, name }: { companyId: string; name: string 
         <Block title="Nómina" empty="Sin preliminar." bandejaHref="/nomina" rows={payrolls.map((row) => ({ href: `/nomina/${row.id}`, label: row.folio, detail: "Autorizar" }))} />
         <Block title="Comisiones" empty="Sin preliminar." bandejaHref="/comisiones" rows={commissions.map((row) => ({ href: `/comisiones/${row.id}`, label: row.month, detail: "Validar" }))} />
         <Block title="Horas extra" empty="Nada espera autorización final." bandejaHref="/personal/horas" rows={overtime.map((row) => ({ href: "/personal/horas", label: row.collaborator.user.name, detail: `${row.hours} h` }))} />
-        <section className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
-          <h2 className="font-medium">Resúmenes</h2>
-          <p className="mt-2"><TextLink href="/operacion">Operación</TextLink> · {overdue} vencidos</p>
-          <p className="mt-1"><TextLink href="/produccion">Producción técnica</TextLink></p>
-          <p className="mt-1"><TextLink href="/finanzas">Finanzas</TextLink> · facturado {money(invoiced._sum.total ?? 0)}</p>
+        <section className="grid gap-3 sm:grid-cols-2">
+          <KpiCard label="Operación vencida" value={String(overdue)} href="/operacion" />
+          <KpiCard label="Producción técnica" value="Ver reporte" href="/produccion" />
         </section>
       </div>
     </>
