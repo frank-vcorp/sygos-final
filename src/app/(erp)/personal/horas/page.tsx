@@ -10,7 +10,9 @@ import {
   FormActions,
   FormPanel,
   FormSection,
+  MobileCard,
   RecordLink,
+  ResponsiveData,
 } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
@@ -88,27 +90,56 @@ export default async function HorasPage() {
         {pending.length === 0 ? (
           <p className="mt-2 text-sm text-[var(--muted)]">No hay horas extra en curso.</p>
         ) : (
-          <ul className="mt-3 space-y-3 text-sm">
-            {pending.map((row) => (
-              <li key={row.id} className="rounded-lg border border-[var(--line)] bg-white px-4 py-3">
-                <p>
-                  <RecordLink href={`/personal/${row.collaboratorId}`}>{row.collaborator.user.name}</RecordLink>
-                  {" · "}
-                  {row.workDate} · {row.startedAt} a {row.endedAt} · {row.hours} h · {row.status}
-                </p>
-                {row.status === "AUTORIZADA" ? (
-                  <p className="mt-1 text-[var(--muted)]">Doble {row.doubleHours} · triple {row.tripleHours}</p>
-                ) : (
-                  <form action={overtimeReviewAction} className="mt-2 flex gap-2">
-                    <input type="hidden" name="overtimeId" value={row.id} />
-                    <input type="hidden" name="version" value={row.version} />
-                    <Button type="submit" name="decision" value="si" tone="ghost">Aprobar</Button>
-                    <Button type="submit" name="decision" value="no" tone="ghost">Rechazar</Button>
-                  </form>
-                )}
-              </li>
-            ))}
-          </ul>
+          <div className="mt-3">
+            <ResponsiveData
+              table={
+                <ul className="space-y-2 text-sm">
+                  {pending.map((row) => (
+                    <li key={row.id} className="rounded-lg border border-[var(--line)] bg-white px-4 py-3">
+                      <p>
+                        <RecordLink href={`/personal/${row.collaboratorId}`}>{row.collaborator.user.name}</RecordLink>
+                        {" · "}
+                        {row.workDate} · {row.startedAt} a {row.endedAt} · {row.hours} h · {row.status}
+                      </p>
+                      {row.status === "AUTORIZADA" ? (
+                        <p className="mt-1 text-[var(--muted)]">Doble {row.doubleHours} · triple {row.tripleHours}</p>
+                      ) : (
+                        <form action={overtimeReviewAction} className="mt-2 flex gap-2">
+                          <input type="hidden" name="overtimeId" value={row.id} />
+                          <input type="hidden" name="version" value={row.version} />
+                          <Button type="submit" name="decision" value="si" tone="ghost">Aprobar</Button>
+                          <Button type="submit" name="decision" value="no" tone="ghost">Rechazar</Button>
+                        </form>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              }
+              cards={pending.map((row) => (
+                <MobileCard
+                  key={row.id}
+                  href={`/personal/${row.collaboratorId}`}
+                  title={row.collaborator.user.name}
+                  meta={<span className="text-xs">{row.status}</span>}
+                  footer={
+                    row.status === "AUTORIZADA"
+                      ? undefined
+                      : (
+                        <form action={overtimeReviewAction} className="flex flex-wrap gap-2">
+                          <input type="hidden" name="overtimeId" value={row.id} />
+                          <input type="hidden" name="version" value={row.version} />
+                          <Button type="submit" name="decision" value="si" tone="ghost">Aprobar</Button>
+                          <Button type="submit" name="decision" value="no" tone="ghost">Rechazar</Button>
+                        </form>
+                      )
+                  }
+                >
+                  <p>{row.workDate} · {row.startedAt} a {row.endedAt} · {row.hours} h</p>
+                  {row.status === "AUTORIZADA" ? <p>Doble {row.doubleHours} · triple {row.tripleHours}</p> : null}
+                </MobileCard>
+              ))}
+            />
+          </div>
         )}
       </section>
     </>

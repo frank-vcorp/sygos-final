@@ -317,23 +317,34 @@ export function MobileCard({
   children,
   footer,
 }: {
-  href: string;
+  href?: string;
   title: React.ReactNode;
   meta?: React.ReactNode;
   children?: React.ReactNode;
   /** Fuera del enlace principal para permitir links anidados (p. ej. cliente). */
   footer?: React.ReactNode;
 }) {
+  const head = (
+    <div className="flex min-h-6 items-start justify-between gap-3">
+      <p className={href ? recordLinkClass : "font-semibold text-[#0b1f3a]"}>{title}</p>
+      {meta}
+    </div>
+  );
+  const body = children ? <div className="mt-2 space-y-1 text-sm text-[var(--muted)]">{children}</div> : null;
   return (
     <div className="overflow-hidden rounded-lg border border-[var(--line)] bg-white">
-      <Link href={href} className="block p-4 outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]">
-        <div className="flex min-h-6 items-start justify-between gap-3">
-          <p className={recordLinkClass}>{title}</p>
-          {meta}
+      {href ? (
+        <Link href={href} className="block p-4 outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)]">
+          {head}
+          {body}
+        </Link>
+      ) : (
+        <div className="p-4">
+          {head}
+          {body}
         </div>
-        {children ? <div className="mt-2 space-y-1 text-sm text-[var(--muted)]">{children}</div> : null}
-      </Link>
-      {footer ? <div className="border-t border-[var(--line)] px-4 py-2 text-sm text-[var(--muted)]">{footer}</div> : null}
+      )}
+      {footer ? <div className="border-t border-[var(--line)] p-4 text-sm">{footer}</div> : null}
     </div>
   );
 }

@@ -18,6 +18,9 @@ export default async function ConfiguracionPage() {
   });
   const hint = (provider: string, companyScoped: boolean) =>
     integrations.find((item) => item.provider === provider && (companyScoped ? item.companyId === company.id : item.companyId === null));
+  const priorities = can(session.role, "config.company")
+    ? await prisma.priority.findMany({ where: { companyId: company.id }, orderBy: [{ attentionType: "asc" }, { sortOrder: "asc" }] })
+    : [];
 
   return (
     <>
@@ -45,20 +48,26 @@ export default async function ConfiguracionPage() {
       ) : null}
 
       {can(session.role, "config.company") ? (
-        <section id="prioridades" className="mt-6 max-w-5xl scroll-mt-28 space-y-3">
-          <h2 className="font-medium">Prioridades y SLA</h2>
-          <p className="text-sm text-[var(--muted)]">Cada empresa tiene su catálogo. Un cambio no altera atenciones ya creadas ni a la otra empresa.</p>
-          {(await prisma.priority.findMany({ where: { companyId: company.id }, orderBy: [{ attentionType: "asc" }, { sortOrder: "asc" }] })).map((priority) => (
-            <form key={priority.id} action={updatePriorityAction} className="grid gap-2 rounded-lg border border-[var(--line)] bg-white p-4 md:grid-cols-6">
+        <section id="prioridades" className="mt-6 max-w-5xl scroll-mt-28 space-y-4">
+          <div>
+            <h2 className="font-medium">Prioridades y SLA</h2>
+            <p className="mt-1 text-sm text-[var(--muted)]">Cada empresa tiene su catálogo. Un cambio no altera atenciones ya creadas ni a la otra empresa.</p>
+          </div>
+          {priorities.map((priority) => (
+            <FormPanel key={priority.id} action={updatePriorityAction}>
               <input type="hidden" name="priorityId" value={priority.id} />
-              <p className="text-sm font-medium md:col-span-6">{ATTENTION_LABEL[priority.attentionType as AttentionType] ?? priority.attentionType} · {priority.name}</p>
-              <Field label="Precio"><input name="price" defaultValue={priority.price ?? ""} className={controlClass} /></Field>
-              <Field label="Incremento %"><input name="incrementPct" defaultValue={priority.incrementPct ?? ""} className={controlClass} /></Field>
-              <Field label="Objetivo mín."><input name="targetMinDays" defaultValue={priority.targetMinDays ?? ""} className={controlClass} /></Field>
-              <Field label="Objetivo máx."><input name="targetMaxDays" defaultValue={priority.targetMaxDays ?? ""} className={controlClass} /></Field>
-              <Field label="SLA máximo"><input name="slaMaxDays" required defaultValue={priority.slaMaxDays} className={controlClass} /></Field>
-              <div className="flex items-end"><Button type="submit" tone="ghost">Guardar</Button></div>
-            </form>
+              <FormSection
+                title={`${ATTENTION_LABEL[priority.attentionType as AttentionType] ?? priority.attentionType} · ${priority.name}`}
+                description="Precio, objetivos de entrega y SLA máximo para nuevas atenciones."
+              >
+                <Field label="Precio"><input name="price" defaultValue={priority.price ?? ""} className={controlClass} /></Field>
+                <Field label="Incremento %"><input name="incrementPct" defaultValue={priority.incrementPct ?? ""} className={controlClass} /></Field>
+                <Field label="Objetivo mín."><input name="targetMinDays" defaultValue={priority.targetMinDays ?? ""} className={controlClass} /></Field>
+                <Field label="Objetivo máx."><input name="targetMaxDays" defaultValue={priority.targetMaxDays ?? ""} className={controlClass} /></Field>
+                <Field label="SLA máximo"><input name="slaMaxDays" required defaultValue={priority.slaMaxDays} className={controlClass} /></Field>
+              </FormSection>
+              <FormActions><Button type="submit" tone="ghost">Guardar prioridad</Button></FormActions>
+            </FormPanel>
           ))}
         </section>
       ) : null}

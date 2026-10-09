@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { switchCompanyAction } from "@/app/auth-actions";
-import { Badge, Button, Card, PageHeader } from "@/components/ui";
+import { Badge, Button, Card, KpiCard, PageHeader } from "@/components/ui";
 import { homePath } from "@/lib/home";
 import { requireSession } from "@/lib/session";
 
@@ -9,9 +9,14 @@ export default async function EmpresaPage() {
   const companies = session.homeCompanyId
     ? await prisma.company.findMany({ where: { id: session.homeCompanyId } })
     : await prisma.company.findMany({ orderBy: { name: "asc" } });
+  const activeName = companies.find((company) => company.id === session.activeCompanyId)?.name ?? "Sin empresa";
   return (
     <>
       <PageHeader title="Empresa activa" subtitle="El cambio es explícito. No hay una vista que mezcle SYSTRON y Servomotores." />
+      <div className="mb-4 grid gap-3 sm:grid-cols-2">
+        <KpiCard label="Razones sociales" value={String(companies.length)} />
+        <KpiCard label="Operando como" value={activeName} />
+      </div>
       <div className="grid gap-3 sm:grid-cols-2">
         {companies.map((company) => {
           const active = session.activeCompanyId === company.id;

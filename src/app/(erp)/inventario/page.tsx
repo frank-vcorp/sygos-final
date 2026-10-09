@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createPartAction, stockAction } from "./actions";
-import { ActionLink, Badge, Button, controlClass, Empty, Field, FormActions, FormPanel, FormSection, PageHeader, ResponsiveData, Table, Td, TextLink, Th } from "@/components/ui";
+import { ActionLink, Badge, Button, controlClass, Empty, Field, FormActions, FormPanel, FormSection, MobileCard, PageHeader, ResponsiveData, Table, Td, TextLink, Th } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { formatUbicacion } from "@/lib/inventory-location";
@@ -102,38 +102,38 @@ export default async function InventarioPage() {
             </Table>
           }
           cards={parts.map((part) => (
-            <article key={part.id} className="rounded-lg border border-[var(--line)] bg-white p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h2 className="font-semibold">{part.partNumber}</h2>
-                  <p className="text-sm text-[var(--muted)]">{part.description || "Sin descripción"}</p>
-                  <p className="mt-1 text-xs text-[var(--muted)]">
-                    {[part.catalogNumero && `Núm. ${part.catalogNumero}`, part.family, formatUbicacion(part.rack, part.nivel), part.mountType].filter(Boolean).join(" · ")}
-                  </p>
-                </div>
-                <strong>{part.qty}</strong>
-              </div>
-              <div className="mt-2 flex flex-wrap gap-2">
+            <MobileCard
+              key={part.id}
+              title={part.partNumber}
+              meta={<strong className="text-base text-[#0b1f3a]">{part.qty}</strong>}
+              footer={
+                <form action={stockAction} className="grid grid-cols-[1fr_88px] gap-2">
+                  <input type="hidden" name="partId" value={part.id} />
+                  <input type="hidden" name="version" value={part.version} />
+                  <select name="kind" className={controlClass}>
+                    <option value="ENTRADA">Entrada</option>
+                    <option value="SALIDA">Salida</option>
+                  </select>
+                  <input name="quantity" aria-label="Cantidad" type="number" min={1} required className={controlClass} />
+                  <Button type="submit" tone="ghost" className="col-span-2">
+                    Aplicar movimiento
+                  </Button>
+                </form>
+              }
+            >
+              <p>{part.description || "Sin descripción"}</p>
+              <p>
+                {[part.catalogNumero && `Núm. ${part.catalogNumero}`, part.family, formatUbicacion(part.rack, part.nivel), part.mountType].filter(Boolean).join(" · ")}
+              </p>
+              <div className="flex flex-wrap gap-2">
                 {part.minQty != null && part.qty < part.minQty ? <Badge tone="warn">bajo mínimo</Badge> : null}
                 {part.maxQty != null && part.qty > part.maxQty ? <Badge tone="warn">sobre máximo</Badge> : null}
-                <span className="text-xs text-[var(--muted)]">
+                <span>
                   Mínimo: {part.minQty ?? "—"}
                   {part.maxQty != null ? ` · Máx. ${part.maxQty}` : ""}
                 </span>
               </div>
-              <form action={stockAction} className="mt-3 grid grid-cols-[1fr_88px] gap-2">
-                <input type="hidden" name="partId" value={part.id} />
-                <input type="hidden" name="version" value={part.version} />
-                <select name="kind" className={controlClass}>
-                  <option value="ENTRADA">Entrada</option>
-                  <option value="SALIDA">Salida</option>
-                </select>
-                <input name="quantity" aria-label="Cantidad" type="number" min={1} required className={controlClass} />
-                <Button type="submit" tone="ghost" className="col-span-2">
-                  Aplicar movimiento
-                </Button>
-              </form>
-            </article>
+            </MobileCard>
           ))}
         />
       )}

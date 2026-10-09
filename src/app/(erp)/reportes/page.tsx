@@ -78,12 +78,7 @@ export async function ReportView({ params, searchParams }: { params: Promise<{ t
           if (href) {
             return <MobileCard key={index} href={href} title={title}><p>{detail}</p></MobileCard>;
           }
-          return (
-            <article key={index} className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
-              <p className="font-medium">{title}</p>
-              <p className="mt-2 text-[var(--muted)]">{detail}</p>
-            </article>
-          );
+          return <MobileCard key={index} title={title}><p>{detail}</p></MobileCard>;
         })}
       />
     </>
