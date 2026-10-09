@@ -5,6 +5,7 @@ import { homePath } from "@/lib/home";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { compareBySla } from "@/lib/sla";
+import { openOperationCaseWhere } from "@/lib/servicios-supervisor";
 import { CASE_STATUS_LABEL } from "@/lib/technical";
 import { salesPortfolioEquipmentWhere } from "@/lib/sales-assignment";
 import { requireCompany } from "@/lib/session";
@@ -21,7 +22,7 @@ export default async function OperacionPage({ searchParams }: { searchParams: Pr
     where: {
       ...(view === "validacion" ? { status: "PENDIENTE_VALIDACION" } : {}),
       ...(view === "cotizar" ? { quotePending: true } : {}),
-      ...(view === "activas" ? { status: { notIn: ["VALIDADO", "TERMINADA", "SIN_REPARACION"] } } : {}),
+      ...(view === "activas" ? openOperationCaseWhere() : {}),
       ...(session.role === "TECNICO" ? { assigneeUserId: session.userId } : {}),
       ...(session.role === "VENTAS" ? { equipment: salesPortfolioEquipmentWhere(session.role, session.userId) } : {}),
       OR: [

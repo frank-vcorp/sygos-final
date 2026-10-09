@@ -6,6 +6,21 @@ import type { AttentionType } from "@/lib/priorities";
 export const CLOSED_CASE = ["VALIDADO", "TERMINADA", "SIN_REPARACION"] as const;
 export const HISTORIAL_CASE = [...CLOSED_CASE, "CANCELADA"] as const;
 
+/** Casos visibles en bandejas activas: operación abierta o cierre técnico con pendiente comercial. */
+export function openOperationCaseWhere() {
+  return {
+    OR: [
+      { status: { notIn: [...CLOSED_CASE] } },
+      { status: "VALIDADO", quotePending: true },
+      {
+        status: "VALIDADO",
+        warrantyDecision: "NO_PROCEDENTE",
+        commercialDecision: null,
+      },
+    ],
+  };
+}
+
 type ListScope = {
   assigneeUserId?: string;
   /** Cartera de ventas: solo equipos de clientes asignados al vendedor. */
@@ -148,7 +163,7 @@ export async function listActiveServicios(
   const cases = await prisma.technicalCase.findMany({
     where: {
       serviceCompanyId: companyId,
-      status: { notIn: [...HISTORIAL_CASE] },
+      ...openOperationCaseWhere(),
       ...(technicianId ? technicianCaseScope(technicianId) : {}),
       ...(clientOwnerUserId ? clientOwnerScope(clientOwnerUserId) : {}),
       ...(attentionType ? { attention: { attentionType } } : {}),
@@ -181,7 +196,7 @@ export async function listActiveServicios(
             serviceCompanyId: companyId,
             status: "ABIERTA",
             equipment: { client: { ownerUserId: clientOwnerUserId, isSystem: false } },
-            technicalCases: { none: { status: { notIn: [...HISTORIAL_CASE] } } },
+            technicalCases: { none: {} },
             ...(attentionType ? { attentionType } : {}),
             ...createdAtRange(options?.desde, options?.hasta),
             ...(q
@@ -250,10 +265,7 @@ export async function listHistorialServicios(
       status: statusFilter ? statusFilter : { in: [...HISTORIAL_CASE] },
       ...(technicianId ? technicianCaseScope(technicianId) : {}),
       ...(clientOwnerUserId ? clientOwnerScope(clientOwnerUserId) : {}),
-      attention: {
-        status: { not: "ABIERTA" },
-        ...(attentionType ? { attentionType } : {}),
-      },
+      ...(attentionType ? { attention: { attentionType } } : {}),
       ...updatedAtRange(options?.desde, options?.hasta),
       ...(q
         ? {
