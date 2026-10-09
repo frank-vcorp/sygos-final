@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createPartAction, stockAction } from "./actions";
-import { ActionLink, Badge, Button, controlClass, Empty, Field, PageHeader, ResponsiveData, Table, Td, Th } from "@/components/ui";
+import { ActionLink, Badge, Button, controlClass, Empty, Field, FormActions, FormPanel, FormSection, PageHeader, ResponsiveData, Table, Td, TextLink, Th } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { formatUbicacion } from "@/lib/inventory-location";
@@ -37,7 +36,7 @@ export default async function InventarioPage() {
         action={<ActionLink href="/inventario/conteo" tone="ghost">Conteo físico</ActionLink>}
       />
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <a href="/inventario/export" className="rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm font-medium">Exportar</a>
+        <TextLink href="/inventario/export" className="rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm font-medium no-underline hover:bg-[#f7f8f9]">Exportar CSV</TextLink>
         {total > parts.length ? (
           <span className="text-sm text-[var(--muted)]">Mostrando {parts.length} de {total}. Exporta el CSV para ver todo.</span>
         ) : (
@@ -138,15 +137,14 @@ export default async function InventarioPage() {
           ))}
         />
       )}
-      <form action={createPartAction} className="mt-4 grid max-w-xl gap-3 rounded-lg border border-[var(--line)] bg-white p-4">
-        <h2 className="font-medium">Nueva línea de inventario</h2>
-        <Field label="Nombre de producto">
-          <input name="partNumber" required className={controlClass} />
-        </Field>
-        <Field label="Descripción">
-          <input name="description" className={controlClass} />
-        </Field>
-        <div className="grid grid-cols-2 gap-3">
+      <FormPanel action={createPartAction} className="mt-4">
+        <FormSection title="Nueva línea de inventario" description="Agrega al catálogo sin inventar existencia; el stock entra con movimientos.">
+          <Field label="Nombre de producto">
+            <input name="partNumber" required className={controlClass} />
+          </Field>
+          <Field label="Descripción">
+            <input name="description" className={controlClass} />
+          </Field>
           <Field label="Número (catálogo)">
             <input name="catalogNumero" className={controlClass} />
           </Field>
@@ -165,17 +163,17 @@ export default async function InventarioPage() {
           <Field label="Montaje">
             <input name="mountType" className={controlClass} />
           </Field>
-        </div>
-        <div className="grid grid-cols-2 gap-3">
           <Field label="Mínimo informativo">
             <input name="minQty" type="number" min={0} className={controlClass} />
           </Field>
           <Field label="Máximo informativo">
             <input name="maxQty" type="number" min={0} className={controlClass} />
           </Field>
-        </div>
-        <Button type="submit">Agregar al catálogo</Button>
-      </form>
+        </FormSection>
+        <FormActions note="La existencia inicial sigue en cero hasta un movimiento de entrada.">
+          <Button type="submit">Agregar al catálogo</Button>
+        </FormActions>
+      </FormPanel>
     </>
   );
 }

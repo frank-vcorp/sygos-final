@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { commissionAction } from "./actions";
-import { Badge, controlClass, Empty, Field, PageHeader, RecordLink, Table, Td, Th } from "@/components/ui";
+import { Badge, Button, controlClass, Empty, Field, FormActions, FormPanel, FormSection, PageHeader, RecordLink, Table, Td, Th } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
@@ -12,10 +12,12 @@ export default async function ComisionesPage() {
   return (
     <>
       <PageHeader title="Comisiones" subtitle="Proceso mensual, separado de la nómina. La factura libre no entra." />
-      <form action={commissionAction} className="mb-4 flex flex-wrap items-end gap-2">
-        <Field label="Mes"><input name="month" type="month" required className={controlClass} /></Field>
-        <button className="rounded-md bg-[var(--accent)] px-3 py-2 text-sm font-medium text-white">Generar preliminar</button>
-      </form>
+      <FormPanel action={commissionAction} className="mb-4">
+        <FormSection title="Corte mensual" description="Calcula comisiones a partir de la facturación del mes.">
+          <Field label="Mes"><input name="month" type="month" required className={controlClass} /></Field>
+        </FormSection>
+        <FormActions><Button type="submit">Generar preliminar</Button></FormActions>
+      </FormPanel>
       {rows.length === 0 ? <Empty title="Sin comisiones" body="El corte conserva la facturación, el porcentaje, el cálculo original y el ajuste." /> : (
         <Table>
           <thead><tr><Th>Mes</Th><Th>Estado</Th></tr></thead>

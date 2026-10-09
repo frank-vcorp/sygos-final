@@ -1,5 +1,6 @@
 import {
   ActionLink,
+  ActiveFilters,
   Button,
   controlClass,
   Empty,
@@ -79,6 +80,10 @@ export async function ServiciosTecnicoBandeja({
   const tipoParam =
     tipo && tipo !== "todos" && tipo in SERVICIO_TIPO_PARAM ? (tipo as ServicioTipoParam) : null;
   const tipoLabel = tipoParam ? SERVICIO_TIPO_OPTIONS.find((opt) => opt.param === tipoParam)?.label : null;
+  const estadoLabel =
+    vista === "historial" && estado && estado !== "todos"
+      ? HISTORIAL_ESTADO_OPTIONS.find((opt) => opt.value === estado)?.label
+      : null;
   const navBase = {
     vista,
     tipo: tipo && tipo !== "todos" ? tipo : "todos",
@@ -169,6 +174,16 @@ export async function ServiciosTecnicoBandeja({
         ) : null}
         <Button type="submit" tone="ghost">Buscar</Button>
       </FilterBar>
+      <ActiveFilters
+        items={[
+          ...(vista === "historial" ? [{ label: "Historial", clearHref: serviciosBandejaHref({ tipo, q: query, desde, hasta, estado }) }] : []),
+          ...(tipoParam && tipoLabel ? [{ label: tipoLabel, clearHref: serviciosBandejaHref({ vista, q: query, desde, hasta, estado }) }] : []),
+          ...(estadoLabel ? [{ label: estadoLabel, clearHref: serviciosBandejaHref({ vista, tipo, q: query, desde, hasta }) }] : []),
+          ...(query ? [{ label: `Búsqueda: ${query}`, clearHref: serviciosBandejaHref({ vista, tipo, desde, hasta, estado }) }] : []),
+          ...(desde ? [{ label: `Desde ${desde}`, clearHref: serviciosBandejaHref({ vista, tipo, q: query, hasta, estado }) }] : []),
+          ...(hasta ? [{ label: `Hasta ${hasta}`, clearHref: serviciosBandejaHref({ vista, tipo, q: query, desde, estado }) }] : []),
+        ]}
+      />
 
       {rows.length === 0 ? (
         <Empty

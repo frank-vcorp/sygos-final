@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { accountAction, movementAction, payCardAction, payPayableAction, proofAction, transferAction } from "./actions";
-import { controlClass, Field, PageHeader, SegmentedNav } from "@/components/ui";
+import { ActiveFilters, controlClass, Field, PageHeader, SegmentedNav } from "@/components/ui";
+import { listHref } from "@/lib/list-url";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
 import { can } from "@/lib/permissions";
@@ -49,10 +50,18 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
     { href: `/finanzas?vista=cuentas&mes=${key}`, label: "Cuentas", active: focus === "cuentas" },
     { href: `/finanzas?vista=cxp&mes=${key}`, label: "CxP", active: focus === "cxp" },
   ];
+  const vistaLabel = navItems.find((item) => item.active && focus)?.label;
+  const defaultMes = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   return (
     <>
       <PageHeader title="Finanzas" subtitle={`${session.activeCompanyCode === "SERVOMOTORES" ? "Servomotores" : "SYSTRON"} · ${key}. No hay consolidado entre empresas.`} />
       <SegmentedNav items={navItems} />
+      <ActiveFilters
+        items={[
+          ...(focus && vistaLabel ? [{ label: vistaLabel, clearHref: listHref("/finanzas", { mes: key !== defaultMes ? key : undefined }) }] : []),
+          ...(key !== defaultMes ? [{ label: `Mes ${key}`, clearHref: listHref("/finanzas", { vista: focus || undefined }) }] : []),
+        ]}
+      />
       <form className="mb-4">
         <input name="mes" type="month" defaultValue={key} className="rounded-md border border-[var(--line)] px-3 py-2 text-sm" />
         {focus ? <input type="hidden" name="vista" value={focus} /> : null}

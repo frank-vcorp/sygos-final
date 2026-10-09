@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { CountForm } from "@/components/count-form";
-import { PageHeader } from "@/components/ui";
+import { PageHeader, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
@@ -13,7 +12,7 @@ export default async function ConteoPage() {
   if (!company?.inventoryEnabled) redirect("/inventario");
   return (
     <>
-      <PageHeader title="Conteo físico" subtitle="Compara contra la existencia vigente antes de aplicar. No crea partes nuevas." action={<Link href="/inventario" className="text-sm text-[var(--accent)]">Volver</Link>} />
+      <PageHeader title="Conteo físico" subtitle="Compara contra la existencia vigente antes de aplicar. No crea partes nuevas." action={<TextLink href="/inventario">Volver a inventario</TextLink>} />
       <CountForm />
     </>
   );

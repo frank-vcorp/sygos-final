@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { Badge, Empty, PageHeader, RecordLink, SegmentedNav, Table, Td, Th } from "@/components/ui";
+import { ActiveFilters, Badge, Empty, PageHeader, RecordLink, SegmentedNav, Table, Td, Th } from "@/components/ui";
 import { CUSTODY_LABEL, type Custody } from "@/lib/custody";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
@@ -53,6 +53,13 @@ export default async function CustodiaPage({ searchParams }: { searchParams: Pro
           : "Ingreso, resguardo y salida a prueba de MOT. El egreso definitivo se confirma en el detalle."}
       />
       <SegmentedNav items={tabs.map(([key, label]) => ({ href: `/custodia?vista=${key}`, label, active: view === key }))} />
+      <ActiveFilters
+        items={
+          view !== "pendientes"
+            ? [{ label: tabs.find(([key]) => key === view)?.[1] ?? "Vista", clearHref: "/custodia" }]
+            : []
+        }
+      />
       {systron && can(session.role, "sale.receive", session.activeCompanyCode) ? <SaleQueue companyId={session.activeCompanyId} /> : null}
       {rows.length === 0 ? (
         <Empty title="Sin equipos en esta vista" body="La custodia cambia solo cuando alguien confirma el movimiento." />

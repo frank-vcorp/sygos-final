@@ -1,7 +1,7 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { CompanyLogo } from "@/components/brand-logo";
 import { PrintButton } from "@/components/print-button";
+import { TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
 import { MOVEMENT_LABEL, type MovementKind } from "@/lib/custody";
@@ -34,7 +34,7 @@ export default async function EntradaDocumentoPage({ params }: { params: Promise
   return (
     <div className="mx-auto max-w-4xl space-y-4 print:max-w-none">
       <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
-        <Link href={backHref} className="text-sm text-[var(--accent)]">Volver al equipo</Link>
+        <TextLink href={backHref}>Volver al equipo</TextLink>
         <PrintButton />
       </div>
       <article className="quote-document overflow-hidden rounded-lg border border-[var(--line)] bg-white text-sm print:rounded-none print:border-0">
