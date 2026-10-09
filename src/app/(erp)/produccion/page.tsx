@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { KpiCard, PageHeader, RecordLink, TextLink } from "@/components/ui";
+import { Empty, KpiCard, MobileCard, PageHeader, RecordLink, ResponsiveData, Table, Td, TextLink, Th } from "@/components/ui";
 import { money } from "@/lib/money";
 import { can } from "@/lib/permissions";
 import { productionForCompany } from "@/lib/reports";
@@ -25,15 +25,43 @@ export default async function ProduccionPage() {
         <KpiCard label="Valor producido" value={money(value)} />
         <KpiCard label="Ticket promedio" value={money(averageTicket(value, billable))} />
       </div>
-      <ul className="space-y-2 text-sm">
-        {rows.map((row) => (
-          <li key={row.userId} className="rounded-lg border border-[var(--line)] bg-white p-4">
-            <RecordLink href="/reportes/produccion">{row.name}</RecordLink>
-            <p className="mt-1">{row.jobs} trabajos · {row.diagnoses} diagnósticos · {row.repairs} reparaciones · {row.warranties} garantías · {money(row.value)}</p>
-            <p className="text-[var(--muted)]">Efectividad {row.effectiveness == null ? "sin reparaciones de origen" : `${Math.round(row.effectiveness * 100)}%`}</p>
-          </li>
-        ))}
-      </ul>
+      {rows.length === 0 ? (
+        <Empty title="Sin producción en el periodo" body="Aparece cuando hay diagnósticos o reparaciones validados." />
+      ) : (
+        <ResponsiveData
+          table={
+            <Table>
+              <thead>
+                <tr>
+                  <Th>Técnico</Th>
+                  <Th>Trabajos</Th>
+                  <Th>Valor</Th>
+                  <Th>Efectividad</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={row.userId}>
+                    <Td><RecordLink href="/reportes/produccion">{row.name}</RecordLink></Td>
+                    <Td>{row.jobs} · {row.diagnoses} diag. · {row.repairs} rep.</Td>
+                    <Td>{money(row.value)}</Td>
+                    <Td>{row.effectiveness == null ? "—" : `${Math.round(row.effectiveness * 100)}%`}</Td>
+                  </tr>
+                ))}
+              </tbody>
+            </Table>
+          }
+          cards={rows.map((row) => (
+            <MobileCard key={row.userId} href="/reportes/produccion" title={row.name}>
+              <p>{row.jobs} trabajos · {row.diagnoses} diagnósticos · {row.repairs} reparaciones · {row.warranties} garantías</p>
+              <p className="mt-1 font-medium">{money(row.value)}</p>
+              <p className="mt-1 text-[var(--muted)]">
+                Efectividad {row.effectiveness == null ? "sin reparaciones de origen" : `${Math.round(row.effectiveness * 100)}%`}
+              </p>
+            </MobileCard>
+          ))}
+        />
+      )}
     </>
   );
 }

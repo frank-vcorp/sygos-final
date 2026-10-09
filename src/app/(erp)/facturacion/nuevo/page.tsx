@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { freeInvoiceAction } from "../actions";
 import { ClientPicker } from "@/components/client-picker";
-import { controlClass, Field, PageHeader } from "@/components/ui";
+import { Button, controlClass, Field, FormActions, FormPanel, FormSection, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
@@ -17,16 +17,22 @@ export default async function FacturaLibrePage() {
   return (
     <>
       <PageHeader back={{ href: "/facturacion", label: "Facturación" }} title="Factura libre" subtitle="No crea equipo, diagnóstico ni venta. Sí abre cuenta por cobrar." />
-      <form action={freeInvoiceAction} className="grid max-w-xl gap-3 rounded-lg border border-[var(--line)] bg-white p-4">
-        <ClientPicker
-          clients={clients}
-          allowQuickClient={can(session.role, "client.create", session.activeCompanyCode)}
-        />
-        <Field label="Concepto"><input name="concept" required className={controlClass} /></Field>
-        <Field label="Importe con IVA"><input name="amount" required type="number" min="0.01" step="0.01" className={controlClass} /></Field>
-        <Field label="Días de crédito"><input name="creditDays" type="number" min="0" className={controlClass} /></Field>
-        <button className="w-fit rounded-md bg-[var(--accent)] px-3 py-2 text-sm font-medium text-white">Emitir factura libre</button>
-      </form>
+      <FormPanel action={freeInvoiceAction} className="max-w-xl">
+        <FormSection title="Factura libre" description="No crea equipo ni venta. Abre cuenta por cobrar con el cliente elegido.">
+          <div className="md:col-span-2">
+            <ClientPicker
+              clients={clients}
+              allowQuickClient={can(session.role, "client.create", session.activeCompanyCode)}
+            />
+          </div>
+          <Field label="Concepto"><input name="concept" required className={controlClass} /></Field>
+          <Field label="Importe con IVA"><input name="amount" required type="number" min="0.01" step="0.01" className={controlClass} /></Field>
+          <Field label="Días de crédito"><input name="creditDays" type="number" min="0" className={controlClass} /></Field>
+        </FormSection>
+        <FormActions note="La emisión queda registrada en facturación y cobranza.">
+          <Button type="submit">Emitir factura libre</Button>
+        </FormActions>
+      </FormPanel>
     </>
   );
 }
