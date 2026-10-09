@@ -6,12 +6,16 @@ import { HistoryTimeline } from "@/components/history-timeline";
 import { ConfirmSubmit, SubmitButton } from "@/components/submit-button";
 import {
   Badge,
+  Card,
   controlClass,
   DetailAnchorButton,
   DetailGrid,
   EntityDetailHeader,
   EntityMetaItem,
   Field,
+  FormActions,
+  FormPanel,
+  FormSection,
   inlineLinkClass,
   TextLink,
 } from "@/components/ui";
@@ -118,7 +122,7 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
         }
       />
       <DetailGrid>
-        <section className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
+        <Card className="p-4 text-sm">
           {source ? <p className="mt-1">{source.kind === "OS" ? "Orden de servicio" : "Diagnóstico de origen"}: <TextLink href={`/operacion/${source.id}`}>{source.folio}</TextLink></p> : null}
           {repairOrder ? <p className="mt-1">Orden de servicio: <TextLink href={`/operacion/${repairOrder.id}`}>{repairOrder.folio}</TextLink></p> : null}
           {quote.client.contacts.length > 0 ? (
@@ -176,51 +180,58 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
             </div>
           ) : null}
           {base ? <p className="mt-3 text-[var(--muted)]">Base Servomotores {base.folio}: {money(quoteTotals(base.lines, base.discountPct)?.total)}. El vendedor no ve este importe.</p> : null}
-        </section>
+        </Card>
         <div className="space-y-4">
           {quote.status === "PENDIENTE_COTIZAR" && can(session.role, "quote.price", session.activeCompanyCode) ? (
-            <form id="asignar-precio" action={setPricesAction} className="grid scroll-mt-24 gap-2 rounded-lg border border-[var(--line)] bg-white p-4">
-              <h2 className="font-medium">Asignar precio</h2>
+            <FormPanel id="asignar-precio" action={setPricesAction} className="scroll-mt-24">
               <input type="hidden" name="quoteId" value={quote.id} />
               <input type="hidden" name="version" value={quote.version} />
-              {quote.lines.map((line) => (
-                <Field key={line.id} label={line.incrementPct != null ? `${line.concept} · base, incremento ${line.incrementPct}%` : line.concept}>
-                  <input type="hidden" name="lineId" value={line.id} />
-                  <input name="amount" required inputMode="decimal" defaultValue={referencePrice ?? ""} className={controlClass} />
-                </Field>
-              ))}
-              <SubmitButton>Guardar precio</SubmitButton>
-            </form>
+              <FormSection title="Asignar precio" description="Confirma el importe por línea antes de enviar al cliente." columns={1}>
+                {quote.lines.map((line) => (
+                  <Field key={line.id} label={line.incrementPct != null ? `${line.concept} · base, incremento ${line.incrementPct}%` : line.concept}>
+                    <input type="hidden" name="lineId" value={line.id} />
+                    <input name="amount" required inputMode="decimal" defaultValue={referencePrice ?? ""} className={controlClass} />
+                  </Field>
+                ))}
+              </FormSection>
+              <FormActions><SubmitButton>Guardar precio</SubmitButton></FormActions>
+            </FormPanel>
           ) : null}
           {quote.status === "PENDIENTE_DECISION" && can(session.role, "quote.follow", session.activeCompanyCode) ? (
             <>
-              <form action={discountAction} className="grid gap-2 rounded-lg border border-[var(--line)] bg-white p-4">
-                <h2 className="font-medium">Descuento</h2>
+              <FormPanel action={discountAction}>
                 <input type="hidden" name="quoteId" value={quote.id} />
                 <input type="hidden" name="version" value={quote.version} />
-                <Field label="Porcentaje" hint={seller?.discountLimitPct != null ? `Tu límite es ${seller.discountLimitPct}%.` : "Tu usuario no tiene un tope de descuento."}>
-                  <input name="discountPct" required defaultValue={quote.discountPct} className={controlClass} />
-                </Field>
-                <SubmitButton tone="ghost">Aplicar</SubmitButton>
-              </form>
-              <form id="decision-cliente" action={decideAction} className="grid scroll-mt-24 gap-2 rounded-lg border border-[var(--line)] bg-white p-4">
-                <h2 className="font-medium">Decisión del cliente</h2>
+                <FormSection title="Descuento" columns={1}>
+                  <Field label="Porcentaje" hint={seller?.discountLimitPct != null ? `Tu límite es ${seller.discountLimitPct}%.` : "Tu usuario no tiene un tope de descuento."}>
+                    <input name="discountPct" required defaultValue={quote.discountPct} className={controlClass} />
+                  </Field>
+                </FormSection>
+                <FormActions><SubmitButton tone="ghost">Aplicar</SubmitButton></FormActions>
+              </FormPanel>
+              <FormPanel id="decision-cliente" action={decideAction} className="scroll-mt-24">
                 <input type="hidden" name="quoteId" value={quote.id} />
                 <input type="hidden" name="version" value={quote.version} />
-                {quote.quoteType === "VENTA_EQUIPO" ? (
-                  <div className="grid gap-1">
-                    <p className="text-xs text-[var(--muted)]">Marca las líneas que el cliente autorizó.</p>
-                    {quote.lines.map((line) => (
-                      <label key={line.id} className="flex items-center gap-2 text-sm"><input type="checkbox" name="authorizedLine" value={line.id} /> {line.concept}</label>
-                    ))}
-                  </div>
-                ) : null}
-                <select name="decision" className={controlClass}>
-                  <option value="si">Autorizada</option>
-                  <option value="no">No autorizada</option>
-                </select>
-                <ConfirmSubmit tone="primary" message="Se registrará la decisión del cliente. Revisa que sea la correcta.">Registrar decisión</ConfirmSubmit>
-              </form>
+                <FormSection title="Decisión del cliente" columns={1}>
+                  {quote.quoteType === "VENTA_EQUIPO" ? (
+                    <div className="grid gap-1">
+                      <p className="text-xs text-[var(--muted)]">Marca las líneas que el cliente autorizó.</p>
+                      {quote.lines.map((line) => (
+                        <label key={line.id} className="flex items-center gap-2 text-sm"><input type="checkbox" name="authorizedLine" value={line.id} /> {line.concept}</label>
+                      ))}
+                    </div>
+                  ) : null}
+                  <Field label="Resultado">
+                    <select name="decision" className={controlClass}>
+                      <option value="si">Autorizada</option>
+                      <option value="no">No autorizada</option>
+                    </select>
+                  </Field>
+                </FormSection>
+                <FormActions>
+                  <ConfirmSubmit tone="primary" message="Se registrará la decisión del cliente. Revisa que sea la correcta.">Registrar decisión</ConfirmSubmit>
+                </FormActions>
+              </FormPanel>
             </>
           ) : null}
           {waitingEquipment && can(session.role, "quote.follow", session.activeCompanyCode) ? (
@@ -241,14 +252,15 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
             </div>
           ) : null}
           {session.activeCompanyCode === "SYSTRON" && quote.equipment?.kind === "MOT" && can(session.role, "quote.price", session.activeCompanyCode) ? (
-            <form action={linkBaseAction} className="grid gap-2 rounded-lg border border-[var(--line)] bg-white p-4">
-              <h2 className="font-medium">Ligar cotización base</h2>
+            <FormPanel action={linkBaseAction}>
               <input type="hidden" name="quoteId" value={quote.id} />
-              <Field label="Cotización de Servomotores" hint="Pega el folio o el identificador de la cotización base.">
-                <input name="baseQuoteId" required placeholder="COT-… o identificador" className={controlClass} />
-              </Field>
-              <SubmitButton tone="ghost">Ligar</SubmitButton>
-            </form>
+              <FormSection title="Ligar cotización base" description="Vincula la cotización de Servomotores con esta venta SYSTRON." columns={1}>
+                <Field label="Cotización de Servomotores" hint="Pega el folio o el identificador de la cotización base.">
+                  <input name="baseQuoteId" required placeholder="COT-… o identificador" className={controlClass} />
+                </Field>
+              </FormSection>
+              <FormActions><SubmitButton tone="ghost">Ligar</SubmitButton></FormActions>
+            </FormPanel>
           ) : null}
           <HistoryTimeline items={history.map((item) => ({ id: item.id, createdAt: item.createdAt, summary: item.summary, authorName: item.author?.name }))} />
         </div>

@@ -24,12 +24,16 @@ import { SupplierPicker } from "@/components/supplier-picker";
 import {
   Badge,
   Button,
+  Card,
   controlClass,
   DetailAnchorButton,
   DetailGrid,
   EntityDetailHeader,
   EntityMetaItem,
   Field,
+  FormActions,
+  FormPanel,
+  FormSection,
   TextLink,
 } from "@/components/ui";
 import { prisma } from "@/lib/db";
@@ -181,7 +185,7 @@ export default async function OperacionDetallePage({ params }: { params: Promise
       {readOnly ? <p className="mb-4 text-sm text-[var(--muted)]">Consulta de solo lectura. SYSTRON no modifica el estado ni la bitácora de Servomotores.</p> : null}
       <DetailGrid>
         <div className="space-y-4">
-          <section className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
+          <Card className="p-4 text-sm">
             <p className="font-medium text-[#0b1f3a]">Contexto del servicio</p>
             {parent?.kind === "DIAGNOSTICO" ? <p className="mt-1">Diagnóstico de origen: <TextLink href={`/operacion/${parent.id}`}>{parent.folio}</TextLink></p> : null}
             <p className="mt-1">
@@ -201,20 +205,20 @@ export default async function OperacionDetallePage({ params }: { params: Promise
               <p className="mt-3 text-[var(--muted)]">Queda pendiente de cotizar.</p>
             ) : null}
             {row.paidAt ? <p className="mt-1">Marcada como pagada {formatWhen(row.paidAt)}.</p> : null}
-          </section>
+          </Card>
           {canWork && row.kind === "DIAGNOSTICO" && ["EN_DIAGNOSTICO", "DEVUELTO"].includes(row.status) ? (
-            <form id="terminar-diagnostico" action={finishDiagnosisAction} className="grid gap-2 rounded-lg border border-[var(--line)] bg-white p-4 scroll-mt-24">
-              <h2 className="font-medium">Terminar diagnóstico</h2>
-              <p className="text-sm text-[var(--muted)]">Resume el hallazgo técnico. La bitácora queda aparte para avances durante el trabajo.</p>
+            <FormPanel id="terminar-diagnostico" action={finishDiagnosisAction} className="scroll-mt-24">
               <input type="hidden" name="caseId" value={row.id} />
               <input type="hidden" name="version" value={row.version} />
-              <Field label="Resultado del diagnóstico">
-                <textarea name="resultText" required rows={4} className={controlClass} placeholder="Hallazgo, pruebas y conclusión" />
-              </Field>
-              <Button type="submit">Terminar diagnóstico</Button>
-            </form>
+              <FormSection title="Terminar diagnóstico" description="Resume el hallazgo técnico. La bitácora queda aparte para avances durante el trabajo." columns={1}>
+                <Field label="Resultado del diagnóstico">
+                  <textarea name="resultText" required rows={4} className={controlClass} placeholder="Hallazgo, pruebas y conclusión" />
+                </Field>
+              </FormSection>
+              <FormActions><Button type="submit">Terminar diagnóstico</Button></FormActions>
+            </FormPanel>
           ) : null}
-          <section className="rounded-lg border border-[var(--line)] bg-white p-4">
+          <Card className="p-4">
             <h2 className="font-medium">Bitácora</h2>
             <p className="mt-1 text-sm text-[var(--muted)]">Las entradas no se editan ni se borran. Una corrección es una entrada nueva.</p>
             <ul className="mt-3 space-y-2 text-sm">
@@ -232,11 +236,11 @@ export default async function OperacionDetallePage({ params }: { params: Promise
                 <Button type="submit" tone="ghost">Agregar entrada</Button>
               </form>
             ) : null}
-          </section>
+          </Card>
         </div>
         <div className="space-y-4">
           {row.kind === "DIAGNOSTICO" ? (
-            <section className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
+            <Card className="p-4 text-sm">
               <h2 className="font-medium">Refacciones previstas</h2>
               <p className="mt-1 text-[var(--muted)]">
                 Presolicitud durante el diagnóstico. Si el cliente autoriza, pasan a la orden de servicio.
@@ -316,10 +320,10 @@ export default async function OperacionDetallePage({ params }: { params: Promise
                   </Button>
                 </form>
               ) : null}
-            </section>
+            </Card>
           ) : null}
           {row.kind === "OS" ? (
-            <section className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
+            <Card className="p-4 text-sm">
               <h2 className="font-medium">Refacciones</h2>
               {row.requests.length === 0 ? <p className="mt-2 text-[var(--muted)]">Sin solicitudes.</p> : (
                 <ul className="mt-2 space-y-3">
@@ -363,79 +367,93 @@ export default async function OperacionDetallePage({ params }: { params: Promise
                   En reparación las solicitudes formales las registra gerencia o almacén. En diagnóstico usa presolicitudes arriba.
                 </p>
               ) : null}
-            </section>
+            </Card>
           ) : null}
           {!readOnly ? (
             <>
             {canManage && !closed ? (
-              <form action={assignCaseAction} className="grid gap-2 rounded-lg border border-[var(--line)] bg-white p-4">
-                <h2 className="font-medium">Asignación</h2>
+              <FormPanel action={assignCaseAction}>
                 <input type="hidden" name="caseId" value={row.id} />
                 <input type="hidden" name="version" value={row.version} />
-                <Field label="Responsable interno">
-                  <select name="assigneeUserId" className={controlClass} defaultValue={row.assigneeUserId ?? ""}>
-                    <option value="">Sin asignar</option>
-                    {candidates.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
-                  </select>
-                </Field>
-                {row.serviceCompany.code === "SYSTRON" ? (
-                  <SupplierPicker
-                    label="O servicio externo"
-                    suppliers={suppliers}
-                    defaultSupplierId={row.externalSupplierId ?? ""}
-                    allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)}
-                    allowEmpty
-                    emptyLabel="Sin proveedor"
-                  />
-                ) : null}
-                <Button type="submit" tone="ghost">Guardar asignación</Button>
-              </form>
+                <FormSection title="Asignación" description="Responsable interno o proveedor externo en SYSTRON.">
+                  <Field label="Responsable interno">
+                    <select name="assigneeUserId" className={controlClass} defaultValue={row.assigneeUserId ?? ""}>
+                      <option value="">Sin asignar</option>
+                      {candidates.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
+                    </select>
+                  </Field>
+                  {row.serviceCompany.code === "SYSTRON" ? (
+                    <div className="md:col-span-2">
+                      <SupplierPicker
+                        label="O servicio externo"
+                        suppliers={suppliers}
+                        defaultSupplierId={row.externalSupplierId ?? ""}
+                        allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)}
+                        allowEmpty
+                        emptyLabel="Sin proveedor"
+                      />
+                    </div>
+                  ) : null}
+                </FormSection>
+                <FormActions><Button type="submit" tone="ghost">Guardar asignación</Button></FormActions>
+              </FormPanel>
             ) : null}
             {canManage && row.kind === "DIAGNOSTICO" && (row.status === "PENDIENTE_VALIDACION" || (row.serviceCompany.code === "SERVOMOTORES" && row.status === "VALIDADO" && warranty && !row.warrantyDecision)) ? (
-              <form id="validacion" action={validateAction} className="grid gap-2 rounded-lg border border-[var(--line)] bg-white p-4 scroll-mt-24">
-                <h2 className="font-medium">Validación</h2>
+              <FormPanel id="validacion" action={validateAction} className="scroll-mt-24">
                 <input type="hidden" name="caseId" value={row.id} />
                 <input type="hidden" name="version" value={row.version} />
-                <select name="decision" className={controlClass}>
-                  {warranty ? <option value="VALIDA">Garantía válida</option> : <option value="VALIDAR">Validar</option>}
-                  {warranty ? <option value="NO_PROCEDENTE">Garantía no procedente</option> : null}
-                  <option value="DEVOLVER">Devolver a corrección</option>
-                </select>
-                <input name="reason" placeholder="Motivo si devuelves" className={controlClass} />
-                <Button type="submit">Registrar validación</Button>
-              </form>
+                <FormSection title="Validación" columns={1}>
+                  <Field label="Decisión">
+                    <select name="decision" className={controlClass}>
+                      {warranty ? <option value="VALIDA">Garantía válida</option> : <option value="VALIDAR">Validar</option>}
+                      {warranty ? <option value="NO_PROCEDENTE">Garantía no procedente</option> : null}
+                      <option value="DEVOLVER">Devolver a corrección</option>
+                    </select>
+                  </Field>
+                  <Field label="Motivo si devuelves"><input name="reason" className={controlClass} /></Field>
+                </FormSection>
+                <FormActions><Button type="submit">Registrar validación</Button></FormActions>
+              </FormPanel>
             ) : null}
             {canWork && row.kind === "OS" && ["EN_REPARACION", "EN_ESPERA_REFACCIONES"].includes(row.status) ? (
-              <form id="cerrar-reparacion" action={finishRepairAction} className="grid gap-2 rounded-lg border border-[var(--line)] bg-white p-4 scroll-mt-24">
-                <h2 className="font-medium">Cierre técnico</h2>
+              <FormPanel id="cerrar-reparacion" action={finishRepairAction} className="scroll-mt-24">
                 <input type="hidden" name="caseId" value={row.id} />
                 <input type="hidden" name="version" value={row.version} />
-                <select name="outcome" className={controlClass}>
-                  <option value="TERMINADA">Reparación terminada</option>
-                  <option value="SIN_REPARACION">Sin reparación</option>
-                </select>
-                <textarea name="resultText" required rows={3} className={controlClass} />
-                <Button type="submit">Cerrar técnicamente</Button>
-              </form>
+                <FormSection title="Cierre técnico" columns={1}>
+                  <Field label="Resultado">
+                    <select name="outcome" className={controlClass}>
+                      <option value="TERMINADA">Reparación terminada</option>
+                      <option value="SIN_REPARACION">Sin reparación</option>
+                    </select>
+                  </Field>
+                  <Field label="Resumen">
+                    <textarea name="resultText" required rows={3} className={controlClass} />
+                  </Field>
+                </FormSection>
+                <FormActions><Button type="submit">Cerrar técnicamente</Button></FormActions>
+              </FormPanel>
             ) : null}
             {row.externalSupplierId && canManage ? (
-              <form action={externalDocumentAction} className="grid gap-2 rounded-lg border border-[var(--line)] bg-white p-4">
-                <h2 className="font-medium">Documento del proveedor</h2>
-                <p className="text-sm text-[var(--muted)]">Capturarlo no valida el diagnóstico.</p>
+              <FormPanel action={externalDocumentAction}>
                 <input type="hidden" name="caseId" value={row.id} />
                 <input type="hidden" name="version" value={row.version} />
-                <textarea name="document" required rows={3} className={controlClass} defaultValue={row.externalDocument ?? ""} />
-                <Button type="submit" tone="ghost">Guardar documento</Button>
-              </form>
+                <FormSection title="Documento del proveedor" description="Capturarlo no valida el diagnóstico." columns={1}>
+                  <Field label="Contenido">
+                    <textarea name="document" required rows={3} className={controlClass} defaultValue={row.externalDocument ?? ""} />
+                  </Field>
+                </FormSection>
+                <FormActions><Button type="submit" tone="ghost">Guardar documento</Button></FormActions>
+              </FormPanel>
             ) : null}
             {closed && canManage ? (
-              <form action={reopenAction} className="grid gap-2 rounded-lg border border-[var(--line)] bg-white p-4">
-                <h2 className="font-medium">Reabrir</h2>
+              <FormPanel action={reopenAction}>
                 <input type="hidden" name="caseId" value={row.id} />
                 <input type="hidden" name="version" value={row.version} />
-                <input name="reason" required className={controlClass} placeholder="Motivo" />
-                <Button type="submit" tone="ghost">Reabrir</Button>
-              </form>
+                <FormSection title="Reabrir" columns={1}>
+                  <Field label="Motivo"><input name="reason" required className={controlClass} placeholder="Motivo" /></Field>
+                </FormSection>
+                <FormActions><Button type="submit" tone="ghost">Reabrir</Button></FormActions>
+              </FormPanel>
             ) : null}
             {row.kind === "OS" && row.status === "TERMINADA" && row.attention.attentionType !== "DIAGNOSTICO_GARANTIA" && !row.paidAt && (session.role === "CEO" || session.role === "ADMINISTRADOR") ? (
               <form action={markPaidAction}>
@@ -444,17 +462,20 @@ export default async function OperacionDetallePage({ params }: { params: Promise
               </form>
             ) : null}
             {row.warrantyDecision === "NO_PROCEDENTE" && !row.commercialDecision && (session.role === "CEO" || session.role === "ADMINISTRADOR") ? (
-              <form id="decision-comercial" action={overrideWarrantyAction} className="grid gap-2 rounded-lg border border-[var(--line)] bg-white p-4 scroll-mt-24">
-                <h2 className="font-medium">Decisión comercial</h2>
+              <FormPanel id="decision-comercial" action={overrideWarrantyAction} className="scroll-mt-24">
                 <input type="hidden" name="caseId" value={row.id} />
                 <input type="hidden" name="version" value={row.version} />
-                <select name="decision" className={controlClass}>
-                  <option value="VALIDA">Aceptar como garantía</option>
-                  <option value="COTIZAR">Enviar a cotización</option>
-                </select>
-                <input name="reason" required className={controlClass} placeholder="Motivo" />
-                <Button type="submit">Guardar decisión</Button>
-              </form>
+                <FormSection title="Decisión comercial" columns={1}>
+                  <Field label="Decisión">
+                    <select name="decision" className={controlClass}>
+                      <option value="VALIDA">Aceptar como garantía</option>
+                      <option value="COTIZAR">Enviar a cotización</option>
+                    </select>
+                  </Field>
+                  <Field label="Motivo"><input name="reason" required className={controlClass} placeholder="Motivo" /></Field>
+                </FormSection>
+                <FormActions><Button type="submit">Guardar decisión</Button></FormActions>
+              </FormPanel>
             ) : null}
             </>
           ) : null}
