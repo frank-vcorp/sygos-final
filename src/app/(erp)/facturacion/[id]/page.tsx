@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { issueDocumentAction, retryFiscalAction } from "../actions";
 import { HistoryTimeline } from "@/components/history-timeline";
 import { ClientNameLink } from "@/components/client-entity-links";
-import { Badge, PageHeader, TextLink } from "@/components/ui";
+import { Badge, Button, EntityDetailHeader, EntityMetaItem, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
 import { historyFor } from "@/lib/history";
@@ -10,6 +10,13 @@ import { money } from "@/lib/money";
 import { can } from "@/lib/permissions";
 import { redirectIfSalesNotAssigned } from "@/lib/sales-assignment";
 import { requireCompany } from "@/lib/session";
+
+const KIND_LABEL: Record<string, string> = {
+  FACTURA: "Factura",
+  REMISION: "Remisión",
+  FACTURA_LIBRE: "Factura libre",
+  FACTURA_INTERCOMPANIA: "Factura a SYSTRON",
+};
 
 export default async function DocumentoPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await requireCompany();
@@ -22,31 +29,63 @@ export default async function DocumentoPage({ params }: { params: Promise<{ id: 
   if (!row) notFound();
   await redirectIfSalesNotAssigned(session, row.client.ownerUserId, "/facturacion");
   const canEditClient = can(session.role, "client.edit", session.activeCompanyCode);
+  const canIssue = can(session.role, "invoice.issue", session.activeCompanyCode);
   const history = await historyFor("DOCUMENTO", row.id);
+  const statusLabel = row.status === "SOLICITADA" ? "Solicitada" : row.status === "EMITIDA" ? "Emitida" : row.status;
+
+  let primaryAction: React.ReactNode = null;
+  if (row.status === "SOLICITADA" && canIssue) {
+    primaryAction = (
+      <form action={issueDocumentAction} className="inline">
+        <input type="hidden" name="documentId" value={row.id} />
+        <Button type="submit">{row.kind === "REMISION" ? "Emitir remisión" : "Emitir factura"}</Button>
+      </form>
+    );
+  } else if (row.fiscalStatus === "ERROR" && canIssue) {
+    primaryAction = (
+      <form action={retryFiscalAction} className="inline">
+        <input type="hidden" name="documentId" value={row.id} />
+        <Button type="submit" tone="ghost">Reintentar timbrado</Button>
+      </form>
+    );
+  }
+
   return (
     <>
-      <PageHeader back={{ href: "/facturacion", label: "Facturación" }} title={row.folio} subtitle={row.kind === "REMISION" ? "Remisión" : "Factura"} action={<Badge>{row.status === "SOLICITADA" ? "Solicitada" : "Emitida"}</Badge>} />
+      <EntityDetailHeader
+        back={{ href: "/facturacion", label: "Facturación" }}
+        title={row.folio}
+        subtitle={KIND_LABEL[row.kind] ?? row.kind}
+        status={<Badge tone={row.status === "SOLICITADA" ? "warn" : "neutral"}>{statusLabel}</Badge>}
+        meta={
+          <>
+            <EntityMetaItem label="Cliente">
+              <ClientNameLink clientId={row.client.id} name={row.client.name} isSystem={row.client.isSystem} canEdit={canEditClient} />
+            </EntityMetaItem>
+            <EntityMetaItem label="Total">{money(row.total)}</EntityMetaItem>
+            {row.quote ? (
+              <EntityMetaItem label="Cotización">
+                <TextLink href={`/cotizaciones/${row.quote.id}`}>{row.quote.folio}</TextLink>
+              </EntityMetaItem>
+            ) : null}
+            {row.issuedAt ? (
+              <EntityMetaItem label="Emisión">{formatWhen(row.issuedAt)}</EntityMetaItem>
+            ) : null}
+            {row.dueAt ? <EntityMetaItem label="Vence">{formatWhen(row.dueAt)}</EntityMetaItem> : null}
+            {row.receivable ? (
+              <EntityMetaItem label="CxC">
+                <TextLink href={`/cobranza/${row.receivable.id}`}>{money(row.receivable.balance)}</TextLink>
+              </EntityMetaItem>
+            ) : null}
+          </>
+        }
+        primaryAction={primaryAction}
+      />
       <section className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
-        <p>Cliente: <ClientNameLink clientId={row.client.id} name={row.client.name} isSystem={row.client.isSystem} canEdit={canEditClient} /></p>
-        {row.quote ? <p className="mt-1">Cotización: <TextLink href={`/cotizaciones/${row.quote.id}`}>{row.quote.folio}</TextLink></p> : null}
-        {row.rfcSnapshot ? <p className="mt-1">RFC congelado: {row.rfcSnapshot}</p> : null}
-        <p className="mt-1">Subtotal {money(row.subtotal)} · IVA {money(row.iva)} · total {money(row.total)}</p>
-        {row.issuedAt ? <p className="mt-1">Emitida {formatWhen(row.issuedAt)}. Vence {row.dueAt ? formatWhen(row.dueAt) : "—"}.</p> : null}
-        {row.receivable ? <p className="mt-1">Cuenta por cobrar: <TextLink href={`/cobranza/${row.receivable.id}`}>{money(row.receivable.balance)}</TextLink></p> : null}
+        {row.rfcSnapshot ? <p>RFC congelado: {row.rfcSnapshot}</p> : null}
+        <p className={row.rfcSnapshot ? "mt-1" : ""}>Subtotal {money(row.subtotal)} · IVA {money(row.iva)}</p>
         {row.fiscalError ? <p className="mt-3 rounded-md bg-[var(--warn-soft)] px-3 py-2">{row.fiscalError}</p> : null}
         <ul className="mt-3 space-y-1">{row.lines.map((line) => <li key={line.id}>{line.concept} · {money(line.amount)}</li>)}</ul>
-        {row.status === "SOLICITADA" && can(session.role, "invoice.issue", session.activeCompanyCode) ? (
-          <form action={issueDocumentAction} className="mt-3">
-            <input type="hidden" name="documentId" value={row.id} />
-            <button className="rounded-md bg-[var(--accent)] px-3 py-2 text-sm font-medium text-white">Emitir</button>
-          </form>
-        ) : null}
-        {row.fiscalStatus === "ERROR" && can(session.role, "invoice.issue", session.activeCompanyCode) ? (
-          <form action={retryFiscalAction} className="mt-2">
-            <input type="hidden" name="documentId" value={row.id} />
-            <button className="rounded-md border border-[var(--line)] px-3 py-2 text-sm">Reintentar timbrado</button>
-          </form>
-        ) : null}
       </section>
       <HistoryTimeline className="mt-6" items={history.map((item) => ({ id: item.id, createdAt: item.createdAt, summary: item.summary, authorName: item.author?.name }))} />
     </>
