@@ -5,11 +5,15 @@ import { SupplierPicker } from "@/components/supplier-picker";
 import {
   Badge,
   Button,
+  Card,
   controlClass,
   DetailAnchorButton,
   EntityDetailHeader,
   EntityMetaItem,
   Field,
+  FormActions,
+  FormPanel,
+  FormSection,
   TextLink,
 } from "@/components/ui";
 import { prisma } from "@/lib/db";
@@ -94,55 +98,58 @@ export default async function CompraPage({ params }: { params: Promise<{ id: str
         primaryAction={primaryAction}
         secondaryActions={secondaryActions}
       />
-      <section className="mb-4 rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
+      <Card className="mb-4 p-4 text-sm">
         {row.authorizedAmount != null ? <p>Importe autorizado: {money(row.authorizedAmount)}</p> : null}
         {row.settlement ? <p className={row.authorizedAmount != null ? "mt-1" : ""}>Procesada como {row.settlement === "CREDITO" ? "cuenta por pagar" : "egreso"}.</p> : null}
         {row.cancelReason ? <p className="mt-1">Cancelación: {row.cancelReason}</p> : null}
-      </section>
+      </Card>
       {canManage && row.kind === "DIRECTA" && row.status === "PENDIENTE_VALIDAR" ? (
-        <form id="cuadrar-compra" action={editDirectAction} className="scroll-mt-24 flex flex-wrap items-end gap-2 rounded-lg border border-[var(--line)] bg-white p-4">
+        <FormPanel id="cuadrar-compra" action={editDirectAction} className="scroll-mt-24 max-w-xl">
           <input type="hidden" name="purchaseId" value={row.id} />
           <input type="hidden" name="version" value={row.version} />
-          <Field label="Cuadrar importe"><input name="amount" type="number" min="0.01" step="0.01" defaultValue={row.amount} className={controlClass} /></Field>
-          <Button type="submit" tone="ghost">Guardar importe</Button>
-        </form>
+          <FormSection title="Cuadrar importe" columns={1}>
+            <Field label="Importe"><input name="amount" type="number" min="0.01" step="0.01" defaultValue={row.amount} className={controlClass} /></Field>
+          </FormSection>
+          <FormActions><Button type="submit" tone="ghost">Guardar importe</Button></FormActions>
+        </FormPanel>
       ) : null}
       {canManage && ready ? (
-        <form id="procesar-compra" action={processPurchaseAction} className="mt-4 grid max-w-xl scroll-mt-24 gap-2 rounded-lg border border-[var(--line)] bg-white p-4">
-          <h2 className="font-medium">Procesar compra</h2>
+        <FormPanel id="procesar-compra" action={processPurchaseAction} className="mt-4 max-w-xl scroll-mt-24">
           <input type="hidden" name="purchaseId" value={row.id} />
           <input type="hidden" name="version" value={row.version} />
-          <Field label="Forma">
-            <select name="settlement" className={controlClass} defaultValue="CONTADO">
-              <option value="CONTADO">Contado, un egreso</option>
-              <option value="CREDITO">Crédito, una cuenta por pagar</option>
-            </select>
-          </Field>
-          <Field label="Cuenta, si es contado">
-            <select name="accountId" className={controlClass} defaultValue={accounts[0]?.id ?? ""}>
-              {accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
-            </select>
-          </Field>
-          <Button type="submit">Procesar compra</Button>
-        </form>
+          <FormSection title="Procesar compra" columns={1}>
+            <Field label="Forma">
+              <select name="settlement" className={controlClass} defaultValue="CONTADO">
+                <option value="CONTADO">Contado, un egreso</option>
+                <option value="CREDITO">Crédito, una cuenta por pagar</option>
+              </select>
+            </Field>
+            <Field label="Cuenta, si es contado">
+              <select name="accountId" className={controlClass} defaultValue={accounts[0]?.id ?? ""}>
+                {accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
+              </select>
+            </Field>
+          </FormSection>
+          <FormActions><Button type="submit">Procesar compra</Button></FormActions>
+        </FormPanel>
       ) : null}
       {canManage && row.kind === "OC" && row.status === "AUTORIZADA" ? (
-        <form action={changeOrderAction} className="mt-4 grid max-w-xl gap-2 rounded-lg border border-[var(--line)] bg-white p-4">
-          <h2 className="font-medium">Cambio material</h2>
-          <p className="text-sm text-[var(--muted)]">Proveedor, concepto o importe regresan la orden al CEO.</p>
+        <FormPanel action={changeOrderAction} className="mt-4 max-w-xl">
           <input type="hidden" name="purchaseId" value={row.id} />
           <input type="hidden" name="version" value={row.version} />
-          <SupplierPicker
-            suppliers={suppliers}
-            defaultSupplierId={row.supplierId ?? ""}
-            allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)}
-            allowEmpty
-            emptyLabel="Sin proveedor"
-          />
-          <Field label="Concepto"><input name="concept" defaultValue={row.concept} className={controlClass} /></Field>
-          <Field label="Importe"><input name="amount" type="number" step="0.01" defaultValue={row.amount} className={controlClass} /></Field>
-          <Button type="submit" tone="ghost">Enviar de nuevo al CEO</Button>
-        </form>
+          <FormSection title="Cambio material" description="Proveedor, concepto o importe regresan la orden al CEO." columns={1}>
+            <SupplierPicker
+              suppliers={suppliers}
+              defaultSupplierId={row.supplierId ?? ""}
+              allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)}
+              allowEmpty
+              emptyLabel="Sin proveedor"
+            />
+            <Field label="Concepto"><input name="concept" defaultValue={row.concept} className={controlClass} /></Field>
+            <Field label="Importe"><input name="amount" type="number" step="0.01" defaultValue={row.amount} className={controlClass} /></Field>
+          </FormSection>
+          <FormActions><Button type="submit" tone="ghost">Enviar de nuevo al CEO</Button></FormActions>
+        </FormPanel>
       ) : null}
       {canManage && row.kind === "DIRECTA" && row.status === "PENDIENTE_VALIDAR" ? (
         <form action={discardDirectAction} className="mt-3">
@@ -152,12 +159,14 @@ export default async function CompraPage({ params }: { params: Promise<{ id: str
         </form>
       ) : null}
       {canManage && row.kind === "OC" && (row.status === "AUTORIZADA" || row.status === "PENDIENTE_AUTORIZACION") ? (
-        <form action={cancelOrderAction} className="mt-3 flex flex-wrap gap-2 rounded-lg border border-[var(--line)] bg-white p-4">
+        <FormPanel action={cancelOrderAction} className="mt-3 max-w-xl">
           <input type="hidden" name="purchaseId" value={row.id} />
           <input type="hidden" name="version" value={row.version} />
-          <input name="reason" required placeholder="Motivo de cancelación" className={`${controlClass} min-w-[12rem] flex-1`} />
-          <Button type="submit" tone="ghost">Cancelar orden</Button>
-        </form>
+          <FormSection title="Cancelar orden" columns={1}>
+            <Field label="Motivo"><input name="reason" required placeholder="Motivo de cancelación" className={controlClass} /></Field>
+          </FormSection>
+          <FormActions><Button type="submit" tone="ghost">Cancelar orden</Button></FormActions>
+        </FormPanel>
       ) : null}
       <HistoryTimeline className="mt-6" items={history.map((item) => ({ id: item.id, createdAt: item.createdAt, summary: item.summary, authorName: item.author?.name }))} />
     </>

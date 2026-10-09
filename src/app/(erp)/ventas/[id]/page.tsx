@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { deliverSaleAction, receiveSaleAction } from "./actions";
 import { ClientNameLink } from "@/components/client-entity-links";
-import { Button, DetailAnchorButton, EntityDetailHeader, EntityMetaItem, TextLink } from "@/components/ui";
+import { Button, DetailAnchorButton, EntityDetailHeader, EntityMetaItem, MobileCard, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { redirectIfSalesNotAssigned } from "@/lib/sales-assignment";
@@ -42,27 +42,34 @@ export default async function VentaDetallePage({ params }: { params: Promise<{ i
         }
         primaryAction={canMove && (pendingReceive > 0 || pendingDeliver > 0) ? <DetailAnchorButton href="#lineas-venta">Registrar recepción o entrega</DetailAnchorButton> : null}
       />
-      <ul id="lineas-venta" className="scroll-mt-24 space-y-3">
+      <ul id="lineas-venta" className="scroll-mt-24 grid gap-3">
         {sale.lines.map((line) => (
-          <li key={line.id} className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
-            <p className="font-medium">{line.concept}</p>
-            <p className="mt-1">Vendido {line.qtySold} · recibido {line.qtyReceived} · entregado {line.qtyDelivered} · pendiente {line.qtySold - line.qtyDelivered}</p>
-            {canMove ? (
-              <div className="mt-2 flex flex-wrap gap-2">
-                <form action={receiveSaleAction} className="flex gap-1">
-                  <input type="hidden" name="lineId" value={line.id} />
-                  <input type="hidden" name="saleId" value={sale.id} />
-                  <input name="quantity" type="number" min={1} required className="w-16 rounded-md border border-[var(--line)] px-2 py-1" />
-                  <Button type="submit" tone="ghost">Recibir</Button>
-                </form>
-                <form action={deliverSaleAction} className="flex gap-1">
-                  <input type="hidden" name="lineId" value={line.id} />
-                  <input type="hidden" name="saleId" value={sale.id} />
-                  <input name="quantity" type="number" min={1} required className="w-16 rounded-md border border-[var(--line)] px-2 py-1" />
-                  <Button type="submit" tone="ghost">Entregar</Button>
-                </form>
-              </div>
-            ) : <p className="mt-2 text-[var(--muted)]">Recepción y entrega las registra almacén.</p>}
+          <li key={line.id}>
+            <MobileCard
+              title={line.concept}
+              meta={<span className="text-xs">Pendiente {line.qtySold - line.qtyDelivered}</span>}
+              footer={
+                canMove ? (
+                  <div className="flex flex-wrap gap-2">
+                    <form action={receiveSaleAction} className="flex gap-1">
+                      <input type="hidden" name="lineId" value={line.id} />
+                      <input type="hidden" name="saleId" value={sale.id} />
+                      <input name="quantity" type="number" min={1} required className="w-16 rounded-md border border-[var(--line)] px-2 py-1" />
+                      <Button type="submit" tone="ghost">Recibir</Button>
+                    </form>
+                    <form action={deliverSaleAction} className="flex gap-1">
+                      <input type="hidden" name="lineId" value={line.id} />
+                      <input type="hidden" name="saleId" value={sale.id} />
+                      <input name="quantity" type="number" min={1} required className="w-16 rounded-md border border-[var(--line)] px-2 py-1" />
+                      <Button type="submit" tone="ghost">Entregar</Button>
+                    </form>
+                  </div>
+                ) : undefined
+              }
+            >
+              <p>Vendido {line.qtySold} · recibido {line.qtyReceived} · entregado {line.qtyDelivered}</p>
+              {!canMove ? <p>Recepción y entrega las registra almacén.</p> : null}
+            </MobileCard>
           </li>
         ))}
       </ul>

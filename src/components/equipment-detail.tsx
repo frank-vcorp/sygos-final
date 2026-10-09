@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { AttentionForm, CancelMovementForm, MovementForm } from "@/components/custody-forms";
 import { EquipmentCustodyActions } from "@/components/equipment-custody-actions";
 import { HistoryTimeline } from "@/components/history-timeline";
-import { Badge, DetailAnchorButton, EntityDetailHeader, EntityMetaItem, Table, Td, TextLink, Th } from "@/components/ui";
+import { Badge, DetailAnchorButton, EntityDetailHeader, EntityMetaItem, MobileCard, Table, Td, TextLink, Th } from "@/components/ui";
 import { allowedMovements, CUSTODY_LABEL, isInitialWarehouseReceipt, isReceipt, MOVEMENT_LABEL, receiptReasonFromAttention, type Custody, type MovementKind } from "@/lib/custody";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
@@ -185,22 +185,25 @@ export async function EquipmentDetail({ id, expectedKind }: { id: string; expect
             {equipment.attentions.length === 0 ? <p className="text-sm text-[var(--muted)]">Todavía no hay un episodio de servicio.</p> : (
               <ul className="space-y-2">
                 {equipment.attentions.map((attention) => (
-                  <li key={attention.id} className="rounded-lg border border-[var(--line)] bg-white p-3 text-sm">
-                    <p className="font-medium">
-                      {ATTENTION_LABEL[attention.attentionType as AttentionType] ?? attention.attentionType} · {attention.priorityName}
-                      {attention.technicalCases.map((item) => (
-                        can(session.role, "operation.queue", session.activeCompanyCode)
-                          ? <TextLink key={item.id} href={`/operacion/${item.id}`} className="ml-2">{item.folio}</TextLink>
-                          : <span key={item.id} className="ml-2 text-[var(--muted)]">{item.folio}</span>
-                      ))}
-                    </p>
-                    <p className="mt-1">{attention.reportedFault}</p>
-                    <p className="mt-1 text-[var(--muted)]">
-                      {attention.status === "ABIERTA" ? "SLA aún no inicia. Empieza cuando se confirma la entrada física." : `SLA iniciado ${attention.slaStartedAt ? formatWhen(attention.slaStartedAt) : ""}.`}
-                      {attention.antecedent ? ` Antecedente: ${attention.antecedent}.` : ""}
-                    </p>
-                    {attention.deliveryInstructions ? <p className="mt-1">Entrega: {attention.deliveryInstructions}</p> : null}
-                    {intercompany ? <p className="mt-1">Cliente administrativo: {attention.adminClient.name}</p> : null}
+                  <li key={attention.id}>
+                    <MobileCard title={`${ATTENTION_LABEL[attention.attentionType as AttentionType] ?? attention.attentionType} · ${attention.priorityName}`}>
+                      {attention.technicalCases.length > 0 ? (
+                        <p>
+                          {attention.technicalCases.map((item) => (
+                            can(session.role, "operation.queue", session.activeCompanyCode)
+                              ? <TextLink key={item.id} href={`/operacion/${item.id}`} className="mr-2">{item.folio}</TextLink>
+                              : <span key={item.id} className="mr-2 text-[var(--muted)]">{item.folio}</span>
+                          ))}
+                        </p>
+                      ) : null}
+                      <p>{attention.reportedFault}</p>
+                      <p>
+                        {attention.status === "ABIERTA" ? "SLA aún no inicia. Empieza cuando se confirma la entrada física." : `SLA iniciado ${attention.slaStartedAt ? formatWhen(attention.slaStartedAt) : ""}.`}
+                        {attention.antecedent ? ` Antecedente: ${attention.antecedent}.` : ""}
+                      </p>
+                      {attention.deliveryInstructions ? <p>Entrega: {attention.deliveryInstructions}</p> : null}
+                      {intercompany ? <p>Cliente administrativo: {attention.adminClient.name}</p> : null}
+                    </MobileCard>
                   </li>
                 ))}
               </ul>

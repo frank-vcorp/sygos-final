@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { aguinaldoAdjustAction, authorizePayrollAction, editExtraAction, extraAction, retryPayrollAction } from "../actions";
-import { Badge, Button, controlClass, DetailAnchorButton, EntityDetailHeader, EntityMetaItem, Field, RecordLink } from "@/components/ui";
+import { Badge, Button, controlClass, DetailAnchorButton, EntityDetailHeader, EntityMetaItem, Field, FormActions, FormPanel, FormSection, MobileCard, RecordLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
 import { can } from "@/lib/permissions";
@@ -62,38 +62,45 @@ export default async function NominaDetallePage({ params }: { params: Promise<{ 
       {hasMissing ? (
         <p className="mb-4 rounded-md bg-[var(--warn-soft)] px-3 py-2 text-sm">Hay colaboradores con datos faltantes. Corrige antes de autorizar.</p>
       ) : null}
-      <ul id="lineas-nomina" className="scroll-mt-24 space-y-3">
+      <ul id="lineas-nomina" className="scroll-mt-24 grid gap-3">
         {row.lines.map((line) => (
-          <li key={line.id} className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
-            <RecordLink href={`/personal/${line.collaboratorId}`}>{line.collaborator.user.name}</RecordLink>
-            {line.collaborator.exemptBenefits ? <span> · solo salario fijo</span> : null}
-            {line.missing ? <p className="text-[var(--danger)]">Falta {line.missing}. No se puede autorizar.</p> : null}
-            <p className="mt-1">Timbrado {money(line.stampedBase)} · Efectivo {money(line.cashBase)} · Descuento {money(line.discountStamped + line.discountCash)}</p>
-            <p>Horas extra {money(line.overtimeStamped + line.overtimeCash)} · Prima {money(line.primaStamped + line.primaCash)} · Bono {money(line.bonus)} · Aguinaldo {money(line.aguinaldoStamped + line.aguinaldoCash)}</p>
-            <p>Transferencia {money(line.transferTotal)} · Efectivo {money(line.cashTotal)}</p>
-            {open && row.kind === "AGUINALDO" && ceo ? (
-              <form action={aguinaldoAdjustAction} className="mt-2 flex flex-wrap gap-2">
-                <input type="hidden" name="periodId" value={row.id} />
-                <input type="hidden" name="lineId" value={line.id} />
-                <input name="stamped" type="number" step="0.01" defaultValue={line.aguinaldoStamped} className="w-28 rounded-md border border-[var(--line)] px-2 py-2" />
-                <input name="cash" type="number" step="0.01" defaultValue={line.aguinaldoCash} className="w-28 rounded-md border border-[var(--line)] px-2 py-2" />
-                <Button type="submit" tone="ghost">Ajustar aguinaldo</Button>
-              </form>
-            ) : null}
+          <li key={line.id}>
+            <MobileCard
+              href={`/personal/${line.collaboratorId}`}
+              title={line.collaborator.user.name}
+              meta={money(line.transferTotal + line.cashTotal)}
+              footer={
+                open && row.kind === "AGUINALDO" && ceo ? (
+                  <form action={aguinaldoAdjustAction} className="flex flex-wrap gap-2">
+                    <input type="hidden" name="periodId" value={row.id} />
+                    <input type="hidden" name="lineId" value={line.id} />
+                    <input name="stamped" type="number" step="0.01" defaultValue={line.aguinaldoStamped} className="w-28 rounded-md border border-[var(--line)] px-2 py-2" />
+                    <input name="cash" type="number" step="0.01" defaultValue={line.aguinaldoCash} className="w-28 rounded-md border border-[var(--line)] px-2 py-2" />
+                    <Button type="submit" tone="ghost">Ajustar aguinaldo</Button>
+                  </form>
+                ) : undefined
+              }
+            >
+              {line.collaborator.exemptBenefits ? <p>Solo salario fijo</p> : null}
+              {line.missing ? <p className="text-[var(--danger)]">Falta {line.missing}. No se puede autorizar.</p> : null}
+              <p>Timbrado {money(line.stampedBase)} · Efectivo {money(line.cashBase)} · Descuento {money(line.discountStamped + line.discountCash)}</p>
+              <p>Horas extra {money(line.overtimeStamped + line.overtimeCash)} · Prima {money(line.primaStamped + line.primaCash)} · Bono {money(line.bonus)} · Aguinaldo {money(line.aguinaldoStamped + line.aguinaldoCash)}</p>
+            </MobileCard>
           </li>
         ))}
       </ul>
       {open ? (
-        <form action={extraAction} className="mt-4 grid max-w-xl gap-2 rounded-lg border border-[var(--line)] bg-white p-4">
-          <h2 className="font-medium">Ingreso o descuento extraordinario</h2>
+        <FormPanel action={extraAction} className="mt-4 max-w-xl">
           <input type="hidden" name="periodId" value={row.id} />
-          <Field label="Colaborador"><select name="collaboratorId" className={controlClass}>{row.lines.filter((line) => !line.collaborator.exemptBenefits).map((line) => <option key={line.id} value={line.collaboratorId}>{line.collaborator.user.name}</option>)}</select></Field>
-          <Field label="Tipo"><select name="kind" className={controlClass}><option value="INGRESO">Ingreso extra</option><option value="DESCUENTO">Descuento extra</option></select></Field>
-          <Field label="Componente"><select name="component" className={controlClass}><option value="TIMBRADO">Timbrado</option><option value="EFECTIVO">Efectivo</option></select></Field>
-          <Field label="Importe"><input name="amount" type="number" min="0.01" step="0.01" required className={controlClass} /></Field>
-          <Field label="Nota"><input name="note" required className={controlClass} /></Field>
-          <Button type="submit" tone="ghost">Agregar movimiento</Button>
-        </form>
+          <FormSection title="Ingreso o descuento extraordinario" columns={1}>
+            <Field label="Colaborador"><select name="collaboratorId" className={controlClass}>{row.lines.filter((line) => !line.collaborator.exemptBenefits).map((line) => <option key={line.id} value={line.collaboratorId}>{line.collaborator.user.name}</option>)}</select></Field>
+            <Field label="Tipo"><select name="kind" className={controlClass}><option value="INGRESO">Ingreso extra</option><option value="DESCUENTO">Descuento extra</option></select></Field>
+            <Field label="Componente"><select name="component" className={controlClass}><option value="TIMBRADO">Timbrado</option><option value="EFECTIVO">Efectivo</option></select></Field>
+            <Field label="Importe"><input name="amount" type="number" min="0.01" step="0.01" required className={controlClass} /></Field>
+            <Field label="Nota"><input name="note" required className={controlClass} /></Field>
+          </FormSection>
+          <FormActions><Button type="submit" tone="ghost">Agregar movimiento</Button></FormActions>
+        </FormPanel>
       ) : null}
       <ul className="mt-3 text-sm">
         {row.adjustments.map((item) => (

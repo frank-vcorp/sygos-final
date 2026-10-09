@@ -1,7 +1,7 @@
 import { cancelMovementAction, createAttentionAction, movementAction } from "@/app/(erp)/equipos/actions";
 import { MovementReasonFields } from "@/components/movement-reason-fields";
 import { SupplierPicker } from "@/components/supplier-picker";
-import { Button, controlClass, Field } from "@/components/ui";
+import { Button, controlClass, Field, FormActions, FormPanel, FormSection } from "@/components/ui";
 import { allowedMovements, MOVEMENT_LABEL, type Custody, type MovementKind } from "@/lib/custody";
 import { ATTENTION_LABEL, ATTENTION_TYPES, prioritySummary } from "@/lib/priorities";
 
@@ -31,11 +31,8 @@ export function AttentionForm({
   repairs: Array<{ id: string; folio: string }>;
   variant?: "card" | "plain";
 }) {
-  const shell = variant === "card" ? "grid gap-3 rounded-lg border border-[var(--line)] bg-white p-4" : "grid gap-3";
-  return (
-    <form action={createAttentionAction} className={shell}>
-      {variant === "card" ? <h2 className="font-medium">Nueva atención</h2> : null}
-      <p className="text-sm text-[var(--muted)]">Es un episodio de servicio. No crea otro equipo ni otro folio.</p>
+  const fields = (
+    <>
       <input type="hidden" name="equipmentId" value={equipmentId} />
       <input type="hidden" name="kind" value={kind} />
       <input type="hidden" name="version" value={version} />
@@ -72,6 +69,21 @@ export function AttentionForm({
           <textarea name="deliveryInstructions" rows={2} className={controlClass} />
         </Field>
       ) : null}
+    </>
+  );
+  if (variant === "card") {
+    return (
+      <FormPanel action={createAttentionAction}>
+        <FormSection title="Nueva atención" description="Es un episodio de servicio. No crea otro equipo ni otro folio." columns={1}>
+          {fields}
+        </FormSection>
+        <FormActions><Button type="submit">Crear atención</Button></FormActions>
+      </FormPanel>
+    );
+  }
+  return (
+    <form action={createAttentionAction} className="grid gap-3">
+      {fields}
       <Button type="submit">Crear atención</Button>
     </form>
   );
@@ -106,11 +118,9 @@ export function MovementForm({
 }) {
   const movements = allowedMovements(kind, custody);
   if (movements.length === 0) return null;
-  const shell = variant === "card" ? "grid gap-3 rounded-lg border border-[var(--line)] bg-white p-4" : "grid gap-3";
-
   if (receiptPreset) {
-    return (
-      <form action={movementAction} className={shell}>
+    const body = (
+      <>
         <input type="hidden" name="equipmentId" value={equipmentId} />
         <input type="hidden" name="kind" value={kind} />
         <input type="hidden" name="version" value={version} />
@@ -126,6 +136,19 @@ export function MovementForm({
           <div><dt className="text-[var(--muted)]">Falla reportada</dt><dd>{receiptPreset.reportedFault}</dd></div>
           <div><dt className="text-[var(--muted)]">Movimiento</dt><dd>{MOVEMENT_LABEL[receiptPreset.movement]}</dd></div>
         </dl>
+      </>
+    );
+    if (variant === "card") {
+      return (
+        <FormPanel action={movementAction}>
+          {body}
+          <FormActions><Button type="submit">Confirmar {MOVEMENT_LABEL[receiptPreset.movement].toLowerCase()} física</Button></FormActions>
+        </FormPanel>
+      );
+    }
+    return (
+      <form action={movementAction} className="grid gap-3">
+        {body}
         <Button type="submit">Confirmar {MOVEMENT_LABEL[receiptPreset.movement].toLowerCase()} física</Button>
       </form>
     );
@@ -133,9 +156,8 @@ export function MovementForm({
 
   const isSimpleExit = movements.length === 1 && movements[0] === "RETORNO";
 
-  return (
-    <form action={movementAction} className={shell}>
-      {variant === "card" ? <h2 className="font-medium">Registrar movimiento</h2> : null}
+  const movementBody = (
+    <>
       <input type="hidden" name="equipmentId" value={equipmentId} />
       <input type="hidden" name="kind" value={kind} />
       <input type="hidden" name="version" value={version} />
@@ -171,6 +193,20 @@ export function MovementForm({
         />
       ) : null}
       <Field label="Observaciones"><textarea name="notes" rows={2} className={controlClass} /></Field>
+    </>
+  );
+
+  if (variant === "card") {
+    return (
+      <FormPanel action={movementAction}>
+        <FormSection title="Registrar movimiento" columns={1}>{movementBody}</FormSection>
+        <FormActions><Button type="submit">Confirmar movimiento</Button></FormActions>
+      </FormPanel>
+    );
+  }
+  return (
+    <form action={movementAction} className="grid gap-3">
+      {movementBody}
       <Button type="submit">Confirmar movimiento</Button>
     </form>
   );

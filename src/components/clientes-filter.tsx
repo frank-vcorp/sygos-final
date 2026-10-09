@@ -37,7 +37,7 @@ export function ClientesFilter({ query, estado }: { query: string; estado: strin
 
   return (
     <form
-      className="mb-4 flex flex-col gap-2 rounded-lg border border-[var(--line)] bg-white p-3 sm:flex-row sm:flex-wrap sm:items-center"
+      className="mb-4 flex flex-col gap-2 rounded-lg border border-[var(--line)] bg-white p-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-2"
       onSubmit={(event) => {
         event.preventDefault();
         skipDebounce.current = true;

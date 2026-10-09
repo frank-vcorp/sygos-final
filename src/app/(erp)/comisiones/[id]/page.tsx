@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { commissionAdjustAction, commissionPayAction } from "../actions";
-import { Badge, Button, DetailAnchorButton, EntityDetailHeader, EntityMetaItem } from "@/components/ui";
+import { Badge, Button, DetailAnchorButton, EntityDetailHeader, EntityMetaItem, MobileCard } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
 import { can } from "@/lib/permissions";
@@ -50,20 +50,26 @@ export default async function ComisionPage({ params }: { params: Promise<{ id: s
         }
         primaryAction={primaryAction}
       />
-      <ul id="lineas-comision" className="scroll-mt-24 space-y-3">
+      <ul id="lineas-comision" className="scroll-mt-24 grid gap-3">
         {row.lines.map((line) => (
-          <li key={line.id} className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
-            <p className="font-medium">{line.label}</p>
-            <p className="mt-1">Fuente {money(line.sourceAmount)} · original {money(line.original)} · ajuste {money(line.adjustment)} · final {money(line.finalAmount)}</p>
-            <p className="mt-1 text-[var(--muted)]">{line.parameters}</p>
-            {open && ceo ? (
-              <form action={commissionAdjustAction} className="mt-2 flex gap-2">
-                <input type="hidden" name="runId" value={row.id} />
-                <input type="hidden" name="lineId" value={line.id} />
-                <input name="adjustment" type="number" step="0.01" defaultValue={line.adjustment} className="w-28 rounded-md border border-[var(--line)] px-2 py-2" />
-                <Button type="submit" tone="ghost">Ajustar</Button>
-              </form>
-            ) : null}
+          <li key={line.id}>
+            <MobileCard
+              title={line.label}
+              meta={money(line.finalAmount)}
+              footer={
+                open && ceo ? (
+                  <form action={commissionAdjustAction} className="flex flex-wrap gap-2">
+                    <input type="hidden" name="runId" value={row.id} />
+                    <input type="hidden" name="lineId" value={line.id} />
+                    <input name="adjustment" type="number" step="0.01" defaultValue={line.adjustment} className="w-28 rounded-md border border-[var(--line)] px-2 py-2" />
+                    <Button type="submit" tone="ghost">Ajustar</Button>
+                  </form>
+                ) : undefined
+              }
+            >
+              <p>Fuente {money(line.sourceAmount)} · original {money(line.original)} · ajuste {money(line.adjustment)}</p>
+              <p>{line.parameters}</p>
+            </MobileCard>
           </li>
         ))}
       </ul>

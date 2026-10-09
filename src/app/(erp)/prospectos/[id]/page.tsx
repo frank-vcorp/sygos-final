@@ -20,6 +20,8 @@ import {
   FormActions,
   FormPanel,
   FormSection,
+  Card,
+  MobileCard,
   RecordLink,
 } from "@/components/ui";
 import { prisma } from "@/lib/db";
@@ -110,27 +112,32 @@ export default async function ProspectoDetallePage({ params }: { params: Promise
         <p className="mb-4 text-sm text-[var(--muted)]">{prospect.note}</p>
       ) : null}
 
-      <section id="seguimiento-prospecto" className="scroll-mt-24 rounded-lg border border-[var(--line)] bg-white p-4">
-        <h2 className="font-medium">Seguimiento</h2>
-        <p className="mt-1 text-xs text-[var(--muted)]">La fecha siguiente es informativa. No genera recordatorios.</p>
-        <ul className="mt-3 space-y-2 text-sm">
-          {prospect.activities.length === 0 ? <li className="text-[var(--muted)]">Sin actividades.</li> : prospect.activities.map((activity) => (
-            <li key={activity.id}>
-              <span className="text-[var(--muted)]">{formatWhen(activity.createdAt)} · {authorName.get(activity.authorUserId) ?? "Usuario"}</span>
-              <p>{activity.note}</p>
-              {activity.nextFollowUp ? <p className="text-[var(--muted)]">Siguiente: {formatWhen(activity.nextFollowUp)}</p> : null}
-            </li>
-          ))}
-        </ul>
+      <div id="seguimiento-prospecto" className="scroll-mt-24">
+        <Card className="p-4">
+          <h2 className="font-medium">Seguimiento</h2>
+          <p className="mt-1 text-xs text-[var(--muted)]">La fecha siguiente es informativa. No genera recordatorios.</p>
+          <ul className="mt-3 grid gap-3 text-sm">
+            {prospect.activities.length === 0 ? <li className="text-[var(--muted)]">Sin actividades.</li> : prospect.activities.map((activity) => (
+              <li key={activity.id}>
+                <MobileCard title={`${formatWhen(activity.createdAt)} · ${authorName.get(activity.authorUserId) ?? "Usuario"}`}>
+                  <p>{activity.note}</p>
+                  {activity.nextFollowUp ? <p>Siguiente: {formatWhen(activity.nextFollowUp)}</p> : null}
+                </MobileCard>
+              </li>
+            ))}
+          </ul>
+        </Card>
         {open ? (
-          <form action={addProspectActivityAction} className="mt-4 grid gap-3">
+          <FormPanel action={addProspectActivityAction} className="mt-4 max-w-xl">
             <input type="hidden" name="id" value={prospect.id} />
-            <Field label="Nota"><textarea name="note" required rows={2} className={controlClass} /></Field>
-            <Field label="Siguiente seguimiento"><input type="date" name="nextFollowUp" className={controlClass} /></Field>
-            <Button type="submit">Registrar actividad</Button>
-          </form>
+            <FormSection title="Nueva actividad" columns={1}>
+              <Field label="Nota"><textarea name="note" required rows={2} className={controlClass} /></Field>
+              <Field label="Siguiente seguimiento"><input type="date" name="nextFollowUp" className={controlClass} /></Field>
+            </FormSection>
+            <FormActions><Button type="submit">Registrar actividad</Button></FormActions>
+          </FormPanel>
         ) : null}
-      </section>
+      </div>
 
       {open ? (
         <div id="conversion-prospecto" className="scroll-mt-24">
@@ -145,11 +152,14 @@ export default async function ProspectoDetallePage({ params }: { params: Promise
       ) : null}
 
       {prospect.status === "DESCARTADO" && (session.role === "CEO" || session.role === "ADMINISTRADOR") ? (
-        <form action={reactivateProspectAction} className="mt-4 rounded-lg border border-[var(--line)] bg-white p-4">
+        <FormPanel action={reactivateProspectAction} className="mt-4 max-w-xl">
           <input type="hidden" name="id" value={prospect.id} />
           <input type="hidden" name="version" value={prospect.version} />
-          <Button type="submit" tone="ghost">Reactivar a En seguimiento</Button>
-        </form>
+          <FormSection title="Reactivar prospecto" description="Vuelve a estado En seguimiento." columns={1}>
+            <p className="text-sm text-[var(--muted)]">El historial de actividades se conserva.</p>
+          </FormSection>
+          <FormActions><Button type="submit" tone="ghost">Reactivar a En seguimiento</Button></FormActions>
+        </FormPanel>
       ) : null}
 
       <HistoryTimeline className="mt-6" items={history.map((item) => ({ id: item.id, createdAt: item.createdAt, summary: item.summary, authorName: item.author?.name }))} />

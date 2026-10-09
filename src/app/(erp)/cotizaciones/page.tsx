@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { ClientNameLink } from "@/components/client-entity-links";
-import { ActionLink, ActiveFilters, Badge, Button, controlClass, Empty, FilterBar, ListCap, MobileCard, PageHeader, RecordLink, ResponsiveData, SegmentedNav, Table, Td, Th, TextLink } from "@/components/ui";
+import { ActionLink, ActiveFilters, Badge, Button, Card, controlClass, Empty, FilterBar, ListCap, MobileCard, PageHeader, RecordLink, ResponsiveData, SegmentedNav, Table, Td, Th, TextLink } from "@/components/ui";
 import { listHref } from "@/lib/list-url";
 import { homePath } from "@/lib/home";
 import { prisma } from "@/lib/db";
@@ -83,14 +83,14 @@ export default async function CotizacionesPage({ searchParams }: { searchParams:
         ]}
       />
       {cases.length > 0 ? (
-        <ul className="mb-4 divide-y divide-[var(--line)] rounded-lg border border-[var(--line)] bg-white">
+        <Card className="mb-4 divide-y divide-[var(--line)] overflow-hidden">
           {cases.map((row) => (
-            <li key={row.id} className="px-4 py-3 text-sm">
+            <div key={row.id} className="px-4 py-3 text-sm">
               <RecordLink href={`/operacion/${row.id}`}>{row.folio}</RecordLink>
               <span className="text-[var(--muted)]"> · {row.equipment.folio} aún no tiene cotización</span>
-            </li>
+            </div>
           ))}
-        </ul>
+        </Card>
       ) : null}
       {quotes.length === 0 ? (
         <Empty

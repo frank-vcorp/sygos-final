@@ -11,6 +11,7 @@ import {
   FormPanel,
   FormSection,
   MobileCard,
+  Card,
   RecordLink,
   ResponsiveData,
 } from "@/components/ui";
@@ -95,7 +96,8 @@ export default async function HorasPage() {
               table={
                 <ul className="space-y-2 text-sm">
                   {pending.map((row) => (
-                    <li key={row.id} className="rounded-lg border border-[var(--line)] bg-white px-4 py-3">
+                    <li key={row.id}>
+                      <Card className="px-4 py-3">
                       <p>
                         <RecordLink href={`/personal/${row.collaboratorId}`}>{row.collaborator.user.name}</RecordLink>
                         {" · "}
@@ -111,6 +113,7 @@ export default async function HorasPage() {
                           <Button type="submit" name="decision" value="no" tone="ghost">Rechazar</Button>
                         </form>
                       )}
+                      </Card>
                     </li>
                   ))}
                 </ul>

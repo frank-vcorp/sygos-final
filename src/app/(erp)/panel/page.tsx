@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { redirect } from "next/navigation";
 import { ClientNameLink } from "@/components/client-entity-links";
-import { KpiCard, PageHeader, RecordLink, TextLink } from "@/components/ui";
+import { Card, KpiCard, PageHeader, RecordLink, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
 import { can } from "@/lib/permissions";
@@ -26,7 +26,7 @@ function Block({
   bandejaHref?: string;
 }) {
   return (
-    <section className="rounded-lg border border-[var(--line)] bg-white p-4">
+    <Card className="p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-medium">{title}</h2>
         {bandejaHref ? <TextLink href={bandejaHref}>Ver bandeja</TextLink> : null}
@@ -36,7 +36,7 @@ function Block({
           {rows.map((row) => <li key={row.key ?? row.href + row.label}><RecordLink href={row.href}>{row.label}</RecordLink> · {row.detail}</li>)}
         </ul>
       )}
-    </section>
+    </Card>
   );
 }
 
@@ -265,12 +265,12 @@ async function Sales({ companyId, userId }: { companyId: string; userId: string 
         <KpiCard label="Saldo en cobranza" value={money(receivables.reduce((sum, row) => sum + row.balance, 0))} href="/cobranza?vista=cxc" />
       </section>
       {goals.length > 0 ? (
-        <section className="mb-4 rounded-lg border border-[var(--line)] bg-white p-4">
+        <Card className="mb-4 p-4">
           <h2 className="font-medium">Mi desempeño — metas del mes</h2>
           <ul className="mt-2 space-y-1 text-sm">
             {goals.map((goal) => <li key={goal.id}>{goal.goalType.name}: objetivo {goal.target}</li>)}
           </ul>
-        </section>
+        </Card>
       ) : null}
       <div className="grid gap-3">
         <Block title="Servicios de tu cartera" empty="No hay servicios activos ni atenciones en espera de ingreso para tus clientes." bandejaHref="/servicios/activos" rows={serviciosCartera.slice(0, 10).map((row) => {
@@ -425,9 +425,9 @@ async function CeoExecutive({ companyId, name, vista }: { companyId: string; nam
     <>
       <PageHeader title={`Panel ${name}`} subtitle={subtitle} />
       {vista === "empresa" ? (
-        <p className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm text-[var(--muted)]">
+        <Card className="p-4 text-sm text-[var(--muted)]">
           El CEO y Coordinación trabajan en SYSTRON o Servomotores cambiando la empresa activa arriba. Todas las cifras y listas de esta pantalla corresponden solo a la empresa seleccionada.
-        </p>
+        </Card>
       ) : null}
       {!vista ? (
         <section className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">

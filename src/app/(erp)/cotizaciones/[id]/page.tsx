@@ -6,6 +6,7 @@ import { HistoryTimeline } from "@/components/history-timeline";
 import { ConfirmSubmit, SubmitButton } from "@/components/submit-button";
 import {
   Badge,
+  Button,
   Card,
   controlClass,
   DetailAnchorButton,
@@ -161,19 +162,19 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
               {quote.client.isSystem && session.activeCompanyCode === "SERVOMOTORES" ? (
                 <form action={requestIntercompanyAction}>
                   <input type="hidden" name="quoteId" value={quote.id} />
-                  <button className="rounded-md border border-[var(--line)] px-3 py-2 text-sm">Solicitar factura a SYSTRON</button>
+                  <Button type="submit" tone="ghost">Solicitar factura a SYSTRON</Button>
                 </form>
               ) : !quote.client.isSystem ? (
                 <>
                   <form action={requestDocumentAction}>
                     <input type="hidden" name="quoteId" value={quote.id} />
                     <input type="hidden" name="kind" value="FACTURA" />
-                    <button className="rounded-md border border-[var(--line)] px-3 py-2 text-sm">Solicitar factura</button>
+                    <Button type="submit" tone="ghost">Solicitar factura</Button>
                   </form>
                   <form action={requestDocumentAction}>
                     <input type="hidden" name="quoteId" value={quote.id} />
                     <input type="hidden" name="kind" value="REMISION" />
-                    <button className="rounded-md border border-[var(--line)] px-3 py-2 text-sm">Solicitar remisión</button>
+                    <Button type="submit" tone="ghost">Solicitar remisión</Button>
                   </form>
                 </>
               ) : null}

@@ -39,7 +39,7 @@ export function AgendaCalendar({
   return (
     <div>
       {view === "semana" ? <p className="mb-2 text-xs text-[var(--muted)] md:hidden">Desliza horizontalmente para recorrer la semana.</p> : null}
-    <div className="overflow-x-auto rounded-lg border border-[var(--line)] bg-white">
+    <div className="overflow-x-auto rounded-xl border border-[var(--line)] bg-white shadow-[0_1px_2px_rgba(20,37,30,0.05)]">
       <div className={`grid ${view === "semana" ? "min-w-[700px]" : "min-w-0"}`} style={{ gridTemplateColumns: `64px repeat(${days.length}, minmax(0, 1fr))` }}>
         <div />
         {days.map((day) => (

@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { collectionNoteAction } from "../actions";
 import { ClientNameLink } from "@/components/client-entity-links";
-import { Badge, Button, controlClass, DetailAnchorButton, EntityDetailHeader, EntityMetaItem, Field, TextLink } from "@/components/ui";
+import { Badge, Button, Card, controlClass, DetailAnchorButton, EntityDetailHeader, EntityMetaItem, Field, FormActions, FormPanel, FormSection, MobileCard, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
 import { money } from "@/lib/money";
@@ -48,7 +48,7 @@ export default async function CuentaPage({ params }: { params: Promise<{ id: str
         primaryAction={canNote && row.balance > 0 ? <DetailAnchorButton href="#seguimiento-cobranza">Registrar seguimiento</DetailAnchorButton> : null}
         secondaryActions={can(session.role, "payment.register", session.activeCompanyCode) ? <TextLink href="/pagos/nuevo">Registrar pago</TextLink> : null}
       />
-      <section className="mb-4 rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
+      <Card className="mb-4 p-4 text-sm">
         <h2 className="font-medium">Pagos aplicados</h2>
         {confirmedApps.length === 0 ? <p className="mt-1 text-[var(--muted)]">Todavía no hay un pago validado.</p> : (
           <ul className="mt-2 space-y-1">
@@ -61,22 +61,24 @@ export default async function CuentaPage({ params }: { params: Promise<{ id: str
             ))}
           </ul>
         )}
-      </section>
+      </Card>
       {canNote ? (
-        <form id="seguimiento-cobranza" action={collectionNoteAction} className="grid max-w-xl scroll-mt-24 gap-2 rounded-lg border border-[var(--line)] bg-white p-4">
-          <h2 className="font-medium">Seguimiento de cobranza</h2>
+        <FormPanel id="seguimiento-cobranza" action={collectionNoteAction} className="max-w-xl scroll-mt-24">
           <input type="hidden" name="receivableId" value={row.id} />
-          <Field label="Nota"><textarea name="note" required rows={3} className={controlClass} /></Field>
-          <Field label="Próximo seguimiento"><input name="followUpAt" type="datetime-local" className={controlClass} /></Field>
-          <Button type="submit" tone="ghost">Guardar seguimiento</Button>
-        </form>
+          <FormSection title="Seguimiento de cobranza" columns={1}>
+            <Field label="Nota"><textarea name="note" required rows={3} className={controlClass} /></Field>
+            <Field label="Próximo seguimiento"><input name="followUpAt" type="datetime-local" className={controlClass} /></Field>
+          </FormSection>
+          <FormActions><Button type="submit" tone="ghost">Guardar seguimiento</Button></FormActions>
+        </FormPanel>
       ) : null}
       {row.notes.length > 0 ? (
-        <ul className="mt-4 space-y-2 text-sm">
+        <ul className="mt-4 grid gap-3 text-sm">
           {row.notes.map((note) => (
-            <li key={note.id} className="rounded-md border border-[var(--line)] bg-white px-3 py-2">
-              <span className="text-[var(--muted)]">{formatWhen(note.createdAt)}</span> · {note.note}
-              {note.followUpAt ? ` · siguiente ${formatWhen(note.followUpAt)}` : ""}
+            <li key={note.id}>
+              <MobileCard title={formatWhen(note.createdAt)}>
+                <p>{note.note}{note.followUpAt ? ` · siguiente ${formatWhen(note.followUpAt)}` : ""}</p>
+              </MobileCard>
             </li>
           ))}
         </ul>

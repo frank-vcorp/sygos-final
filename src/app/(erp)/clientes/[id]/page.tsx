@@ -11,7 +11,7 @@ import {
   ClientRelationsHub,
 } from "@/components/client-detail-panels";
 import { HistoryTimeline } from "@/components/history-timeline";
-import { ActionLink, Badge, EntityDetailHeader, EntityMetaItem, RecordLink } from "@/components/ui";
+import { ActionLink, Badge, Card, EntityDetailHeader, EntityMetaItem, RecordLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { historyFor } from "@/lib/history";
 import { can } from "@/lib/permissions";
@@ -49,11 +49,11 @@ export default async function ClienteDetallePage({ params }: { params: Promise<{
           subtitle="Cliente intercompañía fijo"
           status={<Badge>Intercompañía</Badge>}
         />
-        <section className="max-w-xl rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
+        <Card className="max-w-xl p-4 text-sm">
           <p>Las operaciones que SYSTRON envía a Servomotores usan este cliente. No se edita ni se inactiva.</p>
           <p className="mt-3">Régimen fiscal: {regimenLabel(client.taxRegime)}</p>
           <p className="mt-1">Requiere factura: {client.requiresInvoice ? "Sí" : "No"}</p>
-        </section>
+        </Card>
         <section className="mt-4 max-w-xl">
           <h2 className="mb-2 font-medium">MOT intercompañía</h2>
           {motors.length === 0 ? <p className="text-sm text-[var(--muted)]">Sin motores enviados por SYSTRON.</p> : (

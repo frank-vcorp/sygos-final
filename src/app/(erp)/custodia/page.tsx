@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { ActiveFilters, Badge, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, SegmentedNav, Table, Td, Th } from "@/components/ui";
+import { ActiveFilters, Badge, Card, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, SegmentedNav, Table, Td, Th } from "@/components/ui";
 import { CUSTODY_LABEL, type Custody } from "@/lib/custody";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
@@ -113,7 +113,7 @@ async function SaleQueue({ companyId }: { companyId: string }) {
   const open = sales.filter((sale) => sale.lines.some((line) => line.qtyReceived < line.qtySold || line.qtyDelivered < line.qtyReceived));
   if (open.length === 0) return null;
   return (
-    <section className="mb-4 rounded-lg border border-[var(--line)] bg-white p-4">
+    <Card className="mb-4 p-4">
       <h2 className="font-medium">Mercancía de venta</h2>
       <p className="mt-1 text-sm text-[var(--muted)]">Recepción y entrega de lo autorizado. No entra al inventario de refacciones.</p>
       <ul className="mt-3 space-y-2 text-sm">
@@ -130,6 +130,6 @@ async function SaleQueue({ companyId }: { companyId: string }) {
           );
         })}
       </ul>
-    </section>
+    </Card>
   );
 }

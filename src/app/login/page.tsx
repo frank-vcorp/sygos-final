@@ -3,7 +3,7 @@ import { loginAction } from "@/app/auth-actions";
 import { SygosLogo } from "@/components/brand-logo";
 import { FlashBanner } from "@/components/flash-banner";
 import { SubmitButton } from "@/components/submit-button";
-import { controlClass, Field } from "@/components/ui";
+import { controlClass, Field, FormActions, FormPanel, FormSection } from "@/components/ui";
 import { takeFlash } from "@/lib/flash";
 import { getSession } from "@/lib/session";
 
@@ -21,16 +21,20 @@ export default async function LoginPage() {
       <SygosLogo />
       <h1 className="mt-5 text-3xl font-semibold tracking-tight">Entrar</h1>
       <p className="mt-2 text-sm text-[var(--muted)]">Operación de SYSTRON y Servomotores. Elige la empresa después de entrar si tu rol trabaja en ambas.</p>
-      <form action={loginAction} className="mt-6 space-y-4 rounded-lg border border-[var(--line)] bg-white p-5">
-        {flash ? <FlashBanner flash={flash} /> : null}
-        <Field label="Usuario">
-          <input name="username" required autoComplete="username" className={controlClass} />
-        </Field>
-        <Field label="Contraseña">
-          <input name="password" required type="password" autoComplete="current-password" className={controlClass} />
-        </Field>
-        <SubmitButton className="w-full" pendingLabel="Entrando…">Entrar</SubmitButton>
-      </form>
+      <FormPanel action={loginAction} className="mt-6 max-w-none">
+        <FormSection title="Acceso" columns={1}>
+          {flash ? <FlashBanner flash={flash} /> : null}
+          <Field label="Usuario">
+            <input name="username" required autoComplete="username" className={controlClass} />
+          </Field>
+          <Field label="Contraseña">
+            <input name="password" required type="password" autoComplete="current-password" className={controlClass} />
+          </Field>
+        </FormSection>
+        <FormActions>
+          <SubmitButton className="w-full sm:w-auto" pendingLabel="Entrando…">Entrar</SubmitButton>
+        </FormActions>
+      </FormPanel>
     </main>
   );
 }

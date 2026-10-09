@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { confirmIntercompanyAction, validatePaymentAction } from "../actions";
 import { HistoryTimeline } from "@/components/history-timeline";
 import { ClientNameLink } from "@/components/client-entity-links";
-import { Badge, Button, EntityDetailHeader, EntityMetaItem, TextLink } from "@/components/ui";
+import { Badge, Button, Card, EntityDetailHeader, EntityMetaItem, TextLink } from "@/components/ui";
 import { homePath } from "@/lib/home";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
@@ -69,7 +69,7 @@ export default async function PagoPage({ params }: { params: Promise<{ id: strin
         primaryAction={primaryAction}
       />
       {applied.length > 0 ? (
-        <section className="mb-4 rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
+        <Card className="mb-4 p-4 text-sm">
           <h2 className="font-medium">Aplicado a</h2>
           <ul className="mt-2 space-y-1">
             {applied.map((item) => (
@@ -84,7 +84,7 @@ export default async function PagoPage({ params }: { params: Promise<{ id: strin
               </li>
             ))}
           </ul>
-        </section>
+        </Card>
       ) : null}
       <HistoryTimeline className="mt-6" items={history.map((item) => ({ id: item.id, createdAt: item.createdAt, summary: item.summary, authorName: item.author?.name }))} />
     </>

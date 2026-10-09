@@ -2,7 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { issueDocumentAction, retryFiscalAction } from "../actions";
 import { HistoryTimeline } from "@/components/history-timeline";
 import { ClientNameLink } from "@/components/client-entity-links";
-import { Badge, Button, EntityDetailHeader, EntityMetaItem, TextLink } from "@/components/ui";
+import { Badge, Button, Card, EntityDetailHeader, EntityMetaItem, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
 import { historyFor } from "@/lib/history";
@@ -81,12 +81,12 @@ export default async function DocumentoPage({ params }: { params: Promise<{ id: 
         }
         primaryAction={primaryAction}
       />
-      <section className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
+      <Card className="p-4 text-sm">
         {row.rfcSnapshot ? <p>RFC congelado: {row.rfcSnapshot}</p> : null}
         <p className={row.rfcSnapshot ? "mt-1" : ""}>Subtotal {money(row.subtotal)} · IVA {money(row.iva)}</p>
         {row.fiscalError ? <p className="mt-3 rounded-md bg-[var(--warn-soft)] px-3 py-2">{row.fiscalError}</p> : null}
         <ul className="mt-3 space-y-1">{row.lines.map((line) => <li key={line.id}>{line.concept} · {money(line.amount)}</li>)}</ul>
-      </section>
+      </Card>
       <HistoryTimeline className="mt-6" items={history.map((item) => ({ id: item.id, createdAt: item.createdAt, summary: item.summary, authorName: item.author?.name }))} />
     </>
   );
