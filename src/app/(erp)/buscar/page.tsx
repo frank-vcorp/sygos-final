@@ -1,6 +1,5 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Empty, PageHeader } from "@/components/ui";
+import { ActiveFilters, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
@@ -69,20 +68,29 @@ export default async function BuscarPage({ searchParams }: { searchParams: Promi
   ];
   return (
     <>
-      <PageHeader title={`Resultados para “${query}”`} subtitle={session.activeCompanyName ?? ""} />
+      <PageHeader title="Búsqueda global" subtitle={session.activeCompanyName ?? ""} />
+      <ActiveFilters items={[{ label: `“${query}”`, clearHref: "/buscar" }]} />
       {rows.length === 0 ? (
-        <Empty title="Sin coincidencias" body="No hay registros con ese texto en la empresa activa." />
+        <Empty title="Sin coincidencias" body="No hay registros con ese texto en la empresa activa." action={<TextLink href="/buscar">Nueva búsqueda</TextLink>} />
       ) : (
-        <ul className="divide-y divide-[var(--line)] rounded-lg border border-[var(--line)] bg-white">
-          {rows.map((row) => (
-            <li key={row.href}>
-              <Link href={row.href} className="flex items-center justify-between px-4 py-3 hover:bg-[#f7f8f9]">
-                <span className="font-medium">{row.label}</span>
-                <span className="text-xs text-[var(--muted)]">{row.kind}</span>
-              </Link>
-            </li>
+        <ResponsiveData
+          table={
+            <table className="w-full text-sm">
+              <thead><tr><th className="px-3 py-2 text-left font-medium">Registro</th><th className="px-3 py-2 text-left font-medium">Tipo</th></tr></thead>
+              <tbody>
+                {rows.map((row) => (
+                  <tr key={`${row.kind}-${row.href}-${row.label}`} className="border-t border-[var(--line)]">
+                    <td className="px-3 py-2"><RecordLink href={row.href}>{row.label}</RecordLink></td>
+                    <td className="px-3 py-2 text-[var(--muted)]">{row.kind}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          }
+          cards={rows.map((row) => (
+            <MobileCard key={`${row.kind}-${row.href}-${row.label}`} href={row.href} title={row.label} meta={row.kind} />
           ))}
-        </ul>
+        />
       )}
     </>
   );

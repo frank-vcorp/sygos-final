@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { PageHeader, RecordLink, Table, Td, TextLink, Th } from "@/components/ui";
+import { ActiveFilters, Button, Card, controlClass, Empty, Field, FilterBar, PageHeader, RecordLink, Table, Td, TextLink, Th } from "@/components/ui";
+import { listHref } from "@/lib/list-url";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { reportTable, visibleReports } from "@/lib/reports";
@@ -13,9 +14,20 @@ export default async function ReportesPage() {
   return (
     <>
       <PageHeader title="Reportes" subtitle={`${session.activeCompanyName}. La consulta no mezcla empresas ni crea registros.`} />
-      <ul className="space-y-2">
-        {reports.map((report) => <li key={report.id}><RecordLink href={`/reportes/${report.id}`}>{report.label}</RecordLink></li>)}
-      </ul>
+      {reports.length === 0 ? (
+        <Empty title="Sin reportes" body="Tu rol no tiene reportes asignados en esta empresa." />
+      ) : (
+        <ul className="grid gap-3 sm:grid-cols-2">
+          {reports.map((report) => (
+            <li key={report.id}>
+              <Card className="flex h-full flex-col justify-between p-4">
+                <RecordLink href={`/reportes/${report.id}`} className="text-base">{report.label}</RecordLink>
+                <p className="mt-2 text-xs text-[var(--muted)]">Consulta solo lectura · abre el detalle del folio desde la tabla.</p>
+              </Card>
+            </li>
+          ))}
+        </ul>
+      )}
     </>
   );
 }
@@ -35,11 +47,17 @@ export async function ReportView({ params, searchParams }: { params: Promise<{ t
   return (
     <>
       <PageHeader back={{ href: "/reportes", label: "Reportes" }} title={table.title} subtitle="El folio abre el registro real." action={<TextLink href={`/reportes/${tipo}/csv?${query.toString()}`}>Descargar CSV</TextLink>} />
-      <form className="mb-4 flex flex-wrap items-end gap-2 text-sm">
-        <label>Desde <input name="desde" type="date" defaultValue={desde} className="rounded-md border border-[var(--line)] px-2 py-2" /></label>
-        <label>Hasta <input name="hasta" type="date" defaultValue={hasta} className="rounded-md border border-[var(--line)] px-2 py-2" /></label>
-        <button className="rounded-md border border-[var(--line)] px-3 py-2">Filtrar</button>
-      </form>
+      <FilterBar action={`/reportes/${tipo}`}>
+        <Field label="Desde"><input name="desde" type="date" defaultValue={desde} className={controlClass} /></Field>
+        <Field label="Hasta"><input name="hasta" type="date" defaultValue={hasta} className={controlClass} /></Field>
+        <Button type="submit" tone="ghost">Filtrar</Button>
+      </FilterBar>
+      <ActiveFilters
+        items={[
+          ...(desde ? [{ label: `Desde ${desde}`, clearHref: listHref(`/reportes/${tipo}`, { hasta }) }] : []),
+          ...(hasta ? [{ label: `Hasta ${hasta}`, clearHref: listHref(`/reportes/${tipo}`, { desde }) }] : []),
+        ]}
+      />
       <Table>
         <thead><tr>{table.headers.map((header) => <Th key={header}>{header}</Th>)}</tr></thead>
         <tbody>

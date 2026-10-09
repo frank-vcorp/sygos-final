@@ -2,7 +2,20 @@ import { redirect } from "next/navigation";
 import { createActivityAction, saveGoalAction } from "./actions";
 import { AgendaCalendar } from "@/components/agenda-calendar";
 import { QuickPanel } from "@/components/quick-panel";
-import { Button, controlClass, Field, PageHeader } from "@/components/ui";
+import {
+  ActionLink,
+  ActiveFilters,
+  Button,
+  controlClass,
+  DetailAnchorButton,
+  EntityDetailHeader,
+  Field,
+  FormActions,
+  FormPanel,
+  FormSection,
+  SegmentedNav,
+} from "@/components/ui";
+import { listHref } from "@/lib/list-url";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
@@ -12,7 +25,8 @@ export default async function AgendaPage({ searchParams }: { searchParams: Promi
   if (!can(session.role, "agenda.use", session.activeCompanyCode)) redirect("/inicio");
   const { vista: rawVista, fecha, slot } = await searchParams;
   const vista = rawVista === "semana" || rawVista === "mes" ? rawVista : "dia";
-  const anchor = /^\d{4}-\d{2}-\d{2}$/.test(fecha ?? "") ? fecha! : todayKey();
+  const today = todayKey();
+  const anchor = /^\d{4}-\d{2}-\d{2}$/.test(fecha ?? "") ? fecha! : today;
   const start = parseDay(anchor);
   const end = new Date(start);
   if (vista === "semana") end.setDate(end.getDate() + 7);
@@ -30,51 +44,71 @@ export default async function AgendaPage({ searchParams }: { searchParams: Promi
       : Promise.resolve([]),
     prisma.goalType.findFirst({ where: { companyId: session.activeCompanyId, name: "Clientes nuevos", active: true } }),
   ]);
+  const vistaLabel = vista === "dia" ? "Día" : vista === "semana" ? "Semana" : "Mes";
+
   return (
     <>
-      <PageHeader title="Agenda comercial" subtitle="Elige un horario en el calendario para agendar. No genera recordatorios." />
+      <EntityDetailHeader
+        title="Agenda comercial"
+        subtitle="Elige un horario en el calendario. No genera recordatorios automáticos."
+        primaryAction={<DetailAnchorButton href="#nueva">Nueva actividad</DetailAnchorButton>}
+        secondaryActions={goalType && sellers.length > 0 ? <ActionLink href="#metas" tone="ghost">Metas del mes</ActionLink> : null}
+      />
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <a href={`/agenda?vista=${vista}&fecha=${shiftDay(anchor, vista, -1)}`} className="rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm">Anterior</a>
-        <a href={`/agenda?vista=${vista}&fecha=${todayKey()}`} className="rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm">Hoy</a>
-        <a href={`/agenda?vista=${vista}&fecha=${shiftDay(anchor, vista, 1)}`} className="rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm">Siguiente</a>
-        {[["dia", "Día"], ["semana", "Semana"], ["mes", "Mes"]].map(([key, label]) => (
-          <a key={key} href={`/agenda?vista=${key}&fecha=${anchor}`} className={`rounded-md px-3 py-2 text-sm ${vista === key ? "bg-[var(--accent)] text-white" : "border border-[var(--line)] bg-white"}`}>{label}</a>
-        ))}
+        <ActionLink href={`/agenda?vista=${vista}&fecha=${shiftDay(anchor, vista, -1)}`} tone="ghost">Anterior</ActionLink>
+        <ActionLink href={`/agenda?vista=${vista}&fecha=${today}`} tone="ghost">Hoy</ActionLink>
+        <ActionLink href={`/agenda?vista=${vista}&fecha=${shiftDay(anchor, vista, 1)}`} tone="ghost">Siguiente</ActionLink>
         <span className="text-sm text-[var(--muted)]">{anchor}</span>
       </div>
+      <SegmentedNav
+        items={[
+          { href: listHref("/agenda", { vista: "dia", fecha: anchor }), label: "Día", active: vista === "dia" },
+          { href: listHref("/agenda", { vista: "semana", fecha: anchor }), label: "Semana", active: vista === "semana" },
+          { href: listHref("/agenda", { vista: "mes", fecha: anchor }), label: "Mes", active: vista === "mes" },
+        ]}
+      />
+      <ActiveFilters
+        items={[
+          ...(vista !== "dia" ? [{ label: vistaLabel, clearHref: listHref("/agenda", { fecha: anchor !== today ? anchor : undefined }) }] : []),
+          ...(anchor !== today ? [{ label: `Fecha ${anchor}`, clearHref: listHref("/agenda", { vista: vista !== "dia" ? vista : undefined }) }] : []),
+        ]}
+      />
       <AgendaCalendar
         view={vista}
         anchor={anchor}
         activities={activities.map((item) => ({ id: item.id, note: item.note, category: item.category?.name ?? "Actividad", at: item.scheduledAt.toISOString() }))}
       />
-      <div className="mt-4" id="nueva">
+      <div className="mt-4 scroll-mt-24" id="nueva">
         <QuickPanel label="Nueva actividad" defaultOpen={Boolean(slot)}>
-          <form action={createActivityAction} className="grid gap-3">
+          <FormPanel action={createActivityAction}>
             <input type="hidden" name="vista" value={vista} />
             <input type="hidden" name="fecha" value={anchor} />
-            <Field label="Cuándo"><input name="scheduledAt" type="datetime-local" required defaultValue={slot ?? ""} className={controlClass} /></Field>
-            <Field label="Categoría">
-              <select name="categoryId" className={controlClass} defaultValue="">
-                <option value="">Sin categoría</option>
-                {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
-              </select>
-            </Field>
-            <Field label="Nota"><textarea name="note" required rows={3} className={controlClass} /></Field>
-            <Field label="Evidencia" hint="Si la categoría cuenta para metas, la evidencia permite contarla."><input name="evidence" className={controlClass} /></Field>
-            <Button type="submit">Guardar</Button>
-          </form>
+            <FormSection title="Actividad" description="Queda ligada a la fecha del calendario que estás viendo." columns={1}>
+              <Field label="Cuándo"><input name="scheduledAt" type="datetime-local" required defaultValue={slot ?? ""} className={controlClass} /></Field>
+              <Field label="Categoría">
+                <select name="categoryId" className={controlClass} defaultValue="">
+                  <option value="">Sin categoría</option>
+                  {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+                </select>
+              </Field>
+              <Field label="Nota"><textarea name="note" required rows={3} className={controlClass} /></Field>
+              <Field label="Evidencia" hint="Si la categoría cuenta para metas, la evidencia permite contarla."><input name="evidence" className={controlClass} /></Field>
+            </FormSection>
+            <FormActions><Button type="submit">Guardar</Button></FormActions>
+          </FormPanel>
         </QuickPanel>
       </div>
       {goalType && sellers.length > 0 ? (
-        <form id="metas" action={saveGoalAction} className="mt-4 grid max-w-xl gap-3 rounded-lg border border-[var(--line)] bg-white p-4">
-          <h2 className="font-medium">Meta mensual · {goalType.name}</h2>
-          <input type="hidden" name="goalTypeId" value={goalType.id} />
-          <Field label="Vendedor">
-            <select name="userId" className={controlClass}>{sellers.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}</select>
-          </Field>
-          <Field label="Objetivo"><input name="target" type="number" min={1} required className={controlClass} /></Field>
-          <Button type="submit" tone="ghost">Guardar objetivo del mes</Button>
-        </form>
+        <FormPanel id="metas" action={saveGoalAction} className="mt-4 scroll-mt-24">
+          <FormSection title={`Meta mensual · ${goalType.name}`} description="Objetivo por vendedor para el mes en curso." columns={1}>
+            <input type="hidden" name="goalTypeId" value={goalType.id} />
+            <Field label="Vendedor">
+              <select name="userId" className={controlClass}>{sellers.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}</select>
+            </Field>
+            <Field label="Objetivo"><input name="target" type="number" min={1} required className={controlClass} /></Field>
+          </FormSection>
+          <FormActions><Button type="submit" tone="ghost">Guardar objetivo del mes</Button></FormActions>
+        </FormPanel>
       ) : null}
     </>
   );

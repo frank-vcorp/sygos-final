@@ -1,7 +1,6 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import { accountAction, movementAction, payCardAction, payPayableAction, proofAction, transferAction } from "./actions";
-import { ActiveFilters, controlClass, Field, PageHeader, SegmentedNav } from "@/components/ui";
+import { ActiveFilters, Button, controlClass, Field, KpiCard, PageHeader, SegmentedNav } from "@/components/ui";
 import { listHref } from "@/lib/list-url";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
@@ -62,17 +61,24 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
           ...(key !== defaultMes ? [{ label: `Mes ${key}`, clearHref: listHref("/finanzas", { vista: focus || undefined }) }] : []),
         ]}
       />
-      <form className="mb-4">
-        <input name="mes" type="month" defaultValue={key} className="rounded-md border border-[var(--line)] px-3 py-2 text-sm" />
+      <form className="mb-4 flex flex-wrap items-end gap-2 rounded-xl border border-[var(--line)] bg-white p-4">
+        <Field label="Mes del resumen">
+          <input name="mes" type="month" defaultValue={key} className={controlClass} />
+        </Field>
         {focus ? <input type="hidden" name="vista" value={focus} /> : null}
-        <button className="ml-2 rounded-md border border-[var(--line)] px-3 py-2 text-sm">Ver mes</button>
+        <Button type="submit" tone="ghost">Ver mes</Button>
       </form>
-      {showSection("dashboard") ? <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <Link href="/facturacion" className="rounded-lg border border-[var(--line)] bg-white p-4"><p className="text-sm text-[var(--muted)]">Facturado</p><p className="text-xl font-medium">{money(facturado)}</p></Link>
-        <Link href="/pagos" className="rounded-lg border border-[var(--line)] bg-white p-4"><p className="text-sm text-[var(--muted)]">Cobrado</p><p className="text-xl font-medium">{money(cobrado)}</p></Link>
-        <Link href="/compras" className="rounded-lg border border-[var(--line)] bg-white p-4"><p className="text-sm text-[var(--muted)]">Egresos</p><p className="text-xl font-medium">{money(egresos)}</p></Link>
-        <div className="rounded-lg border border-[var(--line)] bg-white p-4"><p className="text-sm text-[var(--muted)]">Utilidad sobre facturación</p><p className="text-xl font-medium">{money(facturado - egresos)}</p><p className="text-xs text-[var(--muted)]">Flujo de movimientos {money(ingresos - egresos)}</p></div>
-      </div> : null}
+      {showSection("dashboard") ? (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <KpiCard label="Facturado" value={money(facturado)} href="/facturacion" />
+          <KpiCard label="Cobrado" value={money(cobrado)} href="/pagos" />
+          <KpiCard label="Egresos del mes" value={money(egresos)} href="/compras" />
+          <KpiCard label="Utilidad sobre facturación" value={money(facturado - egresos)} />
+        </div>
+      ) : null}
+      {showSection("dashboard") ? (
+        <p className="mt-2 text-sm text-[var(--muted)]">Flujo de movimientos del mes: {money(ingresos - egresos)}</p>
+      ) : null}
       {(showSection("movimientos") || showSection("ingresos") || showSection("egresos")) && movementRows.length > 0 ? (
         <section className="mt-4 rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
           <h2 className="font-medium">Movimientos del mes</h2>

@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { saveFacturapiAction, saveSendgridAction, toggleInventoryAction, updateCompanyAction, updatePriorityAction, verifyFacturapiAction, verifySendgridAction } from "./actions";
 import { WhatsAppPanel } from "@/components/whatsapp-panel";
 import { RegimenSelect } from "@/components/regimen-select";
-import { Button, controlClass, Field, PageHeader } from "@/components/ui";
+import { ActionLink, Button, controlClass, Field, FormActions, FormPanel, FormSection, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { ATTENTION_LABEL, type AttentionType } from "@/lib/priorities";
@@ -23,25 +23,25 @@ export default async function ConfiguracionPage() {
     <>
       <PageHeader title="Configuración" subtitle={`Cambios de ${company.name}. No alteran la otra empresa.`} />
       <nav className="sticky top-14 z-10 mb-4 flex gap-2 overflow-x-auto border-y border-[var(--line)] bg-[var(--bg)] py-2 md:top-0" aria-label="Secciones de configuración">
-        {can(session.role, "config.company") ? <a href="#identidad" className="inline-flex min-h-11 shrink-0 items-center rounded-md border border-[var(--line)] bg-white px-3 text-sm font-medium">Identidad</a> : null}
-        {can(session.role, "config.company") ? <a href="#prioridades" className="inline-flex min-h-11 shrink-0 items-center rounded-md border border-[var(--line)] bg-white px-3 text-sm font-medium">Prioridades</a> : null}
-        {can(session.role, "config.integrations") ? <a href="#integraciones" className="inline-flex min-h-11 shrink-0 items-center rounded-md border border-[var(--line)] bg-white px-3 text-sm font-medium">Integraciones</a> : null}
+        {can(session.role, "config.company") ? <ActionLink href="#identidad" tone="ghost" className="shrink-0">Identidad</ActionLink> : null}
+        {can(session.role, "config.company") ? <ActionLink href="#prioridades" tone="ghost" className="shrink-0">Prioridades</ActionLink> : null}
+        {can(session.role, "config.integrations") ? <ActionLink href="#integraciones" tone="ghost" className="shrink-0">Integraciones</ActionLink> : null}
       </nav>
       {can(session.role, "config.company") ? (
-        <form id="identidad" action={updateCompanyAction} className="grid max-w-3xl scroll-mt-28 gap-4 rounded-lg border border-[var(--line)] bg-white p-4 sm:grid-cols-2">
-          <h2 className="font-medium">Identidad</h2>
-          <span className="hidden sm:block" />
+        <FormPanel id="identidad" action={updateCompanyAction} className="max-w-3xl scroll-mt-28">
           <input type="hidden" name="version" value={company.version} />
-          <Field label="Razón social"><input name="legalName" defaultValue={company.legalName ?? ""} className={controlClass} /></Field>
-          <Field label="RFC"><input name="rfc" defaultValue={company.rfc ?? ""} className={controlClass} /></Field>
-          <Field label="Régimen fiscal" hint="Catálogo c_RegimenFiscal del SAT."><RegimenSelect name="taxRegime" defaultValue={company.taxRegime} /></Field>
-          <Field label="Código postal"><input name="postalCode" defaultValue={company.postalCode ?? ""} className={controlClass} /></Field>
-          <div className="sm:col-span-2"><Field label="Domicilio fiscal"><textarea name="fiscalAddress" defaultValue={company.fiscalAddress ?? ""} rows={2} className={controlClass} /></Field></div>
-          <Field label="Teléfono"><input name="phone" defaultValue={company.phone ?? ""} className={controlClass} /></Field>
-          <Field label="Correo"><input name="email" defaultValue={company.email ?? ""} className={controlClass} /></Field>
-          <Field label="Días de crédito sugeridos"><input name="defaultCreditDays" defaultValue={company.defaultCreditDays ?? ""} className={controlClass} /></Field>
-          <Button type="submit" className="sm:col-span-2 sm:w-fit">Guardar empresa</Button>
-        </form>
+          <FormSection title="Identidad fiscal y contacto" description={`Datos de ${company.name} para facturación y comunicación.`}>
+            <Field label="Razón social"><input name="legalName" defaultValue={company.legalName ?? ""} className={controlClass} /></Field>
+            <Field label="RFC"><input name="rfc" defaultValue={company.rfc ?? ""} className={controlClass} /></Field>
+            <Field label="Régimen fiscal" hint="Catálogo c_RegimenFiscal del SAT."><RegimenSelect name="taxRegime" defaultValue={company.taxRegime} /></Field>
+            <Field label="Código postal"><input name="postalCode" defaultValue={company.postalCode ?? ""} className={controlClass} /></Field>
+            <div className="md:col-span-2"><Field label="Domicilio fiscal"><textarea name="fiscalAddress" defaultValue={company.fiscalAddress ?? ""} rows={2} className={controlClass} /></Field></div>
+            <Field label="Teléfono"><input name="phone" defaultValue={company.phone ?? ""} className={controlClass} /></Field>
+            <Field label="Correo"><input name="email" defaultValue={company.email ?? ""} className={controlClass} /></Field>
+            <Field label="Días de crédito sugeridos"><input name="defaultCreditDays" defaultValue={company.defaultCreditDays ?? ""} className={controlClass} /></Field>
+          </FormSection>
+          <FormActions><Button type="submit">Guardar empresa</Button></FormActions>
+        </FormPanel>
       ) : null}
 
       {can(session.role, "config.company") ? (
