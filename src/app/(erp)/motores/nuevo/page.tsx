@@ -47,7 +47,7 @@ export default async function NuevoMotPage() {
             />
           </div>
           <div className="md:col-span-2"><EquipmentCatalogFields types={types.map((type) => type.name)} brands={brands.map((brand) => brand.name)} models={models.map((row) => ({ type: row.type.name, brand: row.brand.name, model: row.name }))} /></div>
-          <Field label="Serie"><input name="serial" className={controlClass} /></Field>
+          <Field label="Número de serie" hint="Opcional."><input name="serial" className={controlClass} /></Field>
           <Field label="Descripción"><textarea name="description" rows={3} className={controlClass} /></Field>
         </FormSection>
         <FormSection title="Servicio solicitado" description="La prioridad y la falla quedan fotografiadas al crear la atención.">

@@ -38,9 +38,11 @@ export function validateQuickEquipmentDraft(fields: QuickFormFieldMap): string |
   if (fields.equipmentKind !== "EQUI" && fields.equipmentKind !== "MOT") {
     return "Indica si el equipo es EQUI o MOT.";
   }
-  const needsTypeBrand = !fields.typeName?.trim() && !fields.brandName?.trim();
-  if (needsTypeBrand && (!fields.newType?.trim() || !fields.newBrand?.trim())) {
-    return "Si el modelo no está en catálogo, captura tipo y marca.";
+  if (!fields.brandName?.trim() && !fields.newBrand?.trim()) {
+    return "Indica la marca del equipo.";
+  }
+  if (!fields.typeName?.trim() && !fields.newType?.trim()) {
+    return "Indica el tipo de equipo.";
   }
   return null;
 }

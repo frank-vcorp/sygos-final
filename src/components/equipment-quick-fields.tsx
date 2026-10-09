@@ -42,7 +42,9 @@ export function EquipmentQuickFieldsModal({
         </select>
       </Field>
       <EquipmentCatalogFields types={types} brands={brands} models={models} />
-      <Field label="Serie"><input name="serial" className={controlClass} /></Field>
+      <Field label="Número de serie" hint="Opcional.">
+        <input name="serial" className={controlClass} />
+      </Field>
     </FormQuickModal>
   );
 }

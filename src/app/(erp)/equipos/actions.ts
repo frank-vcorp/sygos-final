@@ -33,8 +33,8 @@ export async function createEquiAction(formData: FormData) {
     const { clientId } = await clientIdFromForm(session, formData);
     const equipment = await createEqui(session, {
       clientId,
-      typeName: optionalText(formData.get("newType")) ?? requiredText(formData.get("typeName"), "Tipo"),
-      brandName: optionalText(formData.get("newBrand")) ?? requiredText(formData.get("brandName"), "Marca"),
+      typeName: requiredText(formData.get("typeName") ?? formData.get("newType"), "Tipo"),
+      brandName: requiredText(formData.get("brandName") ?? formData.get("newBrand"), "Marca"),
       model: requiredText(formData.get("model"), "Modelo"),
       description: optionalText(formData.get("description")),
       serial: optionalText(formData.get("serial")),
@@ -55,8 +55,8 @@ export async function createMotAction(formData: FormData) {
     const { clientId } = await clientIdFromForm(session, formData);
     const equipment = await createMot(session, {
       clientId,
-      typeName: optionalText(formData.get("newType")) ?? requiredText(formData.get("typeName"), "Tipo"),
-      brand: optionalText(formData.get("newBrand")) ?? requiredText(formData.get("brandName"), "Marca"),
+      typeName: requiredText(formData.get("typeName") ?? formData.get("newType"), "Tipo"),
+      brand: requiredText(formData.get("brandName") ?? formData.get("newBrand"), "Marca"),
       model: requiredText(formData.get("model"), "Modelo"),
       description: optionalText(formData.get("description")),
       serial: optionalText(formData.get("serial")),

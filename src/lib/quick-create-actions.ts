@@ -14,8 +14,8 @@ import { requireCompany } from "@/lib/session";
 import { quickCreateSupplier } from "@/lib/supplier-quick-create";
 
 function catalogFromFields(fields: QuickFormFieldMap) {
-  const typeName = fields.newType?.trim() || fields.typeName?.trim() || "";
-  const brandName = fields.newBrand?.trim() || fields.brandName?.trim() || "";
+  const typeName = fields.typeName?.trim() || fields.newType?.trim() || "";
+  const brandName = fields.brandName?.trim() || fields.newBrand?.trim() || "";
   const model = fields.model?.trim() || "";
   if (!typeName || !brandName) {
     throw new Error("Indica tipo y marca del equipo.");
