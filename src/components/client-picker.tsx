@@ -82,7 +82,7 @@ export function ClientPicker({
         } : undefined}
       />
       {showNew ? (
-        <div ref={panelRef} className="grid gap-3 rounded-xl border border-[#bed9e9] bg-[#f4f9fc] p-4"
+        <div ref={panelRef} data-quick-create-open="" className="grid gap-3 rounded-xl border border-[#bed9e9] bg-[#f4f9fc] p-4"
           onKeyDown={(event) => {
             if (event.key === "Enter" && event.target instanceof HTMLInputElement) {
               event.preventDefault();
@@ -95,7 +95,7 @@ export function ClientPicker({
           </div>
           <QuickClientFields required extended={extendedContact} defaultName={draftName} />
           {error ? <p role="alert" className="text-sm text-[var(--danger)]">{error}</p> : null}
-          <Button type="button" disabled={saving} onClick={() => void saveClient()}>{saving ? "Guardando…" : "Guardar cliente y continuar"}</Button>
+          <Button type="button" className="sticky bottom-3 z-40 shadow-[0_8px_22px_rgba(20,45,75,0.18)]" disabled={saving} onClick={() => void saveClient()}>{saving ? "Guardando…" : "Guardar cliente y continuar"}</Button>
         </div>
       ) : null}
     </div>

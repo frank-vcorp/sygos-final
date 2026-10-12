@@ -170,3 +170,11 @@ body {
   body { background-image: none; }
   :where(tbody tr):hover { background: transparent; }
 }
+
+/* Mantiene la acción rápida visible sin duplicar el pie principal mientras se captura. */
+[data-form-panel]:has([data-quick-create-open]) [data-form-actions] {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+html { scroll-padding-bottom: 8rem; }

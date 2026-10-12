@@ -215,7 +215,7 @@ export function ClientProfileSection({
           <Field label="Entrega"><input name="deliveryAddress" defaultValue={client.deliveryAddress ?? ""} className={controlClass} /></Field>
         </div>
         <p className="text-xs text-[var(--muted)]">Responsable: {ownerName ?? "Sin asignar"}</p>
-        <Button type="submit" className="w-fit">Guardar</Button>
+        <Button type="submit" className="sticky bottom-3 z-30 w-fit shadow-[0_8px_22px_rgba(20,45,75,0.18)]">Guardar</Button>
       </form>
     );
   }

@@ -283,7 +283,7 @@ export default async function OperacionDetallePage({ params }: { params: Promise
                             <Field label="Cantidad">
                               <input name="quantity" type="number" min={1} required defaultValue={item.qtyRequested} className={controlClass} />
                             </Field>
-                            <Button type="submit" tone="ghost">
+                            <Button type="submit" tone="ghost" className="sticky bottom-3 z-30 shadow-[0_8px_22px_rgba(20,45,75,0.14)]">
                               Guardar
                             </Button>
                           </form>

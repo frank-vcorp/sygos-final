@@ -55,7 +55,7 @@ export function FormQuickModal({
       aria-modal="true"
       aria-labelledby={titleId}
       onKeyDown={(event) => {
-        if (event.key === "Enter" && !(event.target instanceof HTMLTextAreaElement)) {
+        if (event.key === "Enter" && !(event.target instanceof HTMLTextAreaElement) && !(event.target instanceof HTMLButtonElement)) {
           event.preventDefault();
           void handleDone();
         }
@@ -71,6 +71,8 @@ export function FormQuickModal({
         <div ref={bodyRef} className="grid gap-3 p-4">
           {children}
           {commitError ? <p className="text-sm text-[var(--danger)]">{commitError}</p> : null}
+        </div>
+        <div className="sticky bottom-0 z-10 border-t border-[var(--line)] bg-white/95 px-4 py-3 shadow-[0_-8px_20px_rgba(20,45,75,0.1)] backdrop-blur-md" style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
           <Button type="button" className="w-full sm:w-auto" disabled={saving} onClick={handleDone}>
             {saving ? "Guardando…" : doneLabel}
           </Button>

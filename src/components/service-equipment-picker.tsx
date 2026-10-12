@@ -149,7 +149,7 @@ export function ServiceEquipmentPicker({
         onCreate={!warranty && allowQuickEquipment && allowedKinds.length > 0 && clientId ? (typedName) => openNewEquipment({ sourceId: "new:" + typedName, model: typedName, brand: "", typeName: "" }) : undefined}
       />
       {showNew ? (
-        <div ref={panelRef} className="grid gap-3 rounded-xl border border-[#bed9e9] bg-[#f4f9fc] p-4">
+        <div ref={panelRef} data-quick-create-open="" className="grid gap-3 rounded-xl border border-[#bed9e9] bg-[#f4f9fc] p-4">
           <div className="flex items-center justify-between gap-2">
             <h3 className="text-sm font-semibold text-[var(--ink)]">Nuevo equipo</h3>
             <Button type="button" tone="ghost" onClick={() => { setShowNew(false); setTemplate(null); setPickerVersion((current) => current + 1); }}>Cancelar</Button>
@@ -173,7 +173,7 @@ export function ServiceEquipmentPicker({
           <EquipmentCatalogFields key={template?.sourceId ?? "new"} types={types} brands={brands} models={models} initialValues={template ?? undefined} />
           <Field label="Número de serie" hint="Opcional."><input name="serial" className={controlClass} /></Field>
           {error ? <p role="alert" className="text-sm text-[var(--danger)]">{error}</p> : null}
-          <Button type="button" disabled={saving} onClick={() => void saveEquipment()}>{saving ? "Guardando…" : "Guardar equipo y continuar"}</Button>
+          <Button type="button" className="sticky bottom-3 z-40 shadow-[0_8px_22px_rgba(20,45,75,0.18)]" disabled={saving} onClick={() => void saveEquipment()}>{saving ? "Guardando…" : "Guardar equipo y continuar"}</Button>
         </div>
       ) : null}
     </div>

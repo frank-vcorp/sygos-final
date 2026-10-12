@@ -357,7 +357,7 @@ export function DetailGrid({ children }: { children: React.ReactNode }) {
 
 export function FormPanel({ children, className = "", ...props }: React.ComponentProps<"form">) {
   return (
-    <form {...props} className={`max-w-5xl overflow-visible rounded-2xl border border-[var(--line)] bg-white shadow-[0_18px_44px_rgba(20,45,75,0.07)] ${className}`}>
+    <form {...props} data-form-panel="" className={`max-w-5xl overflow-visible rounded-2xl border border-[var(--line)] bg-white shadow-[0_18px_44px_rgba(20,45,75,0.07)] ${className}`}>
       {children}
     </form>
   );
@@ -418,7 +418,7 @@ export function FormBlock({
 
 export function FormActions({ children, note }: { children: React.ReactNode; note?: string }) {
   return (
-    <footer className="flex flex-col-reverse gap-3 rounded-b-2xl bg-[#f3f8fb] px-5 py-5 sm:flex-row sm:items-center sm:justify-between md:px-7">
+    <footer data-form-actions className="sticky bottom-0 z-30 flex flex-col-reverse gap-2 rounded-b-2xl border-t border-[var(--line)] bg-[#f3f8fb]/95 px-5 py-3 shadow-[0_-12px_28px_rgba(20,45,75,0.12)] backdrop-blur-md sm:flex-row sm:items-center sm:justify-between sm:gap-3 md:px-7 print:static print:shadow-none" style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
       {note ? <p className="text-xs text-[var(--muted)]">{note}</p> : <span />}
       <div className="flex flex-col gap-2 sm:flex-row">{children}</div>
     </footer>
