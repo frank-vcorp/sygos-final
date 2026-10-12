@@ -38,11 +38,10 @@ export function QuoteDraft({
   const [clientId, setClientId] = useState(defaultClientId);
   const [createdClients, setCreatedClients] = useState<Client[]>([]);
   const [quoteType, setQuoteType] = useState<QuoteType>(fixedQuoteType ?? "DIAGNOSTICO");
-  const [equipmentId, setEquipmentId] = useState("");
   const [lines, setLines] = useState([{ concept: "", quantity: "1" }]);
   const client = [...clients, ...createdClients].find((row) => row.id === clientId);
   const contacts = client?.contacts ?? [];
-  const needsPreliminary = !equipmentId && quoteType !== "CAMPO" && quoteType !== "VENTA_EQUIPO";
+  const requiresEquipment = quoteType === "DIAGNOSTICO" || quoteType === "REPARACION";
   const concepts = lines
     .map((line) => ({ concept: line.concept.replaceAll("|", " ").trim(), quantity: line.quantity.trim() || "1" }))
     .filter((line) => line.concept)
@@ -75,7 +74,7 @@ export function QuoteDraft({
         />
       </FormBlock>
 
-      <FormBlock title="2. Equipo" description={quoteType === "CAMPO" || quoteType === "VENTA_EQUIPO" ? "Relaciona un equipo si aplica. Puedes continuar sin uno." : "Elige un equipo del cliente o captura sus datos preliminares."} columns={1}>
+      <FormBlock title="2. Equipo" description={requiresEquipment ? "Busca un equipo del cliente por folio o modelo. Si todavía no existe, regístralo aquí; al elegir el modelo se completan marca y tipo." : "Relaciona un equipo si aplica. Puedes continuar sin uno."} columns={1}>
         <ServiceEquipmentPicker
           equipment={equipment}
           clientId={clientId}
@@ -85,33 +84,9 @@ export function QuoteDraft({
           models={models}
           allowQuickEquipment={allowQuickEquipment}
           emptyOptionLabel="Sin equipo físico"
-          onEquipmentChange={setEquipmentId}
+          required={requiresEquipment}
         />
       </FormBlock>
-
-      {needsPreliminary ? <FormBlock
-        title="Datos preliminares del equipo"
-        description={
-          "Indica tipo, marca y modelo si todavía no existe un equipo registrado."
-        }
-        tone="muted"
-        columns={2}
-      >
-        <div className="contents">
-          <Field label="Tipo">
-            <input name="preliminaryType" className={controlClass} placeholder="Ej. Servomotor" required />
-          </Field>
-          <Field label="Marca">
-            <input name="preliminaryBrand" className={controlClass} required />
-          </Field>
-          <Field label="Modelo">
-            <input name="preliminaryModel" className={controlClass} required />
-          </Field>
-          <Field label="Serie">
-            <input name="preliminarySerial" className={controlClass} />
-          </Field>
-        </div>
-      </FormBlock> : null}
 
       <FormBlock title="3. Conceptos" description="Qué incluye la cotización. El precio se define después." columns={1}>
         <div className="overflow-hidden rounded-lg border border-[var(--line)] bg-white">

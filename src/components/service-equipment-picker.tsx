@@ -17,7 +17,7 @@ export type ServiceEquipmentOption = {
 
 export function ServiceEquipmentPicker({
   equipment, clientId, companyCode, types, brands, models, warranty = false,
-  allowQuickEquipment = true, emptyOptionLabel = "Selecciona", onEquipmentChange,
+  allowQuickEquipment = true, emptyOptionLabel = "Selecciona", required = false, onEquipmentChange,
 }: {
   equipment: ServiceEquipmentOption[];
   clientId: string;
@@ -28,6 +28,7 @@ export function ServiceEquipmentPicker({
   warranty?: boolean;
   allowQuickEquipment?: boolean;
   emptyOptionLabel?: string;
+  required?: boolean;
   onEquipmentChange?: (equipmentId: string) => void;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
@@ -76,21 +77,23 @@ export function ServiceEquipmentPicker({
     }
   }
 
+  const mustSelect = warranty || required || emptyOptionLabel !== "Sin equipo físico";
   const available = warranty ? equipment : [...equipment, ...extraEquipment].filter((row) => row.clientId === clientId);
   const options = available.map((row) => ({ id: row.id, name: row.folio + " · " + row.model + " (" + row.kind + ")" }));
 
   return (
     <div className="grid gap-3">
       <SearchableEntityPicker
+        key={clientId || "sin-cliente"}
         label="Equipo del cliente"
         name="equipmentId"
         options={options}
         selectedId={equipmentId}
         onSelect={pickEquipment}
-        required={warranty || emptyOptionLabel !== "Sin equipo físico"}
-        allowEmpty={!warranty && emptyOptionLabel === "Sin equipo físico"}
-        emptyLabel={warranty ? "Selecciona un equipo con reparación previa" : emptyOptionLabel === "Sin equipo físico" ? "Sin equipo registrado" : "Busca o selecciona un equipo"}
-        hint={warranty ? "La garantía exige un equipo con reparación pagada." : !clientId ? "Selecciona primero un cliente." : "Busca por folio o modelo dentro de la lista."}
+        required={mustSelect}
+        allowEmpty={!mustSelect}
+        emptyLabel={warranty ? "Selecciona un equipo con reparación previa" : mustSelect ? "Busca o selecciona un equipo" : "Sin equipo registrado"}
+        hint={warranty ? "La garantía exige un equipo con reparación pagada." : !clientId ? "Selecciona primero un cliente." : mustSelect ? "Busca por folio o modelo, o registra un equipo nuevo aquí." : "Busca por folio o modelo dentro de la lista."}
         createLabel="Nuevo equipo"
         onCreate={!warranty && allowQuickEquipment && clientId ? () => { pickEquipment(""); setError(""); setShowNew(true); } : undefined}
       />

@@ -24,10 +24,6 @@ export async function createSellerQuote(
     clientId: string;
     quoteType: QuoteType;
     equipmentId: string | null;
-    preliminaryType: string | null;
-    preliminaryBrand: string | null;
-    preliminaryModel: string | null;
-    preliminarySerial: string | null;
     reference: string | null;
     concepts: Array<{ concept: string; quantity: number }>;
     contactIds: string[];
@@ -40,12 +36,10 @@ export async function createSellerQuote(
   if (!client) throw new Error("Selecciona un cliente activo de esta empresa.");
   if (actor.role === "VENTAS" && client.ownerUserId !== actor.userId) throw new Error(SALES_NOT_ASSIGNED_MESSAGE);
   if (input.equipmentId) {
-    const equipment = await prisma.equipment.findFirst({ where: { id: input.equipmentId, originCompanyId: actor.activeCompanyId } });
-    if (!equipment) throw new Error("El equipo no pertenece a esta empresa.");
-  } else if (input.quoteType !== "CAMPO" && input.quoteType !== "VENTA_EQUIPO") {
-    if (!input.preliminaryType || !input.preliminaryBrand || !input.preliminaryModel) {
-      throw new Error("Sin equipo físico hay que capturar tipo, marca y modelo preliminares.");
-    }
+    const equipment = await prisma.equipment.findFirst({ where: { id: input.equipmentId, originCompanyId: actor.activeCompanyId, clientId: client.id } });
+    if (!equipment) throw new Error("Selecciona un equipo de este cliente.");
+  } else if (input.quoteType === "DIAGNOSTICO" || input.quoteType === "REPARACION") {
+    throw new Error("Selecciona o registra un equipo para esta cotización.");
   }
   if (input.contactIds.length === 0) throw new Error("Selecciona al menos un contacto.");
   const contacts = await prisma.contact.count({ where: { id: { in: input.contactIds }, clientId: client.id, active: true } });
@@ -59,10 +53,6 @@ export async function createSellerQuote(
       quoteType: input.quoteType,
       status: "PENDIENTE_COTIZAR",
       equipmentId: input.equipmentId,
-      preliminaryType: input.preliminaryType,
-      preliminaryBrand: input.preliminaryBrand,
-      preliminaryModel: input.preliminaryModel,
-      preliminarySerial: input.preliminarySerial,
       reference: input.reference,
       sellerUserId: actor.role === "VENTAS" || actor.role === "GERENTE_OPERATIVO_SERVOMOTORES" ? actor.userId : client.ownerUserId,
       lines: { create: input.concepts.map((line) => ({ concept: line.concept, quantity: line.quantity })) },
