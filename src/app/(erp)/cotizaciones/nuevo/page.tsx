@@ -20,13 +20,16 @@ export default async function NuevaCotizacionPage({ searchParams }: { searchPara
     prisma.equipment.findMany({
       where: { originCompanyId: session.activeCompanyId, ...(session.role === "VENTAS" ? { client: { ownerUserId: session.userId } } : {}) },
       orderBy: { createdAt: "desc" },
-      select: { id: true, folio: true, model: true, clientId: true, kind: true },
+      select: { id: true, folio: true, model: true, clientId: true, kind: true, typeName: true, brandName: true, serial: true },
     }),
     prisma.catalogType.findMany({ orderBy: { name: "asc" } }),
     prisma.catalogBrand.findMany({ orderBy: { name: "asc" } }),
     prisma.catalogModel.findMany({ include: { type: true, brand: true } }),
   ]);
-  const allowQuickEquipment = can(session.role, "equi.create", session.activeCompanyCode) || can(session.role, "mot.create", session.activeCompanyCode);
+  const quickEquipmentKinds: Array<"EQUI" | "MOT"> = [
+    ...(can(session.role, "equi.create", session.activeCompanyCode) ? ["EQUI" as const] : []),
+    ...(can(session.role, "mot.create", session.activeCompanyCode) ? ["MOT" as const] : []),
+  ];
   return (
     <>
       <PageHeader
@@ -38,7 +41,8 @@ export default async function NuevaCotizacionPage({ searchParams }: { searchPara
         <div className="grid gap-5 p-5 md:p-7">
           <QuoteDraft
             allowQuickClient={can(session.role, "client.create", session.activeCompanyCode)}
-            allowQuickEquipment={allowQuickEquipment}
+            allowQuickEquipment={quickEquipmentKinds.length > 0}
+            quickEquipmentKinds={quickEquipmentKinds}
             canEditClient={can(session.role, "client.edit", session.activeCompanyCode)}
             companyCode={session.activeCompanyCode ?? "SYSTRON"}
             defaultClientId={clients.some((client) => client.id === clientId) ? clientId : ""}

@@ -57,14 +57,17 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
   const waitingEquipment = quote.status === "AUTORIZADA_PENDIENTE_EQUIPO" && !quote.equipmentId && !quote.technicalCaseId && (quote.quoteType === "DIAGNOSTICO" || quote.quoteType === "REPARACION");
   const [gear, priorities, types, brands, models] = waitingEquipment
     ? await Promise.all([
-        prisma.equipment.findMany({ where: { originCompanyId: session.activeCompanyId, clientId: quote.clientId }, orderBy: { createdAt: "desc" }, take: 50 }),
+        prisma.equipment.findMany({ where: { originCompanyId: session.activeCompanyId, ...(session.role === "VENTAS" ? { client: { ownerUserId: session.userId } } : {}) }, orderBy: { createdAt: "desc" }, select: { id: true, folio: true, model: true, clientId: true, kind: true, typeName: true, brandName: true, serial: true } }),
         prisma.priority.findMany({ where: { companyId: session.activeCompanyId, attentionType: quote.quoteType, active: true }, orderBy: { sortOrder: "asc" } }),
         prisma.catalogType.findMany({ orderBy: { name: "asc" } }),
         prisma.catalogBrand.findMany({ orderBy: { name: "asc" } }),
         prisma.catalogModel.findMany({ include: { type: true, brand: true } }),
       ])
     : [[], [], [], [], []];
-  const allowQuickEquipment = can(session.role, "equi.create", session.activeCompanyCode) || can(session.role, "mot.create", session.activeCompanyCode);
+  const quickEquipmentKinds: Array<"EQUI" | "MOT"> = [
+    ...(can(session.role, "equi.create", session.activeCompanyCode) ? ["EQUI" as const] : []),
+    ...(can(session.role, "mot.create", session.activeCompanyCode) ? ["MOT" as const] : []),
+  ];
   const showBase = seesEconomicDetail(session.role, session.activeCompanyCode, quote.company.code, false);
   const missing = quote.status === "PENDIENTE_COTIZAR"
     ? "Falta el precio de CEO o Administrador."
@@ -241,10 +244,11 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
               quoteId={quote.id}
               version={quote.version}
               clientId={quote.clientId}
-              gear={gear.map((item) => ({ id: item.id, folio: item.folio, model: item.model, clientId: quote.clientId, kind: item.kind }))}
+              gear={gear}
               priorities={priorities.map((item) => ({ id: item.id, name: item.name }))}
               companyCode={session.activeCompanyCode}
-              allowQuickEquipment={allowQuickEquipment}
+              allowQuickEquipment={quickEquipmentKinds.length > 0}
+              quickEquipmentKinds={quickEquipmentKinds}
               types={types.map((type) => type.name)}
               brands={brands.map((brand) => brand.name)}
               models={models.map((row) => ({ type: row.type.name, brand: row.brand.name, model: row.name }))}

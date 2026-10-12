@@ -35,7 +35,7 @@ export default async function NuevoServicioPage({
     prisma.equipment.findMany({
       where: { originCompanyId: session.activeCompanyId, ...(session.role === "VENTAS" ? { client: { ownerUserId: session.userId } } : {}) },
       orderBy: { createdAt: "desc" },
-      select: { id: true, folio: true, model: true, clientId: true, kind: true },
+      select: { id: true, folio: true, model: true, clientId: true, kind: true, typeName: true, brandName: true, serial: true },
     }),
     prisma.priority.findMany({ where: { companyId: session.activeCompanyId, attentionType, active: true }, orderBy: { sortOrder: "asc" } }),
     prisma.catalogType.findMany({ orderBy: { name: "asc" } }),
@@ -49,6 +49,10 @@ export default async function NuevoServicioPage({
       : Promise.resolve([]),
   ]);
   const defaultClientId = clientIdParam && clients.some((row) => row.id === clientIdParam) ? clientIdParam : "";
+  const quickEquipmentKinds: Array<"EQUI" | "MOT"> = [
+    ...(can(session.role, "equi.create", session.activeCompanyCode) ? ["EQUI" as const] : []),
+    ...(can(session.role, "mot.create", session.activeCompanyCode) ? ["MOT" as const] : []),
+  ];
 
   return (
     <>
@@ -70,7 +74,8 @@ export default async function NuevoServicioPage({
         defaultClientId={defaultClientId}
         companyCode={session.activeCompanyCode ?? "SYSTRON"}
         allowQuickClient={can(session.role, "client.create", session.activeCompanyCode)}
-        allowQuickEquipment={can(session.role, "equi.create", session.activeCompanyCode) || can(session.role, "mot.create", session.activeCompanyCode)}
+        allowQuickEquipment={quickEquipmentKinds.length > 0}
+        quickEquipmentKinds={quickEquipmentKinds}
         warranty={warranty}
       />
     </>

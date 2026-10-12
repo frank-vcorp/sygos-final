@@ -16,6 +16,7 @@ export function QuoteDraft({
   defaultClientId = "",
   allowQuickClient = false,
   allowQuickEquipment = false,
+  quickEquipmentKinds,
   canEditClient = false,
   companyCode,
   types,
@@ -28,6 +29,7 @@ export function QuoteDraft({
   defaultClientId?: string;
   allowQuickClient?: boolean;
   allowQuickEquipment?: boolean;
+  quickEquipmentKinds?: Array<"EQUI" | "MOT">;
   canEditClient?: boolean;
   companyCode: string;
   types: string[];
@@ -83,6 +85,7 @@ export function QuoteDraft({
           brands={brands}
           models={models}
           allowQuickEquipment={allowQuickEquipment}
+          quickEquipmentKinds={quickEquipmentKinds}
           emptyOptionLabel="Sin equipo físico"
           required={requiresEquipment}
         />

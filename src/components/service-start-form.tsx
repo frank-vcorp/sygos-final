@@ -22,6 +22,7 @@ export function ServiceStartForm({
   companyCode,
   allowQuickClient,
   allowQuickEquipment = true,
+  quickEquipmentKinds,
   warranty,
 }: {
   action: (formData: FormData) => void | Promise<void>;
@@ -37,6 +38,7 @@ export function ServiceStartForm({
   companyCode: string;
   allowQuickClient: boolean;
   allowQuickEquipment?: boolean;
+  quickEquipmentKinds?: Array<"EQUI" | "MOT">;
   warranty: boolean;
 }) {
   const [clientId, setClientId] = useState(defaultClientId);
@@ -68,6 +70,7 @@ export function ServiceStartForm({
           models={models}
           warranty={warranty}
           allowQuickEquipment={allowQuickEquipment}
+          quickEquipmentKinds={quickEquipmentKinds}
         />
       </FormSection>
       <FormSection title="Servicio" description="La prioridad define el SLA cuando el equipo tenga entrada física.">

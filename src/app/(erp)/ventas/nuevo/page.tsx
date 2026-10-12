@@ -23,7 +23,7 @@ export default async function NuevaVentaEquipoPage({ searchParams }: { searchPar
     prisma.equipment.findMany({
       where: { originCompanyId: session.activeCompanyId, kind: "EQUI", ...(session.role === "VENTAS" ? { client: { ownerUserId: session.userId } } : {}) },
       orderBy: { createdAt: "desc" },
-      select: { id: true, folio: true, model: true, clientId: true, kind: true },
+      select: { id: true, folio: true, model: true, clientId: true, kind: true, typeName: true, brandName: true, serial: true },
     }),
     prisma.catalogType.findMany({ orderBy: { name: "asc" } }),
     prisma.catalogBrand.findMany({ orderBy: { name: "asc" } }),
@@ -47,6 +47,7 @@ export default async function NuevaVentaEquipoPage({ searchParams }: { searchPar
             fixedQuoteType="VENTA_EQUIPO"
             allowQuickClient={can(session.role, "client.create", session.activeCompanyCode)}
             allowQuickEquipment={allowQuickEquipment}
+            quickEquipmentKinds={allowQuickEquipment ? ["EQUI" as const] : []}
             canEditClient={can(session.role, "client.edit", session.activeCompanyCode)}
             companyCode={session.activeCompanyCode ?? "SYSTRON"}
             defaultClientId={clients.some((client) => client.id === clientId) ? clientId : ""}
