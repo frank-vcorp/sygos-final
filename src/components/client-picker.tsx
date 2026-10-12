@@ -54,30 +54,35 @@ export function ClientPicker({
 
   return (
     <>
-      <Field
-        label={label}
-        hint={
-          hint
-          ?? (allowQuickClient
-            ? "Elige un cliente de la lista o usa el alta si aún no existe."
-            : undefined)
-        }
-      >
-        <select
-          name="clientId"
-          required={!allowQuickClient}
-          className={controlClass}
-          value={clientId}
-          disabled={showNew}
-          onChange={(event) => selectClient(event.target.value)}
+      <div className={allowQuickClient ? "flex flex-col gap-3 sm:flex-row sm:items-end" : undefined}>
+        <Field
+          label={label}
+          hint={
+            hint
+            ?? (allowQuickClient
+              ? "Elige de la lista o registra uno nuevo al lado."
+              : undefined)
+          }
+          className={allowQuickClient ? "min-w-0 flex-1" : undefined}
         >
-          <option value="">Selecciona</option>
-          {options.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}
-        </select>
-      </Field>
+          <select
+            name="clientId"
+            required={!allowQuickClient}
+            className={controlClass}
+            value={clientId}
+            disabled={showNew}
+            onChange={(event) => selectClient(event.target.value)}
+          >
+            <option value="">Selecciona</option>
+            {options.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}
+          </select>
+        </Field>
+        {allowQuickClient && !clientId ? (
+          <QuickCreateButton label="+ Alta de cliente" onClick={() => setShowNew(true)} />
+        ) : null}
+      </div>
       {allowQuickClient && !clientId ? (
         <>
-          <QuickCreateButton label="+ Alta de cliente" onClick={() => setShowNew(true)} />
           <FormQuickModal
             open={showNew}
             title="Alta de cliente"

@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import { createQuoteAction } from "@/app/(erp)/cotizaciones/actions";
 import { QuoteDraft } from "@/components/quote-draft";
-import { Field, FormPanel, FormSection, PageHeader } from "@/components/ui";
+import { SubmitButton } from "@/components/submit-button";
+import { FormActions, FormPanel, FormSection, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { homePath } from "@/lib/home";
 import { can } from "@/lib/permissions";
@@ -41,10 +42,11 @@ export default async function NuevaVentaEquipoPage({ searchParams }: { searchPar
       <FormPanel action={createQuoteAction}>
         <input type="hidden" name="quoteType" value="VENTA_EQUIPO" />
         <input type="hidden" name="origin" value="ventas" />
-        <FormSection title="Propuesta comercial" description="Cliente, equipo (EQUI) y líneas a vender. Coordinación asigna precio antes de enviar al cliente.">
-          <Field label="Tipo">
-            <p className="text-sm font-medium">Venta de equipo</p>
-          </Field>
+        <FormSection title="Propuesta comercial" description="Cliente, equipo (EQUI) y líneas a vender. Coordinación asigna precio antes de enviar al cliente." columns={1}>
+          <div className="max-w-md rounded-lg border border-[var(--line)] bg-[#f7fafc] px-4 py-3">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Tipo</p>
+            <p className="mt-1 text-sm font-medium text-[#0b1f3a]">Venta de equipo</p>
+          </div>
           <QuoteDraft
             allowQuickClient={can(session.role, "client.create", session.activeCompanyCode)}
             allowQuickEquipment={allowQuickEquipment}
@@ -58,6 +60,9 @@ export default async function NuevaVentaEquipoPage({ searchParams }: { searchPar
             models={models.map((row) => ({ type: row.type.name, brand: row.brand.name, model: row.name }))}
           />
         </FormSection>
+        <FormActions note="Al autorizarla, la propuesta aparece en tu bandeja de ventas de equipos.">
+          <SubmitButton pendingLabel="Guardando…">Guardar sin precio</SubmitButton>
+        </FormActions>
       </FormPanel>
     </>
   );

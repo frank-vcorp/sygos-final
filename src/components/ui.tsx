@@ -219,13 +219,15 @@ export function Field({
   label,
   children,
   hint,
+  className = "",
 }: {
   label: string;
   children: React.ReactNode;
   hint?: string;
+  className?: string;
 }) {
   return (
-    <label className="block">
+    <label className={`block ${className}`.trim()}>
       <span className="mb-1 block text-sm font-medium">{label}</span>
       {children}
       {hint ? <span className="mt-1 block text-xs text-[var(--muted)]">{hint}</span> : null}
@@ -379,6 +381,36 @@ export function FormSection({
         <h2 className="text-lg font-semibold text-[#0b1f3a]">{title}</h2>
         {description ? <p className="mt-1 max-w-2xl text-sm leading-6 text-[var(--muted)]">{description}</p> : null}
       </div>
+      <div className={`grid gap-4 ${grids[columns]}`}>{children}</div>
+    </section>
+  );
+}
+
+/** Bloque temático dentro de un formulario (cliente, conceptos, etc.). */
+export function FormBlock({
+  title,
+  description,
+  children,
+  columns = 2,
+  tone = "default",
+}: {
+  title: string;
+  description?: string;
+  children: React.ReactNode;
+  columns?: 1 | 2;
+  tone?: "default" | "muted";
+}) {
+  const grids = { 1: "", 2: "sm:grid-cols-2" };
+  const surface =
+    tone === "muted"
+      ? "border-[var(--line)] bg-[#f7fafc]"
+      : "border-[var(--line)] bg-white";
+  return (
+    <section className={`rounded-xl border ${surface} p-4 md:p-5`}>
+      <header className="mb-4">
+        <h3 className="text-sm font-semibold tracking-tight text-[#0b1f3a]">{title}</h3>
+        {description ? <p className="mt-1 text-xs leading-5 text-[var(--muted)]">{description}</p> : null}
+      </header>
       <div className={`grid gap-4 ${grids[columns]}`}>{children}</div>
     </section>
   );

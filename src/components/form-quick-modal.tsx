@@ -86,11 +86,11 @@ export function QuickCreateButton({
   onClick: () => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex flex-col gap-1 sm:shrink-0">
       <Button
         type="button"
         tone="ghost"
-        className="min-h-10 border border-dashed border-[var(--accent)] text-[var(--accent)]"
+        className="min-h-11 whitespace-nowrap border border-[var(--line)] bg-white px-3 text-[var(--accent)] shadow-sm hover:border-[var(--accent)] hover:bg-[var(--accent-soft)]"
         disabled={disabled}
         onClick={onClick}
       >

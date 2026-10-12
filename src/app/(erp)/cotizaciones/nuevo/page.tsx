@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import { createQuoteAction } from "../actions";
 import { QuoteDraft } from "@/components/quote-draft";
-import { controlClass, Field, FormPanel, FormSection, PageHeader } from "@/components/ui";
+import { SubmitButton } from "@/components/submit-button";
+import { controlClass, Field, FormActions, FormPanel, FormSection, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { QUOTE_TYPE_LABEL, QUOTE_TYPES } from "@/lib/quotes";
@@ -37,8 +38,16 @@ export default async function NuevaCotizacionPage({ searchParams }: { searchPara
         back={{ href: "/cotizaciones", label: "Cotizaciones" }}
       />
       <FormPanel action={createQuoteAction}>
-        <FormSection title="Propuesta comercial" description="Relaciona cliente, equipo y conceptos. El precio se asigna en el siguiente paso.">
-          <Field label="Tipo"><select name="quoteType" required className={controlClass}>{QUOTE_TYPES.map((type) => <option key={type} value={type}>{QUOTE_TYPE_LABEL[type]}</option>)}</select></Field>
+        <FormSection title="Propuesta comercial" description="Relaciona cliente, equipo y conceptos. El precio se asigna en el siguiente paso." columns={1}>
+          <div className="max-w-md">
+            <Field label="Tipo de cotización" hint="Define el flujo de autorización y facturación.">
+              <select name="quoteType" required className={controlClass}>
+                {QUOTE_TYPES.map((type) => (
+                  <option key={type} value={type}>{QUOTE_TYPE_LABEL[type]}</option>
+                ))}
+              </select>
+            </Field>
+          </div>
           <QuoteDraft
             allowQuickClient={can(session.role, "client.create", session.activeCompanyCode)}
             allowQuickEquipment={allowQuickEquipment}
@@ -52,6 +61,9 @@ export default async function NuevaCotizacionPage({ searchParams }: { searchPara
             models={models.map((row) => ({ type: row.type.name, brand: row.brand.name, model: row.name }))}
           />
         </FormSection>
+        <FormActions note="La cotización se guarda sin precio; coordinación o gerencia la completa después.">
+          <SubmitButton pendingLabel="Guardando…">Guardar sin precio</SubmitButton>
+        </FormActions>
       </FormPanel>
     </>
   );

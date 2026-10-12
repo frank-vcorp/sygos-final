@@ -25,6 +25,7 @@ export function ServiceEquipmentPicker({
   warranty = false,
   allowQuickEquipment = true,
   emptyOptionLabel = "Selecciona",
+  onEquipmentChange,
 }: {
   equipment: ServiceEquipmentOption[];
   clientId: string;
@@ -35,6 +36,7 @@ export function ServiceEquipmentPicker({
   warranty?: boolean;
   allowQuickEquipment?: boolean;
   emptyOptionLabel?: string;
+  onEquipmentChange?: (equipmentId: string) => void;
 }) {
   const [equipmentId, setEquipmentId] = useState("");
   const [showNew, setShowNew] = useState(false);
@@ -54,7 +56,14 @@ export function ServiceEquipmentPicker({
     setEquipmentId("");
     setShowNew(false);
     setExtraEquipment([]);
-  }, [clientId]);
+    onEquipmentChange?.("");
+  }, [clientId, onEquipmentChange]);
+
+  const pickEquipment = (id: string) => {
+    setEquipmentId(id);
+    onEquipmentChange?.(id);
+    if (id) setShowNew(false);
+  };
 
   const commitQuickEquipment = async (fields: QuickFormFieldMap) => {
     const validation = validateQuickEquipmentDraft(fields);
@@ -68,7 +77,7 @@ export function ServiceEquipmentPicker({
       kind: created.kind,
     };
     setExtraEquipment((current) => [...current, row]);
-    setEquipmentId(created.equipmentId);
+    pickEquipment(created.equipmentId);
     return null;
   };
 
@@ -93,47 +102,50 @@ export function ServiceEquipmentPicker({
 
   return (
     <>
-      <Field
-        label="Equipo del cliente"
-        hint={
-          !clientId
-            ? "Selecciona un cliente para ver sus equipos."
-            : filtered.length === 0
-              ? "Este cliente no tiene equipos registrados. Usa el alta de equipo."
-              : "Elige un equipo existente o regístralo nuevo."
-        }
-      >
-        <select
-          name="equipmentId"
-          className={controlClass}
-          value={equipmentId}
-          required={emptyOptionLabel !== "Sin equipo físico"}
-          disabled={!clientId || showNew}
-          onChange={(event) => {
-            setEquipmentId(event.target.value);
-            if (event.target.value) setShowNew(false);
-          }}
+      <div className={allowQuickEquipment ? "flex flex-col gap-3 sm:flex-row sm:items-end" : undefined}>
+        <Field
+          label="Equipo del cliente"
+          hint={
+            !clientId
+              ? "Selecciona un cliente para ver sus equipos."
+              : filtered.length === 0
+                ? "Sin equipos en cartera. Registra uno con el botón al lado."
+                : "Equipo existente o alta nueva."
+          }
+          className={allowQuickEquipment ? "min-w-0 flex-1" : undefined}
         >
-          <option value="">{emptyOptionLabel}</option>
-          {filtered.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.folio} · {item.model} ({item.kind})
-            </option>
-          ))}
-        </select>
-      </Field>
+          <select
+            name="equipmentId"
+            className={controlClass}
+            value={equipmentId}
+            required={emptyOptionLabel !== "Sin equipo físico"}
+            disabled={!clientId || showNew}
+            onChange={(event) => pickEquipment(event.target.value)}
+          >
+            <option value="">{emptyOptionLabel}</option>
+            {filtered.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.folio} · {item.model} ({item.kind})
+              </option>
+            ))}
+          </select>
+        </Field>
 
-      {allowQuickEquipment ? (
-        <>
+        {allowQuickEquipment ? (
           <QuickCreateButton
             label="+ Alta de equipo"
             disabled={!clientId}
             disabledHint="Primero elige el cliente."
             onClick={() => {
-              setEquipmentId("");
+              pickEquipment("");
               setShowNew(true);
             }}
           />
+        ) : null}
+      </div>
+
+      {allowQuickEquipment ? (
+        <>
           <EquipmentQuickFieldsModal
             open={showNew}
             onClose={() => setShowNew(false)}
