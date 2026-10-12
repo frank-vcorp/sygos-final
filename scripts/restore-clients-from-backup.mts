@@ -2,6 +2,9 @@
  * Restaura clientes (y sus contactos) desde un respaldo SQLite hacia la base actual.
  * No borra ni modifica registros existentes: solo inserta los que faltan (por id).
  *
+ * Las empresas se emparejan por código y los vendedores por nombre de usuario, de modo que
+ * también sirve para una base con IDs distintos (p. ej. la instancia de diseño).
+ *
  * Uso:
  *   BACKUP_DB=/data/sygos.db.bak-... tsx scripts/restore-clients-from-backup.mts --dry-run
  *   BACKUP_DB=/data/sygos.db.bak-... tsx scripts/restore-clients-from-backup.mts --execute
@@ -27,33 +30,59 @@ async function main() {
   const backupClients = await backup.client.findMany({ where: { isSystem: false } });
   const backupContacts = await backup.contact.findMany({ where: { client: { isSystem: false } } });
 
+  const [backupCompanies, currentCompanies, backupUsers, currentUsers] = await Promise.all([
+    backup.company.findMany({ select: { id: true, code: true } }),
+    current.company.findMany({ select: { id: true, code: true } }),
+    backup.user.findMany({ select: { id: true, username: true } }),
+    current.user.findMany({ select: { id: true, username: true } }),
+  ]);
+  const currentCompanyByCode = new Map(currentCompanies.map((row) => [row.code, row.id]));
+  const companyMap = new Map<string, string>();
+  for (const row of backupCompanies) {
+    const target = currentCompanyByCode.get(row.code);
+    if (target) companyMap.set(row.id, target);
+  }
+  const currentUserByName = new Map(currentUsers.map((row) => [row.username, row.id]));
+  const userMap = new Map<string, string>();
+  for (const row of backupUsers) {
+    const target = currentUserByName.get(row.username);
+    if (target) userMap.set(row.id, target);
+  }
+
   const existingClientIds = new Set((await current.client.findMany({ select: { id: true } })).map((row) => row.id));
   const existingContactIds = new Set((await current.contact.findMany({ select: { id: true } })).map((row) => row.id));
-  const companyIds = new Set((await current.company.findMany({ select: { id: true } })).map((row) => row.id));
-  const userIds = new Set((await current.user.findMany({ select: { id: true } })).map((row) => row.id));
 
-  const missingClients = backupClients.filter((row) => !existingClientIds.has(row.id) && companyIds.has(row.companyId));
-  const orphanedByCompany = backupClients.filter((row) => !companyIds.has(row.companyId)).length;
+  const withCompany = backupClients.filter((row) => companyMap.has(row.companyId));
+  const skippedUnknownCompany = backupClients.length - withCompany.length;
+  const missingClients = withCompany.filter((row) => !existingClientIds.has(row.id));
   const missingClientIds = new Set(missingClients.map((row) => row.id));
-  const missingContacts = backupContacts.filter((row) => !existingContactIds.has(row.id) && (missingClientIds.has(row.clientId) || existingClientIds.has(row.clientId)));
+  const missingContacts = backupContacts.filter(
+    (row) => !existingContactIds.has(row.id) && (missingClientIds.has(row.clientId) || existingClientIds.has(row.clientId)),
+  );
+  const ownerUnmapped = missingClients.filter((row) => row.ownerUserId && !userMap.has(row.ownerUserId)).length;
 
-  const ownerMissing = missingClients.filter((row) => row.ownerUserId && !userIds.has(row.ownerUserId)).length;
-
-  const summary = {
-    backupClients: backupClients.length,
-    backupContacts: backupContacts.length,
-    alreadyPresentClients: backupClients.length - missingClients.length - orphanedByCompany,
-    toInsertClients: missingClients.length,
-    toInsertContacts: missingContacts.length,
-    skippedUnknownCompany: orphanedByCompany,
-    ownerUserNoLongerExists: ownerMissing,
-  };
-  console.log(JSON.stringify({ phase: execute ? "execute" : "dry-run", ...summary }, null, 2));
+  console.log(
+    JSON.stringify(
+      {
+        phase: execute ? "execute" : "dry-run",
+        backupClients: backupClients.length,
+        backupContacts: backupContacts.length,
+        alreadyPresentClients: withCompany.length - missingClients.length,
+        toInsertClients: missingClients.length,
+        toInsertContacts: missingContacts.length,
+        skippedUnknownCompany,
+        ownerUserWithoutMatch: ownerUnmapped,
+      },
+      null,
+      2,
+    ),
+  );
   if (!execute) return;
 
   const clientData = missingClients.map((row) => ({
     ...row,
-    ownerUserId: row.ownerUserId && userIds.has(row.ownerUserId) ? row.ownerUserId : null,
+    companyId: companyMap.get(row.companyId)!,
+    ownerUserId: row.ownerUserId ? userMap.get(row.ownerUserId) ?? null : null,
   }));
   const batch = 200;
   for (let i = 0; i < clientData.length; i += batch) {
