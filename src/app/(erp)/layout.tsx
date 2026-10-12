@@ -119,6 +119,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
         </div>
         <Suspense fallback={<nav className="px-3 pb-5 text-sm text-[var(--muted)]">Menú…</nav>}>
           <SideNav
+            accordionGroups={session.role !== "VENTAS"}
             groups={[
               ...erpNavGroups(session.role).map((group) => ({
                 title: group.title,

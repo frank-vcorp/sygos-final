@@ -24,12 +24,15 @@ function isLinkActive(pathname: string, search: URLSearchParams, href: string, l
 
 export function SideNav({
   groups,
+  /** Si es false, las secciones del menú no usan acordeón (p. ej. rol Ventas). */
+  accordionGroups = true,
 }: {
   groups: Array<{
     title: string | null;
     direct?: boolean;
     links: Array<{ href: string; label: string; createHref?: string }>;
   }>;
+  accordionGroups?: boolean;
 }) {
   const path = usePathname();
   const searchParams = useSearchParams();
@@ -88,6 +91,18 @@ export function SideNav({
             );
           });
         if (!group.title) return <div key={`plain-${group.links.map((link) => link.href).join("-")}`} className="space-y-1">{links}</div>;
+        if (!accordionGroups) {
+          return (
+            <div key={group.title} className="rounded-lg">
+              <div
+                className={`flex min-h-10 items-center rounded-lg px-3 text-[12px] font-bold uppercase tracking-[0.08em] ${groupActive ? "text-[var(--accent)]" : "text-[var(--muted)]"}`}
+              >
+                {group.title}
+              </div>
+              <div className="space-y-1 pb-2 pl-1">{links}</div>
+            </div>
+          );
+        }
         return (
           <details key={`${group.title}-${path}`} open={groupActive} className="group rounded-lg">
             <summary className={`flex min-h-10 cursor-pointer list-none items-center justify-between rounded-lg px-3 text-[12px] font-bold uppercase tracking-[0.08em] ${groupActive ? "text-[var(--accent)]" : "text-[var(--muted)] hover:bg-[#edf5f8]"}`}>
