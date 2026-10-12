@@ -127,7 +127,7 @@ export default async function ClienteDetallePage({ params }: { params: Promise<{
   const primaryAction =
     canQuote || canService ? (
       <>
-        {canService ? <ActionLink href={`/servicios/diagnostico/nuevo?clientId=${client.id}`}>Nueva atención</ActionLink> : null}
+        {canService ? <ActionLink href={`/servicios/nuevo?clientId=${client.id}`}>Nueva atención</ActionLink> : null}
         {canQuote ? (
           <ActionLink
             href={`/cotizaciones/nuevo?clientId=${client.id}`}
