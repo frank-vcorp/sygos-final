@@ -120,15 +120,15 @@ export function ServiceEquipmentPicker({
     : !clientId ? [] : [
       ...available.filter((row) => row.clientId === clientId).map((row) => ({
         id: row.id,
-        name: "Equipo del cliente · " + [row.folio, row.model, row.brandName, row.serial].filter(Boolean).join(" · "),
+        name: [row.folio, row.model, row.brandName, row.serial].filter(Boolean).join(" · "),
       })),
       ...(allowQuickEquipment && allowedKinds.length > 0 ? available.filter((row) => row.clientId !== clientId).map((row) => ({
         id: row.id,
-        name: "Otro cliente · " + [row.folio, row.model, row.brandName, row.serial].filter(Boolean).join(" · ") + " · usar datos",
+        name: [row.folio, row.model, row.brandName, row.serial].filter(Boolean).join(" · "),
       })) : []),
       ...(allowQuickEquipment && allowedKinds.length > 0 ? models.map((row, index) => ({
         id: "catalog-model:" + index,
-        name: "Modelo del catálogo · " + row.model + " · " + row.brand + " · " + row.type,
+        name: [row.model, row.brand, row.type].filter(Boolean).join(" · "),
       })) : []),
     ];
 
@@ -144,7 +144,7 @@ export function ServiceEquipmentPicker({
         required={mustSelect}
         allowEmpty={!mustSelect}
         emptyLabel={warranty ? "Selecciona un equipo con reparación previa" : mustSelect ? "Busca o selecciona un equipo" : "Sin equipo registrado"}
-        hint={warranty ? "La garantía exige un equipo con reparación pagada." : !clientId ? "Selecciona primero un cliente." : "Busca en el catálogo por folio, modelo, marca o serie. Una referencia de otro cliente abre el alta con sus datos; no mueve el equipo original."}
+        hint={warranty ? "La garantía exige un equipo con reparación pagada." : !clientId ? "Selecciona primero un cliente." : "Busca por folio, modelo, marca o serie."}
         createLabel="Registrar equipo nuevo"
         onCreate={!warranty && allowQuickEquipment && allowedKinds.length > 0 && clientId ? (typedName) => openNewEquipment({ sourceId: "new:" + typedName, model: typedName, brand: "", typeName: "" }) : undefined}
       />
