@@ -59,7 +59,7 @@ export default async function NuevoServicioPage({
       <PageHeader
         back={{ href: `/servicios/${tipo}`, label: ATTENTION_LABEL[attentionType as AttentionType] }}
         title={`Nuevo ${ATTENTION_LABEL[attentionType as AttentionType]}`}
-        subtitle="Elige cliente y equipo, o registra uno nuevo. El SLA inicia con la entrada física en taller."
+        subtitle="Elige cliente y equipo, o registra uno nuevo. El servicio inicia con la entrada física en taller."
       />
       <ServiceStartForm
         action={startServiceAction}

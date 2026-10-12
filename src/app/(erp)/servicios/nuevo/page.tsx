@@ -33,14 +33,14 @@ export default async function NuevoServicioPage({
     <>
       <PageHeader
         back={{ href: "/servicios/activos", label: "Servicios" }}
-        title="Alta de atenciones"
+        title="Alta de servicios"
         subtitle={selectedClient
-          ? `Cliente seleccionado: ${selectedClient.name}. Elige el tipo de atención para continuar.`
-          : "Elige el tipo de atención. El formulario captura cliente, equipo y falla reportada."}
+          ? `Cliente seleccionado: ${selectedClient.name}. Elige el tipo de servicio para continuar.`
+          : "Elige el tipo de servicio. El formulario captura cliente, equipo y falla reportada."}
       />
       {selectedClient ? (
         <Card className="mb-4 border-[#cfe0d6] bg-[var(--accent-soft)] p-4">
-          <p className="text-sm font-semibold text-[var(--ok)]">Cliente listo para la atención</p>
+          <p className="text-sm font-semibold text-[var(--ok)]">Cliente listo para el servicio</p>
           <p className="mt-1 text-sm text-[var(--ink)]">
             {selectedClient.name} quedará preseleccionado en el siguiente formulario.
           </p>
@@ -52,7 +52,7 @@ export default async function NuevoServicioPage({
             <Card className="flex h-full flex-col justify-between p-4 transition hover:border-[var(--accent)] hover:shadow-sm">
               <div>
                 <RecordLink href={`/servicios/${opt.param}/nuevo${clientQuery}`} className="text-base">{opt.label}</RecordLink>
-                <p className="mt-2 text-sm text-[var(--muted)]">Alta con cliente y equipo</p>
+                <p className="mt-2 text-sm text-[var(--muted)]">Servicio con cliente y equipo</p>
               </div>
               <ActionLink href={`/servicios/${opt.param}/nuevo${clientQuery}`} tone="ghost" className="mt-4 w-full">Continuar</ActionLink>
             </Card>
