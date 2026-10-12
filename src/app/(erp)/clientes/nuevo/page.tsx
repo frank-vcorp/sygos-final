@@ -15,11 +15,11 @@ export default async function NuevoClientePage() {
         <FormSection title="Datos generales" description="Identifica al cliente y define cómo se clasifica comercialmente.">
           <Field label="Nombre o razón social"><input name="name" className={controlClass} required /></Field>
           <Field label="Clasificación">
-            <select name="classification" className={controlClass} defaultValue="">
+            <select name="classification" className={controlClass} defaultValue="NORMAL">
               <option value="">Sin clasificación</option><option value="NORMAL">Normal</option><option value="PREMIUM">Premium</option>
             </select>
           </Field>
-          <Field label="Días de crédito"><input name="creditDays" inputMode="numeric" className={controlClass} /></Field>
+          <Field label="Días de crédito"><input name="creditDays" inputMode="numeric" className={controlClass} defaultValue="0" /></Field>
           <Field label="Dirección de entrega"><textarea name="deliveryAddress" className={controlClass} rows={2} /></Field>
         </FormSection>
         <FormSection title="Facturación" description="Los datos fiscales aparecen únicamente cuando el cliente requiere factura.">

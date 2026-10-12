@@ -220,7 +220,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
   );
 
   return (
-    <ErpShell sidebar={sidebar} toolbar={toolbar}>
+    <ErpShell sidebar={sidebar} toolbar={toolbar} sidebarCollapsible={session.role !== "VENTAS"}>
         <main className="mx-auto max-w-[1440px] px-4 py-5 sm:px-6 md:px-8 md:py-9 lg:px-10 print:max-w-none print:p-0">
           {session.impersonating ? (
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-[#ead9a8] bg-[var(--warn-soft)] px-3 py-2 text-sm print:hidden">

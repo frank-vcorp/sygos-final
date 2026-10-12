@@ -42,17 +42,19 @@ async function ownerForCreator(session: Awaited<ReturnType<typeof guard>>) {
   return null;
 }
 
-function clientData(formData: FormData) {
-  const classification = optionalText(formData.get("classification"));
+function clientData(formData: FormData, applyCreateDefaults = false) {
+  const classificationRaw = optionalText(formData.get("classification"));
+  const classification = classificationRaw ?? (applyCreateDefaults ? "NORMAL" : null);
   if (classification && classification !== "NORMAL" && classification !== "PREMIUM") {
     throw new Error("La clasificación debe ser Normal o Premium.");
   }
   const requiresInvoice = optionalBool(formData.get("requiresInvoice"));
+  const creditDays = optionalInt(formData.get("creditDays"));
   return {
     name: requiredText(formData.get("name"), "Nombre o razón social"),
     classification,
     requiresInvoice,
-    creditDays: optionalInt(formData.get("creditDays")),
+    creditDays: creditDays ?? (applyCreateDefaults ? 0 : null),
     ...fiscalIdentity(formData, requiresInvoice),
     deliveryAddress: optionalText(formData.get("deliveryAddress")),
   };
@@ -75,7 +77,7 @@ export async function createClientAction(formData: FormData) {
   "use server";
   try {
     const session = await guard("client.create");
-    const data = clientData(formData);
+    const data = clientData(formData, true);
     const contactName = requiredText(formData.get("contactName"), "Nombre del contacto");
     const contactPhone = requiredText(formData.get("contactPhone"), "Teléfono del contacto");
     const ownerUserId = await ownerForCreator(session);
