@@ -6,13 +6,10 @@ export function ErpShell({
   sidebar,
   toolbar,
   children,
-  sidebarCollapsible = true,
 }: {
   sidebar: React.ReactNode;
   toolbar: React.ReactNode;
   children: React.ReactNode;
-  /** Cuando es false el menú lateral permanece expandido (p. ej. rol Ventas). */
-  sidebarCollapsible?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
@@ -20,12 +17,8 @@ export function ErpShell({
 
   useEffect(() => setOpen(false), [path]);
   useEffect(() => {
-    if (!sidebarCollapsible) {
-      setCollapsed(false);
-      return;
-    }
     setCollapsed(window.localStorage.getItem("sygos_sidebar_collapsed") === "si");
-  }, [sidebarCollapsible]);
+  }, []);
   useEffect(() => {
     if (!open) return;
     const close = (event: KeyboardEvent) => {
@@ -40,7 +33,6 @@ export function ErpShell({
   }, [open]);
 
   function toggleCollapsed() {
-    if (!sidebarCollapsible) return;
     setCollapsed((current) => {
       const next = !current;
       window.localStorage.setItem("sygos_sidebar_collapsed", next ? "si" : "no");
@@ -48,13 +40,11 @@ export function ErpShell({
     });
   }
 
-  const sidebarCollapsed = sidebarCollapsible && collapsed;
-
   return (
     <div
       data-erp-shell
-      data-sidebar-collapsed={sidebarCollapsed ? "true" : "false"}
-      className={`min-h-screen md:grid ${sidebarCollapsed ? "md:grid-cols-[72px_minmax(0,1fr)]" : "md:grid-cols-[280px_minmax(0,1fr)]"}`}
+      data-sidebar-collapsed={collapsed ? "true" : "false"}
+      className={`min-h-screen md:grid ${collapsed ? "md:grid-cols-[72px_minmax(0,1fr)]" : "md:grid-cols-[280px_minmax(0,1fr)]"}`}
     >
       <div data-erp-chrome className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-[var(--line)] bg-white px-4 md:hidden print:hidden">
         <button
@@ -96,20 +86,18 @@ export function ErpShell({
             ×
           </button>
         </div>
-        {sidebarCollapsible ? (
-          <div className={`hidden md:flex ${sidebarCollapsed ? "justify-center px-2 py-5" : "absolute right-3 top-3 z-10"}`}>
-            <button
-              type="button"
-              onClick={toggleCollapsed}
-              className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg border border-[#d7e1ec] bg-white text-2xl font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
-              aria-label={sidebarCollapsed ? "Expandir menú lateral" : "Contraer menú lateral"}
-              title={sidebarCollapsed ? "Expandir menú lateral" : "Contraer menú lateral"}
-            >
-              {sidebarCollapsed ? "›" : "‹"}
-            </button>
-          </div>
-        ) : null}
-        <div className={sidebarCollapsed ? "md:hidden" : ""}>{sidebar}</div>
+        <div className={`hidden md:flex ${collapsed ? "justify-center px-2 py-5" : "absolute right-3 top-3 z-10"}`}>
+          <button
+            type="button"
+            onClick={toggleCollapsed}
+            className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg border border-[#d7e1ec] bg-white text-2xl font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
+            aria-label={collapsed ? "Expandir menú lateral" : "Contraer menú lateral"}
+            title={collapsed ? "Expandir menú lateral" : "Contraer menú lateral"}
+          >
+            {collapsed ? "›" : "‹"}
+          </button>
+        </div>
+        <div className={collapsed ? "md:hidden" : ""}>{sidebar}</div>
       </aside>
 
       <div className="min-w-0">
