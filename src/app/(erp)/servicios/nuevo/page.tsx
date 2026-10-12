@@ -42,7 +42,7 @@ export default async function NuevoServicioPage({
         <Card className="mb-4 border-[#cfe0d6] bg-[var(--accent-soft)] p-4">
           <p className="text-sm font-semibold text-[var(--ok)]">Cliente listo para la atención</p>
           <p className="mt-1 text-sm text-[var(--ink)]">
-            ${selectedClient.name} quedará preseleccionado en el siguiente formulario.
+            {selectedClient.name} quedará preseleccionado en el siguiente formulario.
           </p>
         </Card>
       ) : null}
