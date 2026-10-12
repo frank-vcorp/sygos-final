@@ -21,7 +21,6 @@ export default async function NuevoMotPage() {
         ...(session.role === "VENTAS" ? { ownerUserId: session.userId } : {}),
       },
       orderBy: { name: "asc" },
-      take: 200,
     }),
     prisma.priority.findMany({ where: { companyId: session.activeCompanyId, active: true }, orderBy: [{ attentionType: "asc" }, { sortOrder: "asc" }] }),
     prisma.catalogType.findMany({ orderBy: { name: "asc" } }),

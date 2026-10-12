@@ -31,12 +31,10 @@ export default async function NuevoServicioPage({
     prisma.client.findMany({
       where: { companyId: session.activeCompanyId, active: true, isSystem: false, ...(session.role === "VENTAS" ? { ownerUserId: session.userId } : {}) },
       orderBy: { name: "asc" },
-      take: 200,
     }),
     prisma.equipment.findMany({
       where: { originCompanyId: session.activeCompanyId, ...(session.role === "VENTAS" ? { client: { ownerUserId: session.userId } } : {}) },
       orderBy: { createdAt: "desc" },
-      take: 300,
       select: { id: true, folio: true, model: true, clientId: true, kind: true },
     }),
     prisma.priority.findMany({ where: { companyId: session.activeCompanyId, attentionType, active: true }, orderBy: { sortOrder: "asc" } }),

@@ -1,26 +1,18 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
-import { FormQuickModal, QuickCreateButton } from "@/components/form-quick-modal";
+import { useRef, useState } from "react";
 import { QuickSupplierFields } from "@/components/quick-supplier-fields";
-import { controlClass, Field } from "@/components/ui";
+import { SearchableEntityPicker, type PickerOption } from "@/components/searchable-entity-picker";
+import { Button } from "@/components/ui";
 import { quickCreateSupplierAction } from "@/lib/quick-create-actions";
-import { validateQuickSupplierDraft, type QuickFormFieldMap } from "@/lib/quick-form-persist";
-
-type SupplierOption = { id: string; name: string };
+import { readNamedFormFields, validateQuickSupplierDraft, type QuickFormFieldMap } from "@/lib/quick-form-persist";
 
 export function SupplierPicker({
-  suppliers,
-  allowQuickSupplier = false,
-  defaultSupplierId = "",
-  label = "Proveedor",
-  hint,
-  allowEmpty = false,
-  emptyLabel = "Sin proveedor",
-  required = false,
+  suppliers, allowQuickSupplier = false, defaultSupplierId = "", label = "Proveedor",
+  hint, allowEmpty = false, emptyLabel = "Sin proveedor", required = false,
 }: {
-  suppliers: SupplierOption[];
+  suppliers: PickerOption[];
   allowQuickSupplier?: boolean;
   defaultSupplierId?: string;
   label?: string;
@@ -30,69 +22,76 @@ export function SupplierPicker({
   required?: boolean;
 }) {
   const router = useRouter();
+  const panelRef = useRef<HTMLDivElement>(null);
   const [supplierId, setSupplierId] = useState(defaultSupplierId);
   const [showNew, setShowNew] = useState(false);
-  const [extraSuppliers, setExtraSuppliers] = useState<SupplierOption[]>([]);
-  const options = useMemo(() => {
-    const seen = new Set(suppliers.map((row) => row.id));
-    return [...suppliers, ...extraSuppliers.filter((row) => !seen.has(row.id))];
-  }, [suppliers, extraSuppliers]);
+  const [draftName, setDraftName] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [extraSuppliers, setExtraSuppliers] = useState<PickerOption[]>([]);
+  const seen = new Set(suppliers.map((row) => row.id));
+  const options = [...suppliers, ...extraSuppliers.filter((row) => !seen.has(row.id))];
 
-  const selectSupplier = (id: string) => {
-    setSupplierId(id);
-    if (id) setShowNew(false);
-  };
-
-  const commitQuickSupplier = async (fields: QuickFormFieldMap) => {
+  async function saveSupplier() {
+    if (saving || !panelRef.current) return;
+    for (const input of panelRef.current.querySelectorAll<HTMLInputElement>("input")) {
+      if (!input.reportValidity()) return;
+    }
+    const fields: QuickFormFieldMap = readNamedFormFields(panelRef.current);
     const validation = validateQuickSupplierDraft(fields);
-    if (validation) return validation;
-    const created = await quickCreateSupplierAction(fields);
-    setExtraSuppliers((current) => [...current, { id: created.supplierId, name: created.name }]);
-    selectSupplier(created.supplierId);
-    router.refresh();
-    return null;
-  };
+    if (validation) { setError(validation); return; }
+    setSaving(true);
+    setError("");
+    try {
+      const created = await quickCreateSupplierAction(fields);
+      setExtraSuppliers((current) => [...current, { id: created.supplierId, name: created.name }]);
+      setSupplierId(created.supplierId);
+      setShowNew(false);
+      router.refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "No se pudo crear el proveedor.");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
-    <>
-      <Field
+    <div className="grid gap-3">
+      <SearchableEntityPicker
         label={label}
-        hint={
-          hint
-          ?? (allowQuickSupplier
-            ? allowEmpty
-              ? "Opcional. Elige uno existente o regístralo nuevo."
-              : "Elige un proveedor de la lista o usa el alta si aún no existe."
-            : undefined)
-        }
-      >
-        <select
-          name="supplierId"
-          required={required && !allowQuickSupplier}
-          className={controlClass}
-          value={supplierId}
-          disabled={showNew}
-          onChange={(event) => selectSupplier(event.target.value)}
-        >
-          {allowEmpty ? <option value="">{emptyLabel}</option> : <option value="">Selecciona</option>}
-          {options.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}
-        </select>
-      </Field>
-      {allowQuickSupplier && !supplierId ? (
-        <>
-          <QuickCreateButton label="+ Alta de proveedor" onClick={() => setShowNew(true)} />
-          <FormQuickModal
-            open={showNew}
-            title="Alta de proveedor"
-            titleId="supplier-quick-modal-title"
-            onClose={() => setShowNew(false)}
-            onCommit={commitQuickSupplier}
-            doneLabel="Guardar y continuar"
-          >
-            <QuickSupplierFields required />
-          </FormQuickModal>
-        </>
+        name="supplierId"
+        options={options}
+        selectedId={supplierId}
+        onSelect={(id) => { setSupplierId(id); if (id) setShowNew(false); }}
+        required={required}
+        allowEmpty={allowEmpty}
+        emptyLabel={allowEmpty ? emptyLabel : "Busca o selecciona un proveedor"}
+        hint={hint ?? (allowQuickSupplier ? "Busca en el mismo campo o agrega un proveedor nuevo." : undefined)}
+        createLabel="Nuevo proveedor"
+        onCreate={allowQuickSupplier ? (typed) => {
+          setSupplierId("");
+          setDraftName(typed);
+          setError("");
+          setShowNew(true);
+        } : undefined}
+      />
+      {showNew ? (
+        <div ref={panelRef} className="grid gap-3 rounded-xl border border-[#bed9e9] bg-[#f4f9fc] p-4"
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && event.target instanceof HTMLInputElement) {
+              event.preventDefault();
+              void saveSupplier();
+            }
+          }}>
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-[var(--ink)]">Nuevo proveedor</h3>
+            <Button type="button" tone="ghost" onClick={() => setShowNew(false)}>Cancelar</Button>
+          </div>
+          <QuickSupplierFields required defaultName={draftName} />
+          {error ? <p role="alert" className="text-sm text-[var(--danger)]">{error}</p> : null}
+          <Button type="button" disabled={saving} onClick={() => void saveSupplier()}>{saving ? "Guardando…" : "Guardar proveedor y continuar"}</Button>
+        </div>
       ) : null}
-    </>
+    </div>
   );
 }

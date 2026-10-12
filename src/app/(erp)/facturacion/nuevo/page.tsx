@@ -12,7 +12,6 @@ export default async function FacturaLibrePage() {
   const clients = await prisma.client.findMany({
     where: { companyId: session.activeCompanyId, active: true, isSystem: false },
     orderBy: { name: "asc" },
-    take: 200,
   });
   return (
     <>

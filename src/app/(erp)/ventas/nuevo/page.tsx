@@ -19,12 +19,10 @@ export default async function NuevaVentaEquipoPage({ searchParams }: { searchPar
       where: { companyId: session.activeCompanyId, active: true, isSystem: false, ...(session.role === "VENTAS" ? { ownerUserId: session.userId } : {}) },
       include: { contacts: { where: { active: true }, orderBy: [{ isPrimary: "desc" }, { name: "asc" }] } },
       orderBy: { name: "asc" },
-      take: 200,
     }),
     prisma.equipment.findMany({
       where: { originCompanyId: session.activeCompanyId, kind: "EQUI", ...(session.role === "VENTAS" ? { client: { ownerUserId: session.userId } } : {}) },
       orderBy: { createdAt: "desc" },
-      take: 300,
       select: { id: true, folio: true, model: true, clientId: true, kind: true },
     }),
     prisma.catalogType.findMany({ orderBy: { name: "asc" } }),

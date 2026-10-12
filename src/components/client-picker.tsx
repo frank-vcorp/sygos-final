@@ -1,26 +1,18 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
-import { FormQuickModal, QuickCreateButton } from "@/components/form-quick-modal";
+import { useRef, useState } from "react";
 import { QuickClientFields } from "@/components/quick-client-fields";
-import { controlClass, Field } from "@/components/ui";
+import { SearchableEntityPicker, type PickerOption } from "@/components/searchable-entity-picker";
+import { Button } from "@/components/ui";
 import { quickCreateClientAction } from "@/lib/quick-create-actions";
-import { validateQuickClientDraft, type QuickFormFieldMap } from "@/lib/quick-form-persist";
-
-type ClientOption = { id: string; name: string };
+import { readNamedFormFields, validateQuickClientDraft, type QuickFormFieldMap } from "@/lib/quick-form-persist";
 
 export function ClientPicker({
-  clients,
-  allowQuickClient = false,
-  defaultClientId = "",
-  label = "Cliente",
-  hint,
-  onClientChange,
-  onClientCreated,
-  extendedContact = true,
+  clients, allowQuickClient = false, defaultClientId = "", label = "Cliente", hint,
+  onClientChange, onClientCreated, extendedContact = true,
 }: {
-  clients: ClientOption[];
+  clients: PickerOption[];
   allowQuickClient?: boolean;
   defaultClientId?: string;
   label?: string;
@@ -30,85 +22,82 @@ export function ClientPicker({
   extendedContact?: boolean;
 }) {
   const router = useRouter();
+  const panelRef = useRef<HTMLDivElement>(null);
   const [clientId, setClientId] = useState(defaultClientId);
-  const [search, setSearch] = useState("");
   const [showNew, setShowNew] = useState(false);
-  const [extraClients, setExtraClients] = useState<ClientOption[]>([]);
-  const options = useMemo(() => {
-    const seen = new Set(clients.map((row) => row.id));
-    return [...clients, ...extraClients.filter((row) => !seen.has(row.id))];
-  }, [clients, extraClients]);
+  const [draftName, setDraftName] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [extraClients, setExtraClients] = useState<PickerOption[]>([]);
+  const seen = new Set(clients.map((row) => row.id));
+  const options = [...clients, ...extraClients.filter((row) => !seen.has(row.id))];
 
-  const visibleOptions = useMemo(() => {
-    const term = search.trim().normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
-    if (!term) return options;
-    return options.filter((row) => row.id === clientId || row.name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().includes(term));
-  }, [options, search, clientId]);
-
-  const selectClient = (id: string) => {
+  function selectClient(id: string) {
     setClientId(id);
     onClientChange?.(id);
     if (id) setShowNew(false);
-  };
+  }
 
-  const commitQuickClient = async (fields: QuickFormFieldMap) => {
+  async function saveClient() {
+    if (saving || !panelRef.current) return;
+    for (const input of panelRef.current.querySelectorAll<HTMLInputElement>("input")) {
+      if (!input.reportValidity()) return;
+    }
+    const fields: QuickFormFieldMap = readNamedFormFields(panelRef.current);
     const validation = validateQuickClientDraft(fields);
-    if (validation) return validation;
-    const created = await quickCreateClientAction(fields);
-    setExtraClients((current) => [...current, { id: created.clientId, name: created.name }]);
-    onClientCreated?.({ id: created.clientId, name: created.name, contact: { id: created.primaryContactId, name: fields.contactName.trim(), isPrimary: true } });
-    selectClient(created.clientId);
-    router.refresh();
-    return null;
-  };
+    if (validation) { setError(validation); return; }
+    setSaving(true);
+    setError("");
+    try {
+      const created = await quickCreateClientAction(fields);
+      setExtraClients((current) => [...current, { id: created.clientId, name: created.name }]);
+      onClientCreated?.({ id: created.clientId, name: created.name, contact: { id: created.primaryContactId, name: fields.contactName.trim(), isPrimary: true } });
+      selectClient(created.clientId);
+      setShowNew(false);
+      router.refresh();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "No se pudo crear el cliente.");
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
-    <>
-      <div className="grid gap-3">
-        <input type="search" aria-label="Filtrar clientes de la lista" placeholder="Filtrar clientes por nombre…" value={search} onChange={(event) => setSearch(event.target.value)} className={controlClass} />
-        <div className={allowQuickClient ? "flex flex-col gap-3 sm:flex-row sm:items-end" : undefined}>
-        <Field
-          label={label}
-          hint={
-            hint
-            ?? (allowQuickClient
-              ? "Elige de la lista o registra uno nuevo al lado."
-              : undefined)
-          }
-          className={allowQuickClient ? "min-w-0 flex-1" : undefined}
-        >
-          <select
-            name="clientId"
-            required
-            className={controlClass}
-            value={clientId}
-            disabled={showNew}
-            onChange={(event) => selectClient(event.target.value)}
-          >
-            <option value="">Selecciona</option>
-            {visibleOptions.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}
-          </select>
-        </Field>
-        {allowQuickClient && !clientId ? (
-          <QuickCreateButton label="+ Alta de cliente" onClick={() => setShowNew(true)} />
-        ) : null}
+    <div className="grid gap-3">
+      <SearchableEntityPicker
+        label={label}
+        name="clientId"
+        options={options}
+        selectedId={clientId}
+        onSelect={selectClient}
+        required
+        hint={hint ?? (allowQuickClient ? "Busca en el mismo campo o agrega un cliente nuevo." : undefined)}
+        emptyLabel="Busca o selecciona un cliente"
+        createLabel="Nuevo cliente"
+        onCreate={allowQuickClient ? (typed) => {
+          selectClient("");
+          setDraftName(typed);
+          setError("");
+          setShowNew(true);
+        } : undefined}
+      />
+      {showNew ? (
+        <div ref={panelRef} className="grid gap-3 rounded-xl border border-[#bed9e9] bg-[#f4f9fc] p-4"
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && event.target instanceof HTMLInputElement) {
+              event.preventDefault();
+              void saveClient();
+            }
+          }}>
+          <div className="flex items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold text-[var(--ink)]">Nuevo cliente</h3>
+            <Button type="button" tone="ghost" onClick={() => setShowNew(false)}>Cancelar</Button>
+          </div>
+          <QuickClientFields required extended={extendedContact} defaultName={draftName} />
+          {error ? <p role="alert" className="text-sm text-[var(--danger)]">{error}</p> : null}
+          <Button type="button" disabled={saving} onClick={() => void saveClient()}>{saving ? "Guardando…" : "Guardar cliente y continuar"}</Button>
         </div>
-        {search && visibleOptions.length === 0 ? <p className="text-xs text-[var(--muted)]">No hay coincidencias en la lista. Puedes dar de alta un cliente nuevo.</p> : null}
-      </div>
-      {allowQuickClient && !clientId ? (
-        <>
-          <FormQuickModal
-            open={showNew}
-            title="Alta de cliente"
-            titleId="client-quick-modal-title"
-            onClose={() => setShowNew(false)}
-            onCommit={commitQuickClient}
-            doneLabel="Guardar y continuar"
-          >
-            <QuickClientFields required extended={extendedContact} />
-          </FormQuickModal>
-        </>
       ) : null}
-    </>
+    </div>
   );
 }

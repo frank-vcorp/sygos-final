@@ -228,7 +228,7 @@ export function Field({
 }) {
   return (
     <label className={`block ${className}`.trim()}>
-      <span className="mb-1 block text-sm font-medium">{label}</span>
+      <span className="mb-1.5 block text-sm font-semibold text-[var(--ink)]">{label}</span>
       {children}
       {hint ? <span className="mt-1 block text-xs text-[var(--muted)]">{hint}</span> : null}
     </label>
@@ -357,7 +357,7 @@ export function DetailGrid({ children }: { children: React.ReactNode }) {
 
 export function FormPanel({ children, className = "", ...props }: React.ComponentProps<"form">) {
   return (
-    <form {...props} className={`max-w-5xl overflow-hidden rounded-2xl border border-[var(--line)] bg-white shadow-[0_18px_44px_rgba(20,45,75,0.07)] ${className}`}>
+    <form {...props} className={`max-w-5xl overflow-visible rounded-2xl border border-[var(--line)] bg-white shadow-[0_18px_44px_rgba(20,45,75,0.07)] ${className}`}>
       {children}
     </form>
   );
@@ -376,8 +376,8 @@ export function FormSection({
 }) {
   const grids = { 1: "", 2: "md:grid-cols-2", 3: "md:grid-cols-2 xl:grid-cols-3" };
   return (
-    <section className="border-b border-[var(--line)] p-5 md:p-8">
-      <div className="mb-5">
+    <section className="border-b border-[var(--line)] p-5 last:border-b-0 md:p-8">
+      <div className="mb-6 border-l-[3px] border-[#0a8295] pl-4">
         <h2 className="text-lg font-bold tracking-tight text-[var(--ink)]">{title}</h2>
         {description ? <p className="mt-1 max-w-2xl text-sm leading-6 text-[var(--muted)]">{description}</p> : null}
       </div>
@@ -406,9 +406,9 @@ export function FormBlock({
       ? "border-[var(--line)] bg-[#f7fafc]"
       : "border-[var(--line)] bg-white";
   return (
-    <section className={`rounded-xl border ${surface} p-4 md:p-5`}>
-      <header className="mb-4">
-        <h3 className="text-sm font-semibold tracking-tight text-[#0b1f3a]">{title}</h3>
+    <section className={`rounded-2xl border ${surface} p-4 md:p-5`}>
+      <header className="mb-4 border-l-[3px] border-[#0a8295] pl-3">
+        <h3 className="text-sm font-bold tracking-tight text-[#0b1f3a]">{title}</h3>
         {description ? <p className="mt-1 text-xs leading-5 text-[var(--muted)]">{description}</p> : null}
       </header>
       <div className={`grid gap-4 ${grids[columns]}`}>{children}</div>
@@ -418,7 +418,7 @@ export function FormBlock({
 
 export function FormActions({ children, note }: { children: React.ReactNode; note?: string }) {
   return (
-    <footer className="flex flex-col-reverse gap-3 bg-[#f3f8fb] px-5 py-5 sm:flex-row sm:items-center sm:justify-between md:px-7">
+    <footer className="flex flex-col-reverse gap-3 rounded-b-2xl bg-[#f3f8fb] px-5 py-5 sm:flex-row sm:items-center sm:justify-between md:px-7">
       {note ? <p className="text-xs text-[var(--muted)]">{note}</p> : <span />}
       <div className="flex flex-col gap-2 sm:flex-row">{children}</div>
     </footer>
