@@ -40,7 +40,7 @@ export async function quickCreateClientAction(fields: QuickFormFieldMap) {
     where: { id: created.clientId },
     select: { id: true, name: true },
   });
-  return { clientId: created.clientId, name: client?.name ?? fields.newClientName };
+  return { clientId: created.clientId, name: client?.name ?? fields.newClientName, primaryContactId: created.primaryContactId };
 }
 
 export async function quickCreateSupplierAction(fields: QuickFormFieldMap) {

@@ -54,8 +54,14 @@ export function FormQuickModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" && !(event.target instanceof HTMLTextAreaElement)) {
+          event.preventDefault();
+          void handleDone();
+        }
+      }}
     >
-      <div className="max-h-[min(90vh,40rem)] w-full max-w-lg overflow-y-auto rounded-xl border border-[var(--line)] bg-white shadow-xl">
+      <div className="max-h-[min(90vh,40rem)] w-full max-w-lg overflow-y-auto rounded-2xl border border-[var(--line)] bg-white shadow-xl">
         <div className="sticky top-0 flex items-center justify-between gap-3 border-b border-[var(--line)] bg-white px-4 py-3">
           <h3 id={titleId} className="text-sm font-semibold text-[#0b1f3a]">{title}</h3>
           <Button type="button" tone="ghost" className="min-h-9 px-2 text-xs" onClick={onClose}>

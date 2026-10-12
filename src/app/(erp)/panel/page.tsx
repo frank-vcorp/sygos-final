@@ -26,14 +26,19 @@ function Block({
   bandejaHref?: string;
 }) {
   return (
-    <Card className="p-4">
+    <Card className="overflow-hidden p-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="font-medium">{title}</h2>
+        <h2 className="text-base font-bold tracking-tight text-[var(--ink)]">{title}</h2>
         {bandejaHref ? <TextLink href={bandejaHref}>Ver bandeja</TextLink> : null}
       </div>
-      {rows.length === 0 ? <p className="mt-2 text-sm text-[var(--muted)]">{empty}</p> : (
-        <ul className="mt-2 space-y-2 text-sm">
-          {rows.map((row) => <li key={row.key ?? row.href + row.label}><RecordLink href={row.href}>{row.label}</RecordLink> · {row.detail}</li>)}
+      {rows.length === 0 ? <p className="mt-4 rounded-lg bg-[#f5f8fb] px-4 py-3 text-sm text-[var(--muted)]">{empty}</p> : (
+        <ul className="mt-4 divide-y divide-[var(--line)] border-t border-[var(--line)] text-sm">
+          {rows.map((row) => (
+            <li key={row.key ?? row.href + row.label} className="flex flex-col gap-1 py-3 first:pt-3 sm:flex-row sm:items-start sm:gap-4">
+              <RecordLink href={row.href} className="shrink-0">{row.label}</RecordLink>
+              <span className="min-w-0 leading-5 text-[var(--muted)]">{row.detail}</span>
+            </li>
+          ))}
         </ul>
       )}
     </Card>
@@ -258,7 +263,7 @@ async function Sales({ companyId, userId }: { companyId: string; userId: string 
     : [];
   return (
     <>
-      <PageHeader title="Inicio" subtitle="Tus pendientes comerciales y tu desempeño. Solo clientes asignados a ti en cartera; sin costos internos ni base Servomotores." />
+      <PageHeader title="Mi jornada comercial" subtitle="Da seguimiento a tus clientes, cotizaciones, entregas y cobranza desde un solo lugar." />
       <section className="mb-4 grid gap-3 sm:grid-cols-3">
         <KpiCard label="Cotizaciones autorizadas (mes)" value={String(authorizedMonth)} href="/cotizaciones" />
         <KpiCard label="Esperando decisión del cliente" value={String(pendingDecision)} href="/cotizaciones?vista=decision" />
@@ -272,7 +277,7 @@ async function Sales({ companyId, userId }: { companyId: string; userId: string 
           </ul>
         </Card>
       ) : null}
-      <div className="grid gap-3">
+      <div className="grid gap-4 xl:grid-cols-2">
         <Block title="Servicios de tu cartera" empty="No hay servicios activos ni atenciones en espera de ingreso para tus clientes." bandejaHref="/servicios/activos" rows={serviciosCartera.slice(0, 10).map((row) => {
           if (row.kind === "operacion") {
             return {
