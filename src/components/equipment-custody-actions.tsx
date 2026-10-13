@@ -29,7 +29,7 @@ export function EquipmentCustodyActions({
           <Button type="button" onClick={() => setOpen("movement")}>{movementButtonLabel}</Button>
         ) : null}
         {showAttention ? (
-          <Button type="button" tone="ghost" onClick={() => setOpen("attention")}>Nueva atención</Button>
+          <Button type="button" tone="ghost" onClick={() => setOpen("attention")}>Nuevo servicio</Button>
         ) : null}
       </div>
       <FormOverlayDialog
@@ -44,7 +44,7 @@ export function EquipmentCustodyActions({
       <FormOverlayDialog
         open={open === "attention"}
         onClose={() => setOpen(null)}
-        title="Nueva atención"
+        title="Nuevo servicio"
         titleId="equipment-attention-overlay"
         wide
       >

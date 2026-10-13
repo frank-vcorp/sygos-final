@@ -36,7 +36,7 @@ export function AttentionForm({
       <input type="hidden" name="equipmentId" value={equipmentId} />
       <input type="hidden" name="kind" value={kind} />
       <input type="hidden" name="version" value={version} />
-      <Field label="Tipo de atención">
+      <Field label="Tipo de servicio">
         <select name="attentionType" required className={controlClass}>
           <option value="">Selecciona</option>
           {ATTENTION_TYPES.map((type) => (
@@ -74,17 +74,17 @@ export function AttentionForm({
   if (variant === "card") {
     return (
       <FormPanel action={createAttentionAction}>
-        <FormSection title="Nueva atención" description="Es un episodio de servicio. No crea otro equipo ni otro folio." columns={1}>
+        <FormSection title="Nuevo servicio" description="Es un episodio de servicio. No crea otro equipo ni otro folio." columns={1}>
           {fields}
         </FormSection>
-        <FormActions><Button type="submit">Crear atención</Button></FormActions>
+        <FormActions><Button type="submit">Crear servicio</Button></FormActions>
       </FormPanel>
     );
   }
   return (
     <form action={createAttentionAction} className="grid gap-3">
       {fields}
-      <Button type="submit">Crear atención</Button>
+      <Button type="submit">Crear servicio</Button>
     </form>
   );
 }

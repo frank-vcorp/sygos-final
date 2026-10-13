@@ -52,6 +52,9 @@ export async function createMotAction(formData: FormData) {
   "use server";
   try {
     const session = await guard("mot.create");
+    if (!can(session.role, "attention.create", session.activeCompanyCode)) {
+      throw new Error("Ventas no abre servicios manualmente; el servicio se genera al confirmar el ingreso en Almacén.");
+    }
     const { clientId } = await clientIdFromForm(session, formData);
     const equipment = await createMot(session, {
       clientId,
@@ -92,7 +95,7 @@ export async function createAttentionAction(formData: FormData) {
       originalCaseId: optionalText(formData.get("originalCaseId")),
       version: parseVersion(formData.get("version")),
     });
-    await setFlash({ tone: "ok", message: "Atención creada. El SLA inicia con la recepción física." });
+    await setFlash({ tone: "ok", message: "Servicio creado. El SLA inicia con la recepción física." });
     redirect(back);
   } catch (error) {
     if (isRedirect(error)) throw error;
