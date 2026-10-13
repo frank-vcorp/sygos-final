@@ -33,33 +33,49 @@ const HISTORIAL_ESTADO_OPTIONS = [
 ] as const;
 
 function CalendarFilter({
-  name,
-  label,
-  value,
+  desde,
+  hasta,
+  clearHref,
 }: {
-  name: "desde" | "hasta";
-  label: string;
-  value?: string;
+  desde?: string;
+  hasta?: string;
+  clearHref: string;
 }) {
-  const title = value ? `${label}: ${value}` : label;
+  const hasRange = Boolean(desde || hasta);
   return (
-    <label
-      title={title}
-      className="relative inline-flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-[#cbd8e6] bg-white text-[#486078] transition-colors hover:border-[#087d99] hover:bg-[#f3f8fb] hover:text-[#087d99] focus-within:border-[#087d99] focus-within:ring-2 focus-within:ring-[#c7e9f2]"
-    >
-      <span className="sr-only">{title}</span>
-      <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
-        <path d="M7 3v3M17 3v3M4.5 9.5h15M6 5h12a2 2 0 0 1 2 2v11.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-      <input
-        type="date"
-        name={name}
-        defaultValue={value ?? ""}
-        aria-label={title}
-        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
-      />
-      {value ? <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-[var(--accent)]" aria-hidden="true" /> : null}
-    </label>
+    <details className="relative shrink-0">
+      <summary
+        title="Filtrar por fechas"
+        aria-label="Filtrar por fechas"
+        className="relative inline-flex h-11 w-11 cursor-pointer list-none items-center justify-center rounded-lg border border-[#cbd8e6] bg-white text-[#486078] transition-colors hover:border-[#087d99] hover:bg-[#f3f8fb] hover:text-[#087d99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c7e9f2] [&::-webkit-details-marker]:hidden"
+      >
+        <span className="sr-only">Filtrar por fechas</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
+          <path d="M7 3v3M17 3v3M4.5 9.5h15M6 5h12a2 2 0 0 1 2 2v11.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+        {hasRange ? <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-[var(--accent)]" aria-hidden="true" /> : null}
+      </summary>
+      <div className="absolute right-0 top-[calc(100%+0.5rem)] z-30 w-[min(20rem,calc(100vw-2rem))] rounded-xl border border-[var(--line)] bg-white p-4 shadow-[0_14px_34px_rgba(20,45,75,0.16)]">
+        <div className="mb-3">
+          <p className="text-sm font-semibold text-[var(--ink)]">Filtrar por fechas</p>
+          <p className="mt-1 text-xs leading-5 text-[var(--muted)]">Usa una fecha o define un rango completo.</p>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-semibold text-[var(--ink)]">Desde</span>
+            <input type="date" name="desde" defaultValue={desde ?? ""} aria-label="Desde" className={controlClass} />
+          </label>
+          <label className="block">
+            <span className="mb-1.5 block text-xs font-semibold text-[var(--ink)]">Hasta</span>
+            <input type="date" name="hasta" defaultValue={hasta ?? ""} aria-label="Hasta" className={controlClass} />
+          </label>
+        </div>
+        <div className="mt-4 flex items-center justify-between gap-3 border-t border-[var(--line)] pt-3">
+          {hasRange ? <TextLink href={clearHref} className="text-xs">Limpiar</TextLink> : <span />}
+          <Button type="submit" tone="ghost" className="px-4">Aplicar fechas</Button>
+        </div>
+      </div>
+    </details>
   );
 }
 
@@ -183,8 +199,11 @@ export async function ServiciosTecnicoBandeja({
             </option>
           ))}
         </select>
-        <CalendarFilter name="desde" label="Filtrar desde" value={desde} />
-        <CalendarFilter name="hasta" label="Filtrar hasta" value={hasta} />
+        <CalendarFilter
+          desde={desde}
+          hasta={hasta}
+          clearHref={serviciosBandejaHref({ vista, tipo, q: query, estado })}
+        />
         {vista === "historial" ? (
           <select
             name="estado"
@@ -206,8 +225,12 @@ export async function ServiciosTecnicoBandeja({
           ...(tipoParam && tipoLabel ? [{ label: tipoLabel, clearHref: serviciosBandejaHref({ vista, q: query, desde, hasta, estado }) }] : []),
           ...(estadoLabel ? [{ label: estadoLabel, clearHref: serviciosBandejaHref({ vista, tipo, q: query, desde, hasta }) }] : []),
           ...(query ? [{ label: `Búsqueda: ${query}`, clearHref: serviciosBandejaHref({ vista, tipo, desde, hasta, estado }) }] : []),
-          ...(desde ? [{ label: `Desde ${desde}`, clearHref: serviciosBandejaHref({ vista, tipo, q: query, hasta, estado }) }] : []),
-          ...(hasta ? [{ label: `Hasta ${hasta}`, clearHref: serviciosBandejaHref({ vista, tipo, q: query, desde, estado }) }] : []),
+          ...(desde || hasta
+            ? [{
+                label: desde && hasta ? `Fechas: ${desde} – ${hasta}` : desde ? `Desde ${desde}` : `Hasta ${hasta}`,
+                clearHref: serviciosBandejaHref({ vista, tipo, q: query, estado }),
+              }]
+            : []),
         ]}
       />
 
