@@ -14,6 +14,7 @@ export default async function CobranzaPage({ searchParams }: { searchParams: Pro
   const { vista } = await searchParams;
   const canEditClient = can(session.role, "client.edit", session.activeCompanyCode);
   const own = session.role === "VENTAS" ? { sellerUserId: session.userId } : {};
+  const selectedVista = vista === "cxc" || vista === "vencidas" ? vista : "todas";
   const now = new Date();
   const balanceFilter =
     selectedVista === "cxc"
@@ -34,7 +35,6 @@ export default async function CobranzaPage({ searchParams }: { searchParams: Pro
     const late = (row: typeof a) => row.balance > 0 && row.dueAt.getTime() < Date.now() ? Date.now() - row.dueAt.getTime() : 0;
     return late(b) - late(a);
   });
-  const selectedVista = vista === "cxc" || vista === "vencidas" ? vista : "todas";
   return (
     <>
       <PageHeader title={session.role === "VENTAS" ? "Mi cobranza" : "Cobranza"} subtitle="Saldos de esta empresa. Vencida es saldo después de la fecha." />
