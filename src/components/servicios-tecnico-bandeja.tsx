@@ -132,39 +132,47 @@ export async function ServiciosTecnicoBandeja({
           },
         ]}
       />
-      <SegmentedNav
-        items={[
-          {
-            href: serviciosBandejaHref({ ...navBase, tipo: "todos" }),
-            label: "Todos los tipos",
-            active: !tipo || tipo === "todos",
-          },
-          ...SERVICIO_TIPO_OPTIONS.map((opt) => ({
-            href: serviciosBandejaHref({ ...navBase, tipo: opt.param }),
-            label: opt.label,
-            active: tipo === opt.param,
-          })),
-        ]}
-      />
       <FilterBar action={formAction}>
-        {tipo && tipo !== "todos" ? <input type="hidden" name="tipo" value={tipo} /> : null}
-        <input name="q" defaultValue={query} placeholder="Folio, cliente, equipo o falla" className={`${controlClass} min-w-0 sm:flex-1`} />
+        <input
+          name="q"
+          defaultValue={query}
+          placeholder="Folio, cliente, equipo o falla"
+          className={`${controlClass} min-w-0 flex-1`}
+        />
+        <select
+          name="tipo"
+          defaultValue={tipo && tipo !== "todos" ? tipo : "todos"}
+          aria-label="Tipo de servicio"
+          className={`${controlClass} sm:w-[190px]`}
+        >
+          <option value="todos">Todos los tipos</option>
+          {SERVICIO_TIPO_OPTIONS.map((opt) => (
+            <option key={opt.param} value={opt.param}>
+              {opt.label}
+            </option>
+          ))}
+        </select>
         <input
           type="date"
           name="desde"
           defaultValue={desde ?? ""}
           aria-label="Desde"
-          className={`${controlClass} w-full sm:w-auto`}
+          className={`${controlClass} sm:w-[145px]`}
         />
         <input
           type="date"
           name="hasta"
           defaultValue={hasta ?? ""}
           aria-label="Hasta"
-          className={`${controlClass} w-full sm:w-auto`}
+          className={`${controlClass} sm:w-[145px]`}
         />
         {vista === "historial" ? (
-          <select name="estado" defaultValue={estado && estado !== "todos" ? estado : "todos"} className={controlClass}>
+          <select
+            name="estado"
+            defaultValue={estado && estado !== "todos" ? estado : "todos"}
+            aria-label="Estado"
+            className={`${controlClass} sm:w-[190px]`}
+          >
             {HISTORIAL_ESTADO_OPTIONS.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}
@@ -176,7 +184,6 @@ export async function ServiciosTecnicoBandeja({
       </FilterBar>
       <ActiveFilters
         items={[
-          ...(vista === "historial" ? [{ label: "Historial", clearHref: serviciosBandejaHref({ tipo, q: query, desde, hasta, estado }) }] : []),
           ...(tipoParam && tipoLabel ? [{ label: tipoLabel, clearHref: serviciosBandejaHref({ vista, q: query, desde, hasta, estado }) }] : []),
           ...(estadoLabel ? [{ label: estadoLabel, clearHref: serviciosBandejaHref({ vista, tipo, q: query, desde, hasta }) }] : []),
           ...(query ? [{ label: `Búsqueda: ${query}`, clearHref: serviciosBandejaHref({ vista, tipo, desde, hasta, estado }) }] : []),
