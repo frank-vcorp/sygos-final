@@ -32,6 +32,37 @@ const HISTORIAL_ESTADO_OPTIONS = [
   { value: "CANCELADA", label: "Cancelada" },
 ] as const;
 
+function CalendarFilter({
+  name,
+  label,
+  value,
+}: {
+  name: "desde" | "hasta";
+  label: string;
+  value?: string;
+}) {
+  const title = value ? `${label}: ${value}` : label;
+  return (
+    <label
+      title={title}
+      className="relative inline-flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-lg border border-[#cbd8e6] bg-white text-[#486078] transition-colors hover:border-[#087d99] hover:bg-[#f3f8fb] hover:text-[#087d99] focus-within:border-[#087d99] focus-within:ring-2 focus-within:ring-[#c7e9f2]"
+    >
+      <span className="sr-only">{title}</span>
+      <svg viewBox="0 0 24 24" aria-hidden="true" className="h-5 w-5">
+        <path d="M7 3v3M17 3v3M4.5 9.5h15M6 5h12a2 2 0 0 1 2 2v11.5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+      <input
+        type="date"
+        name={name}
+        defaultValue={value ?? ""}
+        aria-label={title}
+        className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+      />
+      {value ? <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-[var(--accent)]" aria-hidden="true" /> : null}
+    </label>
+  );
+}
+
 function bandejaSubtitle(role: Role, vista: ServiciosVista, technician: boolean): string {
   const sales = role === "VENTAS";
   if (vista === "historial") {
@@ -152,20 +183,8 @@ export async function ServiciosTecnicoBandeja({
             </option>
           ))}
         </select>
-        <input
-          type="date"
-          name="desde"
-          defaultValue={desde ?? ""}
-          aria-label="Desde"
-          className={`${controlClass} sm:w-[145px]`}
-        />
-        <input
-          type="date"
-          name="hasta"
-          defaultValue={hasta ?? ""}
-          aria-label="Hasta"
-          className={`${controlClass} sm:w-[145px]`}
-        />
+        <CalendarFilter name="desde" label="Filtrar desde" value={desde} />
+        <CalendarFilter name="hasta" label="Filtrar hasta" value={hasta} />
         {vista === "historial" ? (
           <select
             name="estado"
