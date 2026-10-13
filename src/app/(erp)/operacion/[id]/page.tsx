@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import Link from "next/link";
 import { prepareFromCaseAction } from "@/app/(erp)/cotizaciones/actions";
 import {
   assignCaseAction,
@@ -53,7 +54,7 @@ export default async function OperacionDetallePage({ params }: { params: Promise
   const session = await requireCompany();
   if (session.role === "ALMACEN") redirect(homePath(session.role, session.activeCompanyCode));
   const { id } = await params;
-  const row = await prisma.technicalCase.findUnique({
+  const loadedRow = await prisma.technicalCase.findUnique({
     where: { id },
     include: {
       attention: true,
@@ -65,7 +66,8 @@ export default async function OperacionDetallePage({ params }: { params: Promise
       presolicitudes: { orderBy: { createdAt: "asc" } },
     },
   });
-  if (!row) notFound();
+  if (!loadedRow) notFound();
+  const row = loadedRow!;
   const reflected = session.activeCompanyCode === "SYSTRON" && row.serviceCompany.code === "SERVOMOTORES" && row.equipment.originCompanyId === session.activeCompanyId;
   const owns = row.serviceCompanyId === session.activeCompanyId;
   if (!owns && !reflected) notFound();
@@ -96,6 +98,31 @@ export default async function OperacionDetallePage({ params }: { params: Promise
   const derived = await prisma.technicalCase.findFirst({ where: { spawnedFromId: row.id }, select: { id: true, folio: true } });
   const parent = row.spawnedFromId ? await prisma.technicalCase.findUnique({ where: { id: row.spawnedFromId }, select: { id: true, folio: true, kind: true } }) : null;
   const original = row.originalCaseId ? await prisma.technicalCase.findUnique({ where: { id: row.originalCaseId }, select: { id: true, folio: true } }) : null;
+  const [seller, relatedQuotes, relatedBilling, relatedSales] = await Promise.all([
+    row.attention.sellerUserId
+      ? prisma.user.findUnique({ where: { id: row.attention.sellerUserId }, select: { id: true, name: true } })
+      : null,
+    prisma.quote.findMany({
+      where: {
+        OR: [
+          { technicalCaseId: row.id },
+          ...(row.attention.originQuoteId ? [{ id: row.attention.originQuoteId }] : []),
+        ],
+      },
+      select: { id: true, folio: true, status: true },
+      orderBy: { createdAt: "asc" },
+    }),
+    prisma.billingDocument.findMany({
+      where: { technicalCaseId: row.id },
+      select: { id: true, folio: true, kind: true, status: true },
+      orderBy: { createdAt: "asc" },
+    }),
+    prisma.sale.findMany({
+      where: { quote: { technicalCaseId: row.id } },
+      select: { id: true, folio: true, quoteId: true },
+      orderBy: { createdAt: "asc" },
+    }),
+  ]);
   const repairAfterDiagnosis = row.kind === "OS" && row.attention.attentionType === "DIAGNOSTICO";
   const equipmentHref = row.equipment.kind === "MOT" ? `/motores/${row.equipmentId}` : `/equipos/${row.equipmentId}`;
   const historial = (HISTORIAL_CASE as readonly string[]).includes(row.status);
@@ -116,6 +143,20 @@ export default async function OperacionDetallePage({ params }: { params: Promise
   const back = can(session.role, "attention.catalog", session.activeCompanyCode)
     ? { href: serviciosBandejaHref({ vista: historial ? "historial" : "activos" }), label: "Servicios" }
     : { href: "/operacion", label: "En proceso" };
+  const equipmentIdentity = [row.equipment.typeName, row.equipment.brandName, row.equipment.model].filter(Boolean).join(" · ");
+  const relatedLinks = [
+    { label: "Cliente", href: `/clientes/${row.equipment.client.id}` },
+    { label: "Equipo", href: equipmentHref },
+    ...(relatedQuotes.length > 0
+      ? [{ label: `Cotizaciones${relatedQuotes.length > 1 ? ` (${relatedQuotes.length})` : ""}`, href: relatedQuotes.length === 1 ? `/cotizaciones/${relatedQuotes[0].id}` : "/cotizaciones" }]
+      : []),
+    ...(relatedSales.length > 0
+      ? [{ label: `Ventas${relatedSales.length > 1 ? ` (${relatedSales.length})` : ""}`, href: relatedSales.length === 1 ? `/ventas/${relatedSales[0].id}` : "/ventas" }]
+      : []),
+    ...(relatedBilling.length > 0
+      ? [{ label: `Facturación${relatedBilling.length > 1 ? ` (${relatedBilling.length})` : ""}`, href: relatedBilling.length === 1 ? `/facturacion/${relatedBilling[0].id}` : "/facturacion" }]
+      : []),
+  ];
 
   let primaryAction: React.ReactNode = null;
   if (!readOnly) {
@@ -149,15 +190,148 @@ export default async function OperacionDetallePage({ params }: { params: Promise
     }
   }
 
+  const partsSection = row.kind === "DIAGNOSTICO" ? (
+    <Card className="p-4 text-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="font-medium">Refacciones</h2>
+          <p className="mt-1 text-[var(--muted)]">
+            Presolicitud durante el diagnóstico. Si el cliente autoriza, pasan a la orden de servicio.
+          </p>
+        </div>
+        {canEditPresolicitud ? <Badge tone="ok">Presolicitud disponible</Badge> : null}
+      </div>
+      {row.presolicitudes.length === 0 ? (
+        <p className="mt-3 rounded-lg border border-dashed border-[var(--line)] px-3 py-4 text-[var(--muted)]">Sin presolicitudes registradas.</p>
+      ) : (
+        <ul className="mt-3 space-y-3">
+          {row.presolicitudes.map((item) => (
+            <li key={item.id} className="rounded-lg border border-[var(--line)] p-3">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <p className="font-medium">{item.partNumber} · {item.description}</p>
+                <Badge tone={item.status === "ACTIVA" ? "warn" : "neutral"}>{PRESOLICITUD_LABEL[item.status] ?? item.status}</Badge>
+              </div>
+              <p className="mt-1 text-[var(--muted)]">
+                Cantidad {item.qtyRequested}
+                {item.link ? (
+                  <>
+                    {" · "}
+                    <a href={item.link} className="text-[var(--accent)]" target="_blank" rel="noreferrer">Referencia</a>
+                  </>
+                ) : null}
+              </p>
+              {canEditPresolicitud && item.status === "ACTIVA" ? (
+                <details className="mt-3 rounded-lg bg-[#f7fafc] p-3">
+                  <summary className="cursor-pointer text-sm font-semibold text-[var(--accent)]">Editar presolicitud</summary>
+                  <div className="mt-3 space-y-2">
+                    <form action={updatePresolicitudAction} className="grid gap-2">
+                      <input type="hidden" name="caseId" value={row.id} />
+                      <input type="hidden" name="presolicitudId" value={item.id} />
+                      <Field label="Número de parte"><input name="partNumber" required defaultValue={item.partNumber} className={controlClass} /></Field>
+                      <Field label="Descripción"><input name="description" required defaultValue={item.description} className={controlClass} /></Field>
+                      <Field label="Liga opcional"><input name="link" defaultValue={item.link ?? ""} className={controlClass} /></Field>
+                      <Field label="Cantidad"><input name="quantity" type="number" min={1} required defaultValue={item.qtyRequested} className={controlClass} /></Field>
+                      <Button type="submit" tone="ghost">Guardar cambios</Button>
+                    </form>
+                    <form action={deletePresolicitudAction}>
+                      <input type="hidden" name="caseId" value={row.id} />
+                      <input type="hidden" name="presolicitudId" value={item.id} />
+                      <Button type="submit" tone="ghost">Quitar presolicitud</Button>
+                    </form>
+                  </div>
+                </details>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
+      {canEditPresolicitud ? (
+        <details className="mt-3 rounded-lg border border-[var(--line)] bg-[#f7fafc] p-3" open={row.presolicitudes.length === 0}>
+          <summary className="cursor-pointer text-sm font-semibold text-[var(--accent)]">Presolicitar refacción</summary>
+          <form action={createPresolicitudAction} className="mt-3 grid gap-2">
+            <input type="hidden" name="caseId" value={row.id} />
+            <Field label="Número de parte"><input name="partNumber" required className={controlClass} /></Field>
+            <Field label="Descripción"><input name="description" required className={controlClass} /></Field>
+            <Field label="Liga opcional"><input name="link" className={controlClass} /></Field>
+            <Field label="Cantidad"><input name="quantity" type="number" min={1} required className={controlClass} /></Field>
+            <Button type="submit">Registrar presolicitud</Button>
+          </form>
+        </details>
+      ) : null}
+    </Card>
+  ) : (
+    <Card className="p-4 text-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="font-medium">Refacciones</h2>
+          <p className="mt-1 text-[var(--muted)]">Solicitudes formales asociadas a esta orden de servicio.</p>
+        </div>
+        {canOperatePartRequests ? <Badge tone="ok">Captura disponible</Badge> : null}
+      </div>
+      {row.requests.length === 0 ? <p className="mt-3 rounded-lg border border-dashed border-[var(--line)] px-3 py-4 text-[var(--muted)]">Sin solicitudes registradas.</p> : (
+        <ul className="mt-3 space-y-3">
+          {row.requests.map((request) => (
+            <li key={request.id} className="rounded-lg border border-[var(--line)] p-3">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <p className="font-medium">{request.partNumber} · {request.description}</p>
+                <Badge tone={request.status === "SURTIDA" ? "ok" : "warn"}>{request.status}</Badge>
+              </div>
+              <p className="mt-1 text-[var(--muted)]">Solicitada {request.qtyRequested} · recibida {request.qtyReceived} · surtida {request.qtyIssued}</p>
+              {canOperatePartRequests ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <form action={receivePartAction} className="flex gap-1">
+                    <input type="hidden" name="caseId" value={row.id} />
+                    <input type="hidden" name="requestId" value={request.id} />
+                    <input type="hidden" name="version" value={request.version} />
+                    <input name="quantity" type="number" min={1} required aria-label="Cantidad recibida" placeholder="Cant." className="w-20 rounded-md border border-[var(--line)] px-2 py-1" />
+                    <Button type="submit" tone="ghost">Recibir</Button>
+                  </form>
+                  <form action={issuePartAction} className="flex gap-1">
+                    <input type="hidden" name="caseId" value={row.id} />
+                    <input type="hidden" name="requestId" value={request.id} />
+                    <input type="hidden" name="version" value={request.version} />
+                    <input name="quantity" type="number" min={1} required aria-label="Cantidad surtida" placeholder="Cant." className="w-20 rounded-md border border-[var(--line)] px-2 py-1" />
+                    <Button type="submit" tone="ghost">Surtir</Button>
+                  </form>
+                </div>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
+      {canOperatePartRequests ? (
+        <details className="mt-3 rounded-lg border border-[var(--line)] bg-[#f7fafc] p-3" open={row.requests.length === 0}>
+          <summary className="cursor-pointer text-sm font-semibold text-[var(--accent)]">Solicitar refacción</summary>
+          <form action={requestPartAction} className="mt-3 grid gap-2">
+            <input type="hidden" name="caseId" value={row.id} />
+            <Field label="Número de parte"><input name="partNumber" required className={controlClass} /></Field>
+            <Field label="Descripción"><input name="description" required className={controlClass} /></Field>
+            <Field label="Liga opcional"><input name="link" className={controlClass} /></Field>
+            <Field label="Cantidad"><input name="quantity" type="number" min={1} required className={controlClass} /></Field>
+            <Button type="submit">Registrar solicitud</Button>
+          </form>
+        </details>
+      ) : presolicitudOnly && !closed ? (
+        <p className="mt-3 rounded-lg bg-[#f7fafc] px-3 py-3 text-[var(--muted)]">En reparación las solicitudes formales las registra gerencia o almacén.</p>
+      ) : null}
+    </Card>
+  );
+
   return (
     <>
       <EntityDetailHeader
         back={back}
-        title={row.folio}
+        title={`Atención · ${row.folio}`}
         subtitle={`${row.kind === "OS" ? "Orden de servicio" : "Diagnóstico"} · ${row.serviceCompany.name}`}
         status={<Badge tone={row.quotePending || slaOverdue ? "warn" : "neutral"}>{CASE_STATUS_LABEL[row.status] ?? row.status}</Badge>}
         meta={
           <>
+            <EntityMetaItem label="Identificación del equipo">
+              <TextLink href={equipmentHref}>{equipmentIdentity || row.equipment.folio}</TextLink>
+              <span className="block text-xs text-[var(--muted)]">
+                {row.equipment.folio}{row.equipment.serial ? ` · Serie ${row.equipment.serial}` : ""}
+              </span>
+            </EntityMetaItem>
             <EntityMetaItem label="Cliente">
               <ClientNameLink
                 clientId={row.equipment.client.id}
@@ -166,10 +340,7 @@ export default async function OperacionDetallePage({ params }: { params: Promise
                 canEdit={canEditClient}
               />
             </EntityMetaItem>
-            <EntityMetaItem label="Equipo">
-              <TextLink href={equipmentHref}>{row.equipment.folio}</TextLink>
-              <span className="text-[var(--muted)]"> · {row.equipment.model}</span>
-            </EntityMetaItem>
+            <EntityMetaItem label="Vendedor">{seller?.name ?? "Sin vendedor asignado"}</EntityMetaItem>
             <EntityMetaItem label="Responsable">
               {row.externalSupplierId ? "Servicio externo" : row.assignee?.name ?? "Sin asignar"}
             </EntityMetaItem>
@@ -181,6 +352,15 @@ export default async function OperacionDetallePage({ params }: { params: Promise
           </>
         }
         primaryAction={primaryAction}
+        secondaryActions={
+          <nav className="flex max-w-full flex-wrap gap-2" aria-label="Relaciones de la atención">
+            {relatedLinks.map((item) => (
+              <Link key={item.href} href={item.href} className="rounded-full border border-[var(--line)] bg-white px-3 py-1.5 text-xs font-semibold text-[#38506c] transition hover:border-[#91b7cf] hover:text-[var(--accent)]">
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+        }
       />
       {readOnly ? <p className="mb-4 text-sm text-[var(--muted)]">Consulta de solo lectura. SYSTRON no modifica el estado ni la bitácora de Servomotores.</p> : null}
       <DetailGrid>
@@ -237,8 +417,12 @@ export default async function OperacionDetallePage({ params }: { params: Promise
               </form>
             ) : null}
           </Card>
+          {partsSection}
         </div>
-        <div className="space-y-4">
+        <aside className="space-y-4 lg:sticky lg:top-4 lg:self-start">
+          <HistoryTimeline items={history.map((item) => ({ id: item.id, createdAt: item.createdAt, summary: item.summary, authorName: item.author?.name }))} />
+          {false ? (
+            <>
           {row.kind === "DIAGNOSTICO" ? (
             <Card className="p-4 text-sm">
               <h2 className="font-medium">Refacciones previstas</h2>
@@ -369,6 +553,8 @@ export default async function OperacionDetallePage({ params }: { params: Promise
               ) : null}
             </Card>
           ) : null}
+            </>
+          ) : null}
           {!readOnly ? (
             <>
             {canManage && !closed ? (
@@ -479,8 +665,7 @@ export default async function OperacionDetallePage({ params }: { params: Promise
             ) : null}
             </>
           ) : null}
-          <HistoryTimeline items={history.map((item) => ({ id: item.id, createdAt: item.createdAt, summary: item.summary, authorName: item.author?.name }))} />
-        </div>
+        </aside>
       </DetailGrid>
     </>
   );
