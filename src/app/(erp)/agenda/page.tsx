@@ -76,7 +76,7 @@ export default async function AgendaPage({ searchParams }: { searchParams: Promi
       <AgendaCalendar
         view={vista}
         anchor={anchor}
-        activities={activities.map((item) => ({ id: item.id, note: item.note, category: item.category?.name ?? "Actividad", at: item.scheduledAt.toISOString() }))}
+        activities={activities.map((item: { id: string; note: string; scheduledAt: Date; category: { name: string } | null }) => ({ id: item.id, note: item.note, category: item.category?.name ?? "Actividad", at: item.scheduledAt.toISOString() }))}
       />
       <div className="mt-4 scroll-mt-24" id="nueva">
         <QuickPanel label="Nueva actividad" defaultOpen={Boolean(slot)}>
