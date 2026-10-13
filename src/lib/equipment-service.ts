@@ -204,7 +204,8 @@ export async function createAttention(
     priorityId: string;
     reportedFault: string;
     antecedent: string | null;
-    deliveryInstructions: string | null;
+    deliveryInstructions?: string | null;
+    initialLog?: string | null;
     originalCaseId: string | null;
     version: number;
   },
@@ -257,7 +258,9 @@ export async function createAttention(
         prioritySlaMaxDays: priority.slaMaxDays,
         reportedFault: input.reportedFault,
         antecedent: input.antecedent,
-        deliveryInstructions: input.deliveryInstructions,
+        deliveryInstructions: input.deliveryInstructions ?? null,
+        initialLog: input.initialLog ?? null,
+        createdByUserId: actor.userId,
         sellerUserId: actor.role === "VENTAS" ? actor.userId : client.ownerUserId,
         originalCaseId: input.originalCaseId,
         status: inServiceCustody ? "EN_PROCESO" : "ABIERTA",
@@ -294,7 +297,7 @@ export async function startService(
     reportedFault: string;
     antecedent: string | null;
     originalCaseId: string | null;
-    deliveryInstructions: string | null;
+    initialLog: string | null;
   },
 ) {
   let clientId = input.clientId;
@@ -358,7 +361,7 @@ export async function startService(
     priorityId: input.priorityId,
     reportedFault: input.reportedFault,
     antecedent: input.antecedent,
-    deliveryInstructions: input.deliveryInstructions,
+    initialLog: input.initialLog,
     originalCaseId: input.originalCaseId,
     version,
   });

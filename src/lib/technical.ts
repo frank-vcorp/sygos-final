@@ -34,17 +34,30 @@ export async function openCase(attentionId: string, receivedAt: Date) {
   if (!attention || attention.technicalCases.length > 0 || !attention.slaStartedAt) return null;
   const diagnosis = DIAGNOSIS_TYPES.has(attention.attentionType);
   const folio = await allocateFolio(attention.serviceCompanyId, diagnosis ? "DX" : "OS");
-  return prisma.technicalCase.create({
-    data: {
-      folio,
-      attentionId: attention.id,
-      equipmentId: attention.equipmentId,
-      serviceCompanyId: attention.serviceCompanyId,
-      kind: diagnosis ? "DIAGNOSTICO" : "OS",
-      status: "EN_ESPERA",
-      originalCaseId: attention.originalCaseId,
-      slaDueAt: addBusinessDays(receivedAt, attention.prioritySlaMaxDays),
-    },
+  return prisma.$transaction(async (tx) => {
+    const technicalCase = await tx.technicalCase.create({
+      data: {
+        folio,
+        attentionId: attention.id,
+        equipmentId: attention.equipmentId,
+        serviceCompanyId: attention.serviceCompanyId,
+        kind: diagnosis ? "DIAGNOSTICO" : "OS",
+        status: "EN_ESPERA",
+        originalCaseId: attention.originalCaseId,
+        slaDueAt: addBusinessDays(receivedAt, attention.prioritySlaMaxDays),
+      },
+    });
+    if (attention.initialLog?.trim() && attention.createdByUserId) {
+      await tx.technicalLog.create({
+        data: {
+          caseId: technicalCase.id,
+          body: attention.initialLog.trim(),
+          authorUserId: attention.createdByUserId,
+        },
+      });
+      await tx.attention.update({ where: { id: attention.id }, data: { initialLog: null } });
+    }
+    return technicalCase;
   });
 }
 

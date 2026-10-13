@@ -343,6 +343,8 @@ model Attention {
   reportedFault       String
   antecedent          String?
   deliveryInstructions String?
+  initialLog          String?
+  createdByUserId     String?
   sellerUserId        String?
   originalCaseId      String?
   originQuoteId       String?

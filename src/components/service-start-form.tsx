@@ -109,8 +109,8 @@ export function ServiceStartForm({
             <span className="text-lg text-[var(--muted)] transition-transform group-open:rotate-90" aria-hidden>›</span>
           </summary>
           <div className="border-t border-[var(--line)] p-4 md:p-5">
-            <Field label="Instrucciones de entrega" hint="Quién recibe o cómo entregar el equipo.">
-              <textarea name="deliveryInstructions" rows={2} className={controlClass} />
+            <Field label="Bitácora inicial" hint="Registra el contexto, motivo o cualquier dato importante para el equipo técnico.">
+              <textarea name="initialLog" rows={3} className={controlClass} placeholder="Escribe la primera nota del servicio" />
             </Field>
           </div>
         </details>
