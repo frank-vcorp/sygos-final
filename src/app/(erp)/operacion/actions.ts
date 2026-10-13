@@ -62,7 +62,7 @@ export async function logAction(formData: FormData) {
 
 export async function finishDiagnosisAction(formData: FormData) {
   "use server";
-  await run(formData, (session) => finishDiagnosis(session, requiredText(formData.get("caseId"), "Operación"), parseVersion(formData.get("version")), requiredText(formData.get("resultText"), "Resultado")), "Diagnóstico terminado.");
+  await run(formData, (session) => finishDiagnosis(session, requiredText(formData.get("caseId"), "Operación"), parseVersion(formData.get("version"))), "Diagnóstico terminado.");
 }
 
 export async function validateAction(formData: FormData) {

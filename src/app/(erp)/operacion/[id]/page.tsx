@@ -167,7 +167,13 @@ export default async function OperacionDetallePage({ params }: { params: Promise
         </form>
       );
     } else if (canWork && row.kind === "DIAGNOSTICO" && ["EN_DIAGNOSTICO", "DEVUELTO"].includes(row.status)) {
-      primaryAction = <DetailAnchorButton href="#terminar-diagnostico">Terminar diagnóstico</DetailAnchorButton>;
+      primaryAction = (
+        <form action={finishDiagnosisAction} className="inline">
+          <input type="hidden" name="caseId" value={row.id} />
+          <input type="hidden" name="version" value={row.version} />
+          <Button type="submit">Concluir diagnóstico</Button>
+        </form>
+      );
     } else if (
       canManage &&
       row.kind === "DIAGNOSTICO" &&
@@ -363,18 +369,6 @@ export default async function OperacionDetallePage({ params }: { params: Promise
       {readOnly ? <p className="mb-4 text-sm text-[var(--muted)]">Consulta de solo lectura. SYSTRON no modifica el estado ni la bitácora de Servomotores.</p> : null}
       <DetailGrid>
         <div className="space-y-4">
-          {canWork && row.kind === "DIAGNOSTICO" && ["EN_DIAGNOSTICO", "DEVUELTO"].includes(row.status) ? (
-            <FormPanel id="terminar-diagnostico" action={finishDiagnosisAction} className="scroll-mt-24">
-              <input type="hidden" name="caseId" value={row.id} />
-              <input type="hidden" name="version" value={row.version} />
-              <FormSection title="Terminar diagnóstico" description="Resume el hallazgo técnico. La bitácora queda aparte para avances durante el trabajo." columns={1}>
-                <Field label="Resultado del diagnóstico">
-                  <textarea name="resultText" required rows={4} className={controlClass} placeholder="Hallazgo, pruebas y conclusión" />
-                </Field>
-              </FormSection>
-              <FormActions><Button type="submit">Terminar diagnóstico</Button></FormActions>
-            </FormPanel>
-          ) : null}
           <Card className="p-4">
             <h2 className="font-medium">Bitácora</h2>
             <p className="mt-1 text-sm text-[var(--muted)]">Las entradas no se editan ni se borran. Una corrección es una entrada nueva.</p>

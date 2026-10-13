@@ -173,7 +173,7 @@ export async function addLog(actor: Actor, caseId: string, body: string) {
   await prisma.technicalLog.create({ data: { caseId: row.id, body, authorUserId: actor.userId } });
 }
 
-export async function finishDiagnosis(actor: Actor, caseId: string, version: number, resultText: string) {
+export async function finishDiagnosis(actor: Actor, caseId: string, version: number) {
   const row = await loadCase(caseId);
   assertServiceCompany(actor, row.serviceCompanyId);
   if (row.kind !== "DIAGNOSTICO") throw new Error("Esta no es una operación de diagnóstico.");
@@ -186,7 +186,6 @@ export async function finishDiagnosis(actor: Actor, caseId: string, version: num
     where: { id: row.id, version },
     data: {
       status,
-      resultText,
       finishedByUserId: actor.userId,
       validatedByUserId: servomotores ? actor.userId : null,
       validatedAt: servomotores ? new Date() : null,
