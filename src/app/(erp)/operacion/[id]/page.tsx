@@ -95,9 +95,6 @@ export default async function OperacionDetallePage({ params }: { params: Promise
     ? await prisma.supplier.findMany({ where: { companyId: session.activeCompanyId, active: true, isSystem: false }, orderBy: { name: "asc" } })
     : [];
   const history = await historyFor("OPERACION", row.id);
-  const derived = await prisma.technicalCase.findFirst({ where: { spawnedFromId: row.id }, select: { id: true, folio: true } });
-  const parent = row.spawnedFromId ? await prisma.technicalCase.findUnique({ where: { id: row.spawnedFromId }, select: { id: true, folio: true, kind: true } }) : null;
-  const original = row.originalCaseId ? await prisma.technicalCase.findUnique({ where: { id: row.originalCaseId }, select: { id: true, folio: true } }) : null;
   const [seller, relatedQuotes, relatedBilling, relatedSales] = await Promise.all([
     row.attention.sellerUserId
       ? prisma.user.findUnique({ where: { id: row.attention.sellerUserId }, select: { id: true, name: true } })
@@ -365,27 +362,6 @@ export default async function OperacionDetallePage({ params }: { params: Promise
       {readOnly ? <p className="mb-4 text-sm text-[var(--muted)]">Consulta de solo lectura. SYSTRON no modifica el estado ni la bitácora de Servomotores.</p> : null}
       <DetailGrid>
         <div className="space-y-4">
-          <Card className="p-4 text-sm">
-            <p className="font-medium text-[#0b1f3a]">Contexto del servicio</p>
-            {parent?.kind === "DIAGNOSTICO" ? <p className="mt-1">Diagnóstico de origen: <TextLink href={`/operacion/${parent.id}`}>{parent.folio}</TextLink></p> : null}
-            <p className="mt-1">
-              {repairAfterDiagnosis ? "Prioridad del diagnóstico" : "Prioridad congelada"}: {row.attention.priorityName}
-              {row.attention.priorityPrice != null ? ` · $${row.attention.priorityPrice.toLocaleString("es-MX")}` : ""}
-              {row.attention.priorityIncrementPct != null ? ` · incremento ${row.attention.priorityIncrementPct}%` : ""}
-            </p>
-            <p className="mt-1">Falla reportada: {row.attention.reportedFault}</p>
-            {row.resultText ? <p className="mt-1">Resultado: {row.resultText}</p> : null}
-            {row.returnReason ? <p className="mt-1">Devolución: {row.returnReason}</p> : null}
-            {row.warrantyDecision ? <p className="mt-1">Decisión técnica de garantía: {row.warrantyDecision === "VALIDA" ? "Válida" : "No procedente"}</p> : null}
-            {row.commercialDecision ? <p className="mt-1">Decisión comercial: {row.commercialDecision === "VALIDA" ? "Aceptada como garantía" : "A cotización"} · {row.commercialReason}</p> : null}
-            {row.externalDocument ? <p className="mt-1">Documento externo: {row.externalDocument}</p> : null}
-            {original ? <p className="mt-1">Reparación de origen: <TextLink href={`/operacion/${original.id}`}>{original.folio}</TextLink></p> : null}
-            {derived ? <p className="mt-1">Reparación en garantía: <TextLink href={`/operacion/${derived.id}`}>{derived.folio}</TextLink></p> : null}
-            {row.quotePending && !can(session.role, "quote.price", session.activeCompanyCode) ? (
-              <p className="mt-3 text-[var(--muted)]">Queda pendiente de cotizar.</p>
-            ) : null}
-            {row.paidAt ? <p className="mt-1">Marcada como pagada {formatWhen(row.paidAt)}.</p> : null}
-          </Card>
           {canWork && row.kind === "DIAGNOSTICO" && ["EN_DIAGNOSTICO", "DEVUELTO"].includes(row.status) ? (
             <FormPanel id="terminar-diagnostico" action={finishDiagnosisAction} className="scroll-mt-24">
               <input type="hidden" name="caseId" value={row.id} />
