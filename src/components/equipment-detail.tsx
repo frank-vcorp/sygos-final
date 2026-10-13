@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { AttentionForm, CancelMovementForm, MovementForm } from "@/components/custody-forms";
 import { EquipmentCustodyActions } from "@/components/equipment-custody-actions";
 import { HistoryTimeline } from "@/components/history-timeline";
-import { Badge, DetailAnchorButton, EntityDetailHeader, EntityMetaItem, MobileCard, Table, Td, TextLink, Th } from "@/components/ui";
+import { Badge, Card, DetailAnchorButton, EntityDetailHeader, EntityMetaItem, MobileCard, Table, Td, TextLink, Th } from "@/components/ui";
 import { allowedMovements, CUSTODY_LABEL, isInitialWarehouseReceipt, isReceipt, MOVEMENT_LABEL, receiptReasonFromAttention, type Custody, type MovementKind } from "@/lib/custody";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
@@ -98,6 +98,17 @@ export async function EquipmentDetail({ id, expectedKind }: { id: string; expect
     receiptMovement
     && isInitialWarehouseReceipt(expectedKind, equipment.custody as Custody, receiptMovement)
     && !openAttention;
+  const activeCase = openAttention?.technicalCases[0] ?? null;
+  const activeServiceHref = activeCase
+    ? `/operacion/${activeCase.id}`
+    : openAttention
+      ? `/atenciones/${openAttention.id}`
+      : null;
+  const activeServiceFolio = activeCase?.folio
+    ?? (openAttention ? (openAttention.attentionType === "REPARACION" ? "OS" : "DX") : null);
+  const activeServiceLabel = openAttention
+    ? ATTENTION_LABEL[openAttention.attentionType as AttentionType] ?? openAttention.attentionType
+    : null;
 
   const backLabel = listHref === "/custodia" ? "Almacén" : expectedKind === "EQUI" ? "Equipos" : "Motores";
   let primaryAction: React.ReactNode = null;
@@ -126,15 +137,57 @@ export async function EquipmentDetail({ id, expectedKind }: { id: string; expect
             </EntityMetaItem>
             <EntityMetaItem label="Identificación">{[equipment.typeName, equipment.brandName, equipment.model].filter(Boolean).join(" · ") || "—"}</EntityMetaItem>
             {equipment.serial ? <EntityMetaItem label="Serie">{equipment.serial}</EntityMetaItem> : null}
+            {custodyDetail && activeServiceFolio ? (
+              <EntityMetaItem label="Servicio asociado">
+                {activeServiceHref ? <TextLink href={activeServiceHref}>{activeServiceFolio}</TextLink> : activeServiceFolio}
+                <span className="block text-xs text-[var(--muted)]">{activeServiceLabel} · {openAttention?.priorityName}</span>
+              </EntityMetaItem>
+            ) : null}
+            {custodyDetail && sellerUser ? <EntityMetaItem label="Vendedor">{sellerUser.name}</EntityMetaItem> : null}
             {intercompany && sellerUser ? <EntityMetaItem label="Contacto SYSTRON">{sellerUser.name}</EntityMetaItem> : null}
           </>
         }
-        primaryAction={primaryAction}
+        primaryAction={custodyDetail ? null : primaryAction}
       />
       <div className="space-y-6">
         {equipment.description ? <p className="text-sm text-[var(--muted)]">{equipment.description}</p> : null}
         {expectedKind === "MOT" && session.activeCompanyCode === "SYSTRON" ? (
           <p className="text-sm text-[var(--muted)]">Este MOT no entra al almacén SYSTRON. El estado físico lo confirma Servomotores.</p>
+        ) : null}
+
+        {custodyDetail && openAttention ? (
+          <Card className="overflow-hidden">
+            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--line)] bg-[#f7fafc] p-5">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Servicio asociado</p>
+                <h2 className="mt-1 text-lg font-semibold text-[#0b1f3a]">{activeServiceLabel}</h2>
+                <p className="mt-1 text-sm text-[var(--muted)]">{activeServiceFolio} · prioridad {openAttention.priorityName}</p>
+              </div>
+              {activeServiceHref ? <TextLink href={activeServiceHref}>Abrir atención →</TextLink> : null}
+            </div>
+            <div className="grid gap-4 p-5 text-sm sm:grid-cols-2">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Falla reportada</p>
+                <p className="mt-1 leading-6">{openAttention.reportedFault}</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">SLA</p>
+                <p className="mt-1 leading-6">{openAttention.slaStartedAt ? `Iniciado ${formatWhen(openAttention.slaStartedAt)}` : "Inicia al confirmar la entrada física"}</p>
+              </div>
+              {openAttention.antecedent ? (
+                <div className="sm:col-span-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Antecedente</p>
+                  <p className="mt-1 leading-6">{openAttention.antecedent}</p>
+                </div>
+              ) : null}
+              {openAttention.initialLog ? (
+                <div className="sm:col-span-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Bitácora inicial</p>
+                  <p className="mt-1 whitespace-pre-wrap leading-6">{openAttention.initialLog}</p>
+                </div>
+              ) : null}
+            </div>
+          </Card>
         ) : null}
 
         {awaitingAttentionForReceipt ? (
@@ -143,45 +196,53 @@ export async function EquipmentDetail({ id, expectedKind }: { id: string; expect
           </p>
         ) : null}
         <div id="custodia-equipo" className="scroll-mt-24">
-        <EquipmentCustodyActions
-          showMovement={canMove && movementOptions.length > 0 && !awaitingAttentionForReceipt}
-          showAttention={canAttend}
-          movementButtonLabel={simplifiedReceipt ? "Confirmar entrada física" : "Registrar movimiento"}
-          movementTitle={simplifiedReceipt ? "Confirmar entrada física" : "Registrar movimiento"}
-          movement={
-            <MovementForm
-              variant="plain"
-              equipmentId={equipment.id}
-              equipmentFolio={equipment.folio}
-              kind={expectedKind}
-              custody={equipment.custody as Custody}
-              version={equipment.version}
-              suppliers={suppliers.map((supplier) => ({ id: supplier.id, name: supplier.name }))}
-              allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)}
-              receiptPreset={simplifiedReceipt && receiptMovement && openAttention && receiptReason ? {
-                movement: receiptMovement,
-                reason: receiptReason,
-                serviceLabel: ATTENTION_LABEL[openAttention.attentionType as AttentionType] ?? openAttention.attentionType,
-                reportedFault: openAttention.reportedFault,
-                clientName: intercompany ? "SYSTRON · intercompañía" : equipment.client.name,
-              } : undefined}
+          {custodyDetail ? (
+            <div className="mb-3">
+              <h2 className="text-lg font-semibold text-[#0b1f3a]">Recepción física</h2>
+              <p className="mt-1 text-sm text-[var(--muted)]">El servicio ya fue definido por Ventas. Confirma la entrada para iniciar el SLA y generar el folio DX u OS.</p>
+            </div>
+          ) : null}
+          <div className={custodyDetail ? "sticky top-3 z-20 rounded-xl border border-[var(--line)] bg-white/95 p-2 shadow-[0_8px_24px_rgba(20,45,75,0.12)] backdrop-blur" : ""}>
+            <EquipmentCustodyActions
+              showMovement={canMove && movementOptions.length > 0 && !awaitingAttentionForReceipt}
+              showAttention={canAttend}
+              movementButtonLabel={simplifiedReceipt ? "Confirmar entrada física" : "Registrar movimiento"}
+              movementTitle={simplifiedReceipt ? "Confirmar entrada física" : "Registrar movimiento"}
+              movement={
+                <MovementForm
+                  variant="plain"
+                  equipmentId={equipment.id}
+                  equipmentFolio={equipment.folio}
+                  kind={expectedKind}
+                  custody={equipment.custody as Custody}
+                  version={equipment.version}
+                  suppliers={suppliers.map((supplier) => ({ id: supplier.id, name: supplier.name }))}
+                  allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)}
+                  receiptPreset={simplifiedReceipt && receiptMovement && openAttention && receiptReason ? {
+                    movement: receiptMovement,
+                    reason: receiptReason,
+                    serviceLabel: ATTENTION_LABEL[openAttention.attentionType as AttentionType] ?? openAttention.attentionType,
+                    reportedFault: openAttention.reportedFault,
+                    clientName: intercompany ? "SYSTRON · intercompañía" : equipment.client.name,
+                  } : undefined}
+                />
+              }
+              attention={
+                <AttentionForm
+                  variant="plain"
+                  equipmentId={equipment.id}
+                  kind={expectedKind}
+                  version={equipment.version}
+                  priorities={priorities}
+                  repairs={repairs}
+                />
+              }
             />
-          }
-          attention={
-            <AttentionForm
-              variant="plain"
-              equipmentId={equipment.id}
-              kind={expectedKind}
-              version={equipment.version}
-              priorities={priorities}
-              repairs={repairs}
-            />
-          }
-        />
+          </div>
         </div>
 
-        <section>
-            <h2 className="mb-2 font-medium">Atenciones</h2>
+        {!custodyDetail || equipment.attentions.length > 1 ? <section>
+            <h2 className="mb-2 font-medium">{custodyDetail ? "Historial de servicios" : "Atenciones"}</h2>
             {equipment.attentions.length === 0 ? <p className="text-sm text-[var(--muted)]">Todavía no hay un episodio de servicio.</p> : (
               <ul className="space-y-2">
                 {equipment.attentions.map((attention) => {
@@ -212,9 +273,10 @@ export async function EquipmentDetail({ id, expectedKind }: { id: string; expect
                 })}
               </ul>
             )}
-          </section>
+          </section> : null}
           <section>
-            <h2 className="mb-2 font-medium">Movimientos físicos</h2>
+            <h2 className="mb-2 font-medium">{custodyDetail ? "Movimientos secundarios" : "Movimientos físicos"}</h2>
+            {custodyDetail ? <p className="mb-2 text-sm text-[var(--muted)]">Aquí aparecerán pruebas, salidas, retornos y demás movimientos posteriores a la recepción.</p> : null}
             {equipment.movements.length === 0 ? <p className="text-sm text-[var(--muted)]">Sin movimientos.</p> : (
               <Table>
                 <thead><tr><Th>Cuándo</Th><Th>Movimiento</Th><Th>Detalle</Th><Th>Autor</Th></tr></thead>
