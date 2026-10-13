@@ -1,6 +1,6 @@
 import { resolveClientIdForProcess } from "./client-quick-create";
 import { prisma } from "./db";
-import { isReceipt, nextCustody, reasonsFor, receiptReasonFromAttention, type Custody, type MovementKind } from "./custody";
+import { isInitialWarehouseReceipt, isReceipt, nextCustody, reasonsFor, receiptReasonFromAttention, type Custody, type MovementKind } from "./custody";
 import { allocateFolio } from "./folios";
 import { ConcurrencyError } from "./form";
 import { recordHistory } from "./history";
@@ -412,6 +412,7 @@ export async function registerMovement(
     throw new Error("El motivo no pertenece al catálogo de este movimiento.");
   }
   const kind = equipment.kind === "MOT" ? "MOT" : "EQUI";
+  const initialWarehouseReceipt = isInitialWarehouseReceipt(kind, equipment.custody as Custody, input.kind);
   const custody = nextCustody(kind, equipment.custody as Custody, input.kind);
   const attention = await prisma.attention.findFirst({
     where: { equipmentId: equipment.id, status: "ABIERTA" },
@@ -475,7 +476,7 @@ export async function registerMovement(
     summary: folio ? `${folio} confirmado. Custodia: ${custody}.` : `${input.kind} confirmado. Custodia: ${custody}.`,
     authorUserId: actor.userId,
   });
-  return { id: movementId, folio };
+  return { id: movementId, folio, initialWarehouseReceipt };
 }
 
 export async function cancelMovement(actor: Actor, movementId: string, reason: string) {

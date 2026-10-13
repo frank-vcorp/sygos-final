@@ -132,7 +132,7 @@ export async function movementAction(formData: FormData) {
         ? `${result.folio} confirmado. Imprime el documento de recepción para firma del vendedor.`
         : "Movimiento físico registrado.",
     });
-    redirect(back);
+    redirect(result.initialWarehouseReceipt ? `${back}?etiqueta=1` : back);
   } catch (error) {
     if (isRedirect(error)) throw error;
     await setFlash({ tone: "error", message: messageOf(error) });

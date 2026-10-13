@@ -2,6 +2,7 @@ import { ClientNameLink } from "@/components/client-entity-links";
 import { notFound } from "next/navigation";
 import { AttentionForm, CancelMovementForm, MovementForm } from "@/components/custody-forms";
 import { EquipmentCustodyActions } from "@/components/equipment-custody-actions";
+import { EquipmentLabel } from "@/components/equipment-label";
 import { HistoryTimeline } from "@/components/history-timeline";
 import { Badge, Card, DetailAnchorButton, EntityDetailHeader, EntityMetaItem, MobileCard, Table, Td, TextLink, Th } from "@/components/ui";
 import { allowedMovements, CUSTODY_LABEL, isInitialWarehouseReceipt, isReceipt, MOVEMENT_LABEL, receiptReasonFromAttention, type Custody, type MovementKind } from "@/lib/custody";
@@ -14,7 +15,7 @@ import { ATTENTION_LABEL, type AttentionType } from "@/lib/priorities";
 import { redirectIfSalesNotAssigned } from "@/lib/sales-assignment";
 import { requireCompany } from "@/lib/session";
 
-export async function EquipmentDetail({ id, expectedKind }: { id: string; expectedKind: "EQUI" | "MOT" }) {
+export async function EquipmentDetail({ id, expectedKind, showLabel = false }: { id: string; expectedKind: "EQUI" | "MOT"; showLabel?: boolean }) {
   const session = await requireCompany();
   const custodyDetail =
     can(session.role, "custody.confirm", session.activeCompanyCode)
@@ -86,6 +87,7 @@ export async function EquipmentDetail({ id, expectedKind }: { id: string; expect
     && ((expectedKind === "EQUI" && session.activeCompanyCode === "SYSTRON") || (expectedKind === "MOT" && session.activeCompanyCode === "SERVOMOTORES"));
   const canAttend = equipment.originCompanyId === session.activeCompanyId && can(session.role, "attention.create", session.activeCompanyCode);
   const latestOpen = equipment.movements.find((row) => !row.cancelledAt);
+  const hasReceipt = equipment.movements.some((row) => !row.cancelledAt && isReceipt(row.kind as MovementKind));
   const movementOptions = allowedMovements(expectedKind, equipment.custody as Custody);
   const openAttention = equipment.attentions.find((row) => row.status === "ABIERTA");
   const receiptMovement = movementOptions.find((movement) => isReceipt(movement));
@@ -149,6 +151,20 @@ export async function EquipmentDetail({ id, expectedKind }: { id: string; expect
         }
         primaryAction={custodyDetail ? null : primaryAction}
       />
+      {custodyDetail && hasReceipt ? (
+        <div className="mb-6">
+          <EquipmentLabel
+            equipmentHref={expectedKind === "MOT" ? `/motores/${equipment.id}` : `/equipos/${equipment.id}`}
+            equipmentFolio={equipment.folio}
+            kind={expectedKind}
+            typeName={equipment.typeName}
+            brandName={equipment.brandName}
+            model={equipment.model}
+            serial={equipment.serial}
+            autoOpen={showLabel}
+          />
+        </div>
+      ) : null}
       <div className="space-y-6">
         {equipment.description ? <p className="text-sm text-[var(--muted)]">{equipment.description}</p> : null}
         {expectedKind === "MOT" && session.activeCompanyCode === "SYSTRON" ? (
