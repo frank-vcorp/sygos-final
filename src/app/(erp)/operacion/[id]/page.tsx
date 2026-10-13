@@ -94,6 +94,7 @@ export default async function OperacionDetallePage({ params }: { params: Promise
   const suppliers = owns && row.serviceCompany.code === "SYSTRON"
     ? await prisma.supplier.findMany({ where: { companyId: session.activeCompanyId, active: true, isSystem: false }, orderBy: { name: "asc" } })
     : [];
+  const currentSupplier = row.externalSupplierId ? suppliers.find((supplier) => supplier.id === row.externalSupplierId) : null;
   const history = await historyFor("OPERACION", row.id);
   const [seller, relatedQuotes, relatedBilling, relatedSales] = await Promise.all([
     row.attention.sellerUserId
@@ -544,19 +545,30 @@ export default async function OperacionDetallePage({ params }: { params: Promise
           ) : null}
           {!readOnly ? (
             <>
-            {canManage && !closed ? (
-              <FormPanel action={assignCaseAction}>
-                <input type="hidden" name="caseId" value={row.id} />
-                <input type="hidden" name="version" value={row.version} />
-                <FormSection title="Asignación" description="Responsable interno o proveedor externo en SYSTRON.">
-                  <Field label="Responsable interno">
-                    <select name="assigneeUserId" className={controlClass} defaultValue={row.assigneeUserId ?? ""}>
-                      <option value="">Sin asignar</option>
-                      {candidates.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
-                    </select>
-                  </Field>
-                  {row.serviceCompany.code === "SYSTRON" ? (
-                    <div className="md:col-span-2">
+            <Card className="p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">Asignación</p>
+                  <p className="mt-1 truncate font-medium text-[#0b1f3a]">{row.assignee?.name ?? "Sin responsable"}</p>
+                  {row.externalSupplierId ? <p className="mt-1 truncate text-xs text-[var(--muted)]">Proveedor: {currentSupplier?.name ?? "Servicio externo"}</p> : null}
+                </div>
+                <Badge tone={row.assigneeUserId || row.externalSupplierId ? "ok" : "warn"}>
+                  {row.assigneeUserId || row.externalSupplierId ? "Asignado" : "Pendiente"}
+                </Badge>
+              </div>
+              {canManage && !closed ? (
+                <details className="mt-3 border-t border-[var(--line)] pt-3">
+                  <summary className="cursor-pointer text-sm font-semibold text-[var(--accent)]">Cambiar asignación</summary>
+                  <form action={assignCaseAction} className="mt-3 space-y-3">
+                    <input type="hidden" name="caseId" value={row.id} />
+                    <input type="hidden" name="version" value={row.version} />
+                    <Field label="Responsable interno">
+                      <select name="assigneeUserId" className={controlClass} defaultValue={row.assigneeUserId ?? ""}>
+                        <option value="">Sin asignar</option>
+                        {candidates.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
+                      </select>
+                    </Field>
+                    {row.serviceCompany.code === "SYSTRON" ? (
                       <SupplierPicker
                         label="O servicio externo"
                         suppliers={suppliers}
@@ -565,12 +577,12 @@ export default async function OperacionDetallePage({ params }: { params: Promise
                         allowEmpty
                         emptyLabel="Sin proveedor"
                       />
-                    </div>
-                  ) : null}
-                </FormSection>
-                <FormActions><Button type="submit" tone="ghost">Guardar asignación</Button></FormActions>
-              </FormPanel>
-            ) : null}
+                    ) : null}
+                    <Button type="submit" tone="ghost">Guardar asignación</Button>
+                  </form>
+                </details>
+              ) : null}
+            </Card>
             {canManage && row.kind === "DIAGNOSTICO" && (row.status === "PENDIENTE_VALIDACION" || (row.serviceCompany.code === "SERVOMOTORES" && row.status === "VALIDADO" && warranty && !row.warrantyDecision)) ? (
               <FormPanel id="validacion" action={validateAction} className="scroll-mt-24">
                 <input type="hidden" name="caseId" value={row.id} />
