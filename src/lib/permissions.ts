@@ -103,8 +103,8 @@ export function can(role: Role, action: Action, companyCode?: string | null): bo
       if (companyCode === "SERVOMOTORES") return admin || ceo || coord || gerenteSm;
       return false;
     case "attention.create":
-      // Ventas relaciona cotizaciones y equipos; el servicio se genera en el flujo de almacén.
-      return admin || ceo || coord || gerenteSy || gerenteSm;
+      // Ventas captura la Atención; el ingreso físico de Almacén inicia el SLA.
+      return can(role, "equi.create", companyCode) || can(role, "mot.create", companyCode);
     case "attention.catalog":
       if (admin || ceo) return true;
       if (companyCode === "SYSTRON") return sales || gerenteSy || role === "SUPERVISOR_TECNICO" || role === "TECNICO";

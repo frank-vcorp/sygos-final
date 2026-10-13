@@ -106,6 +106,9 @@ export async function createClientAction(formData: FormData) {
       authorUserId: session.userId,
     });
     await setFlash({ tone: "ok", message: "Cliente creado." });
+    if (optionalText(formData.get("nextStep")) === "attention") {
+      redirect(`/servicios/nuevo?clientId=${encodeURIComponent(client.id)}`);
+    }
     redirect(`/clientes/${client.id}`);
   } catch (error) {
     if (isRedirect(error)) throw error;

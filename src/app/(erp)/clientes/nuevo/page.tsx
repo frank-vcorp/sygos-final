@@ -31,7 +31,10 @@ export default async function NuevoClientePage() {
           <Field label="Puesto"><input name="contactRole" className={controlClass} /></Field>
           <Field label="Correo"><input name="contactEmail" className={controlClass} /></Field>
         </FormSection>
-        <FormActions note="Al guardar abrirás el detalle del cliente para agregar contactos, equipos o servicios cuando lo necesites."><Button type="submit">Guardar cliente</Button></FormActions>
+        <FormActions note="Puedes guardar el cliente y continuar después, o iniciar una Atención con sus datos ya precargados.">
+          <Button type="submit" name="nextStep" value="detail" tone="ghost">Guardar cliente</Button>
+          <Button type="submit" name="nextStep" value="attention">Guardar y crear Atención</Button>
+        </FormActions>
       </FormPanel>
     </>
   );

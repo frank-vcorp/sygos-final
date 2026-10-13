@@ -26,7 +26,7 @@ describe("permisos de fase 1", () => {
   it("separa equipos, motores, almacén e inventario", () => {
     assert.equal(can("VENTAS", "equi.create", "SYSTRON"), true);
     assert.equal(can("VENTAS", "mot.create", "SYSTRON"), true);
-    assert.equal(can("VENTAS", "attention.create", "SYSTRON"), false);
+    assert.equal(can("VENTAS", "attention.create", "SYSTRON"), true);
     assert.equal(can("GERENTE_OPERATIVO_SYSTRON", "attention.create", "SYSTRON"), true);
     assert.equal(can("VENTAS", "mot.create", "SERVOMOTORES"), false);
     assert.equal(can("ALMACEN", "equi.view", "SYSTRON"), false);
