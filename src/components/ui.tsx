@@ -239,7 +239,7 @@ export const controlClass =
   "min-h-11 w-full rounded-lg border border-[#cbd8e6] bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[#087d99] focus-visible:ring-2 focus-visible:ring-[#c7e9f2]";
 
 export function FilterBar({ children, action, className = "" }: { children: React.ReactNode; action: string; className?: string }) {
-  return <form className={`mb-4 flex flex-col gap-2 rounded-lg border border-[var(--line)] bg-white p-3 sm:flex-row sm:flex-wrap sm:items-center ${className}`} action={action}>{children}</form>;
+  return <form className={`mb-4 flex flex-col gap-2 rounded-xl border border-[var(--line)] bg-white p-3 shadow-[0_4px_14px_rgba(20,45,75,0.04)] sm:flex-row sm:flex-wrap sm:items-center ${className}`} action={action}>{children}</form>;
 }
 
 export function SegmentedNav({ items }: { items: Array<{ href: string; label: string; active: boolean }> }) {

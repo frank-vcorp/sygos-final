@@ -12,7 +12,6 @@ import {
   PageHeader,
   RecordLink,
   ResponsiveData,
-  SegmentedNav,
   Table,
   Td,
   Th,
@@ -77,15 +76,12 @@ export default async function VentasPage({ searchParams }: { searchParams: Promi
         back={session.role === "VENTAS" ? { href: "/panel", label: "Inicio" } : undefined}
         action={can(session.role, "quote.create", session.activeCompanyCode) ? <ActionLink href="/ventas/nuevo">Nueva venta de equipo</ActionLink> : null}
       />
-      <SegmentedNav
-        items={[
-          { href: listHref("/ventas", { q: query || undefined }), label: "Todas", active: view === "todas" },
-          { href: listHref("/ventas", { vista: "pendientes", q: query || undefined }), label: "Requieren atención", active: view === "pendientes" },
-          { href: listHref("/ventas", { vista: "al_dia", q: query || undefined }), label: "Al día", active: view === "al_dia" },
-        ]}
-      />
       <FilterBar action="/ventas">
-        {view !== "todas" ? <input type="hidden" name="vista" value={view} /> : null}
+        <select name="vista" defaultValue={view} aria-label="Vista de ventas" className={`${controlClass} sm:w-[190px]`}>
+          <option value="todas">Todas</option>
+          <option value="pendientes">Requieren atención</option>
+          <option value="al_dia">Al día</option>
+        </select>
         <input name="q" defaultValue={query} placeholder="Folio, cliente o cotización" className={`${controlClass} sm:flex-1`} />
         <Button type="submit" tone="ghost">Buscar</Button>
       </FilterBar>

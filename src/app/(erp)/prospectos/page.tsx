@@ -37,7 +37,7 @@ export default async function ProspectosPage({ searchParams }: { searchParams: P
           <option value="ABIERTOS">Abiertos</option>
           {Object.entries(LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select>
-        <Button type="submit" tone="ghost">Filtrar</Button>
+        <Button type="submit" tone="ghost">Buscar</Button>
       </FilterBar>
       <ActiveFilters
         items={[

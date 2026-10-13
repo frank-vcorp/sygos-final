@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { ClientNameLink } from "@/components/client-entity-links";
-import { ActionLink, ActiveFilters, Badge, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, SegmentedNav, Table, Td, Th } from "@/components/ui";
+import { ActionLink, ActiveFilters, Badge, Button, controlClass, Empty, FilterBar, MobileCard, PageHeader, RecordLink, ResponsiveData, Table, Td, Th } from "@/components/ui";
 import { homePath } from "@/lib/home";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
@@ -58,7 +58,12 @@ export default async function FacturacionPage({ searchParams }: { searchParams: 
   return (
     <>
       <PageHeader title="Facturación" subtitle="Solicitud, emisión y remisión de esta empresa. El timbrado no se duplica." action={can(session.role, "invoice.issue", session.activeCompanyCode) ? <ActionLink href="/facturacion/nuevo">Factura libre</ActionLink> : null} />
-      <SegmentedNav items={tabs} />
+      <FilterBar action="/facturacion">
+        <select name="vista" defaultValue={vista} aria-label="Vista de facturación" className={`${controlClass} sm:w-[190px]`}>
+          {tabs.map((tab) => <option key={tab.key} value={tab.key}>{tab.label}</option>)}
+        </select>
+        <Button type="submit" tone="ghost">Buscar</Button>
+      </FilterBar>
       <ActiveFilters
         items={vista !== "todas" && vistaLabel ? [{ label: vistaLabel, clearHref: "/facturacion" }] : []}
       />

@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { ClientNameLink } from "@/components/client-entity-links";
-import { ActionLink, ActiveFilters, Badge, Button, Card, controlClass, Empty, FilterBar, ListCap, MobileCard, PageHeader, RecordLink, ResponsiveData, SegmentedNav, Table, Td, Th, TextLink } from "@/components/ui";
+import { ActionLink, ActiveFilters, Badge, Button, Card, controlClass, Empty, FilterBar, ListCap, MobileCard, PageHeader, RecordLink, ResponsiveData, Table, Td, Th, TextLink } from "@/components/ui";
 import { listHref } from "@/lib/list-url";
 import { homePath } from "@/lib/home";
 import { prisma } from "@/lib/db";
@@ -62,19 +62,15 @@ export default async function CotizacionesPage({ searchParams }: { searchParams:
         subtitle={session.role === "VENTAS" ? "Consulta el avance de tus propuestas y da seguimiento a las que esperan respuesta del cliente." : "Revisa las propuestas que necesitan precio y las que esperan respuesta del cliente."}
         action={can(session.role, "quote.create", session.activeCompanyCode) ? <ActionLink href="/cotizaciones/nuevo">Nueva cotización</ActionLink> : null}
       />
-      <SegmentedNav
-        items={[
-          { href: listHref("/cotizaciones", { q: query || undefined }), label: "Todas", active: !pending && !decision },
-          { href: listHref("/cotizaciones", { vista: "pendientes", q: query || undefined }), label: "Sin precio", active: pending },
-          { href: listHref("/cotizaciones", { vista: "decision", q: query || undefined }), label: "Esperan respuesta", active: decision },
-        ]}
-      />
-        <FilterBar action="/cotizaciones">
-          {pending ? <input type="hidden" name="vista" value="pendientes" /> : null}
-          {decision ? <input type="hidden" name="vista" value="decision" /> : null}
-          <input name="q" defaultValue={query} placeholder="Buscar por folio o cliente" className={`${controlClass} sm:flex-1`} />
-          <Button type="submit" tone="ghost">Buscar</Button>
-        </FilterBar>
+      <FilterBar action="/cotizaciones">
+        <select name="vista" defaultValue={pending ? "pendientes" : decision ? "decision" : "todas"} aria-label="Vista de cotizaciones" className={`${controlClass} sm:w-[190px]`}>
+          <option value="todas">Todas</option>
+          <option value="pendientes">Sin precio</option>
+          <option value="decision">Esperan respuesta</option>
+        </select>
+        <input name="q" defaultValue={query} placeholder="Buscar por folio o cliente" className={`${controlClass} sm:flex-1`} />
+        <Button type="submit" tone="ghost">Buscar</Button>
+      </FilterBar>
       <ActiveFilters
         items={[
           ...(pending ? [{ label: "Pendientes de cotizar", clearHref: listHref("/cotizaciones", { q: query || undefined }) }] : []),
