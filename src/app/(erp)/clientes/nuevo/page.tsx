@@ -31,7 +31,7 @@ export default async function NuevoClientePage() {
           <Field label="Puesto"><input name="contactRole" className={controlClass} /></Field>
           <Field label="Correo"><input name="contactEmail" className={controlClass} /></Field>
         </FormSection>
-        <FormActions note="Después podrás elegir Diagnóstico, Reparación o Garantía y continuar con el servicio."><Button type="submit">Guardar y elegir servicio</Button></FormActions>
+        <FormActions note="Al guardar abrirás el detalle del cliente para agregar contactos, equipos o servicios cuando lo necesites."><Button type="submit">Guardar cliente</Button></FormActions>
       </FormPanel>
     </>
   );
