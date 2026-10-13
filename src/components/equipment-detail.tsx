@@ -184,15 +184,16 @@ export async function EquipmentDetail({ id, expectedKind }: { id: string; expect
             <h2 className="mb-2 font-medium">Atenciones</h2>
             {equipment.attentions.length === 0 ? <p className="text-sm text-[var(--muted)]">Todavía no hay un episodio de servicio.</p> : (
               <ul className="space-y-2">
-                {equipment.attentions.map((attention) => (
+                {equipment.attentions.map((attention) => {
+                  const caseRow = attention.technicalCases[0];
+                  const attentionHref = caseRow ? `/operacion/${caseRow.id}` : `/atenciones/${attention.id}`;
+                  return (
                   <li key={attention.id}>
-                    <MobileCard title={`${ATTENTION_LABEL[attention.attentionType as AttentionType] ?? attention.attentionType} · ${attention.priorityName}`}>
+                    <MobileCard href={attentionHref} title={`${ATTENTION_LABEL[attention.attentionType as AttentionType] ?? attention.attentionType} · ${attention.priorityName}`}>
                       {attention.technicalCases.length > 0 ? (
                         <p>
                           {attention.technicalCases.map((item) => (
-                            can(session.role, "operation.queue", session.activeCompanyCode)
-                              ? <TextLink key={item.id} href={`/operacion/${item.id}`} className="mr-2">{item.folio}</TextLink>
-                              : <span key={item.id} className="mr-2 text-[var(--muted)]">{item.folio}</span>
+                            <span key={item.id} className="mr-2 text-[var(--muted)]">{item.folio}</span>
                           ))}
                         </p>
                       ) : null}
@@ -201,11 +202,14 @@ export async function EquipmentDetail({ id, expectedKind }: { id: string; expect
                         {attention.status === "ABIERTA" ? "SLA aún no inicia. Empieza cuando se confirma la entrada física." : `SLA iniciado ${attention.slaStartedAt ? formatWhen(attention.slaStartedAt) : ""}.`}
                         {attention.antecedent ? ` Antecedente: ${attention.antecedent}.` : ""}
                       </p>
+                      {!caseRow ? <p className="font-medium text-[var(--accent)]">Ver detalle de la atención →</p> : null}
                       {attention.deliveryInstructions ? <p>Entrega: {attention.deliveryInstructions}</p> : null}
+                      {attention.initialLog ? <p>Bitácora inicial: {attention.initialLog}</p> : null}
                       {intercompany ? <p>Cliente administrativo: {attention.adminClient.name}</p> : null}
                     </MobileCard>
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             )}
           </section>

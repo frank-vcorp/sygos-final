@@ -642,7 +642,7 @@ export function ClientRelationsHub({
                 return (
                   <MobileCard
                     key={row.id}
-                    href={caseLink ? `/operacion/${caseLink.id}` : equipHref}
+                    href={caseLink ? `/operacion/${caseLink.id}` : `/atenciones/${row.id}`}
                     title={`${ATTENTION_LABEL[type] ?? row.attentionType} · ${row.equipment.folio}`}
                     meta={<Badge tone={st.tone}>{st.label}</Badge>}
                   >
