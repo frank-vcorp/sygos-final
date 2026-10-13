@@ -218,7 +218,7 @@ export async function listActiveServicios(
   const waitingRows: EsperaIngresoAttentionRow[] = waitingAttentions.map((row) => ({
     kind: "espera_ingreso",
     id: row.id,
-    href: row.equipment.kind === "MOT" ? `/motores/${row.equipmentId}` : `/equipos/${row.equipmentId}`,
+    href: `/atenciones/${row.id}`,
     attentionType: row.attentionType as AttentionType,
     equipmentFolio: row.equipment.folio,
     clientName: row.equipment.client.name,
@@ -319,7 +319,7 @@ export async function listHistorialServicios(
   const cancelledRows: CancelledAttentionRow[] = cancelledAttentions.map((row) => ({
     kind: "atencion_cancelada",
     id: row.id,
-    href: row.equipment.kind === "MOT" ? `/motores/${row.equipmentId}` : `/equipos/${row.equipmentId}`,
+    href: `/atenciones/${row.id}`,
     attentionType: row.attentionType as AttentionType,
     equipmentFolio: row.equipment.folio,
     clientName: row.equipment.client.name,

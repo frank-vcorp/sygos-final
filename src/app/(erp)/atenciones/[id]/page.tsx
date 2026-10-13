@@ -61,6 +61,7 @@ export default async function AtencionDetallePage({ params }: { params: Promise<
             <EntityMetaItem label="Vendedor">{seller?.name ?? "Sin vendedor asignado"}</EntityMetaItem>
             <EntityMetaItem label="Prioridad">{attention.priorityName}</EntityMetaItem>
             <EntityMetaItem label="Capturada">{formatWhen(attention.createdAt)}</EntityMetaItem>
+            <EntityMetaItem label="ID de la atención"><span className="break-all text-xs">{attention.id}</span></EntityMetaItem>
           </>
         }
         secondaryActions={
@@ -88,7 +89,7 @@ export default async function AtencionDetallePage({ params }: { params: Promise<
         <aside className="lg:sticky lg:top-4 lg:self-start">
           <Card className="p-5 text-sm">
             <h2 className="font-medium text-[#0b1f3a]">Seguimiento</h2>
-            <p className="mt-2 leading-6 text-[var(--muted)]">La atención ya fue capturada por Ventas. El caso técnico y su bitácora aparecerán cuando Almacén confirme la entrada física.</p>
+            <p className="mt-2 leading-6 text-[var(--muted)]">La atención ya fue capturada por Ventas. El folio del diagnóstico, el caso técnico y su bitácora aparecerán cuando Almacén confirme la entrada física.</p>
             <div className="mt-4"><DetailAnchorButton href={equipmentHref}>Ver ficha del equipo</DetailAnchorButton></div>
           </Card>
         </aside>
