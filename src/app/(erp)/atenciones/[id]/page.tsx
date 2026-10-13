@@ -61,6 +61,7 @@ export default async function AtencionDetallePage({ params }: { params: Promise<
             <EntityMetaItem label="Vendedor">{seller?.name ?? "Sin vendedor asignado"}</EntityMetaItem>
             <EntityMetaItem label="Prioridad">{attention.priorityName}</EntityMetaItem>
             <EntityMetaItem label="Capturada">{formatWhen(attention.createdAt)}</EntityMetaItem>
+            <EntityMetaItem label="Folio del servicio">{attention.attentionType === "REPARACION" ? "OS" : "DX"} · se asigna al ingreso físico</EntityMetaItem>
             <EntityMetaItem label="ID de la atención"><span className="break-all text-xs">{attention.id}</span></EntityMetaItem>
           </>
         }
