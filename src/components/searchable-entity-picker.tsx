@@ -52,9 +52,9 @@ export function SearchableEntityPicker({
 
   const canCreate = Boolean(onCreate && (!dirty || !query.trim() || !options.some((row) => key(row.name) === key(query))));
   const rows: Array<{ kind: "option"; id: string; name: string } | { kind: "empty" } | { kind: "create" }> = [
+    ...(canCreate ? [{ kind: "create" as const }] : []),
     ...(allowEmpty ? [{ kind: "empty" as const }] : []),
     ...matches.map((row) => ({ kind: "option" as const, id: row.id, name: row.name })),
-    ...(canCreate ? [{ kind: "create" as const }] : []),
   ];
 
   function choose(index: number) {
@@ -125,7 +125,7 @@ export function SearchableEntityPicker({
         {open ? (
           <ul id={id + "-list"} role="listbox" aria-label={label} className="absolute z-40 mt-1 max-h-64 w-full overflow-y-auto rounded-xl border border-[var(--line)] bg-white p-1 shadow-[0_16px_36px_rgba(20,45,75,0.16)]">
             {rows.length === 0 ? <li className="px-3 py-3 text-sm text-[var(--muted)]">No hay coincidencias.</li> : rows.map((row, index) => (
-              <li key={row.kind === "option" ? row.id : row.kind} id={id + "-option-" + index} role="option" aria-selected={index === highlight}>
+              <li key={row.kind === "option" ? row.id : row.kind} id={id + "-option-" + index} role="option" aria-selected={index === highlight} className={row.kind === "create" ? "mb-1 border-b border-[var(--line)] pb-1" : ""}>
                 <button type="button" className={"w-full rounded-lg px-3 py-2.5 text-left text-sm " + (index === highlight ? "bg-[var(--accent-soft)]" : "hover:bg-[#f3f8fb]") + (row.kind === "create" ? " font-semibold text-[var(--accent)]" : "")}
                   onMouseDown={(event) => event.preventDefault()} onClick={() => choose(index)}>
                   {row.kind === "option" ? row.name : row.kind === "empty" ? emptyLabel : "+ " + createLabel}
