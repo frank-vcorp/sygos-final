@@ -127,7 +127,28 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
 
   let primaryAction: React.ReactNode = null;
   if (quote.status === "PENDIENTE_COTIZAR" && can(session.role, "quote.price", session.activeCompanyCode)) {
-    primaryAction = <DetailAnchorButton href="#asignar-precio">Asignar precio</DetailAnchorButton>;
+    primaryAction = (
+      <form action={setPricesAction} className="flex flex-wrap items-end gap-2">
+        <input type="hidden" name="quoteId" value={quote.id} />
+        <input type="hidden" name="version" value={quote.version} />
+        {quote.lines.map((line) => (
+          <label key={line.id} className="grid gap-1">
+            <span className="text-xs font-semibold text-[var(--muted)]">{quote.lines.length === 1 ? "Precio" : line.concept}</span>
+            <input type="hidden" name="lineId" value={line.id} />
+            <input
+              name="amount"
+              required
+              inputMode="decimal"
+              aria-label={`Precio de ${line.concept}`}
+              defaultValue={referencePrice ?? ""}
+              placeholder="$0.00"
+              className="min-h-11 w-32 rounded-lg border border-[#cbd8e6] bg-white px-3 py-2 text-right text-sm outline-none focus:border-[#087d99] focus-visible:ring-2 focus-visible:ring-[#c7e9f2]"
+            />
+          </label>
+        ))}
+        <SubmitButton>Asignar precio</SubmitButton>
+      </form>
+    );
   } else if (quote.status === "PENDIENTE_DECISION" && can(session.role, "quote.follow", session.activeCompanyCode)) {
     primaryAction = (
       <QuoteDecisionActions
@@ -434,21 +455,6 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
           ) : null}
         </div>
         <div className="space-y-4">
-          {quote.status === "PENDIENTE_COTIZAR" && can(session.role, "quote.price", session.activeCompanyCode) ? (
-            <FormPanel id="asignar-precio" action={setPricesAction} className="scroll-mt-24">
-              <input type="hidden" name="quoteId" value={quote.id} />
-              <input type="hidden" name="version" value={quote.version} />
-              <FormSection title="Asignar precio" description="Confirma el importe por línea antes de enviar al cliente." columns={1}>
-                {quote.lines.map((line) => (
-                  <Field key={line.id} label={line.incrementPct != null ? `${line.concept} · base, incremento ${line.incrementPct}%` : line.concept}>
-                    <input type="hidden" name="lineId" value={line.id} />
-                    <input name="amount" required inputMode="decimal" defaultValue={referencePrice ?? ""} className={controlClass} />
-                  </Field>
-                ))}
-              </FormSection>
-              <FormActions><SubmitButton>Guardar precio</SubmitButton></FormActions>
-            </FormPanel>
-          ) : null}
           {quote.status === "PENDIENTE_DECISION" && can(session.role, "quote.follow", session.activeCompanyCode) ? (
             <>
               <FormPanel action={discountAction}>
