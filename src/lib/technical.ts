@@ -34,7 +34,7 @@ export async function openCase(attentionId: string, receivedAt: Date) {
   if (!attention || attention.technicalCases.length > 0 || !attention.slaStartedAt) return null;
   const diagnosis = DIAGNOSIS_TYPES.has(attention.attentionType);
   const folio = await allocateFolio(attention.serviceCompanyId, diagnosis ? "DX" : "OS");
-  return prisma.$transaction(async (tx) => {
+  const technicalCase = await prisma.$transaction(async (tx) => {
     const technicalCase = await tx.technicalCase.create({
       data: {
         folio,
@@ -59,6 +59,15 @@ export async function openCase(attentionId: string, receivedAt: Date) {
     }
     return technicalCase;
   });
+  await recordHistory({
+    companyId: attention.serviceCompanyId,
+    entityType: "OPERACION",
+    entityId: technicalCase.id,
+    action: "ALTA",
+    summary: `${technicalCase.folio} abierta y en espera de asignación técnica.`,
+    authorUserId: attention.createdByUserId,
+  });
+  return technicalCase;
 }
 
 export async function assertWarrantyOrigin(equipmentId: string, originalCaseId: string) {
@@ -160,6 +169,14 @@ export async function startCase(actor: Actor, caseId: string, version: number) {
   const data = { status: next, version: { increment: 1 }, ...(claim ? { assigneeUserId: actor.userId } : {}) };
   const updated = await prisma.technicalCase.updateMany({ where: { id: row.id, version }, data });
   if (updated.count === 0) throw new ConcurrencyError();
+  await recordHistory({
+    companyId: actor.activeCompanyId,
+    entityType: "OPERACION",
+    entityId: row.id,
+    action: "INICIO_TECNICO",
+    summary: row.kind === "DIAGNOSTICO" ? "Inició el diagnóstico técnico." : "Inició la reparación técnica.",
+    authorUserId: actor.userId,
+  });
 }
 
 export async function addLog(actor: Actor, caseId: string, body: string) {

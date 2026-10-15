@@ -277,6 +277,14 @@ export async function createAttention(
     summary: `Nueva atención ${input.attentionType} con prioridad ${priority.name}. No sustituye la identidad ${equipment.folio}.`,
     authorUserId: actor.userId,
   });
+  await recordHistory({
+    companyId: actor.activeCompanyId,
+    entityType: "ATENCION",
+    entityId: attention.id,
+    action: "ALTA",
+    summary: `Atención ${input.attentionType} creada con prioridad ${priority.name}.`,
+    authorUserId: actor.userId,
+  });
   return attention;
 }
 
@@ -476,6 +484,18 @@ export async function registerMovement(
     summary: folio ? `${folio} confirmado. Custodia: ${custody}.` : `${input.kind} confirmado. Custodia: ${custody}.`,
     authorUserId: actor.userId,
   });
+  if (attention) {
+    await recordHistory({
+      companyId: actor.activeCompanyId,
+      entityType: "ATENCION",
+      entityId: attention.id,
+      action: receipt ? "ENTRADA_FISICA" : "MOVIMIENTO_FISICO",
+      summary: receipt
+        ? `${folio ?? input.kind} confirmado. El equipo quedó en resguardo e inició la atención.`
+        : `${input.kind} registrado para el equipo.`,
+      authorUserId: actor.userId,
+    });
+  }
   return { id: movementId, folio, initialWarehouseReceipt };
 }
 

@@ -22,6 +22,7 @@ import {
   TextLink,
 } from "@/components/ui";
 import { prisma } from "@/lib/db";
+import { attentionMetrics, elapsedLabel } from "@/lib/attention-timing";
 import { formatWhen } from "@/lib/form";
 import { historyFor } from "@/lib/history";
 import { linesForTotal, money, quoteTotals } from "@/lib/money";
@@ -44,11 +45,33 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
   const base = quote.linkedQuoteId && (session.role === "ADMINISTRADOR" || session.role === "CEO")
     ? await prisma.quote.findUnique({ where: { id: quote.linkedQuoteId }, include: { lines: true, company: true } })
     : null;
-  const history = await historyFor("COTIZACION", quote.id);
-  const seller = await prisma.user.findUnique({ where: { id: session.userId }, select: { discountLimitPct: true } });
-  const source = quote.technicalCaseId
-    ? await prisma.technicalCase.findUnique({ where: { id: quote.technicalCaseId }, include: { attention: true } })
+  const [history, seller, source] = await Promise.all([
+    historyFor("COTIZACION", quote.id),
+    prisma.user.findUnique({ where: { id: session.userId }, select: { discountLimitPct: true } }),
+    quote.technicalCaseId
+      ? prisma.technicalCase.findUnique({ where: { id: quote.technicalCaseId }, include: { attention: true } })
+      : null,
+  ]);
+  const executiveTimingAttention = session.role === "CEO" && source
+    ? await prisma.attention.findUnique({
+        where: { id: source.attentionId },
+        include: {
+          movements: { where: { cancelledAt: null }, orderBy: { occurredAt: "asc" } },
+          technicalCases: {
+            orderBy: { createdAt: "asc" },
+            select: { id: true },
+          },
+        },
+      })
     : null;
+  const executiveCaseIds = executiveTimingAttention?.technicalCases.map((item) => item.id) ?? [];
+  const executiveOperationHistory = executiveTimingAttention
+    ? await prisma.functionalHistory.findMany({
+        where: { entityType: "OPERACION", entityId: { in: executiveCaseIds } },
+        orderBy: { createdAt: "asc" },
+        select: { action: true, createdAt: true },
+      })
+    : [];
   const repairOrder = source
     ? await prisma.technicalCase.findFirst({ where: { spawnedFromId: source.id, kind: "OS" } })
     : null;
@@ -100,6 +123,18 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
   const equipmentLabel = quote.equipment
     ? quote.equipment.folio
     : [quote.preliminaryType, quote.preliminaryBrand, quote.preliminaryModel, quote.preliminarySerial].filter(Boolean).join(" · ") || "Sin equipo físico";
+  const executiveReceivedAt = executiveTimingAttention?.movements.find((item) => item.kind === "ENTRADA" || item.kind === "INGRESO")?.occurredAt
+    ?? executiveTimingAttention?.slaStartedAt
+    ?? null;
+  const executiveMetrics = executiveTimingAttention
+    ? attentionMetrics({
+        attentionCreatedAt: executiveTimingAttention.createdAt,
+        receivedAt: executiveReceivedAt,
+        operationEvents: executiveOperationHistory,
+        quoteCreatedAt: quote.createdAt,
+        quoteEvents: history,
+      })
+    : null;
 
   return (
     <>
@@ -134,6 +169,23 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
           </>
         }
       />
+      {executiveMetrics ? (
+        <details className="mb-6 border-y border-[var(--line)] py-3" aria-label="Tiempos de la atención">
+          <summary className="cursor-pointer list-none text-xs font-bold uppercase tracking-[0.12em] text-[var(--muted)] [&::-webkit-details-marker]:hidden">
+            <span className="inline-flex items-center gap-2">Tiempos de atención <span className="text-[var(--accent)]">Ver desglose</span></span>
+          </summary>
+          <div className="mt-3 flex flex-wrap gap-x-5 gap-y-2">
+            {executiveMetrics.map((metric) => (
+              <div key={metric.key} className={metric.active ? "text-[var(--accent)]" : "text-[#38506c]"}>
+                <span className="text-xs font-medium text-[var(--muted)]">{metric.label}: </span>
+                <span className="text-sm font-semibold">{elapsedLabel(metric.milliseconds)}</span>
+                {metric.active ? <span className="ml-1 text-xs">actual</span> : null}
+                {metric.estimated ? <span className="ml-1 text-xs text-[var(--muted)]">estimado</span> : null}
+              </div>
+            ))}
+          </div>
+        </details>
+      ) : null}
       <DetailGrid>
         <Card className="p-4 text-sm">
           {source ? <p className="mt-1">{source.kind === "OS" ? "Orden de servicio" : "Diagnóstico de origen"}: <TextLink href={`/operacion/${source.id}`}>{source.folio}</TextLink></p> : null}

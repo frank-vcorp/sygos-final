@@ -3,6 +3,7 @@ import { allocateFolio } from "./folios";
 import { ConcurrencyError } from "./form";
 import { recordHistory } from "./history";
 import { finalFromBase } from "./money";
+import { ATTENTION_LABEL, type AttentionType } from "./priorities";
 import type { Role } from "./roles";
 import { QUOTE_STATUS_LABEL, QUOTE_TYPE_LABEL, QUOTE_TYPES, type QuoteType } from "./quote-meta";
 import { SALES_NOT_ASSIGNED_MESSAGE } from "./sales-assignment";
@@ -16,6 +17,22 @@ export function seesEconomicDetail(role: Role, companyCode: string, quoteCompany
   if (companyCode === "SERVOMOTORES" && quoteCompanyCode === "SYSTRON") return false;
   if (role === "GERENTE_OPERATIVO_SERVOMOTORES" && isBaseForOther) return true;
   return role === "ADMINISTRADOR" || role === "CEO" || role === "COORDINACION_ADMINISTRACION" || role === "GERENTE_OPERATIVO_SERVOMOTORES";
+}
+
+function automaticQuoteConcept(row: {
+  folio: string;
+  kind: string;
+  resultText: string | null;
+  attention: { attentionType: string; reportedFault: string };
+  equipment: { typeName: string | null; brandName: string | null; model: string | null; serial: string | null };
+}) {
+  const service = row.kind === "OS"
+    ? "Reparación"
+    : ATTENTION_LABEL[row.attention.attentionType as AttentionType] ?? row.attention.attentionType;
+  const identity = [row.equipment.typeName, row.equipment.brandName, row.equipment.model].filter(Boolean).join(" · ");
+  const serial = row.equipment.serial ? `Serie ${row.equipment.serial}` : null;
+  const detail = (row.resultText || row.attention.reportedFault).trim();
+  return [service, `Origen ${row.folio}`, identity || null, serial, detail].filter(Boolean).join(" · ");
 }
 
 export async function createSellerQuote(
@@ -95,7 +112,7 @@ export async function ensureQuoteFromCase(actor: { userId: string; activeCompany
   });
   if (!client) throw new Error("Falta el cliente de la cotización.");
   const repair = row.kind === "OS";
-  const concept = (row.resultText || row.attention.reportedFault).trim();
+  const concept = automaticQuoteConcept(row);
   const folio = await allocateFolio(actor.activeCompanyId, "COT");
   const quote = await prisma.quote.create({
     data: {
@@ -135,13 +152,21 @@ export async function ensureQuoteFromCase(actor: { userId: string; activeCompany
 }
 
 async function ensureOriginQuote(
-  row: { id: string; folio: string; equipmentId: string; resultText: string | null; attention: { reportedFault: string; sellerUserId: string | null }; equipment: { originCompanyId: string; clientId: string } },
+  row: {
+    id: string;
+    folio: string;
+    kind: string;
+    equipmentId: string;
+    resultText: string | null;
+    attention: { attentionType: string; reportedFault: string; sellerUserId: string | null };
+    equipment: { originCompanyId: string; clientId: string; typeName: string | null; brandName: string | null; model: string | null; serial: string | null };
+  },
   baseQuoteId: string,
   authorUserId: string,
 ) {
   const existing = await prisma.quote.findFirst({ where: { technicalCaseId: row.id, companyId: row.equipment.originCompanyId } });
   if (existing) return existing;
-  const concept = (row.resultText || row.attention.reportedFault).trim();
+  const concept = automaticQuoteConcept(row);
   const folio = await allocateFolio(row.equipment.originCompanyId, "COT");
   const quote = await prisma.quote.create({
     data: {
