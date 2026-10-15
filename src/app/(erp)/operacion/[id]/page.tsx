@@ -400,17 +400,6 @@ export default async function OperacionDetallePage({ params }: { params: Promise
         </div>
         <aside className="space-y-4 lg:sticky lg:top-4 lg:self-start">
           <HistoryTimeline items={history.map((item) => ({ id: item.id, createdAt: item.createdAt, summary: item.summary, authorName: item.author?.name }))} />
-          {(row.kind === "DIAGNOSTICO" ? canEditPresolicitud : canOperatePartRequests) ? (
-            <Card className="p-4">
-              <p className="text-sm font-semibold text-[#0b1f3a]">Acción rápida</p>
-              <p className="mt-1 text-xs leading-5 text-[var(--muted)]">Captura una refacción sin perder de vista el historial.</p>
-              <div className="mt-3">
-                <DetailAnchorButton href="#refacciones">
-                  {row.kind === "DIAGNOSTICO" ? "Presolicitar refacción" : "Solicitar refacción"}
-                </DetailAnchorButton>
-              </div>
-            </Card>
-          ) : null}
           {false ? (
             <>
           {row.kind === "DIAGNOSTICO" ? (
