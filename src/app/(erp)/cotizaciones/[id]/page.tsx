@@ -1,9 +1,10 @@
 import { notFound, redirect } from "next/navigation";
 import { requestDocumentAction, requestIntercompanyAction } from "@/app/(erp)/facturacion/actions";
-import { decideAction, discountAction, linkBaseAction, relateEquipmentAction, sendQuoteMailAction, setPricesAction, updateGeneratedConceptAction } from "../actions";
+import { decideAction, discountAction, linkBaseAction, relateEquipmentAction, sendQuoteMailAction, setPricesAction, updateGeneratedConceptAction, updateSellerConceptComplementAction } from "../actions";
 import { RelateEquipmentForm } from "@/components/relate-equipment-form";
 import { HistoryTimeline } from "@/components/history-timeline";
 import { QuoteDecisionActions } from "@/components/quote-decision-actions";
+import { QuoteConcept } from "@/components/quote-concept";
 import { SubmitButton } from "@/components/submit-button";
 import {
   Badge,
@@ -125,6 +126,9 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
           : "Falta crear o relacionar el equipo y confirmar su ingreso. Todavía no hay orden de servicio."
         : null;
   const canEditGeneratedConcept = session.role === "CEO" && Boolean(quote.technicalCaseId) && quote.status === "PENDIENTE_COTIZAR";
+  const canEditSellerConceptComplement = session.role === "VENTAS"
+    && quote.sellerUserId === session.userId
+    && ["PENDIENTE_COTIZAR", "PENDIENTE_DECISION"].includes(quote.status);
 
   let primaryAction: React.ReactNode = null;
   if (quote.status === "PENDIENTE_COTIZAR" && can(session.role, "quote.price", session.activeCompanyCode)) {
@@ -343,13 +347,13 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
           <table className="mt-4 min-w-full text-left">
             <thead><tr><th className="py-1">Concepto</th><th>Cant.</th>{priced ? <th>Precio</th> : null}</tr></thead>
             <tbody>
-              {quote.lines.map((line) => (
+              {quote.lines.map((line, index) => (
                 <tr key={line.id}>
                   <td className="py-1">
                     {canEditGeneratedConcept ? (
                       <details className="group">
                         <summary className="flex cursor-pointer list-none items-start gap-1.5 [&::-webkit-details-marker]:hidden">
-                          <span>{line.concept}</span>
+                          <QuoteConcept concept={line.concept} complement={index === 0 ? quote.sellerConceptComplement : null} />
                           <span title="Editar concepto" className="mt-0.5 inline-flex shrink-0 rounded p-0.5 text-[var(--accent)] transition hover:bg-[var(--accent-soft)]" aria-label="Editar concepto">
                             <svg viewBox="0 0 24 24" aria-hidden="true" className="h-3.5 w-3.5 fill-none stroke-current stroke-2">
                               <path d="M12 20h9" />
@@ -371,8 +375,26 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
                           <SubmitButton tone="ghost" className="min-h-9 px-3 text-xs">Guardar</SubmitButton>
                         </form>
                       </details>
+                    ) : canEditSellerConceptComplement && index === 0 ? (
+                      <details className="group">
+                        <summary className="flex cursor-pointer list-none items-start gap-1.5 [&::-webkit-details-marker]:hidden">
+                          <QuoteConcept concept={line.concept} complement={quote.sellerConceptComplement} />
+                          <span title="Editar complemento" className="mt-0.5 inline-flex shrink-0 rounded p-0.5 text-[var(--accent)] transition hover:bg-[var(--accent-soft)]" aria-label="Editar complemento">
+                            <svg viewBox="0 0 24 24" aria-hidden="true" className="h-3.5 w-3.5 fill-none stroke-current stroke-2">
+                              <path d="M12 20h9" />
+                              <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z" />
+                            </svg>
+                          </span>
+                        </summary>
+                        <form action={updateSellerConceptComplementAction} className="mt-2 flex flex-wrap items-end gap-2">
+                          <input type="hidden" name="quoteId" value={quote.id} />
+                          <input type="hidden" name="version" value={quote.version} />
+                          <textarea name="sellerConceptComplement" rows={2} maxLength={500} defaultValue={quote.sellerConceptComplement ?? ""} placeholder="Agrega información relevante para el cliente" className="min-h-16 flex-1 rounded-lg border border-[#cbd8e6] bg-white px-3 py-2 text-sm outline-none focus:border-[#087d99] focus-visible:ring-2 focus-visible:ring-[#c7e9f2]" />
+                          <SubmitButton tone="ghost" className="min-h-9 px-3 text-xs">Guardar</SubmitButton>
+                        </form>
+                      </details>
                     ) : (
-                      <>{line.concept}{quote.status === "AUTORIZADA" && quote.quoteType === "VENTA_EQUIPO" ? (line.authorized ? " · autorizada" : " · no autorizada") : line.authorized ? " · autorizada" : ""}</>
+                      <><QuoteConcept concept={line.concept} complement={index === 0 ? quote.sellerConceptComplement : null} />{quote.status === "AUTORIZADA" && quote.quoteType === "VENTA_EQUIPO" ? (line.authorized ? " · autorizada" : " · no autorizada") : line.authorized ? " · autorizada" : ""}</>
                     )}
                   </td>
                   <td>{line.quantity}</td>

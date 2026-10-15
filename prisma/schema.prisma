@@ -541,6 +541,7 @@ model Quote {
   preliminaryModel   String?
   preliminarySerial  String?
   reference          String?
+  sellerConceptComplement String?
   creditDays         Int?
   discountPct        Float    @default(0)
   sellerUserId       String?

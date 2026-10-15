@@ -4,6 +4,7 @@ import { ConcurrencyError } from "./form";
 import { recordHistory } from "./history";
 import { finalFromBase } from "./money";
 import { ATTENTION_LABEL, type AttentionType } from "./priorities";
+import { technicalServiceConcept } from "./quote-concept";
 import type { Role } from "./roles";
 import { QUOTE_STATUS_LABEL, QUOTE_TYPE_LABEL, QUOTE_TYPES, type QuoteType } from "./quote-meta";
 import { SALES_NOT_ASSIGNED_MESSAGE } from "./sales-assignment";
@@ -20,19 +21,9 @@ export function seesEconomicDetail(role: Role, companyCode: string, quoteCompany
 }
 
 function automaticQuoteConcept(row: {
-  folio: string;
-  kind: string;
-  resultText: string | null;
-  attention: { attentionType: string; reportedFault: string };
   equipment: { typeName: string | null; brandName: string | null; model: string | null; serial: string | null };
 }) {
-  const service = row.kind === "OS"
-    ? "Reparación"
-    : ATTENTION_LABEL[row.attention.attentionType as AttentionType] ?? row.attention.attentionType;
-  const identity = [row.equipment.typeName, row.equipment.brandName, row.equipment.model].filter(Boolean).join(" · ");
-  const serial = row.equipment.serial ? `Serie ${row.equipment.serial}` : null;
-  const detail = (row.resultText || row.attention.reportedFault).trim();
-  return [service, `Origen ${row.folio}`, identity || null, serial, detail].filter(Boolean).join(" · ");
+  return technicalServiceConcept(row.equipment);
 }
 
 export async function createSellerQuote(
@@ -271,6 +262,41 @@ export async function updateGeneratedQuoteConcepts(
     entityId: quote.id,
     action: "CONCEPTO",
     summary: `CEO ajustó el concepto antes de asignar precio: ${changed.map(({ line, concept }) => `${line.concept} → ${concept}`).join(" | ")}.`,
+    authorUserId: actor.userId,
+  });
+}
+
+/** The assigned seller may add the commercial note shown in italics below the technical concept. */
+export async function updateSellerQuoteConceptComplement(
+  actor: Actor,
+  quoteId: string,
+  version: number,
+  complement: string | null,
+) {
+  if (actor.role !== "VENTAS") throw new Error("Solo el Vendedor puede modificar el complemento del concepto.");
+  const quote = await prisma.quote.findFirst({
+    where: {
+      id: quoteId,
+      companyId: actor.activeCompanyId,
+      sellerUserId: actor.userId,
+      status: { in: ["PENDIENTE_COTIZAR", "PENDIENTE_DECISION"] },
+    },
+  });
+  if (!quote) throw new Error("Esta cotización ya no permite modificar el complemento del concepto.");
+  const next = complement?.trim() || null;
+  if (next && next.length > 500) throw new Error("El complemento puede tener hasta 500 caracteres.");
+  if (next === quote.sellerConceptComplement) return;
+  const updated = await prisma.quote.updateMany({
+    where: { id: quote.id, version },
+    data: { sellerConceptComplement: next, version: { increment: 1 } },
+  });
+  if (updated.count === 0) throw new ConcurrencyError();
+  await recordHistory({
+    companyId: actor.activeCompanyId,
+    entityType: "COTIZACION",
+    entityId: quote.id,
+    action: "COMPLEMENTO_CONCEPTO",
+    summary: next ? "Vendedor actualizó el complemento comercial del concepto." : "Vendedor eliminó el complemento comercial del concepto.",
     authorUserId: actor.userId,
   });
 }
