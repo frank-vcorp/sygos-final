@@ -27,11 +27,13 @@ import { formatWhen } from "@/lib/form";
 import { historyFor } from "@/lib/history";
 import { linesForTotal, money, quoteTotals } from "@/lib/money";
 import { can } from "@/lib/permissions";
+import { PRESOLICITUD_LABEL } from "@/lib/part-presolicitud";
 import { ATTENTION_LABEL, type AttentionType } from "@/lib/priorities";
 import { QUOTE_STATUS_LABEL, QUOTE_TYPE_LABEL, seesEconomicDetail, type QuoteType } from "@/lib/quotes";
 import { ClientNameLink, ContactNameLink } from "@/components/client-entity-links";
 import { redirectIfSalesNotAssigned } from "@/lib/sales-assignment";
 import { requireCompany } from "@/lib/session";
+import { PART_REQUEST_STATUS_LABEL } from "@/lib/case-labels";
 import { CASE_STATUS_LABEL } from "@/lib/technical";
 
 export default async function CotizacionDetallePage({ params }: { params: Promise<{ id: string }> }) {
@@ -61,7 +63,11 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
           movements: { where: { cancelledAt: null }, orderBy: { occurredAt: "asc" } },
           technicalCases: {
             orderBy: { createdAt: "asc" },
-            include: { logs: { orderBy: { createdAt: "asc" } } },
+            include: {
+              logs: { orderBy: { createdAt: "asc" } },
+              requests: { orderBy: { createdAt: "asc" } },
+              presolicitudes: { orderBy: { createdAt: "asc" } },
+            },
           },
         },
       })
@@ -154,6 +160,41 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
   const executiveCaseById = new Map(executiveTimingAttention?.technicalCases.map((item) => [item.id, item]) ?? []);
   const executiveCasesWithOpenHistory = new Set(executiveOperationHistory.filter((item) => item.action === "ALTA").map((item) => item.entityId));
   const executiveAttentionHasOpenHistory = executiveAttentionHistory.some((item) => item.action === "ALTA");
+  const executivePartItems = executiveTimingAttention?.technicalCases.flatMap((technicalCase) => [
+    ...technicalCase.presolicitudes.map((item) => ({
+      id: `presolicitud-${item.id}`,
+      caseFolio: technicalCase.folio,
+      stage: "Prevista en diagnóstico",
+      partNumber: item.partNumber,
+      description: item.description,
+      quantity: item.qtyRequested,
+      status: PRESOLICITUD_LABEL[item.status] ?? item.status,
+      link: item.link,
+      received: null,
+      issued: null,
+    })),
+    ...technicalCase.requests.map((item) => ({
+      id: `request-${item.id}`,
+      caseFolio: technicalCase.folio,
+      stage: "Solicitud de refacción",
+      partNumber: item.partNumber,
+      description: item.description,
+      quantity: item.qtyRequested,
+      status: PART_REQUEST_STATUS_LABEL[item.status] ?? item.status,
+      link: item.link,
+      received: item.qtyReceived,
+      issued: item.qtyIssued,
+    })),
+  ]) ?? [];
+  const executiveLogs = executiveTimingAttention?.technicalCases
+    .flatMap((technicalCase) => technicalCase.logs.map((item) => ({
+      id: item.id,
+      folio: technicalCase.folio,
+      body: item.body,
+      createdAt: item.createdAt,
+      authorName: executiveAuthorNames.get(item.authorUserId),
+    })))
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime()) ?? [];
   const executiveAttentionHistoryItems = executiveTimingAttention
     ? [
         ...(!executiveAttentionHasOpenHistory
@@ -191,12 +232,6 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
                 authorName: null,
               }]
             : []),
-          ...technicalCase.logs.map((log) => ({
-            id: `log-${log.id}`,
-            createdAt: log.createdAt,
-            summary: `${technicalCase.folio} · Bitácora: ${log.body}`,
-            authorName: executiveAuthorNames.get(log.authorUserId),
-          })),
         ]),
         ...executiveOperationHistory.map((item) => ({
           id: `operation-history-${item.id}`,
@@ -264,7 +299,8 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
         </details>
       ) : null}
       <DetailGrid>
-        <Card className="p-4 text-sm">
+        <div className="space-y-4">
+          <Card className="p-4 text-sm">
           {source ? <p className="mt-1">{source.kind === "OS" ? "Orden de servicio" : "Diagnóstico de origen"}: <TextLink href={`/operacion/${source.id}`}>{source.folio}</TextLink></p> : null}
           {repairOrder ? <p className="mt-1">Orden de servicio: <TextLink href={`/operacion/${repairOrder.id}`}>{repairOrder.folio}</TextLink></p> : null}
           {quote.client.contacts.length > 0 ? (
@@ -322,7 +358,51 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
             </div>
           ) : null}
           {base ? <p className="mt-3 text-[var(--muted)]">Base Servomotores {base.folio}: {money(quoteTotals(base.lines, base.discountPct)?.total)}. El vendedor no ve este importe.</p> : null}
-        </Card>
+          </Card>
+          {session.role === "CEO" && executivePartItems.length > 0 ? (
+            <Card className="p-5 text-sm">
+              <h2 className="font-semibold text-[#0b1f3a]">Refacciones</h2>
+              <p className="mt-1 text-[var(--muted)]">Refacciones previstas o solicitadas para esta atención.</p>
+              <ul className="mt-3 divide-y divide-[var(--line)]">
+                {executivePartItems.map((item) => (
+                  <li key={item.id} className="py-3 first:pt-0 last:pb-0">
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--muted)]">
+                      <span>{item.caseFolio}</span>
+                      <span aria-hidden>·</span>
+                      <span>{item.stage}</span>
+                      <span className="rounded-full bg-[var(--accent-soft)] px-2 py-0.5 font-semibold text-[var(--accent)]">{item.status}</span>
+                    </div>
+                    <p className="mt-1 font-medium text-[#0b1f3a]">{item.partNumber} · {item.description}</p>
+                    <p className="mt-1 text-xs text-[var(--muted)]">
+                      Cantidad solicitada: {item.quantity}
+                      {item.received != null ? ` · recibidas: ${item.received}` : ""}
+                      {item.issued != null ? ` · surtidas: ${item.issued}` : ""}
+                      {item.link ? <><span aria-hidden> · </span><a href={item.link} target="_blank" rel="noreferrer" className="text-[var(--accent)]">Referencia</a></> : null}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            </Card>
+          ) : null}
+          {session.role === "CEO" && executiveTimingAttention ? (
+            <Card className="p-5 text-sm">
+              <h2 className="font-semibold text-[#0b1f3a]">Bitácora</h2>
+              <p className="mt-1 text-[var(--muted)]">Avances, hallazgos, pruebas e incidencias registrados por el equipo técnico.</p>
+              {executiveLogs.length === 0 ? (
+                <p className="mt-4 text-[var(--muted)]">Aún no hay entradas técnicas registradas.</p>
+              ) : (
+                <ul className="mt-3 divide-y divide-[var(--line)]">
+                  {executiveLogs.map((item) => (
+                    <li key={item.id} className="py-3 first:pt-0 last:pb-0">
+                      <p className="text-xs text-[var(--muted)]">{formatWhen(item.createdAt)} · {item.folio} · {item.authorName ?? "Sistema"}</p>
+                      <p className="mt-1 whitespace-pre-wrap leading-6 text-[#24364d]">{item.body}</p>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </Card>
+          ) : null}
+        </div>
         <div className="space-y-4">
           {quote.status === "PENDIENTE_COTIZAR" && can(session.role, "quote.price", session.activeCompanyCode) ? (
             <FormPanel id="asignar-precio" action={setPricesAction} className="scroll-mt-24">
@@ -387,7 +467,7 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
               ? executiveAttentionHistoryItems
               : history.map((item) => ({ id: item.id, createdAt: item.createdAt, summary: item.summary, authorName: item.author?.name }))}
             title={session.role === "CEO" && executiveAttentionHistoryItems.length > 0 ? "Historial completo" : undefined}
-            description={session.role === "CEO" && executiveAttentionHistoryItems.length > 0 ? "Atención, movimientos físicos, diagnóstico, bitácora y cotización." : undefined}
+            description={session.role === "CEO" && executiveAttentionHistoryItems.length > 0 ? "Atención, movimientos físicos, diagnóstico y decisiones de cotización." : undefined}
           />
         </div>
       </DetailGrid>
