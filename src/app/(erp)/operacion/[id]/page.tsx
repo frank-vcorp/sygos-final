@@ -20,6 +20,7 @@ import {
   validateAction,
 } from "../actions";
 import { ClientNameLink } from "@/components/client-entity-links";
+import { DiagnosisValidationActions } from "@/components/diagnosis-validation-actions";
 import { HistoryTimeline } from "@/components/history-timeline";
 import { SupplierPicker } from "@/components/supplier-picker";
 import {
@@ -179,7 +180,14 @@ export default async function OperacionDetallePage({ params }: { params: Promise
       row.kind === "DIAGNOSTICO" &&
       (row.status === "PENDIENTE_VALIDACION" || (row.serviceCompany.code === "SERVOMOTORES" && row.status === "VALIDADO" && warranty && !row.warrantyDecision))
     ) {
-      primaryAction = <DetailAnchorButton href="#validacion">Validar diagnóstico</DetailAnchorButton>;
+      primaryAction = (
+        <DiagnosisValidationActions
+          caseId={row.id}
+          version={row.version}
+          warranty={warranty}
+          validateAction={validateAction}
+        />
+      );
     } else if (canWork && row.kind === "OS" && ["EN_REPARACION", "EN_ESPERA_REFACCIONES"].includes(row.status)) {
       primaryAction = <DetailAnchorButton href="#cerrar-reparacion">Terminar reparación</DetailAnchorButton>;
     } else if (row.quotePending && can(session.role, "quote.price", session.activeCompanyCode)) {
@@ -392,6 +400,17 @@ export default async function OperacionDetallePage({ params }: { params: Promise
         </div>
         <aside className="space-y-4 lg:sticky lg:top-4 lg:self-start">
           <HistoryTimeline items={history.map((item) => ({ id: item.id, createdAt: item.createdAt, summary: item.summary, authorName: item.author?.name }))} />
+          {(row.kind === "DIAGNOSTICO" ? canEditPresolicitud : canOperatePartRequests) ? (
+            <Card className="p-4">
+              <p className="text-sm font-semibold text-[#0b1f3a]">Acción rápida</p>
+              <p className="mt-1 text-xs leading-5 text-[var(--muted)]">Captura una refacción sin perder de vista el historial.</p>
+              <div className="mt-3">
+                <DetailAnchorButton href="#refacciones">
+                  {row.kind === "DIAGNOSTICO" ? "Presolicitar refacción" : "Solicitar refacción"}
+                </DetailAnchorButton>
+              </div>
+            </Card>
+          ) : null}
           {false ? (
             <>
           {row.kind === "DIAGNOSTICO" ? (
@@ -566,23 +585,6 @@ export default async function OperacionDetallePage({ params }: { params: Promise
                 </details>
               ) : null}
             </Card>
-            {canManage && row.kind === "DIAGNOSTICO" && (row.status === "PENDIENTE_VALIDACION" || (row.serviceCompany.code === "SERVOMOTORES" && row.status === "VALIDADO" && warranty && !row.warrantyDecision)) ? (
-              <FormPanel id="validacion" action={validateAction} className="scroll-mt-24">
-                <input type="hidden" name="caseId" value={row.id} />
-                <input type="hidden" name="version" value={row.version} />
-                <FormSection title="Validación" columns={1}>
-                  <Field label="Decisión">
-                    <select name="decision" className={controlClass}>
-                      {warranty ? <option value="VALIDA">Garantía válida</option> : <option value="VALIDAR">Validar</option>}
-                      {warranty ? <option value="NO_PROCEDENTE">Garantía no procedente</option> : null}
-                      <option value="DEVOLVER">Devolver a corrección</option>
-                    </select>
-                  </Field>
-                  <Field label="Motivo si devuelves"><input name="reason" className={controlClass} /></Field>
-                </FormSection>
-                <FormActions><Button type="submit">Registrar validación</Button></FormActions>
-              </FormPanel>
-            ) : null}
             {canWork && row.kind === "OS" && ["EN_REPARACION", "EN_ESPERA_REFACCIONES"].includes(row.status) ? (
               <FormPanel id="cerrar-reparacion" action={finishRepairAction} className="scroll-mt-24">
                 <input type="hidden" name="caseId" value={row.id} />
