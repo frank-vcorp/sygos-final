@@ -181,7 +181,8 @@ export async function finishDiagnosis(actor: Actor, caseId: string, version: num
   if (!["EN_DIAGNOSTICO", "DEVUELTO"].includes(row.status)) throw new Error("El diagnóstico no está en ejecución.");
   const servomotores = row.serviceCompany.code === "SERVOMOTORES";
   const status = servomotores ? "VALIDADO" : "PENDIENTE_VALIDACION";
-  const quotePending = servomotores && (row.attention.priorityPrice == null || row.attention.priorityPrice > 0) && row.attention.attentionType !== "DIAGNOSTICO_GARANTIA";
+  // Todo Diagnóstico normal termina en una cotización; la prioridad solo conserva precio/SLA.
+  const quotePending = servomotores && row.attention.attentionType === "DIAGNOSTICO";
   const updated = await prisma.technicalCase.updateMany({
     where: { id: row.id, version },
     data: {
@@ -236,7 +237,8 @@ export async function validateDiagnosis(actor: Actor, caseId: string, version: n
   const warranty = row.attention.attentionType === "DIAGNOSTICO_GARANTIA";
   const warrantyDecision = decision === "VALIDA" || decision === "NO_PROCEDENTE" ? decision : null;
   if (warranty && !warrantyDecision) throw new Error("Indica si la garantía procede.");
-  const quotePending = !warranty && (row.attention.priorityPrice == null || row.attention.priorityPrice > 0);
+  // La validación de cualquier Diagnóstico normal entrega el pendiente de precio a CEO/Administrador.
+  const quotePending = row.attention.attentionType === "DIAGNOSTICO";
   const updated = await prisma.technicalCase.updateMany({
     where: { id: row.id, version },
     data: {

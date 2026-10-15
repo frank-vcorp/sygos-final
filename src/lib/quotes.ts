@@ -80,7 +80,14 @@ export async function ensureQuoteFromCase(actor: { userId: string; activeCompany
     where: { id: caseId },
     include: { attention: true, equipment: true },
   });
-  if (!row?.quotePending) throw new Error("Esta operación no está pendiente de cotizar.");
+  if (!row) throw new Error("No se encontró la operación técnica.");
+  const recoverValidatedDiagnosis =
+    row.status === "VALIDADO" && row.kind === "DIAGNOSTICO" && row.attention.attentionType === "DIAGNOSTICO";
+  if (!row.quotePending && !recoverValidatedDiagnosis) throw new Error("Esta operación no está pendiente de cotizar.");
+  // Recupera diagnósticos validados antes de esta regla, que quedaron sin pendiente comercial.
+  if (!row.quotePending) {
+    await prisma.technicalCase.update({ where: { id: row.id }, data: { quotePending: true } });
+  }
   const clientId = row.equipment.originCompanyId === actor.activeCompanyId ? row.equipment.clientId : row.attention.adminClientId;
   const client = await prisma.client.findUnique({
     where: { id: clientId },

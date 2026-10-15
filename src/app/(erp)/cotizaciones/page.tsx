@@ -21,7 +21,13 @@ export default async function CotizacionesPage({ searchParams }: { searchParams:
   const decision = vista === "decision";
   if (pending && can(session.role, "quote.price", session.activeCompanyCode)) {
     const missing = await prisma.technicalCase.findMany({
-      where: { serviceCompanyId: session.activeCompanyId, quotePending: true },
+      where: {
+        serviceCompanyId: session.activeCompanyId,
+        OR: [
+          { quotePending: true },
+          { status: "VALIDADO", kind: "DIAGNOSTICO", attention: { attentionType: "DIAGNOSTICO" } },
+        ],
+      },
       select: { id: true },
       take: 50,
     });
