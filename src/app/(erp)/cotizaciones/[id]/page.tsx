@@ -123,6 +123,7 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
           ? "El equipo ya está relacionado. La operación arranca con la entrada física. Todavía no hay orden de servicio."
           : "Falta crear o relacionar el equipo y confirmar su ingreso. Todavía no hay orden de servicio."
         : null;
+  const canEditGeneratedConcept = session.role === "CEO" && Boolean(quote.technicalCaseId) && quote.status === "PENDIENTE_COTIZAR";
 
   let primaryAction: React.ReactNode = null;
   if (quote.status === "PENDIENTE_COTIZAR" && can(session.role, "quote.price", session.activeCompanyCode)) {
@@ -323,7 +324,36 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
             <tbody>
               {quote.lines.map((line) => (
                 <tr key={line.id}>
-                  <td className="py-1">{line.concept}{quote.status === "AUTORIZADA" && quote.quoteType === "VENTA_EQUIPO" ? (line.authorized ? " · autorizada" : " · no autorizada") : line.authorized ? " · autorizada" : ""}</td>
+                  <td className="py-1">
+                    {canEditGeneratedConcept ? (
+                      <details className="group">
+                        <summary className="flex cursor-pointer list-none items-start gap-1.5 [&::-webkit-details-marker]:hidden">
+                          <span>{line.concept}</span>
+                          <span title="Editar concepto" className="mt-0.5 inline-flex shrink-0 rounded p-0.5 text-[var(--accent)] transition hover:bg-[var(--accent-soft)]" aria-label="Editar concepto">
+                            <svg viewBox="0 0 24 24" aria-hidden="true" className="h-3.5 w-3.5 fill-none stroke-current stroke-2">
+                              <path d="M12 20h9" />
+                              <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L8 18l-4 1 1-4Z" />
+                            </svg>
+                          </span>
+                        </summary>
+                        <form action={updateGeneratedConceptAction} className="mt-2 flex flex-wrap items-end gap-2">
+                          <input type="hidden" name="quoteId" value={quote.id} />
+                          <input type="hidden" name="version" value={quote.version} />
+                          <input type="hidden" name="lineId" value={line.id} />
+                          <textarea name="concept" required rows={3} defaultValue={line.concept} className="min-h-20 flex-1 rounded-lg border border-[#cbd8e6] bg-white px-3 py-2 text-sm outline-none focus:border-[#087d99] focus-visible:ring-2 focus-visible:ring-[#c7e9f2]" />
+                          {quote.lines.filter((candidate) => candidate.id !== line.id).map((candidate) => (
+                            <span key={candidate.id}>
+                              <input type="hidden" name="lineId" value={candidate.id} />
+                              <input type="hidden" name="concept" value={candidate.concept} />
+                            </span>
+                          ))}
+                          <SubmitButton tone="ghost" className="min-h-9 px-3 text-xs">Guardar</SubmitButton>
+                        </form>
+                      </details>
+                    ) : (
+                      <>{line.concept}{quote.status === "AUTORIZADA" && quote.quoteType === "VENTA_EQUIPO" ? (line.authorized ? " · autorizada" : " · no autorizada") : line.authorized ? " · autorizada" : ""}</>
+                    )}
+                  </td>
                   <td>{line.quantity}</td>
                   {priced ? <td>{showBase && line.basePrice != null ? `${money(line.basePrice)} base · final ${money(line.unitPrice)}` : money(line.unitPrice)}</td> : null}
                 </tr>
@@ -404,21 +434,6 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
           ) : null}
         </div>
         <div className="space-y-4">
-          {session.role === "CEO" && quote.technicalCaseId && quote.status === "PENDIENTE_COTIZAR" ? (
-            <FormPanel action={updateGeneratedConceptAction}>
-              <input type="hidden" name="quoteId" value={quote.id} />
-              <input type="hidden" name="version" value={quote.version} />
-              <FormSection title="Ajustar concepto" description="Solo CEO. Corrige la redacción técnica antes de asignar precio." columns={1}>
-                {quote.lines.map((line) => (
-                  <Field key={line.id} label="Concepto">
-                    <input type="hidden" name="lineId" value={line.id} />
-                    <textarea name="concept" required rows={3} defaultValue={line.concept} className={controlClass} />
-                  </Field>
-                ))}
-              </FormSection>
-              <FormActions><SubmitButton tone="ghost">Guardar concepto</SubmitButton></FormActions>
-            </FormPanel>
-          ) : null}
           {quote.status === "PENDIENTE_COTIZAR" && can(session.role, "quote.price", session.activeCompanyCode) ? (
             <FormPanel id="asignar-precio" action={setPricesAction} className="scroll-mt-24">
               <input type="hidden" name="quoteId" value={quote.id} />
