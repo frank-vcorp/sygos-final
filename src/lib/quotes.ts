@@ -234,6 +234,47 @@ export async function setPrices(
   });
 }
 
+/** The CEO may correct the generated wording before a technical quote is priced. */
+export async function updateGeneratedQuoteConcepts(
+  actor: Actor,
+  quoteId: string,
+  version: number,
+  concepts: Array<{ lineId: string; concept: string }>,
+) {
+  if (actor.role !== "CEO") throw new Error("Solo el CEO puede ajustar el concepto de una cotización generada.");
+  const quote = await prisma.quote.findFirst({
+    where: { id: quoteId, companyId: actor.activeCompanyId, technicalCaseId: { not: null }, status: "PENDIENTE_COTIZAR" },
+    include: { lines: true },
+  });
+  if (!quote) throw new Error("Solo se ajusta el concepto de una cotización generada que aún no tiene precio.");
+  if (concepts.length !== quote.lines.length || new Set(concepts.map((item) => item.lineId)).size !== concepts.length) {
+    throw new Error("La cotización tiene conceptos incompletos.");
+  }
+  const changes = concepts.map((item) => {
+    const line = quote.lines.find((candidate) => candidate.id === item.lineId);
+    const concept = item.concept.trim();
+    if (!line || !concept) throw new Error("Cada concepto debe tener una descripción.");
+    return { line, concept };
+  });
+  const changed = changes.filter(({ line, concept }) => line.concept !== concept);
+  if (changed.length === 0) return;
+  await prisma.$transaction(async (tx) => {
+    for (const { line, concept } of changed) {
+      await tx.quoteLine.update({ where: { id: line.id }, data: { concept } });
+    }
+    const updated = await tx.quote.updateMany({ where: { id: quote.id, version }, data: { version: { increment: 1 } } });
+    if (updated.count === 0) throw new ConcurrencyError();
+  });
+  await recordHistory({
+    companyId: actor.activeCompanyId,
+    entityType: "COTIZACION",
+    entityId: quote.id,
+    action: "CONCEPTO",
+    summary: `CEO ajustó el concepto antes de asignar precio: ${changed.map(({ line, concept }) => `${line.concept} → ${concept}`).join(" | ")}.`,
+    authorUserId: actor.userId,
+  });
+}
+
 export async function applyDiscount(actor: Actor, quoteId: string, version: number, discountPct: number) {
   if (!Number.isFinite(discountPct) || discountPct < 0 || discountPct > 100) throw new Error("El descuento no es válido.");
   if (actor.role === "VENTAS") {

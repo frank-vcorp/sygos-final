@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { requestDocumentAction, requestIntercompanyAction } from "@/app/(erp)/facturacion/actions";
-import { decideAction, discountAction, linkBaseAction, relateEquipmentAction, sendQuoteMailAction, setPricesAction } from "../actions";
+import { decideAction, discountAction, linkBaseAction, relateEquipmentAction, sendQuoteMailAction, setPricesAction, updateGeneratedConceptAction } from "../actions";
 import { RelateEquipmentForm } from "@/components/relate-equipment-form";
 import { HistoryTimeline } from "@/components/history-timeline";
 import { QuoteDecisionActions } from "@/components/quote-decision-actions";
@@ -404,6 +404,21 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
           ) : null}
         </div>
         <div className="space-y-4">
+          {session.role === "CEO" && quote.technicalCaseId && quote.status === "PENDIENTE_COTIZAR" ? (
+            <FormPanel action={updateGeneratedConceptAction}>
+              <input type="hidden" name="quoteId" value={quote.id} />
+              <input type="hidden" name="version" value={quote.version} />
+              <FormSection title="Ajustar concepto" description="Solo CEO. Corrige la redacción técnica antes de asignar precio." columns={1}>
+                {quote.lines.map((line) => (
+                  <Field key={line.id} label="Concepto">
+                    <input type="hidden" name="lineId" value={line.id} />
+                    <textarea name="concept" required rows={3} defaultValue={line.concept} className={controlClass} />
+                  </Field>
+                ))}
+              </FormSection>
+              <FormActions><SubmitButton tone="ghost">Guardar concepto</SubmitButton></FormActions>
+            </FormPanel>
+          ) : null}
           {quote.status === "PENDIENTE_COTIZAR" && can(session.role, "quote.price", session.activeCompanyCode) ? (
             <FormPanel id="asignar-precio" action={setPricesAction} className="scroll-mt-24">
               <input type="hidden" name="quoteId" value={quote.id} />

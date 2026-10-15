@@ -5,7 +5,7 @@ import { setFlash } from "@/lib/flash";
 import { clientIdFromForm } from "@/lib/form-quick-entities";
 import { optionalText, parseVersion, requiredText } from "@/lib/form";
 import { can, type Action } from "@/lib/permissions";
-import { QUOTE_TYPES, type QuoteType, applyDiscount, createSellerQuote, decideQuote, linkIntercompanyQuote, prepareQuoteFromCase, relateQuoteEquipment, setPrices } from "@/lib/quotes";
+import { QUOTE_TYPES, type QuoteType, applyDiscount, createSellerQuote, decideQuote, linkIntercompanyQuote, prepareQuoteFromCase, relateQuoteEquipment, setPrices, updateGeneratedQuoteConcepts } from "@/lib/quotes";
 import { sendMail } from "@/lib/sendgrid";
 import { prisma } from "@/lib/db";
 import { requireCompany } from "@/lib/session";
@@ -117,6 +117,25 @@ export async function setPricesAction(formData: FormData) {
     }));
     await setPrices(session, requiredText(formData.get("quoteId"), "Cotización"), parseVersion(formData.get("version")), prices);
     await setFlash({ tone: "ok", message: "Precio asignado." });
+    redirect(target);
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    await setFlash({ tone: "error", message: messageOf(error) });
+    redirect(target);
+  }
+}
+
+export async function updateGeneratedConceptAction(formData: FormData) {
+  "use server";
+  const target = back(formData);
+  try {
+    const session = await guard("quote.price");
+    const concepts = formData.getAll("lineId").map((lineId, index) => ({
+      lineId: String(lineId),
+      concept: requiredText(formData.getAll("concept")[index], "Concepto"),
+    }));
+    await updateGeneratedQuoteConcepts(session, requiredText(formData.get("quoteId"), "Cotización"), parseVersion(formData.get("version")), concepts);
+    await setFlash({ tone: "ok", message: "Concepto actualizado. Ya puedes asignar el precio." });
     redirect(target);
   } catch (error) {
     if (isRedirect(error)) throw error;
