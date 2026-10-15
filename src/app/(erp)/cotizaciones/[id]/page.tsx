@@ -19,6 +19,7 @@ import {
   FormPanel,
   FormSection,
   inlineLinkClass,
+  MoneyInput,
   TextLink,
 } from "@/components/ui";
 import { prisma } from "@/lib/db";
@@ -135,14 +136,13 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
           <label key={line.id} className="grid gap-1">
             <span className="text-xs font-semibold text-[var(--muted)]">{quote.lines.length === 1 ? "Precio" : line.concept}</span>
             <input type="hidden" name="lineId" value={line.id} />
-            <input
+            <MoneyInput
               name="amount"
               required
-              inputMode="decimal"
               aria-label={`Precio de ${line.concept}`}
               defaultValue={referencePrice ?? ""}
-              placeholder="$0.00"
-              className="min-h-11 w-32 rounded-lg border border-[#cbd8e6] bg-white px-3 py-2 text-right text-sm outline-none focus:border-[#087d99] focus-visible:ring-2 focus-visible:ring-[#c7e9f2]"
+              wrapperClassName="w-32"
+              className="text-right"
             />
           </label>
         ))}

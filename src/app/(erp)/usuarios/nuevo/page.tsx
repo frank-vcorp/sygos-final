@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createUserAction } from "../actions";
-import { Button, controlClass, Field, FormActions, FormPanel, FormSection, PageHeader } from "@/components/ui";
+import { Button, controlClass, Field, FormActions, FormPanel, FormSection, MoneyInput, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { companiesForRole, ROLE_LABEL, ROLES, type Role } from "@/lib/roles";
@@ -33,8 +33,8 @@ export default async function NuevoUsuarioPage() {
         </FormSection>
         <FormSection title="Límites opcionales" description="Solo aplican según el rol elegido.">
           <Field label="Límite de descuento (%)" hint="Solo aplica al rol Ventas."><input name="discountLimitPct" className={controlClass} /></Field>
-          <Field label="Presupuesto mensual de compra" hint="Gerente Operativo. Si lo omites, queda en 5000."><input name="monthlyPurchaseBudget" className={controlClass} /></Field>
-          <Field label="Máximo por compra directa" hint="Gerente Operativo. Si lo omites, queda en 2000."><input name="purchaseLimit" className={controlClass} /></Field>
+          <Field label="Presupuesto mensual de compra" hint="Gerente Operativo. Si lo omites, queda en 5000."><MoneyInput name="monthlyPurchaseBudget" /></Field>
+          <Field label="Máximo por compra directa" hint="Gerente Operativo. Si lo omites, queda en 2000."><MoneyInput name="purchaseLimit" /></Field>
         </FormSection>
         <FormActions><Button type="submit">Crear usuario</Button></FormActions>
       </FormPanel>

@@ -238,6 +238,41 @@ export function Field({
 export const controlClass =
   "min-h-11 w-full rounded-lg border border-[#cbd8e6] bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[#087d99] focus-visible:ring-2 focus-visible:ring-[#c7e9f2]";
 
+function moneyDefault(value: string | number | readonly string[] | undefined) {
+  if (typeof value !== "string" && typeof value !== "number") return value ?? "";
+  if (value === "") return "";
+  const numeric = typeof value === "number" ? value : Number(value.replace(/[,$\s]/g, ""));
+  return Number.isFinite(numeric) ? numeric.toFixed(2) : value;
+}
+
+/** Monetary capture stays numeric for forms, while the visual $ prefix and two decimals remain consistent. */
+export function MoneyInput({
+  className = "",
+  defaultValue,
+  wrapperClassName = "",
+  step = "0.01",
+  ...props
+}: Omit<React.ComponentProps<"input">, "type" | "defaultValue" | "step"> & {
+  defaultValue?: string | number | readonly string[];
+  wrapperClassName?: string;
+  step?: string | number;
+}) {
+  return (
+    <span className={`relative block ${wrapperClassName}`.trim()}>
+      <span aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 z-10 -translate-y-1/2 text-sm text-[var(--muted)]">$</span>
+      <input
+        {...props}
+        type="number"
+        step={step}
+        inputMode="decimal"
+        defaultValue={moneyDefault(defaultValue)}
+        placeholder={props.placeholder ?? "0.00"}
+        className={`${controlClass} pl-7 ${className}`.trim()}
+      />
+    </span>
+  );
+}
+
 export function FilterBar({ children, action, className = "" }: { children: React.ReactNode; action: string; className?: string }) {
   return <form className={`mb-4 flex flex-col gap-2 rounded-xl border border-[var(--line)] bg-white p-3 shadow-[0_4px_14px_rgba(20,45,75,0.04)] sm:flex-row sm:flex-wrap sm:items-center ${className}`} action={action}>{children}</form>;
 }

@@ -12,6 +12,7 @@ import {
   FormActions,
   FormPanel,
   FormSection,
+  MoneyInput,
 } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { historyFor } from "@/lib/history";
@@ -58,8 +59,8 @@ export default async function UsuarioDetallePage({ params }: { params: Promise<{
         </FormSection>
         {isPurchaseManager(user.role) ? (
           <FormSection title="Límites de compra" description="Aplican a compras directas del gerente operativo.">
-            <Field label="Presupuesto mensual de compra"><input name="monthlyPurchaseBudget" defaultValue={user.monthlyPurchaseBudget ?? 5000} className={controlClass} /></Field>
-            <Field label="Máximo por compra directa"><input name="purchaseLimit" defaultValue={user.purchaseLimit ?? 2000} className={controlClass} /></Field>
+            <Field label="Presupuesto mensual de compra"><MoneyInput name="monthlyPurchaseBudget" defaultValue={user.monthlyPurchaseBudget ?? 5000} /></Field>
+            <Field label="Máximo por compra directa"><MoneyInput name="purchaseLimit" defaultValue={user.purchaseLimit ?? 2000} /></Field>
           </FormSection>
         ) : null}
         <FormActions><Button type="submit">Guardar</Button></FormActions>

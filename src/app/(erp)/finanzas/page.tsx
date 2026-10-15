@@ -11,6 +11,7 @@ import {
   FormPanel,
   FormSection,
   KpiCard,
+  MoneyInput,
   MobileCard,
   PageHeader,
   ResponsiveData,
@@ -167,7 +168,7 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
                   <option value="TARJETA">Tarjeta</option>
                 </select>
               </Field>
-              <Field label="Saldo o deuda inicial"><input name="opening" type="number" step="0.01" defaultValue="0" className={controlClass} /></Field>
+              <Field label="Saldo o deuda inicial"><MoneyInput name="opening" defaultValue="0" /></Field>
             </FormSection>
             <FormActions><Button type="submit" tone="ghost">Guardar cuenta</Button></FormActions>
           </FormPanel>
@@ -180,7 +181,7 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
                 <Field label="Hacia">
                   <select name="toId" className={controlClass}>{banks.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select>
                 </Field>
-                <Field label="Importe"><input name="amount" type="number" min="0.01" step="0.01" required className={controlClass} /></Field>
+                <Field label="Importe"><MoneyInput name="amount" min="0.01" required /></Field>
               </FormSection>
               <FormActions><Button type="submit" tone="ghost">Transferir</Button></FormActions>
             </FormPanel>
@@ -196,7 +197,7 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
             <Field label="Banco">
               <select name="bankId" className={controlClass}>{banks.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select>
             </Field>
-            <Field label="Importe"><input name="amount" type="number" min="0.01" step="0.01" required className={controlClass} /></Field>
+            <Field label="Importe"><MoneyInput name="amount" min="0.01" required /></Field>
           </FormSection>
           <FormActions><Button type="submit" tone="ghost">Abonar</Button></FormActions>
         </FormPanel>
@@ -220,7 +221,7 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
                         ))}
                       </select>
                     </Field>
-                    <Field label="Importe"><input name="amount" type="number" min="0.01" step="0.01" required className={controlClass} /></Field>
+                    <Field label="Importe"><MoneyInput name="amount" min="0.01" required /></Field>
                   </FormSection>
                   <FormActions><Button type="submit" tone="ghost">Pagar</Button></FormActions>
                 </FormPanel>
@@ -272,7 +273,7 @@ function MovementManualForm({ accounts, className = "" }: { accounts: FinanceAcc
             <option value="INGRESO">Ingreso</option>
           </select>
         </Field>
-        <Field label="Importe"><input name="amount" type="number" min="0.01" step="0.01" required className={controlClass} /></Field>
+        <Field label="Importe"><MoneyInput name="amount" min="0.01" required /></Field>
         <Field label="Categoría"><input name="category" required className={controlClass} /></Field>
         <Field label="Nota"><input name="note" required className={controlClass} /></Field>
         <div className="md:col-span-2">

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { orderAction } from "../actions";
 import { SupplierPicker } from "@/components/supplier-picker";
-import { Button, controlClass, Field, FormActions, FormPanel, FormSection, PageHeader } from "@/components/ui";
+import { Button, controlClass, Field, FormActions, FormPanel, FormSection, MoneyInput, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
@@ -25,7 +25,7 @@ export default async function NuevaOrdenPage() {
           </div>
           <Field label="Concepto"><input name="concept" required className={controlClass} /></Field>
           <Field label="Cantidad"><input name="quantity" type="number" min="1" defaultValue="1" className={controlClass} /></Field>
-          <Field label="Importe estimado"><input name="amount" required type="number" min="0.01" step="0.01" className={controlClass} /></Field>
+          <Field label="Importe estimado"><MoneyInput name="amount" required min="0.01" /></Field>
         </FormSection>
         <FormSection title="Destino" columns={1}>
           <Field label="Destino">

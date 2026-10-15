@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { commissionAdjustAction, commissionPayAction } from "../actions";
-import { Badge, Button, DetailAnchorButton, EntityDetailHeader, EntityMetaItem, MobileCard } from "@/components/ui";
+import { Badge, Button, DetailAnchorButton, EntityDetailHeader, EntityMetaItem, MobileCard, MoneyInput } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
 import { can } from "@/lib/permissions";
@@ -61,7 +61,7 @@ export default async function ComisionPage({ params }: { params: Promise<{ id: s
                   <form action={commissionAdjustAction} className="flex flex-wrap gap-2">
                     <input type="hidden" name="runId" value={row.id} />
                     <input type="hidden" name="lineId" value={line.id} />
-                    <input name="adjustment" type="number" step="0.01" defaultValue={line.adjustment} className="w-28 rounded-md border border-[var(--line)] px-2 py-2" />
+                    <MoneyInput name="adjustment" defaultValue={line.adjustment} wrapperClassName="w-28" className="min-h-9 rounded-md px-2 py-2" />
                     <Button type="submit" tone="ghost">Ajustar</Button>
                   </form>
                 ) : undefined
