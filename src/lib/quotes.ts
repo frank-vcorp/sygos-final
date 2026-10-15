@@ -303,11 +303,10 @@ export async function updateSellerQuoteConceptComplement(
 
 export async function applyDiscount(actor: Actor, quoteId: string, version: number, discountPct: number) {
   if (!Number.isFinite(discountPct) || discountPct < 0 || discountPct > 100) throw new Error("El descuento no es válido.");
-  if (actor.role === "VENTAS") {
-    const user = await prisma.user.findUnique({ where: { id: actor.userId } });
-    const limit = user?.discountLimitPct ?? 0;
-    if (discountPct > limit) throw new Error(`Tu límite de descuento es ${limit}%.`);
-  }
+  if (actor.role !== "VENTAS") throw new Error("Solo el Vendedor puede aplicar descuentos.");
+  const user = await prisma.user.findUnique({ where: { id: actor.userId } });
+  const limit = user?.discountLimitPct ?? 0;
+  if (discountPct > limit) throw new Error(`Tu límite de descuento es ${limit}%.`);
   const updated = await prisma.quote.updateMany({
     where: { id: quoteId, companyId: actor.activeCompanyId, status: "PENDIENTE_DECISION", version },
     data: { discountPct, version: { increment: 1 } },

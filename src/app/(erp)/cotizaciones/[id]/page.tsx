@@ -53,7 +53,9 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
     : null;
   const [history, seller, source] = await Promise.all([
     historyFor("COTIZACION", quote.id),
-    prisma.user.findUnique({ where: { id: session.userId }, select: { discountLimitPct: true } }),
+    session.role === "VENTAS"
+      ? prisma.user.findUnique({ where: { id: session.userId }, select: { discountLimitPct: true } })
+      : Promise.resolve(null),
     quote.technicalCaseId
       ? prisma.technicalCase.findUnique({ where: { id: quote.technicalCaseId }, include: { attention: true } })
       : null,
@@ -477,7 +479,7 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
           ) : null}
         </div>
         <div className="space-y-4">
-          {quote.status === "PENDIENTE_DECISION" && can(session.role, "quote.follow", session.activeCompanyCode) ? (
+          {quote.status === "PENDIENTE_DECISION" && session.role === "VENTAS" && can(session.role, "quote.follow", session.activeCompanyCode) ? (
             <>
               <FormPanel action={discountAction}>
                 <input type="hidden" name="quoteId" value={quote.id} />
