@@ -8,10 +8,12 @@ export type HistoryTimelineItem = {
 export function HistoryTimeline({
   items,
   title = "Historial",
+  description = "Cambios y decisiones registrados.",
   className = "",
 }: {
   items: HistoryTimelineItem[];
   title?: string;
+  description?: string;
   className?: string;
 }) {
   return (
@@ -19,7 +21,7 @@ export function HistoryTimeline({
       <header className="flex items-center justify-between border-b border-[var(--line)] bg-[#f7fafc] px-5 py-4">
         <div>
           <h2 className="font-semibold text-[#0b1f3a]">{title}</h2>
-          <p className="mt-0.5 text-xs text-[var(--muted)]">Cambios y decisiones registrados.</p>
+          <p className="mt-0.5 text-xs text-[var(--muted)]">{description}</p>
         </div>
         <span className="rounded-full bg-[var(--accent-soft)] px-2.5 py-1 text-xs font-bold text-[var(--accent)]">{items.length}</span>
       </header>
