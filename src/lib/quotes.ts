@@ -229,6 +229,7 @@ export async function decideQuote(
   version: number,
   authorized: boolean,
   lineIds: string[],
+  rejectionReason?: string | null,
 ) {
   const quote = await prisma.quote.findFirst({
     where: { id: quoteId, companyId: actor.activeCompanyId },
@@ -236,6 +237,7 @@ export async function decideQuote(
   });
   if (!quote || quote.status !== "PENDIENTE_DECISION") throw new Error("La cotización no está pendiente de decisión.");
   if (quote.lines.some((line) => line.unitPrice == null)) throw new Error("Falta el precio.");
+  if (!authorized && !rejectionReason) throw new Error("Indica por qué el cliente no autorizó la cotización.");
   const chosen = authorized ? quote.lines.filter((line) => quote.quoteType !== "VENTA_EQUIPO" || lineIds.includes(line.id)) : [];
   if (authorized && chosen.length === 0) throw new Error("Selecciona al menos una línea autorizada.");
   const serviceQuote = quote.quoteType === "DIAGNOSTICO" || quote.quoteType === "REPARACION";
@@ -284,7 +286,9 @@ export async function decideQuote(
     entityType: "COTIZACION",
     entityId: quote.id,
     action: "DECISION",
-    summary: authorized ? `Decisión: ${status}. El crédito queda congelado.` : "El cliente no autorizó. Se conserva el historial.",
+    summary: authorized
+      ? `Decisión: ${status}. El crédito queda congelado.`
+      : `El cliente no autorizó. Motivo: ${rejectionReason}. Se conserva el historial.`,
     authorUserId: actor.userId,
   });
   if (!authorized && diagnosis?.kind === "DIAGNOSTICO") {

@@ -3,7 +3,8 @@ import { requestDocumentAction, requestIntercompanyAction } from "@/app/(erp)/fa
 import { decideAction, discountAction, linkBaseAction, relateEquipmentAction, sendQuoteMailAction, setPricesAction } from "../actions";
 import { RelateEquipmentForm } from "@/components/relate-equipment-form";
 import { HistoryTimeline } from "@/components/history-timeline";
-import { ConfirmSubmit, SubmitButton } from "@/components/submit-button";
+import { QuoteDecisionActions } from "@/components/quote-decision-actions";
+import { SubmitButton } from "@/components/submit-button";
 import {
   Badge,
   Button,
@@ -83,7 +84,15 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
   if (quote.status === "PENDIENTE_COTIZAR" && can(session.role, "quote.price", session.activeCompanyCode)) {
     primaryAction = <DetailAnchorButton href="#asignar-precio">Asignar precio</DetailAnchorButton>;
   } else if (quote.status === "PENDIENTE_DECISION" && can(session.role, "quote.follow", session.activeCompanyCode)) {
-    primaryAction = <DetailAnchorButton href="#decision-cliente">Registrar decisión del cliente</DetailAnchorButton>;
+    primaryAction = (
+      <QuoteDecisionActions
+        quoteId={quote.id}
+        version={quote.version}
+        quoteType={quote.quoteType}
+        lines={quote.lines.map((line) => ({ id: line.id, concept: line.concept }))}
+        decideAction={decideAction}
+      />
+    );
   } else if (waitingEquipment && can(session.role, "quote.follow", session.activeCompanyCode)) {
     primaryAction = <DetailAnchorButton href="#relacionar-equipo">Relacionar equipo</DetailAnchorButton>;
   }
@@ -212,29 +221,6 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
                   </Field>
                 </FormSection>
                 <FormActions><SubmitButton tone="ghost">Aplicar</SubmitButton></FormActions>
-              </FormPanel>
-              <FormPanel id="decision-cliente" action={decideAction} className="scroll-mt-24">
-                <input type="hidden" name="quoteId" value={quote.id} />
-                <input type="hidden" name="version" value={quote.version} />
-                <FormSection title="Decisión del cliente" columns={1}>
-                  {quote.quoteType === "VENTA_EQUIPO" ? (
-                    <div className="grid gap-1">
-                      <p className="text-xs text-[var(--muted)]">Marca las líneas que el cliente autorizó.</p>
-                      {quote.lines.map((line) => (
-                        <label key={line.id} className="flex items-center gap-2 text-sm"><input type="checkbox" name="authorizedLine" value={line.id} /> {line.concept}</label>
-                      ))}
-                    </div>
-                  ) : null}
-                  <Field label="Resultado">
-                    <select name="decision" className={controlClass}>
-                      <option value="si">Autorizada</option>
-                      <option value="no">No autorizada</option>
-                    </select>
-                  </Field>
-                </FormSection>
-                <FormActions>
-                  <ConfirmSubmit tone="primary" message="Se registrará la decisión del cliente. Revisa que sea la correcta.">Registrar decisión</ConfirmSubmit>
-                </FormActions>
               </FormPanel>
             </>
           ) : null}

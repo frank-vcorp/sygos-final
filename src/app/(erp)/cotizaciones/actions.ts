@@ -151,6 +151,7 @@ export async function decideAction(formData: FormData) {
       parseVersion(formData.get("version")),
       formData.get("decision") === "si",
       formData.getAll("authorizedLine").map(String),
+      optionalText(formData.get("reason")),
     );
     await setFlash({ tone: "ok", message: "Decisión registrada." });
     redirect(target);
