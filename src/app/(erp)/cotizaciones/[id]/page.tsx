@@ -4,6 +4,7 @@ import { decideAction, discountAction, linkBaseAction, relateEquipmentAction, se
 import { RelateEquipmentForm } from "@/components/relate-equipment-form";
 import { HistoryTimeline } from "@/components/history-timeline";
 import { QuoteDecisionActions } from "@/components/quote-decision-actions";
+import { QuoteSellerDecisionDiscountPanel, QuoteSellerDecisionHeaderActions, QuoteSellerDecisionRoot } from "@/components/quote-seller-decision";
 import { QuoteConcept } from "@/components/quote-concept";
 import { SubmitButton } from "@/components/submit-button";
 import {
@@ -131,6 +132,10 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
   const canEditSellerConceptComplement = session.role === "VENTAS"
     && quote.sellerUserId === session.userId
     && ["PENDIENTE_COTIZAR", "PENDIENTE_DECISION"].includes(quote.status);
+  const sellerPendingDecision =
+    quote.status === "PENDIENTE_DECISION"
+    && session.role === "VENTAS"
+    && can(session.role, "quote.follow", session.activeCompanyCode);
 
   let primaryAction: React.ReactNode = null;
   if (quote.status === "PENDIENTE_COTIZAR" && can(session.role, "quote.price", session.activeCompanyCode)) {
@@ -155,7 +160,7 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
         <SubmitButton>Asignar precio</SubmitButton>
       </form>
     );
-  } else if (quote.status === "PENDIENTE_DECISION" && can(session.role, "quote.follow", session.activeCompanyCode)) {
+  } else if (quote.status === "PENDIENTE_DECISION" && can(session.role, "quote.follow", session.activeCompanyCode) && !sellerPendingDecision) {
     primaryAction = (
       <QuoteDecisionActions
         quoteId={quote.id}
@@ -165,6 +170,8 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
         decideAction={decideAction}
       />
     );
+  } else if (sellerPendingDecision) {
+    primaryAction = <QuoteSellerDecisionHeaderActions />;
   } else if (waitingEquipment && can(session.role, "quote.follow", session.activeCompanyCode)) {
     primaryAction = <DetailAnchorButton href="#relacionar-equipo">Relacionar equipo</DetailAnchorButton>;
   }
@@ -276,7 +283,7 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
       ].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
     : [];
 
-  return (
+  const pageBody = (
     <>
       <EntityDetailHeader
         back={{ href: "/cotizaciones", label: "Cotizaciones" }}
@@ -479,20 +486,7 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
           ) : null}
         </div>
         <div className="space-y-4">
-          {quote.status === "PENDIENTE_DECISION" && session.role === "VENTAS" && can(session.role, "quote.follow", session.activeCompanyCode) ? (
-            <>
-              <FormPanel action={discountAction}>
-                <input type="hidden" name="quoteId" value={quote.id} />
-                <input type="hidden" name="version" value={quote.version} />
-                <FormSection title="Descuento" columns={1}>
-                  <Field label="Porcentaje" hint={seller?.discountLimitPct != null ? `Tu límite es ${seller.discountLimitPct}%.` : "Tu usuario no tiene un tope de descuento."}>
-                    <input name="discountPct" required defaultValue={quote.discountPct} className={controlClass} />
-                  </Field>
-                </FormSection>
-                <FormActions><SubmitButton tone="ghost">Aplicar</SubmitButton></FormActions>
-              </FormPanel>
-            </>
-          ) : null}
+          {sellerPendingDecision ? <QuoteSellerDecisionDiscountPanel /> : null}
           {waitingEquipment && can(session.role, "quote.follow", session.activeCompanyCode) ? (
             <div id="relacionar-equipo" className="scroll-mt-24">
             <RelateEquipmentForm
@@ -533,4 +527,23 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
       </DetailGrid>
     </>
   );
+
+  if (sellerPendingDecision) {
+    return (
+      <QuoteSellerDecisionRoot
+        quoteId={quote.id}
+        version={quote.version}
+        quoteType={quote.quoteType}
+        lines={quote.lines.map((line) => ({ id: line.id, concept: line.concept }))}
+        initialDiscountPct={quote.discountPct}
+        discountLimitPct={seller?.discountLimitPct ?? null}
+        decideAction={decideAction}
+        discountAction={discountAction}
+      >
+        {pageBody}
+      </QuoteSellerDecisionRoot>
+    );
+  }
+
+  return pageBody;
 }

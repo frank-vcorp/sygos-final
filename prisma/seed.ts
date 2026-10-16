@@ -210,6 +210,7 @@ async function ensureVerificationUsers(systronId: string, servomotoresId: string
       active: true,
       monthlyPurchaseBudget: isPurchaseManager(profile.role) ? DEFAULT_MONTHLY_PURCHASE : null,
       purchaseLimit: isPurchaseManager(profile.role) ? DEFAULT_PURCHASE_LIMIT : null,
+      discountLimitPct: profile.role === "VENTAS" ? 15 : null,
     };
     if (!existing) {
       await prisma.user.create({ data: { username: profile.username, passwordHash: hashPassword(password), ...data } });

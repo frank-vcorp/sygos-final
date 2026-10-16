@@ -21,12 +21,15 @@ export function QuoteDecisionActions({
   quoteType,
   lines,
   decideAction,
+  discountPct = 0,
 }: {
   quoteId: string;
   version: number;
   quoteType: string;
   lines: QuoteLine[];
   decideAction: DecideAction;
+  /** Descuento comercial vigente; se guarda al autorizar si el vendedor no pulsó Aplicar antes. */
+  discountPct?: number;
 }) {
   const [open, setOpen] = useState<null | "authorize" | "reject">(null);
   const needsLineSelection = quoteType === "VENTA_EQUIPO";
@@ -41,6 +44,7 @@ export function QuoteDecisionActions({
             <input type="hidden" name="quoteId" value={quoteId} />
             <input type="hidden" name="version" value={version} />
             <input type="hidden" name="decision" value="si" />
+            <input type="hidden" name="discountPct" value={discountPct} />
             <Button type="submit">Autorizada</Button>
           </form>
         )}
@@ -57,6 +61,7 @@ export function QuoteDecisionActions({
           <input type="hidden" name="quoteId" value={quoteId} />
           <input type="hidden" name="version" value={version} />
           <input type="hidden" name="decision" value="si" />
+          <input type="hidden" name="discountPct" value={discountPct} />
           <div className="grid gap-2">
             <p className="text-sm text-[var(--muted)]">Selecciona los conceptos que autorizó el cliente.</p>
             {lines.map((line) => (

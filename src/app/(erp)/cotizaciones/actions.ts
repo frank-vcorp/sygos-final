@@ -184,6 +184,8 @@ export async function decideAction(formData: FormData) {
   const target = back(formData);
   try {
     const session = await guard("quote.follow");
+    const rawDiscount = optionalText(formData.get("discountPct"));
+    const discountPct = rawDiscount != null && rawDiscount !== "" ? Number(rawDiscount) : null;
     await decideQuote(
       session,
       requiredText(formData.get("quoteId"), "Cotización"),
@@ -191,6 +193,7 @@ export async function decideAction(formData: FormData) {
       formData.get("decision") === "si",
       formData.getAll("authorizedLine").map(String),
       optionalText(formData.get("reason")),
+      discountPct,
     );
     await setFlash({ tone: "ok", message: "Decisión registrada." });
     redirect(target);
