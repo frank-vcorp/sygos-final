@@ -43,6 +43,12 @@ export async function requestFromQuote(actor: Actor, quoteId: string, kind: "FAC
   });
   if (!quote || quote.status !== "AUTORIZADA") throw new Error("Solo se solicita documento de una cotización autorizada.");
   if (actor.role === "VENTAS" && quote.sellerUserId !== actor.userId) throw new Error(SALES_NOT_ASSIGNED_MESSAGE);
+  if (quote.client.requiresInvoice === true && kind === "REMISION") {
+    throw new Error("Este cliente requiere factura (CFDI).");
+  }
+  if (quote.client.requiresInvoice !== true && kind === "FACTURA") {
+    throw new Error("Este cliente no está marcado como que requiere factura; usa remisión.");
+  }
   const totals = quoteTotals(linesForTotal(quote.lines, quote.quoteType, quote.status), quote.discountPct);
   if (!totals) throw new Error("La cotización no tiene importe.");
   const used = await invoicedTotal(quote.id);

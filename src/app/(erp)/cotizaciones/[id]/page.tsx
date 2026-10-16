@@ -424,18 +424,13 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
                   <Button type="submit" tone="ghost">Solicitar factura a SYSTRON</Button>
                 </form>
               ) : !quote.client.isSystem ? (
-                <>
-                  <form action={requestDocumentAction}>
-                    <input type="hidden" name="quoteId" value={quote.id} />
-                    <input type="hidden" name="kind" value="FACTURA" />
-                    <Button type="submit" tone="ghost">Solicitar factura</Button>
-                  </form>
-                  <form action={requestDocumentAction}>
-                    <input type="hidden" name="quoteId" value={quote.id} />
-                    <input type="hidden" name="kind" value="REMISION" />
-                    <Button type="submit" tone="ghost">Solicitar remisión</Button>
-                  </form>
-                </>
+                <form action={requestDocumentAction}>
+                  <input type="hidden" name="quoteId" value={quote.id} />
+                  <input type="hidden" name="kind" value={quote.client.requiresInvoice ? "FACTURA" : "REMISION"} />
+                  <Button type="submit" tone="ghost">
+                    {quote.client.requiresInvoice ? "Solicitar factura" : "Solicitar remisión"}
+                  </Button>
+                </form>
               ) : null}
             </div>
           ) : null}
