@@ -64,9 +64,13 @@ export function EntityDetailHeader({
         </div>
         {meta ? <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">{meta}</div> : null}
         {primaryAction || secondaryActions ? (
-          <div className="mt-4 flex flex-col gap-3 border-t border-[var(--line)] pt-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-            <div className="flex flex-wrap gap-2">{primaryAction}</div>
-            {secondaryActions ? <div className="flex flex-wrap items-center gap-3 text-sm">{secondaryActions}</div> : null}
+          <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-[var(--line)] pt-4">
+            {primaryAction ? <div className="flex flex-wrap items-center gap-2">{primaryAction}</div> : null}
+            {secondaryActions ? (
+              <div className={`flex min-w-0 flex-wrap items-center gap-2 text-sm ${primaryAction ? "sm:ml-auto" : ""}`}>
+                {secondaryActions}
+              </div>
+            ) : null}
           </div>
         ) : null}
       </div>

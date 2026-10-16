@@ -20,7 +20,7 @@ import {
 } from "../actions";
 import { ClientNameLink } from "@/components/client-entity-links";
 import { DiagnosisValidationActions } from "@/components/diagnosis-validation-actions";
-import { HistoryTimeline } from "@/components/history-timeline";
+import { HistoryTimeline, type HistoryTimelineItem } from "@/components/history-timeline";
 import {
   Badge,
   Button,
@@ -38,6 +38,7 @@ import {
 } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
+import { buildAttentionHistoryTimeline, seesFullAttentionHistory } from "@/lib/attention-history";
 import { historyFor } from "@/lib/history";
 import { can } from "@/lib/permissions";
 import { ATTENTION_LABEL, type AttentionType } from "@/lib/priorities";
@@ -98,8 +99,8 @@ export default async function OperacionDetallePage({ params }: { params: Promise
       ? suggestedAssigneeRaw
       : null;
   const defaultAssigneeId = row.assigneeUserId ?? suggestedAssigneeId ?? "";
-  const history = await historyFor("OPERACION", row.id);
-  const [seller, relatedQuotes, relatedBilling, relatedSales] = await Promise.all([
+  const [caseHistory, seller, relatedQuotes, relatedBilling, relatedSales] = await Promise.all([
+    historyFor("OPERACION", row.id),
     row.attention.sellerUserId
       ? prisma.user.findUnique({ where: { id: row.attention.sellerUserId }, select: { id: true, name: true } })
       : null,
@@ -124,6 +125,63 @@ export default async function OperacionDetallePage({ params }: { params: Promise
       orderBy: { createdAt: "asc" },
     }),
   ]);
+  const caseHistoryItems: HistoryTimelineItem[] = caseHistory.map((item) => ({
+    id: item.id,
+    createdAt: item.createdAt,
+    summary: item.summary,
+    authorName: item.author?.name,
+  }));
+  let historyTimelineItems: HistoryTimelineItem[] = caseHistoryItems;
+  if (seesFullAttentionHistory(session.role)) {
+    const attentionContext = await prisma.attention.findUnique({
+      where: { id: row.attentionId },
+      include: {
+        movements: { where: { cancelledAt: null }, orderBy: { occurredAt: "asc" } },
+        technicalCases: { orderBy: { createdAt: "asc" }, select: { id: true, folio: true, kind: true, status: true, createdAt: true } },
+      },
+    });
+    if (attentionContext) {
+      const caseIds = attentionContext.technicalCases.map((item) => item.id);
+      const quoteIds = relatedQuotes.map((item) => item.id);
+      const [attentionHistory, operationHistory, quoteHistoryRows] = await Promise.all([
+        historyFor("ATENCION", attentionContext.id),
+        prisma.functionalHistory.findMany({
+          where: { entityType: "OPERACION", entityId: { in: caseIds } },
+          orderBy: { createdAt: "asc" },
+          include: { author: { select: { name: true } } },
+        }),
+        quoteIds.length > 0
+          ? prisma.functionalHistory.findMany({
+              where: { entityType: "COTIZACION", entityId: { in: quoteIds } },
+              orderBy: { createdAt: "asc" },
+              include: { author: { select: { name: true } } },
+            })
+          : Promise.resolve([]),
+      ]);
+      const quoteFolioById = new Map(relatedQuotes.map((item) => [item.id, item.folio]));
+      const quoteHistories = quoteIds.map((quoteId) => ({
+        quoteFolio: quoteFolioById.get(quoteId) ?? "Cotización",
+        items: quoteHistoryRows.filter((item) => item.entityId === quoteId),
+      }));
+      const authorIds = [
+        attentionContext.createdByUserId,
+        ...attentionContext.movements.map((item) => item.authorUserId),
+      ].filter((id): id is string => Boolean(id));
+      const authorRows = authorIds.length > 0
+        ? await prisma.user.findMany({ where: { id: { in: authorIds } }, select: { id: true, name: true } })
+        : [];
+      const authorNames = new Map(authorRows.map((item) => [item.id, item.name]));
+      historyTimelineItems = buildAttentionHistoryTimeline({
+        attention: attentionContext,
+        movements: attentionContext.movements,
+        technicalCases: attentionContext.technicalCases,
+        attentionHistory,
+        operationHistory,
+        quoteHistories,
+        authorNames,
+      });
+    }
+  }
   const repairAfterDiagnosis = row.kind === "OS" && row.attention.attentionType === "DIAGNOSTICO";
   const equipmentHref = row.equipment.kind === "MOT" ? `/motores/${row.equipmentId}` : `/equipos/${row.equipmentId}`;
   const historial = (HISTORIAL_CASE as readonly string[]).includes(row.status);
@@ -170,29 +228,29 @@ export default async function OperacionDetallePage({ params }: { params: Promise
       : []),
   ];
 
+  const headerAssignmentForm = showHeaderAssignment ? (
+    <form action={assignCaseAction} className="inline-flex max-w-full items-center gap-2">
+      <input type="hidden" name="caseId" value={row.id} />
+      <input type="hidden" name="version" value={row.version} />
+      <select
+        name="assigneeUserId"
+        required
+        aria-label="Técnico responsable"
+        className={`${controlClass} min-h-9 min-w-[9.5rem] max-w-[11rem] py-1.5 text-sm`}
+        defaultValue={defaultAssigneeId}
+      >
+        {!defaultAssigneeId ? <option value="">Técnico</option> : null}
+        {candidates.map((user) => (
+          <option key={user.id} value={user.id}>{user.name}</option>
+        ))}
+      </select>
+      <Button type="submit" className="min-h-9 shrink-0 px-3 py-1.5 text-sm">Asignar</Button>
+    </form>
+  ) : null;
+
   let primaryAction: React.ReactNode = null;
   if (!readOnly) {
-    if (showHeaderAssignment) {
-      primaryAction = (
-        <form action={assignCaseAction} className="flex flex-wrap items-center gap-2">
-          <input type="hidden" name="caseId" value={row.id} />
-          <input type="hidden" name="version" value={row.version} />
-          <select
-            name="assigneeUserId"
-            required
-            aria-label="Técnico responsable"
-            className={`${controlClass} min-h-11 min-w-[12rem] max-w-full sm:min-w-[14rem]`}
-            defaultValue={defaultAssigneeId}
-          >
-            {!defaultAssigneeId ? <option value="">Selecciona técnico</option> : null}
-            {candidates.map((user) => (
-              <option key={user.id} value={user.id}>{user.name}</option>
-            ))}
-          </select>
-          <Button type="submit">Asignar</Button>
-        </form>
-      );
-    } else if (canStartPending) {
+    if (canStartPending) {
       primaryAction = (
         <form action={startCaseAction} className="inline">
           <input type="hidden" name="caseId" value={row.id} />
@@ -396,13 +454,16 @@ export default async function OperacionDetallePage({ params }: { params: Promise
         }
         primaryAction={primaryAction}
         secondaryActions={
-          <nav className="flex max-w-full flex-wrap gap-2" aria-label="Relaciones de la atención">
-            {relatedLinks.map((item) => (
-              <Link key={item.href} href={item.href} className="rounded-full border border-[var(--line)] bg-white px-3 py-1.5 text-xs font-semibold text-[#38506c] transition hover:border-[#91b7cf] hover:text-[var(--accent)]">
-                {item.label}
-              </Link>
-            ))}
-          </nav>
+          <>
+            <nav className="flex max-w-full flex-wrap items-center gap-2" aria-label="Relaciones de la atención">
+              {relatedLinks.map((item) => (
+                <Link key={item.href} href={item.href} className="rounded-full border border-[var(--line)] bg-white px-3 py-1.5 text-xs font-semibold text-[#38506c] transition hover:border-[#91b7cf] hover:text-[var(--accent)]">
+                  {item.label}
+                </Link>
+              ))}
+            </nav>
+            {headerAssignmentForm}
+          </>
         }
       />
       {readOnly ? <p className="mb-4 text-sm text-[var(--muted)]">Consulta de solo lectura. SYSTRON no modifica el estado ni la bitácora de Servomotores.</p> : null}
@@ -430,7 +491,15 @@ export default async function OperacionDetallePage({ params }: { params: Promise
           <div id="refacciones" className="scroll-mt-6">{partsSection}</div>
         </div>
         <aside className="space-y-4 lg:sticky lg:top-4 lg:self-start">
-          <HistoryTimeline items={history.map((item) => ({ id: item.id, createdAt: item.createdAt, summary: item.summary, authorName: item.author?.name }))} />
+          <HistoryTimeline
+            items={historyTimelineItems}
+            title={historyTimelineItems.length > caseHistoryItems.length ? "Historial completo" : undefined}
+            description={
+              historyTimelineItems.length > caseHistoryItems.length
+                ? "Atención, movimientos, diagnóstico, cotización y esta operación."
+                : undefined
+            }
+          />
           {false ? (
             <>
           {row.kind === "DIAGNOSTICO" ? (
