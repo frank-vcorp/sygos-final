@@ -20,6 +20,8 @@ import {
 } from "../actions";
 import { ClientNameLink } from "@/components/client-entity-links";
 import { DiagnosisValidationActions } from "@/components/diagnosis-validation-actions";
+import { RepairClosureActions } from "@/components/repair-closure-actions";
+import { SupervisorReassignControl } from "@/components/supervisor-reassign-control";
 import { HistoryTimeline, type HistoryTimelineItem } from "@/components/history-timeline";
 import {
   Badge,
@@ -199,7 +201,12 @@ export default async function OperacionDetallePage({ params }: { params: Promise
       : session.role === "SUPERVISOR_TECNICO"
         ? row.assigneeUserId === session.userId
         : canWork);
-  const showHeaderAssignment = canManage && !closed && awaitingStart;
+  const showInitialAssignment = canManage && !closed && awaitingStart && !row.assigneeUserId;
+  const showSupervisorReassign =
+    !readOnly
+    && session.role === "SUPERVISOR_TECNICO"
+    && !closed
+    && Boolean(row.assigneeUserId);
   const presolicitudOnly = fieldPresolicitudOnly(session.role);
   const canEditPresolicitud =
     !readOnly &&
@@ -228,7 +235,7 @@ export default async function OperacionDetallePage({ params }: { params: Promise
       : []),
   ];
 
-  const headerAssignmentForm = showHeaderAssignment ? (
+  const headerAssignmentForm = showInitialAssignment ? (
     <form action={assignCaseAction} className="inline-flex max-w-full items-center gap-2">
       <input type="hidden" name="caseId" value={row.id} />
       <input type="hidden" name="version" value={row.version} />
@@ -280,7 +287,13 @@ export default async function OperacionDetallePage({ params }: { params: Promise
         />
       );
     } else if (canWork && row.kind === "OS" && ["EN_REPARACION", "EN_ESPERA_REFACCIONES"].includes(row.status)) {
-      primaryAction = <DetailAnchorButton href="#cerrar-reparacion">Terminar reparación</DetailAnchorButton>;
+      primaryAction = (
+        <RepairClosureActions
+          caseId={row.id}
+          version={row.version}
+          finishRepairAction={finishRepairAction}
+        />
+      );
     } else if (row.quotePending && can(session.role, "quote.price", session.activeCompanyCode)) {
       primaryAction = (
         <form action={prepareFromCaseAction} className="inline">
@@ -444,7 +457,20 @@ export default async function OperacionDetallePage({ params }: { params: Promise
               />
             </EntityMetaItem>
             <EntityMetaItem label="Vendedor">{seller?.name ?? "Sin vendedor asignado"}</EntityMetaItem>
-            <EntityMetaItem label="Responsable">{row.assignee?.name ?? "Sin asignar"}</EntityMetaItem>
+            <EntityMetaItem label="Responsable">
+              <span className="inline-flex flex-wrap items-center gap-x-1">
+                {row.assignee?.name ?? "Sin asignar"}
+                {showSupervisorReassign && row.assigneeUserId ? (
+                  <SupervisorReassignControl
+                    caseId={row.id}
+                    version={row.version}
+                    assigneeUserId={row.assigneeUserId}
+                    candidates={candidates}
+                    assignCaseAction={assignCaseAction}
+                  />
+                ) : null}
+              </span>
+            </EntityMetaItem>
             <EntityMetaItem label="Prioridad">{row.attention.priorityName}</EntityMetaItem>
             <EntityMetaItem label="SLA">{row.slaDueAt ? formatWhen(row.slaDueAt) : "Aún no inicia"}</EntityMetaItem>
             <EntityMetaItem label="Atención">
@@ -642,24 +668,6 @@ export default async function OperacionDetallePage({ params }: { params: Promise
           ) : null}
           {!readOnly ? (
             <>
-            {canWork && row.kind === "OS" && ["EN_REPARACION", "EN_ESPERA_REFACCIONES"].includes(row.status) ? (
-              <FormPanel id="cerrar-reparacion" action={finishRepairAction} className="scroll-mt-24">
-                <input type="hidden" name="caseId" value={row.id} />
-                <input type="hidden" name="version" value={row.version} />
-                <FormSection title="Cierre técnico" columns={1}>
-                  <Field label="Resultado">
-                    <select name="outcome" className={controlClass}>
-                      <option value="TERMINADA">Reparación terminada</option>
-                      <option value="SIN_REPARACION">Sin reparación</option>
-                    </select>
-                  </Field>
-                  <Field label="Resumen">
-                    <textarea name="resultText" required rows={3} className={controlClass} />
-                  </Field>
-                </FormSection>
-                <FormActions><Button type="submit">Cerrar técnicamente</Button></FormActions>
-              </FormPanel>
-            ) : null}
             {closed && canManage ? (
               <FormPanel action={reopenAction}>
                 <input type="hidden" name="caseId" value={row.id} />
