@@ -99,6 +99,8 @@ export function MovementForm({
   allowQuickSupplier = false,
   variant = "card",
   receiptPreset,
+  formId,
+  hideSubmit = false,
 }: {
   equipmentId: string;
   equipmentFolio: string;
@@ -108,6 +110,8 @@ export function MovementForm({
   suppliers: Array<{ id: string; name: string }>;
   allowQuickSupplier?: boolean;
   variant?: "card" | "plain";
+  formId?: string;
+  hideSubmit?: boolean;
   receiptPreset?: {
     movement: MovementKind;
     reason: string;
@@ -140,16 +144,16 @@ export function MovementForm({
     );
     if (variant === "card") {
       return (
-        <FormPanel action={movementAction}>
+        <FormPanel action={movementAction} id={formId}>
           {body}
-          <FormActions><Button type="submit">Confirmar {MOVEMENT_LABEL[receiptPreset.movement].toLowerCase()} física</Button></FormActions>
+          {hideSubmit ? null : <FormActions><Button type="submit">Confirmar {MOVEMENT_LABEL[receiptPreset.movement].toLowerCase()} física</Button></FormActions>}
         </FormPanel>
       );
     }
     return (
-      <form action={movementAction} className="grid gap-3">
+      <form action={movementAction} id={formId} className="grid gap-3">
         {body}
-        <Button type="submit">Confirmar {MOVEMENT_LABEL[receiptPreset.movement].toLowerCase()} física</Button>
+        {hideSubmit ? null : <Button type="submit">Confirmar {MOVEMENT_LABEL[receiptPreset.movement].toLowerCase()} física</Button>}
       </form>
     );
   }

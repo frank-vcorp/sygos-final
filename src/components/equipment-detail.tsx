@@ -4,7 +4,7 @@ import { AttentionForm, CancelMovementForm, MovementForm } from "@/components/cu
 import { EquipmentCustodyActions } from "@/components/equipment-custody-actions";
 import { EquipmentLabel } from "@/components/equipment-label";
 import { HistoryTimeline } from "@/components/history-timeline";
-import { Badge, Card, DetailAnchorButton, EntityDetailHeader, EntityMetaItem, MobileCard, Table, Td, TextLink, Th } from "@/components/ui";
+import { Badge, Card, DetailAnchorButton, DetailFormSubmitButton, EntityDetailHeader, EntityMetaItem, MobileCard, Table, Td, TextLink, Th } from "@/components/ui";
 import { allowedMovements, CUSTODY_LABEL, isInitialWarehouseReceipt, isReceipt, MOVEMENT_LABEL, receiptReasonFromAttention, type Custody, type MovementKind } from "@/lib/custody";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
@@ -111,15 +111,42 @@ export async function EquipmentDetail({ id, expectedKind, showLabel = false }: {
   const activeServiceLabel = openAttention
     ? ATTENTION_LABEL[openAttention.attentionType as AttentionType] ?? openAttention.attentionType
     : null;
+  const receiptPreset =
+    simplifiedReceipt && receiptMovement && openAttention && receiptReason
+      ? {
+          movement: receiptMovement,
+          reason: receiptReason,
+          serviceLabel: ATTENTION_LABEL[openAttention.attentionType as AttentionType] ?? openAttention.attentionType,
+          reportedFault: openAttention.reportedFault,
+          clientName: intercompany ? "SYSTRON · intercompañía" : equipment.client.name,
+        }
+      : undefined;
 
   const backLabel = listHref === "/custodia" ? "Almacén" : expectedKind === "EQUI" ? "Equipos" : "Motores";
+  const warehouseReceiptFormId = "warehouse-receipt-form";
+  const oneStepWarehouseReceipt =
+    custodyDetail && canMove && simplifiedReceipt && !awaitingAttentionForReceipt;
   let primaryAction: React.ReactNode = null;
   if (awaitingAttentionForReceipt && canAttend) {
     primaryAction = <DetailAnchorButton href="#custodia-equipo">Crear atención</DetailAnchorButton>;
+  } else if (oneStepWarehouseReceipt) {
+    primaryAction = <DetailFormSubmitButton form={warehouseReceiptFormId}>Confirmar entrada física</DetailFormSubmitButton>;
   } else if (canMove && simplifiedReceipt && !awaitingAttentionForReceipt) {
     primaryAction = <DetailAnchorButton href="#custodia-equipo">Confirmar entrada física</DetailAnchorButton>;
   } else if (canMove && movementOptions.length > 0 && !awaitingAttentionForReceipt) {
     primaryAction = <DetailAnchorButton href="#custodia-equipo">Registrar movimiento</DetailAnchorButton>;
+  }
+  let custodyPrimaryAction: React.ReactNode = null;
+  if (custodyDetail && !awaitingAttentionForReceipt) {
+    if (oneStepWarehouseReceipt) {
+      custodyPrimaryAction = primaryAction;
+    } else if (canMove && movementOptions.length > 0) {
+      custodyPrimaryAction = (
+        <DetailAnchorButton href="#custodia-equipo">
+          {simplifiedReceipt ? "Confirmar entrada física" : "Registrar movimiento"}
+        </DetailAnchorButton>
+      );
+    }
   }
 
   return (
@@ -149,7 +176,7 @@ export async function EquipmentDetail({ id, expectedKind, showLabel = false }: {
             {intercompany && sellerUser ? <EntityMetaItem label="Contacto SYSTRON">{sellerUser.name}</EntityMetaItem> : null}
           </>
         }
-        primaryAction={custodyDetail ? null : primaryAction}
+        primaryAction={custodyDetail ? custodyPrimaryAction : primaryAction}
       />
       {custodyDetail && hasReceipt ? (
         <div className="mb-6">
@@ -211,6 +238,23 @@ export async function EquipmentDetail({ id, expectedKind, showLabel = false }: {
             Falta la atención de ventas (diagnóstico o reparación) antes de confirmar la entrada física.
           </p>
         ) : null}
+        {oneStepWarehouseReceipt && receiptPreset ? (
+          <div className="hidden">
+            <MovementForm
+              variant="plain"
+              equipmentId={equipment.id}
+              equipmentFolio={equipment.folio}
+              kind={expectedKind}
+              custody={equipment.custody as Custody}
+              version={equipment.version}
+              suppliers={suppliers.map((supplier) => ({ id: supplier.id, name: supplier.name }))}
+              allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)}
+              formId={warehouseReceiptFormId}
+              hideSubmit
+              receiptPreset={receiptPreset}
+            />
+          </div>
+        ) : null}
         <div id="custodia-equipo" className="scroll-mt-24">
           {custodyDetail ? (
             <div className="mb-3">
@@ -218,30 +262,26 @@ export async function EquipmentDetail({ id, expectedKind, showLabel = false }: {
               <p className="mt-1 text-sm text-[var(--muted)]">El servicio ya fue definido por Ventas. Confirma la entrada para iniciar el SLA y generar el folio DX u OS.</p>
             </div>
           ) : null}
-          <div className={custodyDetail ? "sticky top-3 z-20 rounded-xl border border-[var(--line)] bg-white/95 p-2 shadow-[0_8px_24px_rgba(20,45,75,0.12)] backdrop-blur" : ""}>
+          <div className={custodyDetail && !oneStepWarehouseReceipt ? "sticky top-3 z-20 rounded-xl border border-[var(--line)] bg-white/95 p-2 shadow-[0_8px_24px_rgba(20,45,75,0.12)] backdrop-blur" : ""}>
             <EquipmentCustodyActions
-              showMovement={canMove && movementOptions.length > 0 && !awaitingAttentionForReceipt}
+              showMovement={canMove && movementOptions.length > 0 && !awaitingAttentionForReceipt && !oneStepWarehouseReceipt}
               showAttention={canAttend}
               movementButtonLabel={simplifiedReceipt ? "Confirmar entrada física" : "Registrar movimiento"}
               movementTitle={simplifiedReceipt ? "Confirmar entrada física" : "Registrar movimiento"}
               movement={
-                <MovementForm
-                  variant="plain"
-                  equipmentId={equipment.id}
-                  equipmentFolio={equipment.folio}
-                  kind={expectedKind}
-                  custody={equipment.custody as Custody}
-                  version={equipment.version}
-                  suppliers={suppliers.map((supplier) => ({ id: supplier.id, name: supplier.name }))}
-                  allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)}
-                  receiptPreset={simplifiedReceipt && receiptMovement && openAttention && receiptReason ? {
-                    movement: receiptMovement,
-                    reason: receiptReason,
-                    serviceLabel: ATTENTION_LABEL[openAttention.attentionType as AttentionType] ?? openAttention.attentionType,
-                    reportedFault: openAttention.reportedFault,
-                    clientName: intercompany ? "SYSTRON · intercompañía" : equipment.client.name,
-                  } : undefined}
-                />
+                oneStepWarehouseReceipt ? null : (
+                  <MovementForm
+                    variant="plain"
+                    equipmentId={equipment.id}
+                    equipmentFolio={equipment.folio}
+                    kind={expectedKind}
+                    custody={equipment.custody as Custody}
+                    version={equipment.version}
+                    suppliers={suppliers.map((supplier) => ({ id: supplier.id, name: supplier.name }))}
+                    allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)}
+                    receiptPreset={receiptPreset}
+                  />
+                )
               }
               attention={
                 <AttentionForm

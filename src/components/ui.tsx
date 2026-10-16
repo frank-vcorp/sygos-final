@@ -84,14 +84,22 @@ export function EntityMetaItem({ label, children }: { label: string; children: R
 }
 
 /** Botón de ancla hacia el bloque de captura de la acción principal en la misma página. */
+const detailPrimaryButtonClass =
+  "inline-flex min-h-11 items-center justify-center rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2";
+
 export function DetailAnchorButton({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <a
-      href={href}
-      className="inline-flex min-h-11 items-center justify-center rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2"
-    >
+    <a href={href} className={detailPrimaryButtonClass}>
       {children}
     </a>
+  );
+}
+
+export function DetailFormSubmitButton({ form, children }: { form: string; children: React.ReactNode }) {
+  return (
+    <button type="submit" form={form} className={detailPrimaryButtonClass}>
+      {children}
+    </button>
   );
 }
 

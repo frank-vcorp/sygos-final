@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { FormOverlayDialog } from "@/components/overlay-dialog";
 import { Button, Card } from "@/components/ui";
 
 type EquipmentLabelProps = {
@@ -47,26 +48,23 @@ export function EquipmentLabel({
     };
   }, [open, target]);
 
-  if (!open) {
-    return (
-      <Button type="button" tone="ghost" onClick={() => setOpen(true)}>
-        Ver / reimprimir etiqueta
-      </Button>
-    );
-  }
-
-  return (
-    <Card className="overflow-hidden border-[#b9ccdc]">
+  const labelBody = (
+    <>
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--line)] bg-[#f7fafc] px-5 py-4 print:hidden">
         <div>
-          <h2 className="font-semibold text-[#0b1f3a]">Etiqueta de identificación</h2>
-          <p className="mt-1 text-sm text-[var(--muted)]">Colócala en el equipo después de verificar sus datos.</p>
+          <p className="text-sm text-[var(--muted)]">Colócala en el equipo después de verificar sus datos.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button type="button" onClick={() => window.print()} disabled={!qr}>
             Imprimir etiqueta
           </Button>
-          {autoOpen ? <Link href={equipmentHref} className="inline-flex min-h-11 items-center rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm font-medium">Continuar</Link> : <Button type="button" tone="ghost" onClick={() => setOpen(false)}>Cerrar</Button>}
+          {autoOpen ? (
+            <Link href={equipmentHref} className="inline-flex min-h-11 items-center rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm font-medium">
+              Continuar
+            </Link>
+          ) : (
+            <Button type="button" tone="ghost" onClick={() => setOpen(false)}>Cerrar</Button>
+          )}
         </div>
       </div>
       <div id="equipment-label-print" className="flex items-center justify-center p-5 print:p-0">
@@ -84,6 +82,42 @@ export function EquipmentLabel({
         </div>
       </div>
       <style>{`@media print { body * { visibility: hidden !important; } #equipment-label-print, #equipment-label-print * { visibility: visible !important; } #equipment-label-print { position: absolute; inset: 0; } @page { size: 80mm 50mm; margin: 0; } }`}</style>
+    </>
+  );
+
+  if (autoOpen) {
+    return (
+      <>
+        <Button type="button" tone="ghost" onClick={() => setOpen(true)}>
+          Ver / reimprimir etiqueta
+        </Button>
+        <FormOverlayDialog
+          open={open}
+          onClose={() => setOpen(false)}
+          title="Etiqueta de identificación"
+          titleId="equipment-label-overlay"
+          wide
+        >
+          {labelBody}
+        </FormOverlayDialog>
+      </>
+    );
+  }
+
+  if (!open) {
+    return (
+      <Button type="button" tone="ghost" onClick={() => setOpen(true)}>
+        Ver / reimprimir etiqueta
+      </Button>
+    );
+  }
+
+  return (
+    <Card className="overflow-hidden border-[#b9ccdc]">
+      <div className="border-b border-[var(--line)] bg-[#f7fafc] px-5 py-4 print:hidden">
+        <h2 className="font-semibold text-[#0b1f3a]">Etiqueta de identificación</h2>
+      </div>
+      {labelBody}
     </Card>
   );
 }
