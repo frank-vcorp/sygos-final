@@ -1,6 +1,7 @@
 import { ClientNameLink } from "@/components/client-entity-links";
 import { notFound } from "next/navigation";
-import { AttentionForm, CancelMovementForm, MovementForm } from "@/components/custody-forms";
+import { CancelMovementForm, MovementForm } from "@/components/custody-forms";
+import { EquipmentAttentionLauncher } from "@/components/equipment-attention-launcher";
 import { EquipmentCustodyActions } from "@/components/equipment-custody-actions";
 import { EquipmentLabel } from "@/components/equipment-label";
 import { HistoryTimeline } from "@/components/history-timeline";
@@ -70,10 +71,6 @@ export async function EquipmentDetail({ id, expectedKind, showLabel = false }: {
   const suppliers = can(session.role, "custody.confirm", session.activeCompanyCode)
     ? await prisma.supplier.findMany({ where: { companyId: session.activeCompanyId, active: true, isSystem: false }, orderBy: { name: "asc" } })
     : [];
-  const repairs = await prisma.technicalCase.findMany({
-    where: { equipmentId: equipment.id, kind: "OS", status: "TERMINADA", paidAt: { not: null }, attention: { attentionType: { not: "DIAGNOSTICO_GARANTIA" } } },
-    select: { id: true, folio: true },
-  });
   const priorities = equipment.originCompanyId === session.activeCompanyId
     ? await prisma.priority.findMany({ where: { companyId: session.activeCompanyId, active: true }, orderBy: { sortOrder: "asc" } })
     : [];
@@ -127,8 +124,20 @@ export async function EquipmentDetail({ id, expectedKind, showLabel = false }: {
   const oneStepWarehouseReceipt =
     custodyDetail && canMove && simplifiedReceipt && !awaitingAttentionForReceipt;
   let primaryAction: React.ReactNode = null;
+  const reportedFault = equipment.description?.trim() ?? "";
+  const clientDisplayName = intercompany ? "SYSTRON · intercompañía" : equipment.client.name;
   if (awaitingAttentionForReceipt && canAttend) {
-    primaryAction = <DetailAnchorButton href="#custodia-equipo">Crear atención</DetailAnchorButton>;
+    primaryAction = (
+      <EquipmentAttentionLauncher
+        equipmentId={equipment.id}
+        equipmentFolio={equipment.folio}
+        clientName={clientDisplayName}
+        kind={expectedKind}
+        version={equipment.version}
+        reportedFault={reportedFault}
+        priorities={priorities.map((row) => ({ id: row.id, attentionType: row.attentionType, name: row.name }))}
+      />
+    );
   } else if (oneStepWarehouseReceipt) {
     primaryAction = <DetailFormSubmitButton form={warehouseReceiptFormId}>Confirmar entrada física</DetailFormSubmitButton>;
   } else if (canMove && simplifiedReceipt && !awaitingAttentionForReceipt) {
@@ -193,7 +202,9 @@ export async function EquipmentDetail({ id, expectedKind, showLabel = false }: {
         </div>
       ) : null}
       <div className="space-y-6">
-        {equipment.description ? <p className="text-sm text-[var(--muted)]">{equipment.description}</p> : null}
+        {equipment.description && !openAttention ? (
+          <p className="text-sm text-[var(--muted)]"><span className="font-medium text-[var(--ink)]">Falla reportada:</span> {equipment.description}</p>
+        ) : null}
         {expectedKind === "MOT" && session.activeCompanyCode === "SYSTRON" ? (
           <p className="text-sm text-[var(--muted)]">Este MOT no entra al almacén SYSTRON. El estado físico lo confirma Servomotores.</p>
         ) : null}
@@ -265,7 +276,7 @@ export async function EquipmentDetail({ id, expectedKind, showLabel = false }: {
           <div className={custodyDetail && !oneStepWarehouseReceipt ? "sticky top-3 z-20 rounded-xl border border-[var(--line)] bg-white/95 p-2 shadow-[0_8px_24px_rgba(20,45,75,0.12)] backdrop-blur" : ""}>
             <EquipmentCustodyActions
               showMovement={canMove && movementOptions.length > 0 && !awaitingAttentionForReceipt && !oneStepWarehouseReceipt}
-              showAttention={canAttend}
+              showAttention={false}
               movementButtonLabel={simplifiedReceipt ? "Confirmar entrada física" : "Registrar movimiento"}
               movementTitle={simplifiedReceipt ? "Confirmar entrada física" : "Registrar movimiento"}
               movement={
@@ -283,16 +294,7 @@ export async function EquipmentDetail({ id, expectedKind, showLabel = false }: {
                   />
                 )
               }
-              attention={
-                <AttentionForm
-                  variant="plain"
-                  equipmentId={equipment.id}
-                  kind={expectedKind}
-                  version={equipment.version}
-                  priorities={priorities}
-                  repairs={repairs}
-                />
-              }
+              attention={null}
             />
           </div>
         </div>

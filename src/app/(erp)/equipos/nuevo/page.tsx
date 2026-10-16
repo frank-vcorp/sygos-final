@@ -39,7 +39,9 @@ export default async function NuevoEquiPage() {
         <FormSection title="Identificación del equipo" description="Modelo, marca y tipo en el mismo bloque. Enter confirma; lo nuevo queda en catálogo al guardar.">
           <div className="md:col-span-2"><EquipmentCatalogFields types={types.map((type) => type.name)} brands={brands.map((brand) => brand.name)} models={models.map((row) => ({ type: row.type.name, brand: row.brand.name, model: row.name }))} /></div>
           <Field label="Número de serie" hint="Opcional. La identidad principal es el folio EQUI."><input name="serial" className={controlClass} /></Field>
-          <Field label="Descripción"><textarea name="description" rows={3} className={controlClass} /></Field>
+          <Field label="Falla reportada" hint="Se hereda al crear la atención. Describe el síntoma que reporta el cliente.">
+            <textarea name="description" required rows={3} className={controlClass} />
+          </Field>
         </FormSection>
         <FormActions note="La entrada física se confirma posteriormente en Almacén."><Button type="submit">Crear folio EQUI</Button></FormActions>
       </FormPanel>

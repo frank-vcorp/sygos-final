@@ -15,7 +15,7 @@ export function EquipmentCustodyActions({
   showMovement: boolean;
   showAttention: boolean;
   movement: React.ReactNode;
-  attention: React.ReactNode;
+  attention?: React.ReactNode;
   movementTitle?: string;
   movementButtonLabel?: string;
 }) {

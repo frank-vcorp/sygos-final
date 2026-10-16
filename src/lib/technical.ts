@@ -113,6 +113,30 @@ export async function assertWarrantyOrigin(equipmentId: string, originalCaseId: 
   return original;
 }
 
+/** Última OS pagada del equipo que aún esté dentro del periodo de garantía. */
+export async function resolveWarrantyOriginForEquipment(equipmentId: string) {
+  const candidates = await prisma.technicalCase.findMany({
+    where: {
+      equipmentId,
+      kind: "OS",
+      status: "TERMINADA",
+      paidAt: { not: null },
+      attention: { attentionType: { not: "DIAGNOSTICO_GARANTIA" } },
+    },
+    orderBy: { paidAt: "desc" },
+    select: { id: true, folio: true },
+  });
+  for (const candidate of candidates) {
+    try {
+      await assertWarrantyOrigin(equipmentId, candidate.id);
+      return candidate;
+    } catch {
+      continue;
+    }
+  }
+  throw new Error("Este equipo no tiene una reparación pagada con garantía vigente.");
+}
+
 async function loadCase(id: string) {
   const row = await prisma.technicalCase.findUnique({
     where: { id },

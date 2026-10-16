@@ -7,7 +7,7 @@ import { recordHistory } from "./history";
 import { rememberCatalog } from "./catalog";
 import { isAttentionType, type AttentionType } from "./priorities";
 import { SALES_NOT_ASSIGNED_MESSAGE } from "./sales-assignment";
-import { assertWarrantyOrigin, openCase, openPendingCases } from "./technical";
+import { assertWarrantyOrigin, openCase, openPendingCases, resolveWarrantyOriginForEquipment } from "./technical";
 
 type Actor = {
   userId: string;
@@ -202,7 +202,7 @@ export async function createAttention(
     equipmentId: string;
     attentionType: string;
     priorityId: string;
-    reportedFault: string;
+    reportedFault: string | null;
     antecedent: string | null;
     deliveryInstructions?: string | null;
     initialLog?: string | null;
@@ -211,14 +211,25 @@ export async function createAttention(
   },
 ) {
   if (!isAttentionType(input.attentionType)) throw new Error("Selecciona el tipo de atención.");
-  if (input.attentionType === "DIAGNOSTICO_GARANTIA") {
-    if (!input.antecedent) throw new Error("Describe el antecedente del reclamo de garantía.");
-    if (!input.originalCaseId) throw new Error("Selecciona la reparación pagada que origina la garantía.");
-    await assertWarrantyOrigin(input.equipmentId, input.originalCaseId);
-  }
   const equipment = await prisma.equipment.findUnique({ where: { id: input.equipmentId } });
   if (!equipment || equipment.originCompanyId !== actor.activeCompanyId) {
     throw new Error("La atención se crea en la empresa que originó el equipo.");
+  }
+  const reportedFault = (input.reportedFault?.trim() || equipment.description?.trim() || "");
+  if (!reportedFault) {
+    throw new Error("Falta la falla reportada del equipo. Regístrala al dar de alta el equipo.");
+  }
+  let originalCaseId = input.originalCaseId;
+  let antecedent = input.antecedent?.trim() || null;
+  if (input.attentionType === "DIAGNOSTICO_GARANTIA") {
+    if (!originalCaseId) {
+      const origin = await resolveWarrantyOriginForEquipment(input.equipmentId);
+      originalCaseId = origin.id;
+      if (!antecedent) antecedent = `Garantía sobre ${origin.folio}`;
+    } else {
+      const original = await assertWarrantyOrigin(input.equipmentId, originalCaseId);
+      if (!antecedent) antecedent = `Garantía sobre ${original.folio}`;
+    }
   }
   const priority = await freezePriority(actor.activeCompanyId, input.attentionType, input.priorityId);
   const service =
@@ -256,13 +267,13 @@ export async function createAttention(
         priorityTargetMin: priority.targetMinDays,
         priorityTargetMax: priority.targetMaxDays,
         prioritySlaMaxDays: priority.slaMaxDays,
-        reportedFault: input.reportedFault,
-        antecedent: input.antecedent,
+        reportedFault,
+        antecedent,
         deliveryInstructions: input.deliveryInstructions ?? null,
         initialLog: input.initialLog ?? null,
         createdByUserId: actor.userId,
         sellerUserId: actor.role === "VENTAS" ? actor.userId : client.ownerUserId,
-        originalCaseId: input.originalCaseId,
+        originalCaseId,
         status: inServiceCustody ? "EN_PROCESO" : "ABIERTA",
         slaStartedAt: inServiceCustody ? new Date() : null,
       },

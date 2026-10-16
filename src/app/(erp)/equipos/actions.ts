@@ -36,7 +36,7 @@ export async function createEquiAction(formData: FormData) {
       typeName: requiredText(formData.get("typeName") ?? formData.get("newType"), "Tipo"),
       brandName: requiredText(formData.get("brandName") ?? formData.get("newBrand"), "Marca"),
       model: requiredText(formData.get("model"), "Modelo"),
-      description: optionalText(formData.get("description")),
+      description: requiredText(formData.get("description"), "Falla reportada"),
       serial: optionalText(formData.get("serial")),
     });
     await setFlash({ tone: "ok", message: `${equipment.folio} quedó registrado. El SLA inicia cuando se confirme la entrada física.` });
@@ -89,13 +89,13 @@ export async function createAttentionAction(formData: FormData) {
       equipmentId: requiredText(formData.get("equipmentId"), "Equipo"),
       attentionType: requiredText(formData.get("attentionType"), "Tipo de atención"),
       priorityId: requiredText(formData.get("priorityId"), "Prioridad"),
-      reportedFault: requiredText(formData.get("reportedFault"), "Falla reportada"),
+      reportedFault: optionalText(formData.get("reportedFault")),
       antecedent: optionalText(formData.get("antecedent")),
       deliveryInstructions: optionalText(formData.get("deliveryInstructions")),
       originalCaseId: optionalText(formData.get("originalCaseId")),
       version: parseVersion(formData.get("version")),
     });
-    await setFlash({ tone: "ok", message: "Servicio creado. El SLA inicia con la recepción física." });
+    await setFlash({ tone: "ok", message: "Atención creada. El SLA inicia con la recepción física." });
     redirect(back);
   } catch (error) {
     if (isRedirect(error)) throw error;
