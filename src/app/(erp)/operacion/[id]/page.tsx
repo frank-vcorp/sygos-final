@@ -452,18 +452,24 @@ export default async function OperacionDetallePage({ params }: { params: Promise
             </EntityMetaItem>
           </>
         }
-        primaryAction={primaryAction}
+        primaryAction={
+          primaryAction || headerAssignmentForm
+            ? (
+              <div className="flex flex-wrap items-center gap-2">
+                {primaryAction}
+                {headerAssignmentForm}
+              </div>
+            )
+            : null
+        }
         secondaryActions={
-          <>
-            <nav className="flex max-w-full flex-wrap items-center gap-2" aria-label="Relaciones de la atención">
-              {relatedLinks.map((item) => (
-                <Link key={item.href} href={item.href} className="rounded-full border border-[var(--line)] bg-white px-3 py-1.5 text-xs font-semibold text-[#38506c] transition hover:border-[#91b7cf] hover:text-[var(--accent)]">
-                  {item.label}
-                </Link>
-              ))}
-            </nav>
-            {headerAssignmentForm}
-          </>
+          <nav className="flex max-w-full flex-wrap items-center justify-end gap-2" aria-label="Relaciones de la atención">
+            {relatedLinks.map((item) => (
+              <Link key={item.href} href={item.href} className="rounded-full border border-[var(--line)] bg-white px-3 py-1.5 text-xs font-semibold text-[#38506c] transition hover:border-[#91b7cf] hover:text-[var(--accent)]">
+                {item.label}
+              </Link>
+            ))}
+          </nav>
         }
       />
       {readOnly ? <p className="mb-4 text-sm text-[var(--muted)]">Consulta de solo lectura. SYSTRON no modifica el estado ni la bitácora de Servomotores.</p> : null}
