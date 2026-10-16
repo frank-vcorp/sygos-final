@@ -17,6 +17,28 @@ export { CASE_STATUS_LABEL };
 
 const DIAGNOSIS_TYPES = new Set(["DIAGNOSTICO", "DIAGNOSTICO_GARANTIA"]);
 
+const CLOSED_TECHNICAL_STATUSES = ["VALIDADO", "TERMINADA", "SIN_REPARACION"] as const;
+
+/** Último técnico que cerró un caso previo del mismo equipo en esta empresa de servicio. */
+export async function lastTechnicianWhoClosedEquipmentCase(
+  equipmentId: string,
+  serviceCompanyId: string,
+  excludeCaseId: string,
+): Promise<string | null> {
+  const prior = await prisma.technicalCase.findFirst({
+    where: {
+      equipmentId,
+      serviceCompanyId,
+      id: { not: excludeCaseId },
+      finishedByUserId: { not: null },
+      status: { in: [...CLOSED_TECHNICAL_STATUSES] },
+    },
+    orderBy: { updatedAt: "desc" },
+    select: { finishedByUserId: true },
+  });
+  return prior?.finishedByUserId ?? null;
+}
+
 export async function openPendingCases(equipmentId: string, receivedAt: Date) {
   const attentions = await prisma.attention.findMany({
     where: { equipmentId, slaStartedAt: { not: null }, technicalCases: { none: {} } },
@@ -160,12 +182,15 @@ export async function startCase(actor: Actor, caseId: string, version: number) {
   if (!canExecute(actor, row.assigneeUserId) && !(actor.role === "GERENTE_OPERATIVO_SERVOMOTORES")) {
     throw new Error("Solo el responsable asignado inicia el trabajo.");
   }
-  if (row.kind === "DIAGNOSTICO" && !row.assigneeUserId && actor.role !== "GERENTE_OPERATIVO_SERVOMOTORES" && actor.role !== "ADMINISTRADOR" && actor.role !== "CEO" && actor.role !== "SUPERVISOR_TECNICO") {
+  if (!row.assigneeUserId && actor.role === "SUPERVISOR_TECNICO") {
+    throw new Error("Asigna un responsable antes de iniciar el trabajo.");
+  }
+  if (row.kind === "DIAGNOSTICO" && !row.assigneeUserId && actor.role !== "GERENTE_OPERATIVO_SERVOMOTORES" && actor.role !== "ADMINISTRADOR" && actor.role !== "CEO") {
     throw new Error("Asigna un responsable antes de iniciar.");
   }
   const next = row.kind === "DIAGNOSTICO" ? "EN_DIAGNOSTICO" : "EN_REPARACION";
   if (row.status !== "EN_ESPERA" && row.status !== "DEVUELTO") throw new Error("Esta operación no está en espera.");
-  const claim = !row.assigneeUserId && (actor.role === "GERENTE_OPERATIVO_SERVOMOTORES" || actor.role === "SUPERVISOR_TECNICO");
+  const claim = !row.assigneeUserId && actor.role === "GERENTE_OPERATIVO_SERVOMOTORES";
   const data = { status: next, version: { increment: 1 }, ...(claim ? { assigneeUserId: actor.userId } : {}) };
   const updated = await prisma.technicalCase.updateMany({ where: { id: row.id, version }, data });
   if (updated.count === 0) throw new ConcurrencyError();

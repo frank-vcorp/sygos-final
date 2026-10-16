@@ -44,7 +44,7 @@ import { historyFor } from "@/lib/history";
 import { can } from "@/lib/permissions";
 import { ATTENTION_LABEL, type AttentionType } from "@/lib/priorities";
 import { diagnosisPresolicitudEditable, fieldPresolicitudOnly, PRESOLICITUD_LABEL } from "@/lib/part-presolicitud";
-import { CASE_STATUS_LABEL } from "@/lib/technical";
+import { CASE_STATUS_LABEL, lastTechnicianWhoClosedEquipmentCase } from "@/lib/technical";
 import { homePath } from "@/lib/home";
 import { redirectIfSalesNotAssigned } from "@/lib/sales-assignment";
 import { serviciosBandejaHref } from "@/lib/servicios-catalog";
@@ -92,6 +92,26 @@ export default async function OperacionDetallePage({ params }: { params: Promise
         orderBy: { name: "asc" },
       })
     : [];
+  const suggestedAssigneeRaw = owns
+    ? await lastTechnicianWhoClosedEquipmentCase(row.equipmentId, row.serviceCompanyId, row.id)
+    : null;
+  const suggestedAssigneeId =
+    suggestedAssigneeRaw && candidates.some((user) => user.id === suggestedAssigneeRaw)
+      ? suggestedAssigneeRaw
+      : null;
+  const defaultAssigneeId = row.assigneeUserId ?? suggestedAssigneeId ?? "";
+  const awaitingStart = row.status === "EN_ESPERA" || row.status === "DEVUELTO";
+  const canStartPending =
+    !readOnly
+    && awaitingStart
+    && Boolean(row.assigneeUserId)
+    && !row.externalSupplierId
+    && (session.role === "TECNICO"
+      ? row.assigneeUserId === session.userId
+      : session.role === "SUPERVISOR_TECNICO"
+        ? row.assigneeUserId === session.userId
+        : canWork);
+  const showAssignmentPanel = canManage && !closed && (awaitingStart || !row.assigneeUserId);
   const suppliers = owns && row.serviceCompany.code === "SYSTRON"
     ? await prisma.supplier.findMany({ where: { companyId: session.activeCompanyId, active: true, isSystem: false }, orderBy: { name: "asc" } })
     : [];
@@ -159,7 +179,9 @@ export default async function OperacionDetallePage({ params }: { params: Promise
 
   let primaryAction: React.ReactNode = null;
   if (!readOnly) {
-    if (canWork && (row.status === "EN_ESPERA" || row.status === "DEVUELTO")) {
+    if (canManage && awaitingStart && !row.assigneeUserId && !row.externalSupplierId) {
+      primaryAction = <DetailAnchorButton href="#asignacion-operacion">Asignar responsable</DetailAnchorButton>;
+    } else if (canStartPending) {
       primaryAction = (
         <form action={startCaseAction} className="inline">
           <input type="hidden" name="caseId" value={row.id} />
@@ -536,25 +558,55 @@ export default async function OperacionDetallePage({ params }: { params: Promise
           ) : null}
           {!readOnly ? (
             <>
-            <Card className="p-4">
+            <Card id="asignacion-operacion" className="scroll-mt-24 p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">Asignación</p>
                   <p className="mt-1 truncate font-medium text-[#0b1f3a]">{row.assignee?.name ?? "Sin responsable"}</p>
                   {row.externalSupplierId ? <p className="mt-1 truncate text-xs text-[var(--muted)]">Proveedor: {currentSupplier?.name ?? "Servicio externo"}</p> : null}
+                  {suggestedAssigneeId && !row.assigneeUserId ? (
+                    <p className="mt-1 text-xs text-[var(--muted)]">
+                      Sugerido: {candidates.find((user) => user.id === suggestedAssigneeId)?.name ?? "técnico del último cierre en este equipo"}.
+                    </p>
+                  ) : null}
                 </div>
                 <Badge tone={row.assigneeUserId || row.externalSupplierId ? "ok" : "warn"}>
                   {row.assigneeUserId || row.externalSupplierId ? "Asignado" : "Pendiente"}
                 </Badge>
               </div>
-              {canManage && !closed ? (
+              {showAssignmentPanel ? (
+                <form action={assignCaseAction} className="mt-3 space-y-3 border-t border-[var(--line)] pt-3">
+                  <input type="hidden" name="caseId" value={row.id} />
+                  <input type="hidden" name="version" value={row.version} />
+                  <Field
+                    label="Responsable interno"
+                    hint="Técnicos y supervisor. El técnico que cerró el último servicio en este equipo queda preseleccionado."
+                  >
+                    <select name="assigneeUserId" required className={controlClass} defaultValue={defaultAssigneeId}>
+                      {!defaultAssigneeId ? <option value="">Selecciona responsable</option> : null}
+                      {candidates.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
+                    </select>
+                  </Field>
+                  {row.serviceCompany.code === "SYSTRON" ? (
+                    <SupplierPicker
+                      label="O servicio externo"
+                      suppliers={suppliers}
+                      defaultSupplierId={row.externalSupplierId ?? ""}
+                      allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)}
+                      allowEmpty
+                      emptyLabel="Sin proveedor"
+                    />
+                  ) : null}
+                  <Button type="submit">{row.assigneeUserId ? "Actualizar asignación" : "Asignar responsable"}</Button>
+                </form>
+              ) : canManage && !closed ? (
                 <details className="mt-3 border-t border-[var(--line)] pt-3">
                   <summary className="cursor-pointer text-sm font-semibold text-[var(--accent)]">Cambiar asignación</summary>
                   <form action={assignCaseAction} className="mt-3 space-y-3">
                     <input type="hidden" name="caseId" value={row.id} />
                     <input type="hidden" name="version" value={row.version} />
                     <Field label="Responsable interno">
-                      <select name="assigneeUserId" className={controlClass} defaultValue={row.assigneeUserId ?? ""}>
+                      <select name="assigneeUserId" className={controlClass} defaultValue={defaultAssigneeId}>
                         <option value="">Sin asignar</option>
                         {candidates.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
                       </select>
