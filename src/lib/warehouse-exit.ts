@@ -30,7 +30,7 @@ export async function loadWarehouseExitContext(input: {
   custody: Custody;
   companyId: string;
 }) {
-  const exitMovement = input.equipmentKind === "MOT" ? "EGRESO" : "SALIDA";
+  const exitMovement: "SALIDA" | "EGRESO" = input.equipmentKind === "MOT" ? "EGRESO" : "SALIDA";
   const osCase = await prisma.technicalCase.findFirst({
     where: { equipmentId: input.equipmentId, kind: "OS", status: "TERMINADA", serviceCompanyId: input.companyId },
     orderBy: { updatedAt: "desc" },
