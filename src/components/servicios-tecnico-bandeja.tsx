@@ -26,6 +26,7 @@ import { listActiveServicios, listHistorialServicios } from "@/lib/servicios-sup
 
 const HISTORIAL_ESTADO_OPTIONS = [
   { value: "todos", label: "Todos los estados" },
+  { value: "PENDIENTE_VALIDACION", label: "Pendiente de validación" },
   { value: "VALIDADO", label: "Validado" },
   { value: "TERMINADA", label: "Reparación terminada" },
   { value: "SIN_REPARACION", label: "Sin reparación" },

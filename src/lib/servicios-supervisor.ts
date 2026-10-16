@@ -5,6 +5,9 @@ import type { AttentionType } from "@/lib/priorities";
 
 export const CLOSED_CASE = ["VALIDADO", "TERMINADA", "SIN_REPARACION"] as const;
 export const HISTORIAL_CASE = [...CLOSED_CASE, "CANCELADA"] as const;
+/** Tras concluir diagnóstico en SYSTRON el técnico ya no ejecuta; sigue visible para gerencia en activos del taller. */
+export const TECHNICIAN_HANDOFF_CASE = ["PENDIENTE_VALIDACION", ...CLOSED_CASE] as const;
+export const TECHNICIAN_HISTORIAL_CASE = [...HISTORIAL_CASE, "PENDIENTE_VALIDACION"] as const;
 
 /** Casos visibles en bandejas activas: operación abierta o cierre técnico con pendiente comercial. */
 export function openOperationCaseWhere() {
@@ -36,6 +39,25 @@ function clientOwnerScope(userId: string) {
 
 function technicianCaseScope(userId: string) {
   return { OR: [{ assigneeUserId: userId }, { finishedByUserId: userId }] };
+}
+
+/** Bandeja activa del técnico: solo asignaciones con trabajo pendiente de ejecución. */
+export function technicianActiveCaseWhere(userId: string) {
+  return {
+    assigneeUserId: userId,
+    status: { notIn: [...TECHNICIAN_HANDOFF_CASE] },
+  };
+}
+
+function caseSearchWhere(q: string) {
+  return {
+    OR: [
+      { folio: { contains: q } },
+      { equipment: { folio: { contains: q } } },
+      { equipment: { client: { name: { contains: q } } } },
+      { attention: { reportedFault: { contains: q } } },
+    ],
+  };
 }
 
 function createdAtRange(desde?: string, hasta?: string) {
@@ -160,25 +182,17 @@ export async function listActiveServicios(
   const technicianId = options?.assigneeUserId;
   const clientOwnerUserId = options?.clientOwnerUserId;
 
+  const activeFilters = [
+    { serviceCompanyId: companyId },
+    technicianId ? technicianActiveCaseWhere(technicianId) : openOperationCaseWhere(),
+    ...(clientOwnerUserId ? [clientOwnerScope(clientOwnerUserId)] : []),
+    ...(attentionType ? [{ attention: { attentionType } }] : []),
+    createdAtRange(options?.desde, options?.hasta),
+    ...(q ? [caseSearchWhere(q)] : []),
+  ].filter((part) => Object.keys(part).length > 0);
+
   const cases = await prisma.technicalCase.findMany({
-    where: {
-      serviceCompanyId: companyId,
-      ...openOperationCaseWhere(),
-      ...(technicianId ? technicianCaseScope(technicianId) : {}),
-      ...(clientOwnerUserId ? clientOwnerScope(clientOwnerUserId) : {}),
-      ...(attentionType ? { attention: { attentionType } } : {}),
-      ...createdAtRange(options?.desde, options?.hasta),
-      ...(q
-        ? {
-            OR: [
-              { folio: { contains: q } },
-              { equipment: { folio: { contains: q } } },
-              { equipment: { client: { name: { contains: q } } } },
-              { attention: { reportedFault: { contains: q } } },
-            ],
-          }
-        : {}),
-    },
+    where: { AND: activeFilters },
     include: {
       equipment: { include: { client: true } },
       attention: { select: { priorityName: true, slaStartedAt: true, attentionType: true } },
@@ -254,30 +268,24 @@ export async function listHistorialServicios(
   const q = query.trim();
   const technicianId = options?.assigneeUserId;
   const clientOwnerUserId = options?.clientOwnerUserId;
+  const historialStatuses = technicianId ? TECHNICIAN_HISTORIAL_CASE : HISTORIAL_CASE;
   const statusFilter =
-    options?.status && options.status !== "todos" && (HISTORIAL_CASE as readonly string[]).includes(options.status)
+    options?.status && options.status !== "todos" && (historialStatuses as readonly string[]).includes(options.status)
       ? options.status
       : null;
 
+  const historialFilters = [
+    { serviceCompanyId: companyId },
+    { status: statusFilter ? statusFilter : { in: [...historialStatuses] } },
+    ...(technicianId ? [technicianCaseScope(technicianId)] : []),
+    ...(clientOwnerUserId ? [clientOwnerScope(clientOwnerUserId)] : []),
+    ...(attentionType ? [{ attention: { attentionType } }] : []),
+    updatedAtRange(options?.desde, options?.hasta),
+    ...(q ? [caseSearchWhere(q)] : []),
+  ].filter((part) => Object.keys(part).length > 0);
+
   const cases = await prisma.technicalCase.findMany({
-    where: {
-      serviceCompanyId: companyId,
-      status: statusFilter ? statusFilter : { in: [...HISTORIAL_CASE] },
-      ...(technicianId ? technicianCaseScope(technicianId) : {}),
-      ...(clientOwnerUserId ? clientOwnerScope(clientOwnerUserId) : {}),
-      ...(attentionType ? { attention: { attentionType } } : {}),
-      ...updatedAtRange(options?.desde, options?.hasta),
-      ...(q
-        ? {
-            OR: [
-              { folio: { contains: q } },
-              { equipment: { folio: { contains: q } } },
-              { equipment: { client: { name: { contains: q } } } },
-              { attention: { reportedFault: { contains: q } } },
-            ],
-          }
-        : {}),
-    },
+    where: { AND: historialFilters },
     include: {
       equipment: { include: { client: true } },
       attention: { select: { priorityName: true, slaStartedAt: true, attentionType: true, status: true } },
