@@ -202,7 +202,7 @@ export async function createAttention(
     equipmentId: string;
     attentionType: string;
     priorityId: string;
-    reportedFault: string | null;
+    reportedFault: string;
     antecedent: string | null;
     deliveryInstructions?: string | null;
     initialLog?: string | null;
@@ -215,10 +215,8 @@ export async function createAttention(
   if (!equipment || equipment.originCompanyId !== actor.activeCompanyId) {
     throw new Error("La atención se crea en la empresa que originó el equipo.");
   }
-  const reportedFault = (input.reportedFault?.trim() || equipment.description?.trim() || "");
-  if (!reportedFault) {
-    throw new Error("Falta la falla reportada del equipo. Regístrala al dar de alta el equipo.");
-  }
+  const reportedFault = input.reportedFault?.trim() || "";
+  if (!reportedFault) throw new Error("Indica la falla reportada.");
   let originalCaseId = input.originalCaseId;
   let antecedent = input.antecedent?.trim() || null;
   if (input.attentionType === "DIAGNOSTICO_GARANTIA") {

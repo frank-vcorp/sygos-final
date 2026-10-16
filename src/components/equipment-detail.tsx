@@ -124,7 +124,6 @@ export async function EquipmentDetail({ id, expectedKind, showLabel = false }: {
   const oneStepWarehouseReceipt =
     custodyDetail && canMove && simplifiedReceipt && !awaitingAttentionForReceipt;
   let primaryAction: React.ReactNode = null;
-  const reportedFault = equipment.description?.trim() ?? "";
   const clientDisplayName = intercompany ? "SYSTRON · intercompañía" : equipment.client.name;
   if (awaitingAttentionForReceipt && canAttend) {
     primaryAction = (
@@ -134,7 +133,6 @@ export async function EquipmentDetail({ id, expectedKind, showLabel = false }: {
         clientName={clientDisplayName}
         kind={expectedKind}
         version={equipment.version}
-        reportedFault={reportedFault}
         priorities={priorities.map((row) => ({ id: row.id, attentionType: row.attentionType, name: row.name }))}
       />
     );
@@ -202,9 +200,7 @@ export async function EquipmentDetail({ id, expectedKind, showLabel = false }: {
         </div>
       ) : null}
       <div className="space-y-6">
-        {equipment.description && !openAttention ? (
-          <p className="text-sm text-[var(--muted)]"><span className="font-medium text-[var(--ink)]">Falla reportada:</span> {equipment.description}</p>
-        ) : null}
+        {equipment.description ? <p className="text-sm text-[var(--muted)]">{equipment.description}</p> : null}
         {expectedKind === "MOT" && session.activeCompanyCode === "SYSTRON" ? (
           <p className="text-sm text-[var(--muted)]">Este MOT no entra al almacén SYSTRON. El estado físico lo confirma Servomotores.</p>
         ) : null}

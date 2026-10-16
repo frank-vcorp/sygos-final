@@ -17,7 +17,6 @@ export function EquipmentAttentionLauncher({
   clientName,
   kind,
   version,
-  reportedFault,
   priorities,
 }: {
   equipmentId: string;
@@ -25,11 +24,11 @@ export function EquipmentAttentionLauncher({
   clientName: string;
   kind: "EQUI" | "MOT";
   version: number;
-  reportedFault: string;
   priorities: PriorityRow[];
 }) {
   const [open, setOpen] = useState(false);
   const [attentionType, setAttentionType] = useState<AttentionType | "">("");
+  const [reportedFault, setReportedFault] = useState("");
   const priorityOptions = attentionType ? priorities.filter((row) => row.attentionType === attentionType) : [];
   const canSubmit = Boolean(attentionType && reportedFault.trim());
 
@@ -49,16 +48,13 @@ export function EquipmentAttentionLauncher({
           <input type="hidden" name="equipmentId" value={equipmentId} />
           <input type="hidden" name="kind" value={kind} />
           <input type="hidden" name="version" value={version} />
-          <input type="hidden" name="reportedFault" value={reportedFault} />
           <dl className="grid gap-2 rounded-md border border-[var(--line)] bg-[#f7f8f9] p-3 text-sm">
             <div><dt className="text-[var(--muted)]">Equipo</dt><dd className="font-medium">{equipmentFolio}</dd></div>
             <div><dt className="text-[var(--muted)]">Cliente</dt><dd>{clientName}</dd></div>
-            {reportedFault.trim() ? (
-              <div><dt className="text-[var(--muted)]">Falla reportada</dt><dd>{reportedFault}</dd></div>
-            ) : (
-              <p className="text-[var(--danger)]">Registra la falla al dar de alta el equipo antes de abrir la atención.</p>
-            )}
           </dl>
+          <Field label="Falla reportada" hint="Describe el síntoma que reporta el cliente.">
+            <textarea name="reportedFault" required rows={3} className={controlClass} value={reportedFault} onChange={(event) => setReportedFault(event.target.value)} />
+          </Field>
           <Field label="Tipo de atención">
             <select
               name="attentionType"
