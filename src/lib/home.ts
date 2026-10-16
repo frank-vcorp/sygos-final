@@ -5,6 +5,7 @@ import type { Role } from "@/lib/roles";
 export function homePath(role: Role, companyCode: string | null): string {
   if (role === "KIOSCO_ASISTENCIA") return "/kiosco";
   if (role === "AYUDANTE_GENERAL") return "/personal/asistencia";
+  if (role === "TECNICO") return "/servicios/activos";
   if (role === "ALMACEN" && can(role, "custody.confirm", companyCode)) return "/custodia";
   if (can(role, "panel.view", companyCode)) return "/panel";
   if (can(role, "custody.confirm", companyCode)) return "/custodia";

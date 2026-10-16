@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { ClientNameLink } from "@/components/client-entity-links";
-import { ActionLink, ActiveFilters, Badge, Button, Card, controlClass, Empty, FilterBar, ListCap, MobileCard, PageHeader, RecordLink, ResponsiveData, SegmentedNav, Table, Td, Th, TextLink } from "@/components/ui";
+import { ActionLink, ActiveFilters, Badge, Button, Card, controlClass, Empty, FilterBar, ListCap, MobileCard, PageHeader, RecordLink, ResponsiveData, Table, Td, Th, TextLink } from "@/components/ui";
 import { listHref } from "@/lib/list-url";
 import { homePath } from "@/lib/home";
 import { prisma } from "@/lib/db";
@@ -21,7 +21,13 @@ export default async function CotizacionesPage({ searchParams }: { searchParams:
   const decision = vista === "decision";
   if (pending && can(session.role, "quote.price", session.activeCompanyCode)) {
     const missing = await prisma.technicalCase.findMany({
-      where: { serviceCompanyId: session.activeCompanyId, quotePending: true },
+      where: {
+        serviceCompanyId: session.activeCompanyId,
+        OR: [
+          { quotePending: true },
+          { status: "VALIDADO", kind: "DIAGNOSTICO", attention: { attentionType: "DIAGNOSTICO" } },
+        ],
+      },
       select: { id: true },
       take: 50,
     });
@@ -59,22 +65,18 @@ export default async function CotizacionesPage({ searchParams }: { searchParams:
     <>
       <PageHeader
         title={pending ? "Pendientes de cotizar" : decision ? "Esperando decisión del cliente" : "Cotizaciones"}
-        subtitle="Una sola bandeja para lo que necesita precio. El vendedor no fija el precio."
+        subtitle={session.role === "VENTAS" ? "Consulta el avance de tus propuestas y da seguimiento a las que esperan respuesta del cliente." : "Revisa las propuestas que necesitan precio y las que esperan respuesta del cliente."}
         action={can(session.role, "quote.create", session.activeCompanyCode) ? <ActionLink href="/cotizaciones/nuevo">Nueva cotización</ActionLink> : null}
       />
-      <SegmentedNav
-        items={[
-          { href: "/cotizaciones", label: "Todas", active: !pending && !decision },
-          { href: "/cotizaciones?vista=pendientes", label: "Pendientes de cotizar", active: pending },
-          { href: "/cotizaciones?vista=decision", label: "Decisión del cliente", active: decision },
-        ]}
-      />
-        <FilterBar action="/cotizaciones">
-          {pending ? <input type="hidden" name="vista" value="pendientes" /> : null}
-          {decision ? <input type="hidden" name="vista" value="decision" /> : null}
-          <input name="q" defaultValue={query} placeholder="Folio o cliente" className={`${controlClass} sm:flex-1`} />
-          <Button type="submit" tone="ghost">Buscar</Button>
-        </FilterBar>
+      <FilterBar action="/cotizaciones">
+        <select name="vista" defaultValue={pending ? "pendientes" : decision ? "decision" : "todas"} aria-label="Vista de cotizaciones" className={`${controlClass} sm:w-[190px]`}>
+          <option value="todas">Todas</option>
+          <option value="pendientes">Sin precio</option>
+          <option value="decision">Esperan respuesta</option>
+        </select>
+        <input name="q" defaultValue={query} placeholder="Buscar por folio o cliente" className={`${controlClass} sm:flex-1`} />
+        <Button type="submit" tone="ghost">Buscar</Button>
+      </FilterBar>
       <ActiveFilters
         items={[
           ...(pending ? [{ label: "Pendientes de cotizar", clearHref: listHref("/cotizaciones", { q: query || undefined }) }] : []),
@@ -110,7 +112,7 @@ export default async function CotizacionesPage({ searchParams }: { searchParams:
                   <Td><RecordLink href={`/cotizaciones/${quote.id}`}>{quote.folio}</RecordLink></Td>
                   <Td><ClientNameLink clientId={quote.client.id} name={quote.client.name} isSystem={quote.client.isSystem} canEdit={canEditClient} /></Td>
                   <Td>{QUOTE_TYPE_LABEL[quote.quoteType as QuoteType] ?? quote.quoteType}</Td>
-                  <Td><Badge>{QUOTE_STATUS_LABEL[quote.status] ?? quote.status}</Badge></Td>
+                  <Td><Badge tone={quote.status === "PENDIENTE_DECISION" ? "warn" : quote.status.startsWith("AUTORIZADA") ? "ok" : quote.status === "NO_AUTORIZADA" ? "danger" : "neutral"}>{QUOTE_STATUS_LABEL[quote.status] ?? quote.status}</Badge></Td>
                   <Td>{hidePrice ? "Sin precio" : money(totals?.total)}</Td>
                 </tr>
               );
@@ -124,7 +126,7 @@ export default async function CotizacionesPage({ searchParams }: { searchParams:
               key={quote.id}
               href={`/cotizaciones/${quote.id}`}
               title={quote.folio}
-              meta={<Badge>{QUOTE_STATUS_LABEL[quote.status] ?? quote.status}</Badge>}
+              meta={<Badge tone={quote.status === "PENDIENTE_DECISION" ? "warn" : quote.status.startsWith("AUTORIZADA") ? "ok" : quote.status === "NO_AUTORIZADA" ? "danger" : "neutral"}>{QUOTE_STATUS_LABEL[quote.status] ?? quote.status}</Badge>}
               footer={<ClientNameLink clientId={quote.client.id} name={quote.client.name} isSystem={quote.client.isSystem} canEdit={canEditClient} />}
             >
               <p>{QUOTE_TYPE_LABEL[quote.quoteType as QuoteType] ?? quote.quoteType} · {hidePrice ? "Sin precio" : money(totals?.total)}</p>

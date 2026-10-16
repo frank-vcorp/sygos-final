@@ -1,13 +1,14 @@
 import { resolveClientIdForProcess } from "./client-quick-create";
 import { prisma } from "./db";
-import { isReceipt, nextCustody, reasonsFor, receiptReasonFromAttention, type Custody, type MovementKind } from "./custody";
+import { isInitialWarehouseReceipt, isReceipt, nextCustody, reasonsFor, receiptReasonFromAttention, type Custody, type MovementKind } from "./custody";
 import { allocateFolio } from "./folios";
 import { ConcurrencyError } from "./form";
 import { recordHistory } from "./history";
 import { rememberCatalog } from "./catalog";
 import { isAttentionType, type AttentionType } from "./priorities";
 import { SALES_NOT_ASSIGNED_MESSAGE } from "./sales-assignment";
-import { assertWarrantyOrigin, openCase, openPendingCases } from "./technical";
+import { assertDefinitiveWarehouseExit, assertTestWarehouseExit } from "./warehouse-exit";
+import { assertWarrantyOrigin, openCase, openPendingCases, resolveWarrantyOriginForEquipment } from "./technical";
 
 type Actor = {
   userId: string;
@@ -204,20 +205,30 @@ export async function createAttention(
     priorityId: string;
     reportedFault: string;
     antecedent: string | null;
-    deliveryInstructions: string | null;
+    deliveryInstructions?: string | null;
+    initialLog?: string | null;
     originalCaseId: string | null;
     version: number;
   },
 ) {
   if (!isAttentionType(input.attentionType)) throw new Error("Selecciona el tipo de atención.");
-  if (input.attentionType === "DIAGNOSTICO_GARANTIA") {
-    if (!input.antecedent) throw new Error("Describe el antecedente del reclamo de garantía.");
-    if (!input.originalCaseId) throw new Error("Selecciona la reparación pagada que origina la garantía.");
-    await assertWarrantyOrigin(input.equipmentId, input.originalCaseId);
-  }
   const equipment = await prisma.equipment.findUnique({ where: { id: input.equipmentId } });
   if (!equipment || equipment.originCompanyId !== actor.activeCompanyId) {
     throw new Error("La atención se crea en la empresa que originó el equipo.");
+  }
+  const reportedFault = input.reportedFault?.trim() || "";
+  if (!reportedFault) throw new Error("Indica la falla reportada.");
+  let originalCaseId = input.originalCaseId;
+  let antecedent = input.antecedent?.trim() || null;
+  if (input.attentionType === "DIAGNOSTICO_GARANTIA") {
+    if (!originalCaseId) {
+      const origin = await resolveWarrantyOriginForEquipment(input.equipmentId);
+      originalCaseId = origin.id;
+      if (!antecedent) antecedent = `Garantía sobre ${origin.folio}`;
+    } else {
+      const original = await assertWarrantyOrigin(input.equipmentId, originalCaseId);
+      if (!antecedent) antecedent = `Garantía sobre ${original.folio}`;
+    }
   }
   const priority = await freezePriority(actor.activeCompanyId, input.attentionType, input.priorityId);
   const service =
@@ -255,11 +266,13 @@ export async function createAttention(
         priorityTargetMin: priority.targetMinDays,
         priorityTargetMax: priority.targetMaxDays,
         prioritySlaMaxDays: priority.slaMaxDays,
-        reportedFault: input.reportedFault,
-        antecedent: input.antecedent,
-        deliveryInstructions: input.deliveryInstructions,
+        reportedFault,
+        antecedent,
+        deliveryInstructions: input.deliveryInstructions ?? null,
+        initialLog: input.initialLog ?? null,
+        createdByUserId: actor.userId,
         sellerUserId: actor.role === "VENTAS" ? actor.userId : client.ownerUserId,
-        originalCaseId: input.originalCaseId,
+        originalCaseId,
         status: inServiceCustody ? "EN_PROCESO" : "ABIERTA",
         slaStartedAt: inServiceCustody ? new Date() : null,
       },
@@ -272,6 +285,14 @@ export async function createAttention(
     entityId: equipment.id,
     action: "ATENCION",
     summary: `Nueva atención ${input.attentionType} con prioridad ${priority.name}. No sustituye la identidad ${equipment.folio}.`,
+    authorUserId: actor.userId,
+  });
+  await recordHistory({
+    companyId: actor.activeCompanyId,
+    entityType: "ATENCION",
+    entityId: attention.id,
+    action: "ALTA",
+    summary: `Atención ${input.attentionType} creada con prioridad ${priority.name}.`,
     authorUserId: actor.userId,
   });
   return attention;
@@ -294,7 +315,7 @@ export async function startService(
     reportedFault: string;
     antecedent: string | null;
     originalCaseId: string | null;
-    deliveryInstructions: string | null;
+    initialLog: string | null;
   },
 ) {
   let clientId = input.clientId;
@@ -358,7 +379,7 @@ export async function startService(
     priorityId: input.priorityId,
     reportedFault: input.reportedFault,
     antecedent: input.antecedent,
-    deliveryInstructions: input.deliveryInstructions,
+    initialLog: input.initialLog,
     originalCaseId: input.originalCaseId,
     version,
   });
@@ -378,6 +399,7 @@ export async function registerMovement(
     enablingDocument: string | null;
     supplierId: string | null;
     notes: string | null;
+    technicalCaseId?: string | null;
   },
 ) {
   const equipment = await prisma.equipment.findUnique({ where: { id: input.equipmentId } });
@@ -392,11 +414,23 @@ export async function registerMovement(
   if (equipment.kind === "MOT" && equipment.originCompanyId !== actor.activeCompanyId && actor.activeCompanyCode === "SYSTRON") {
     throw new Error("SYSTRON no registra la custodia de este MOT.");
   }
-  if ((input.kind === "SALIDA" || input.kind === "EGRESO") && (!input.enablingDocument || !input.deliveryMode || !input.receiverName)) {
-    throw new Error("La salida definitiva exige documento habilitante, modalidad de entrega y persona que recibe.");
+  let enablingDocument = input.enablingDocument;
+  if (input.kind === "SALIDA" || input.kind === "EGRESO") {
+    if (!input.technicalCaseId) {
+      throw new Error("La salida definitiva debe ligarse a la OS terminada.");
+    }
+    const doc = await assertDefinitiveWarehouseExit(input.technicalCaseId, input.equipmentId);
+    enablingDocument = doc.enablingDocument;
+    if (!input.deliveryMode || !input.receiverName) {
+      throw new Error("Indica si entrega el vendedor asignado o paquetería.");
+    }
+    if (input.deliveryMode !== "Vendedor asignado" && input.deliveryMode !== "Paquetería") {
+      throw new Error("La entrega solo puede ser al vendedor asignado o por paquetería.");
+    }
   }
-  if (input.kind === "SALIDA_PRUEBA" && !input.receiverName) {
-    throw new Error("Indica el receptor o el contexto de la salida a prueba.");
+  if (input.kind === "SALIDA_PRUEBA") {
+    if (!input.receiverName) throw new Error("Indica quién recibe el equipo en prueba.");
+    await assertTestWarehouseExit(input.equipmentId, actor.activeCompanyId);
   }
   if (input.kind === "SALIDA_PROVEEDOR") {
     if (!input.supplierId) throw new Error("Selecciona el proveedor.");
@@ -409,6 +443,7 @@ export async function registerMovement(
     throw new Error("El motivo no pertenece al catálogo de este movimiento.");
   }
   const kind = equipment.kind === "MOT" ? "MOT" : "EQUI";
+  const initialWarehouseReceipt = isInitialWarehouseReceipt(kind, equipment.custody as Custody, input.kind);
   const custody = nextCustody(kind, equipment.custody as Custody, input.kind);
   const attention = await prisma.attention.findFirst({
     where: { equipmentId: equipment.id, status: "ABIERTA" },
@@ -444,7 +479,7 @@ export async function registerMovement(
         receiverName: input.receiverName,
         deliveryMode: input.deliveryMode,
         contact: input.contact,
-        enablingDocument: input.enablingDocument,
+        enablingDocument,
         supplierId: input.supplierId,
         notes: input.notes,
         authorUserId: actor.userId,
@@ -472,7 +507,19 @@ export async function registerMovement(
     summary: folio ? `${folio} confirmado. Custodia: ${custody}.` : `${input.kind} confirmado. Custodia: ${custody}.`,
     authorUserId: actor.userId,
   });
-  return { id: movementId, folio };
+  if (attention) {
+    await recordHistory({
+      companyId: actor.activeCompanyId,
+      entityType: "ATENCION",
+      entityId: attention.id,
+      action: receipt ? "ENTRADA_FISICA" : "MOVIMIENTO_FISICO",
+      summary: receipt
+        ? `${folio ?? input.kind} confirmado. El equipo quedó en resguardo e inició la atención.`
+        : `${input.kind} registrado para el equipo.`,
+      authorUserId: actor.userId,
+    });
+  }
+  return { id: movementId, folio, initialWarehouseReceipt };
 }
 
 export async function cancelMovement(actor: Actor, movementId: string, reason: string) {

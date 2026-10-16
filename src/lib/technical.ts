@@ -17,6 +17,28 @@ export { CASE_STATUS_LABEL };
 
 const DIAGNOSIS_TYPES = new Set(["DIAGNOSTICO", "DIAGNOSTICO_GARANTIA"]);
 
+const CLOSED_TECHNICAL_STATUSES = ["VALIDADO", "TERMINADA", "SIN_REPARACION"] as const;
+
+/** Último técnico que cerró un caso previo del mismo equipo en esta empresa de servicio. */
+export async function lastTechnicianWhoClosedEquipmentCase(
+  equipmentId: string,
+  serviceCompanyId: string,
+  excludeCaseId: string,
+): Promise<string | null> {
+  const prior = await prisma.technicalCase.findFirst({
+    where: {
+      equipmentId,
+      serviceCompanyId,
+      id: { not: excludeCaseId },
+      finishedByUserId: { not: null },
+      status: { in: [...CLOSED_TECHNICAL_STATUSES] },
+    },
+    orderBy: { updatedAt: "desc" },
+    select: { finishedByUserId: true },
+  });
+  return prior?.finishedByUserId ?? null;
+}
+
 export async function openPendingCases(equipmentId: string, receivedAt: Date) {
   const attentions = await prisma.attention.findMany({
     where: { equipmentId, slaStartedAt: { not: null }, technicalCases: { none: {} } },
@@ -34,18 +56,40 @@ export async function openCase(attentionId: string, receivedAt: Date) {
   if (!attention || attention.technicalCases.length > 0 || !attention.slaStartedAt) return null;
   const diagnosis = DIAGNOSIS_TYPES.has(attention.attentionType);
   const folio = await allocateFolio(attention.serviceCompanyId, diagnosis ? "DX" : "OS");
-  return prisma.technicalCase.create({
-    data: {
-      folio,
-      attentionId: attention.id,
-      equipmentId: attention.equipmentId,
-      serviceCompanyId: attention.serviceCompanyId,
-      kind: diagnosis ? "DIAGNOSTICO" : "OS",
-      status: "EN_ESPERA",
-      originalCaseId: attention.originalCaseId,
-      slaDueAt: addBusinessDays(receivedAt, attention.prioritySlaMaxDays),
-    },
+  const technicalCase = await prisma.$transaction(async (tx) => {
+    const technicalCase = await tx.technicalCase.create({
+      data: {
+        folio,
+        attentionId: attention.id,
+        equipmentId: attention.equipmentId,
+        serviceCompanyId: attention.serviceCompanyId,
+        kind: diagnosis ? "DIAGNOSTICO" : "OS",
+        status: "EN_ESPERA",
+        originalCaseId: attention.originalCaseId,
+        slaDueAt: addBusinessDays(receivedAt, attention.prioritySlaMaxDays),
+      },
+    });
+    if (attention.initialLog?.trim() && attention.createdByUserId) {
+      await tx.technicalLog.create({
+        data: {
+          caseId: technicalCase.id,
+          body: attention.initialLog.trim(),
+          authorUserId: attention.createdByUserId,
+        },
+      });
+      await tx.attention.update({ where: { id: attention.id }, data: { initialLog: null } });
+    }
+    return technicalCase;
   });
+  await recordHistory({
+    companyId: attention.serviceCompanyId,
+    entityType: "OPERACION",
+    entityId: technicalCase.id,
+    action: "ALTA",
+    summary: `${technicalCase.folio} abierta y en espera de asignación técnica.`,
+    authorUserId: attention.createdByUserId,
+  });
+  return technicalCase;
 }
 
 export async function assertWarrantyOrigin(equipmentId: string, originalCaseId: string) {
@@ -67,6 +111,30 @@ export async function assertWarrantyOrigin(equipmentId: string, originalCaseId: 
     throw new Error("El periodo de garantía de seis meses ya venció.");
   }
   return original;
+}
+
+/** Última OS pagada del equipo que aún esté dentro del periodo de garantía. */
+export async function resolveWarrantyOriginForEquipment(equipmentId: string) {
+  const candidates = await prisma.technicalCase.findMany({
+    where: {
+      equipmentId,
+      kind: "OS",
+      status: "TERMINADA",
+      paidAt: { not: null },
+      attention: { attentionType: { not: "DIAGNOSTICO_GARANTIA" } },
+    },
+    orderBy: { paidAt: "desc" },
+    select: { id: true, folio: true },
+  });
+  for (const candidate of candidates) {
+    try {
+      await assertWarrantyOrigin(equipmentId, candidate.id);
+      return candidate;
+    } catch {
+      continue;
+    }
+  }
+  throw new Error("Este equipo no tiene una reparación pagada con garantía vigente.");
 }
 
 async function loadCase(id: string) {
@@ -138,15 +206,26 @@ export async function startCase(actor: Actor, caseId: string, version: number) {
   if (!canExecute(actor, row.assigneeUserId) && !(actor.role === "GERENTE_OPERATIVO_SERVOMOTORES")) {
     throw new Error("Solo el responsable asignado inicia el trabajo.");
   }
-  if (row.kind === "DIAGNOSTICO" && !row.assigneeUserId && actor.role !== "GERENTE_OPERATIVO_SERVOMOTORES" && actor.role !== "ADMINISTRADOR" && actor.role !== "CEO" && actor.role !== "SUPERVISOR_TECNICO") {
+  if (!row.assigneeUserId && actor.role === "SUPERVISOR_TECNICO") {
+    throw new Error("Asigna un responsable antes de iniciar el trabajo.");
+  }
+  if (row.kind === "DIAGNOSTICO" && !row.assigneeUserId && actor.role !== "GERENTE_OPERATIVO_SERVOMOTORES" && actor.role !== "ADMINISTRADOR" && actor.role !== "CEO") {
     throw new Error("Asigna un responsable antes de iniciar.");
   }
   const next = row.kind === "DIAGNOSTICO" ? "EN_DIAGNOSTICO" : "EN_REPARACION";
   if (row.status !== "EN_ESPERA" && row.status !== "DEVUELTO") throw new Error("Esta operación no está en espera.");
-  const claim = !row.assigneeUserId && (actor.role === "GERENTE_OPERATIVO_SERVOMOTORES" || actor.role === "SUPERVISOR_TECNICO");
+  const claim = !row.assigneeUserId && actor.role === "GERENTE_OPERATIVO_SERVOMOTORES";
   const data = { status: next, version: { increment: 1 }, ...(claim ? { assigneeUserId: actor.userId } : {}) };
   const updated = await prisma.technicalCase.updateMany({ where: { id: row.id, version }, data });
   if (updated.count === 0) throw new ConcurrencyError();
+  await recordHistory({
+    companyId: actor.activeCompanyId,
+    entityType: "OPERACION",
+    entityId: row.id,
+    action: "INICIO_TECNICO",
+    summary: row.kind === "DIAGNOSTICO" ? "Inició el diagnóstico técnico." : "Inició la reparación técnica.",
+    authorUserId: actor.userId,
+  });
 }
 
 export async function addLog(actor: Actor, caseId: string, body: string) {
@@ -160,7 +239,7 @@ export async function addLog(actor: Actor, caseId: string, body: string) {
   await prisma.technicalLog.create({ data: { caseId: row.id, body, authorUserId: actor.userId } });
 }
 
-export async function finishDiagnosis(actor: Actor, caseId: string, version: number, resultText: string) {
+export async function finishDiagnosis(actor: Actor, caseId: string, version: number) {
   const row = await loadCase(caseId);
   assertServiceCompany(actor, row.serviceCompanyId);
   if (row.kind !== "DIAGNOSTICO") throw new Error("Esta no es una operación de diagnóstico.");
@@ -168,12 +247,12 @@ export async function finishDiagnosis(actor: Actor, caseId: string, version: num
   if (!["EN_DIAGNOSTICO", "DEVUELTO"].includes(row.status)) throw new Error("El diagnóstico no está en ejecución.");
   const servomotores = row.serviceCompany.code === "SERVOMOTORES";
   const status = servomotores ? "VALIDADO" : "PENDIENTE_VALIDACION";
-  const quotePending = servomotores && (row.attention.priorityPrice == null || row.attention.priorityPrice > 0) && row.attention.attentionType !== "DIAGNOSTICO_GARANTIA";
+  // Todo Diagnóstico normal termina en una cotización; la prioridad solo conserva precio/SLA.
+  const quotePending = servomotores && row.attention.attentionType === "DIAGNOSTICO";
   const updated = await prisma.technicalCase.updateMany({
     where: { id: row.id, version },
     data: {
       status,
-      resultText,
       finishedByUserId: actor.userId,
       validatedByUserId: servomotores ? actor.userId : null,
       validatedAt: servomotores ? new Date() : null,
@@ -224,7 +303,8 @@ export async function validateDiagnosis(actor: Actor, caseId: string, version: n
   const warranty = row.attention.attentionType === "DIAGNOSTICO_GARANTIA";
   const warrantyDecision = decision === "VALIDA" || decision === "NO_PROCEDENTE" ? decision : null;
   if (warranty && !warrantyDecision) throw new Error("Indica si la garantía procede.");
-  const quotePending = !warranty && (row.attention.priorityPrice == null || row.attention.priorityPrice > 0);
+  // La validación de cualquier Diagnóstico normal entrega el pendiente de precio a CEO/Administrador.
+  const quotePending = row.attention.attentionType === "DIAGNOSTICO";
   const updated = await prisma.technicalCase.updateMany({
     where: { id: row.id, version },
     data: {

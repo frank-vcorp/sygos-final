@@ -12,7 +12,6 @@ import {
   PageHeader,
   RecordLink,
   ResponsiveData,
-  SegmentedNav,
   Table,
   Td,
   Th,
@@ -27,7 +26,7 @@ import { requireCompany } from "@/lib/session";
 function salePending(sale: { lines: Array<{ qtySold: number; qtyReceived: number; qtyDelivered: number }> }) {
   const pendingReceive = sale.lines.reduce((sum, line) => sum + Math.max(0, line.qtySold - line.qtyReceived), 0);
   const pendingDeliver = sale.lines.reduce((sum, line) => sum + Math.max(0, line.qtyReceived - line.qtyDelivered), 0);
-  const pendingLabel = pendingReceive > 0 ? `Recibir ${pendingReceive}` : pendingDeliver > 0 ? `Entregar ${pendingDeliver}` : "Al día";
+  const pendingLabel = pendingReceive > 0 ? `Por recibir: ${pendingReceive}` : pendingDeliver > 0 ? `Por entregar: ${pendingDeliver}` : "Al día";
   return { pendingReceive, pendingDeliver, pendingLabel };
 }
 
@@ -67,25 +66,22 @@ export default async function VentasPage({ searchParams }: { searchParams: Promi
       return pendingReceive === 0 && pendingDeliver === 0;
     });
   }
-  const vistaLabel = view === "pendientes" ? "Con pendientes" : view === "al_dia" ? "Al día" : null;
+  const vistaLabel = view === "pendientes" ? "Requieren atención" : view === "al_dia" ? "Al día" : null;
 
   return (
     <>
       <PageHeader
         title="Venta de equipos"
-        subtitle="Ventas autorizadas de tu cartera. Recepción y entrega se confirman en el detalle."
+        subtitle="Consulta lo que falta por recibir o entregar. Abre el folio para registrar el avance."
         back={session.role === "VENTAS" ? { href: "/panel", label: "Inicio" } : undefined}
         action={can(session.role, "quote.create", session.activeCompanyCode) ? <ActionLink href="/ventas/nuevo">Nueva venta de equipo</ActionLink> : null}
       />
-      <SegmentedNav
-        items={[
-          { href: listHref("/ventas", { q: query || undefined }), label: "Todas", active: view === "todas" },
-          { href: listHref("/ventas", { vista: "pendientes", q: query || undefined }), label: "Con pendientes", active: view === "pendientes" },
-          { href: listHref("/ventas", { vista: "al_dia", q: query || undefined }), label: "Al día", active: view === "al_dia" },
-        ]}
-      />
       <FilterBar action="/ventas">
-        {view !== "todas" ? <input type="hidden" name="vista" value={view} /> : null}
+        <select name="vista" defaultValue={view} aria-label="Vista de ventas" className={`${controlClass} sm:w-[190px]`}>
+          <option value="todas">Todas</option>
+          <option value="pendientes">Requieren atención</option>
+          <option value="al_dia">Al día</option>
+        </select>
         <input name="q" defaultValue={query} placeholder="Folio, cliente o cotización" className={`${controlClass} sm:flex-1`} />
         <Button type="submit" tone="ghost">Buscar</Button>
       </FilterBar>
@@ -115,7 +111,7 @@ export default async function VentasPage({ searchParams }: { searchParams: Promi
         <ResponsiveData
           table={
             <Table>
-              <thead><tr><Th>Folio</Th><Th>Cliente</Th><Th>Cotización</Th><Th>Pendiente</Th></tr></thead>
+              <thead><tr><Th>Folio</Th><Th>Cliente</Th><Th>Cotización</Th><Th>Siguiente paso</Th></tr></thead>
               <tbody>
                 {sales.map((sale) => {
                   const { pendingLabel } = salePending(sale);
@@ -124,7 +120,7 @@ export default async function VentasPage({ searchParams }: { searchParams: Promi
                       <Td><RecordLink href={`/ventas/${sale.id}`}>{sale.folio}</RecordLink></Td>
                       <Td><ClientNameLink clientId={sale.client.id} name={sale.client.name} isSystem={sale.client.isSystem} canEdit={canEditClient} /></Td>
                       <Td><TextLink href={`/cotizaciones/${sale.quoteId}`}>{sale.quote.folio}</TextLink></Td>
-                      <Td><Badge>{pendingLabel}</Badge></Td>
+                      <Td><Badge tone={pendingLabel === "Al día" ? "ok" : "warn"}>{pendingLabel}</Badge></Td>
                     </tr>
                   );
                 })}
@@ -138,7 +134,7 @@ export default async function VentasPage({ searchParams }: { searchParams: Promi
                 key={sale.id}
                 href={`/ventas/${sale.id}`}
                 title={sale.folio}
-                meta={<Badge>{pendingLabel}</Badge>}
+                meta={<Badge tone={pendingLabel === "Al día" ? "ok" : "warn"}>{pendingLabel}</Badge>}
                 footer={
                   <>
                     <p><ClientNameLink clientId={sale.client.id} name={sale.client.name} isSystem={sale.client.isSystem} canEdit={canEditClient} /></p>

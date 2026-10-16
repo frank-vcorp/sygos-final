@@ -76,7 +76,7 @@ export default async function AgendaPage({ searchParams }: { searchParams: Promi
       <AgendaCalendar
         view={vista}
         anchor={anchor}
-        activities={activities.map((item) => ({ id: item.id, note: item.note, category: item.category?.name ?? "Actividad", at: item.scheduledAt.toISOString() }))}
+        activities={activities.map((item: { id: string; note: string; scheduledAt: Date; category: { name: string } | null }) => ({ id: item.id, note: item.note, category: item.category?.name ?? "Actividad", at: item.scheduledAt.toISOString() }))}
       />
       <div className="mt-4 scroll-mt-24" id="nueva">
         <QuickPanel label="Nueva actividad" defaultOpen={Boolean(slot)}>
@@ -88,7 +88,7 @@ export default async function AgendaPage({ searchParams }: { searchParams: Promi
               <Field label="Categoría">
                 <select name="categoryId" className={controlClass} defaultValue="">
                   <option value="">Sin categoría</option>
-                  {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+                  {categories.map((category: { id: string; name: string }) => <option key={category.id} value={category.id}>{category.name}</option>)}
                 </select>
               </Field>
               <Field label="Nota"><textarea name="note" required rows={3} className={controlClass} /></Field>
@@ -103,7 +103,7 @@ export default async function AgendaPage({ searchParams }: { searchParams: Promi
           <FormSection title={`Meta mensual · ${goalType.name}`} description="Objetivo por vendedor para el mes en curso." columns={1}>
             <input type="hidden" name="goalTypeId" value={goalType.id} />
             <Field label="Vendedor">
-              <select name="userId" className={controlClass}>{sellers.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}</select>
+              <select name="userId" className={controlClass}>{sellers.map((user: { id: string; name: string }) => <option key={user.id} value={user.id}>{user.name}</option>)}</select>
             </Field>
             <Field label="Objetivo"><input name="target" type="number" min={1} required className={controlClass} /></Field>
           </FormSection>

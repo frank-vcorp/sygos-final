@@ -52,6 +52,9 @@ export async function createMotAction(formData: FormData) {
   "use server";
   try {
     const session = await guard("mot.create");
+    if (!can(session.role, "attention.create", session.activeCompanyCode)) {
+      throw new Error("Ventas no abre servicios manualmente; el servicio se genera al confirmar el ingreso en Almacén.");
+    }
     const { clientId } = await clientIdFromForm(session, formData);
     const equipment = await createMot(session, {
       clientId,
@@ -122,6 +125,7 @@ export async function movementAction(formData: FormData) {
       enablingDocument: optionalText(formData.get("enablingDocument")),
       supplierId: await supplierIdFromForm(session, formData),
       notes: optionalText(formData.get("notes")),
+      technicalCaseId: optionalText(formData.get("technicalCaseId")),
     });
     await setFlash({
       tone: "ok",
@@ -129,7 +133,7 @@ export async function movementAction(formData: FormData) {
         ? `${result.folio} confirmado. Imprime el documento de recepción para firma del vendedor.`
         : "Movimiento físico registrado.",
     });
-    redirect(back);
+    redirect(result.initialWarehouseReceipt ? `${back}?etiqueta=1` : back);
   } catch (error) {
     if (isRedirect(error)) throw error;
     await setFlash({ tone: "error", message: messageOf(error) });

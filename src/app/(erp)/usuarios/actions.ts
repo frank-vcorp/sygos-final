@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { hashPassword } from "@/lib/crypto";
 import { setFlash } from "@/lib/flash";
 import { ConcurrencyError, optionalText, parseVersion, requiredText } from "@/lib/form";
+import { parseMoneyInput } from "@/lib/money";
 import { recordHistory } from "@/lib/history";
 import { can, canSeeUser } from "@/lib/permissions";
 import {
@@ -151,8 +152,11 @@ function limitsFrom(role: Role, formData: FormData) {
     return { discountLimitPct: n };
   }
   if (isPurchaseManager(role)) {
-    const monthly = Number(optionalText(formData.get("monthlyPurchaseBudget")) ?? DEFAULT_MONTHLY_PURCHASE);
-    const limit = Number(optionalText(formData.get("purchaseLimit")) ?? DEFAULT_PURCHASE_LIMIT);
+    const monthlyRaw = optionalText(formData.get("monthlyPurchaseBudget"));
+    const limitRaw = optionalText(formData.get("purchaseLimit"));
+    const monthly = monthlyRaw ? parseMoneyInput(monthlyRaw) : DEFAULT_MONTHLY_PURCHASE;
+    const limit = limitRaw ? parseMoneyInput(limitRaw) : DEFAULT_PURCHASE_LIMIT;
+    if (monthly == null || limit == null) throw new Error("Los límites de compra no son válidos.");
     if (!Number.isFinite(monthly) || monthly < 0 || !Number.isFinite(limit) || limit < 0) {
       throw new Error("Los límites de compra no son válidos.");
     }

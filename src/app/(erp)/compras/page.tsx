@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { ActionLink, ActiveFilters, Badge, Button, controlClass, Empty, FilterBar, MobileCard, PageHeader, RecordLink, ResponsiveData, SegmentedNav, Table, Td, Th, TextLink } from "@/components/ui";
+import { ActionLink, ActiveFilters, Badge, Button, controlClass, Empty, FilterBar, MobileCard, PageHeader, RecordLink, ResponsiveData, Table, Td, Th, TextLink } from "@/components/ui";
 import { listHref } from "@/lib/list-url";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
@@ -53,9 +53,10 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
   return (
     <>
       <PageHeader title="Compras" subtitle="Cada compra termina en un egreso o en una cuenta por pagar, nunca en ambos." action={<ActionLink href="/compras/nueva">Nueva compra</ActionLink>} />
-      <SegmentedNav items={tabs.map(([key, label]) => ({ href: `/compras?vista=${key}`, label, active: view === key }))} />
       <FilterBar action="/compras">
-        {view !== "directas" ? <input type="hidden" name="vista" value={view} /> : null}
+        <select name="vista" defaultValue={view} aria-label="Vista de compras" className={`${controlClass} sm:w-[210px]`}>
+          {tabs.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+        </select>
         <input name="q" defaultValue={query} placeholder="Folio o proveedor" className={`${controlClass} sm:flex-1`} />
         <Button type="submit" tone="ghost">Buscar</Button>
       </FilterBar>

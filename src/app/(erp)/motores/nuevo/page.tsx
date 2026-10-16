@@ -11,7 +11,7 @@ import { requireCompany } from "@/lib/session";
 
 export default async function NuevoMotPage() {
   const session = await requireCompany();
-  if (!can(session.role, "mot.create", session.activeCompanyCode)) redirect("/motores");
+  if (!can(session.role, "mot.create", session.activeCompanyCode) || !can(session.role, "attention.create", session.activeCompanyCode)) redirect("/motores");
   const [clients, priorities, types, brands, models] = await Promise.all([
     prisma.client.findMany({
       where: {
@@ -21,7 +21,6 @@ export default async function NuevoMotPage() {
         ...(session.role === "VENTAS" ? { ownerUserId: session.userId } : {}),
       },
       orderBy: { name: "asc" },
-      take: 200,
     }),
     prisma.priority.findMany({ where: { companyId: session.activeCompanyId, active: true }, orderBy: [{ attentionType: "asc" }, { sortOrder: "asc" }] }),
     prisma.catalogType.findMany({ orderBy: { name: "asc" } }),
@@ -50,7 +49,7 @@ export default async function NuevoMotPage() {
           <Field label="Número de serie" hint="Opcional."><input name="serial" className={controlClass} /></Field>
           <Field label="Descripción"><textarea name="description" rows={3} className={controlClass} /></Field>
         </FormSection>
-        <FormSection title="Servicio solicitado" description="La prioridad y la falla quedan fotografiadas al crear la atención.">
+        <FormSection title="Servicio técnico solicitado" description="La prioridad y la falla quedan fotografiadas al crear la atención.">
           <div className="md:col-span-2"><ServiceTypePriority hint="La garantía se abre desde Servicios, sobre un equipo que ya tuvo una reparación pagada." types={ATTENTION_TYPES.filter((type) => type !== "DIAGNOSTICO_GARANTIA").map((type) => ({ value: type, label: ATTENTION_LABEL[type] }))} priorities={priorities.filter((row) => row.attentionType !== "DIAGNOSTICO_GARANTIA").map((row) => ({ id: row.id, attentionType: row.attentionType, label: prioritySummary(row) }))} /></div>
           <Field label="Falla reportada"><textarea name="reportedFault" required rows={4} className={controlClass} /></Field>
           <Field label="Instrucciones de entrega"><textarea name="deliveryInstructions" rows={4} className={controlClass} /></Field>

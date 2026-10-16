@@ -19,7 +19,6 @@ export default async function NuevoEquiPage() {
         ...(session.role === "VENTAS" ? { ownerUserId: session.userId } : {}),
       },
       orderBy: { name: "asc" },
-      take: 200,
     }),
     prisma.catalogType.findMany({ orderBy: { name: "asc" } }),
     prisma.catalogBrand.findMany({ orderBy: { name: "asc" } }),

@@ -54,8 +54,14 @@ export function FormQuickModal({
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
+      onKeyDown={(event) => {
+        if (event.key === "Enter" && !(event.target instanceof HTMLTextAreaElement) && !(event.target instanceof HTMLButtonElement)) {
+          event.preventDefault();
+          void handleDone();
+        }
+      }}
     >
-      <div className="max-h-[min(90vh,40rem)] w-full max-w-lg overflow-y-auto rounded-xl border border-[var(--line)] bg-white shadow-xl">
+      <div className="max-h-[min(90vh,40rem)] w-full max-w-lg overflow-y-auto rounded-2xl border border-[var(--line)] bg-white shadow-xl">
         <div className="sticky top-0 flex items-center justify-between gap-3 border-b border-[var(--line)] bg-white px-4 py-3">
           <h3 id={titleId} className="text-sm font-semibold text-[#0b1f3a]">{title}</h3>
           <Button type="button" tone="ghost" className="min-h-9 px-2 text-xs" onClick={onClose}>
@@ -65,6 +71,8 @@ export function FormQuickModal({
         <div ref={bodyRef} className="grid gap-3 p-4">
           {children}
           {commitError ? <p className="text-sm text-[var(--danger)]">{commitError}</p> : null}
+        </div>
+        <div className="sticky bottom-0 z-10 border-t border-[var(--line)] bg-white/95 px-4 py-3 shadow-[0_-8px_20px_rgba(20,45,75,0.1)] backdrop-blur-md" style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
           <Button type="button" className="w-full sm:w-auto" disabled={saving} onClick={handleDone}>
             {saving ? "Guardando…" : doneLabel}
           </Button>

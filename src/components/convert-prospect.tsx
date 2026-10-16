@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { SearchableEntityPicker } from "@/components/searchable-entity-picker";
 import { ConfirmSubmit, SubmitButton } from "@/components/submit-button";
 import { controlClass, Field, FormActions, FormPanel, FormSection } from "@/components/ui";
 
@@ -22,6 +23,7 @@ export function ConvertProspect({
   discardAction: (formData: FormData) => void | Promise<void>;
 }) {
   const [mode, setMode] = useState("nuevo");
+  const [clientId, setClientId] = useState("");
   return (
     <div className="mt-4 grid gap-4 lg:grid-cols-2">
       <FormPanel action={convertAction}>
@@ -44,12 +46,7 @@ export function ConvertProspect({
               </Field>
             </>
           ) : (
-            <Field label="Cliente existente">
-              <select name="clientId" required className={controlClass} defaultValue="">
-                <option value="">Selecciona</option>
-                {clients.map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}
-              </select>
-            </Field>
+            <SearchableEntityPicker label="Cliente existente" name="clientId" options={clients} selectedId={clientId} onSelect={setClientId} required emptyLabel="Busca o selecciona un cliente" />
           )}
         </FormSection>
         <FormActions><SubmitButton>Convertir a cliente</SubmitButton></FormActions>

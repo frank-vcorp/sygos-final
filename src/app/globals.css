@@ -93,3 +93,88 @@ summary {
     break-inside: avoid;
   }
 }
+
+
+/* Capa visual compartida para las vistas operativas. */
+:root {
+  --bg: #f4f7fb;
+  --ink: #14243b;
+  --muted: #52647a;
+  --line: #dbe4ef;
+  --accent: #0a477e;
+  --accent-soft: #e8f3fa;
+  --ok: #067782;
+}
+
+body {
+  background-image: radial-gradient(circle at 90% -15%, #e7f2fa 0, transparent 34rem);
+  letter-spacing: -0.005em;
+}
+
+::selection {
+  background: #c7e9f2;
+  color: var(--ink);
+}
+
+:where(a, button, input, select, textarea, summary):focus-visible {
+  outline: 2px solid #087d99;
+  outline-offset: 2px;
+}
+
+:where(input, select, textarea):disabled {
+  cursor: not-allowed;
+  background: #f1f4f7;
+  color: var(--muted);
+}
+
+:where(input, select, textarea)::placeholder {
+  color: #718197;
+}
+
+:where(input, select, textarea):not([type="checkbox"]):not([type="radio"]):not([type="hidden"]) {
+  transition: border-color 160ms ease, box-shadow 160ms ease, background-color 160ms ease;
+}
+
+:where(input, select, textarea):not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):hover:not(:disabled) {
+  border-color: #aabbd0;
+}
+
+:where(button, a) {
+  transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+}
+
+:where(button):active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+:where(table) {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+:where(tbody tr):hover {
+  background: #f4f9fc;
+}
+
+:where(tbody tr:last-child td) {
+  border-bottom-color: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :where(button, a, input, select, textarea) {
+    transition: none !important;
+  }
+}
+
+@media print {
+  body { background-image: none; }
+  :where(tbody tr):hover { background: transparent; }
+}
+
+/* Mantiene la acción rápida visible sin duplicar el pie principal mientras se captura. */
+[data-form-panel]:has([data-quick-create-open]) [data-form-actions] {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+html { scroll-padding-bottom: 8rem; }

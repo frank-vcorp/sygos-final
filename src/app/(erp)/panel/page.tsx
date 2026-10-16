@@ -1,15 +1,15 @@
 import type { ReactNode } from "react";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ClientNameLink } from "@/components/client-entity-links";
-import { Card, KpiCard, PageHeader, RecordLink, TextLink } from "@/components/ui";
+import { AuthorizeExitWithoutDocumentButton } from "@/components/exit-without-document-actions";
+import { ActionLink, Card, KpiCard, PageHeader, RecordLink, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
 import { can } from "@/lib/permissions";
 import { QUOTE_STATUS_LABEL } from "@/lib/quotes";
 import { PART_REQUEST_STATUS_LABEL } from "@/lib/case-labels";
 import { homePath } from "@/lib/home";
-import { salesPortfolioUserId } from "@/lib/sales-assignment";
-import { listActiveServicios } from "@/lib/servicios-supervisor";
 import { requireCompany } from "@/lib/session";
 
 const CLOSED = ["VALIDADO", "TERMINADA", "SIN_REPARACION"];
@@ -25,15 +25,31 @@ function Block({
   rows: Array<{ key?: string; href: string; label: string; detail: ReactNode }>;
   bandejaHref?: string;
 }) {
+  const shownLabel =
+    rows.length === 0
+      ? "Sin pendientes"
+      : rows.length === 1
+        ? "1 pendiente mostrado"
+        : `${rows.length} pendientes mostrados`;
   return (
-    <Card className="p-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="font-medium">{title}</h2>
+    <Card className="flex h-full flex-col overflow-hidden p-0">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--line)] bg-[#fbfdff] px-5 py-4">
+        <div>
+          <h2 className="text-base font-bold tracking-tight text-[var(--ink)]">{title}</h2>
+          <p className="mt-1 text-xs text-[var(--muted)]">{shownLabel}</p>
+        </div>
         {bandejaHref ? <TextLink href={bandejaHref}>Ver bandeja</TextLink> : null}
       </div>
-      {rows.length === 0 ? <p className="mt-2 text-sm text-[var(--muted)]">{empty}</p> : (
-        <ul className="mt-2 space-y-2 text-sm">
-          {rows.map((row) => <li key={row.key ?? row.href + row.label}><RecordLink href={row.href}>{row.label}</RecordLink> · {row.detail}</li>)}
+      {rows.length === 0 ? (
+        <p className="m-5 rounded-lg bg-[#f5f8fb] px-4 py-3 text-sm text-[var(--muted)]">{empty}</p>
+      ) : (
+        <ul className="divide-y divide-[var(--line)] text-sm">
+          {rows.map((row) => (
+            <li key={row.key ?? row.href + row.label} className="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-start sm:gap-4">
+              <RecordLink href={row.href} className="shrink-0">{row.label}</RecordLink>
+              <span className="min-w-0 leading-5 text-[var(--muted)]">{row.detail}</span>
+            </li>
+          ))}
         </ul>
       )}
     </Card>
@@ -44,6 +60,17 @@ function panelClientLink(client: { id: string; name: string; isSystem: boolean }
   return <ClientNameLink clientId={client.id} name={client.name} isSystem={client.isSystem} canEdit />;
 }
 
+function SalesMetric({ label, value, href }: { label: string; value: ReactNode; href: string }) {
+  return (
+    <Link
+      href={href}
+      className="rounded-xl border border-[var(--line)] bg-white px-4 py-3 outline-none transition-colors hover:border-[#91b7cf] hover:bg-[#f8fbfd] focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2"
+    >
+      <span className="block text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">{label}</span>
+      <span className="mt-1 block text-xl font-bold text-[var(--ink)]">{value}</span>
+    </Link>
+  );
+}
 export default async function PanelPage({ searchParams }: { searchParams: Promise<{ vista?: string; filtro?: string }> }) {
   const session = await requireCompany();
   if (!can(session.role, "panel.view", session.activeCompanyCode)) redirect(homePath(session.role, session.activeCompanyCode));
@@ -235,85 +262,148 @@ async function Sales({ companyId, userId }: { companyId: string; userId: string 
   const monthStart = new Date();
   monthStart.setDate(1);
   monthStart.setHours(0, 0, 0, 0);
-  const [quotes, waitingPrice, receivables, activities, invoices, sales, goals, authorizedMonth, pendingDecision] = await Promise.all([
-    prisma.quote.findMany({ where: { companyId, sellerUserId: userId, status: { in: ["PENDIENTE_DECISION", "AUTORIZADA", "AUTORIZADA_PENDIENTE_EQUIPO"] } }, include: { client: true }, take: 12, orderBy: { updatedAt: "desc" } }),
-    prisma.quote.findMany({ where: { companyId, sellerUserId: userId, status: "PENDIENTE_COTIZAR" }, include: { client: true }, take: 8, orderBy: { updatedAt: "desc" } }),
-    prisma.receivable.findMany({ where: { companyId, sellerUserId: userId, balance: { gt: 0 } }, include: { document: true, client: true }, take: 12 }),
+  const [quotes, receivables, activities, invoices, sales, goals, authorizedMonth, pendingDecision] = await Promise.all([
+    prisma.quote.findMany({
+      where: {
+        companyId,
+        sellerUserId: userId,
+        status: { in: ["PENDIENTE_DECISION", "AUTORIZADA", "AUTORIZADA_PENDIENTE_EQUIPO"] },
+      },
+      include: { client: true },
+      take: 12,
+      orderBy: { updatedAt: "desc" },
+    }),
+    prisma.receivable.findMany({
+      where: { companyId, sellerUserId: userId, balance: { gt: 0 } },
+      include: { document: true, client: true },
+      take: 12,
+      orderBy: { dueAt: "asc" },
+    }),
     prisma.agendaActivity.findMany({
       where: { companyId, authorUserId: userId, scheduledAt: { gte: new Date() } },
       include: { client: { select: { id: true, name: true, isSystem: true } } },
       orderBy: { scheduledAt: "asc" },
       take: 6,
     }),
-    prisma.quote.findMany({ where: { companyId, sellerUserId: userId, status: { startsWith: "AUTORIZADA" }, client: { requiresInvoice: true }, billingDocuments: { none: { kind: "FACTURA", status: "EMITIDA" } } }, include: { client: true }, take: 12 }),
-    prisma.sale.findMany({ where: { companyId, quote: { sellerUserId: userId } }, include: { client: true, lines: true }, take: 20, orderBy: { createdAt: "desc" } }),
-    prisma.salesGoal.findMany({ where: { companyId, userId, year: new Date().getFullYear(), month: new Date().getMonth() + 1 }, include: { goalType: true } }),
-    prisma.quote.count({ where: { companyId, sellerUserId: userId, status: { startsWith: "AUTORIZADA" }, updatedAt: { gte: monthStart } } }),
-    prisma.quote.count({ where: { companyId, sellerUserId: userId, status: "PENDIENTE_DECISION" } }),
+    prisma.quote.findMany({
+      where: {
+        companyId,
+        sellerUserId: userId,
+        status: { startsWith: "AUTORIZADA" },
+        client: { requiresInvoice: true },
+        billingDocuments: { none: { kind: "FACTURA", status: "EMITIDA" } },
+      },
+      include: { client: true },
+      take: 12,
+      orderBy: { updatedAt: "desc" },
+    }),
+    prisma.sale.findMany({
+      where: { companyId, quote: { sellerUserId: userId } },
+      include: { client: true, lines: true },
+      take: 20,
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.salesGoal.findMany({
+      where: { companyId, userId, year: new Date().getFullYear(), month: new Date().getMonth() + 1 },
+      include: { goalType: true },
+    }),
+    prisma.quote.count({
+      where: { companyId, sellerUserId: userId, status: { startsWith: "AUTORIZADA" }, updatedAt: { gte: monthStart } },
+    }),
+    prisma.quote.count({
+      where: { companyId, sellerUserId: userId, status: "PENDIENTE_DECISION" },
+    }),
   ]);
   const deliveries = sales.filter((sale) => sale.lines.some((line) => line.qtyReceived < line.qtySold || line.qtyDelivered < line.qtyReceived));
-  const portfolioId = salesPortfolioUserId("VENTAS", userId);
-  const serviciosCartera = portfolioId
-    ? await listActiveServicios(companyId, "", { clientOwnerUserId: portfolioId })
-    : [];
+
   return (
     <>
-      <PageHeader title="Inicio" subtitle="Tus pendientes comerciales y tu desempeño. Solo clientes asignados a ti en cartera; sin costos internos ni base Servomotores." />
-      <section className="mb-4 grid gap-3 sm:grid-cols-3">
-        <KpiCard label="Cotizaciones autorizadas (mes)" value={String(authorizedMonth)} href="/cotizaciones" />
-        <KpiCard label="Esperando decisión del cliente" value={String(pendingDecision)} href="/cotizaciones?vista=decision" />
-        <KpiCard label="Saldo en cobranza" value={money(receivables.reduce((sum, row) => sum + row.balance, 0))} href="/cobranza?vista=cxc" />
+      <PageHeader
+        title="Inicio"
+        subtitle="Pendientes comerciales de tu cartera."
+        action={<ActionLink href="/cotizaciones/nuevo">Nueva cotización</ActionLink>}
+      />
+      <Card className="mb-4 p-5">
+        <div>
+          <h2 className="text-base font-bold tracking-tight text-[var(--ink)]">Mi desempeño</h2>
+          <p className="mt-1 text-sm text-[var(--muted)]">Resumen de actividad comercial propia.</p>
+        </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-3">
+          <SalesMetric label="Cotizaciones autorizadas este mes" value={authorizedMonth} href="/cotizaciones" />
+          <SalesMetric label="Esperando decisión" value={pendingDecision} href="/cotizaciones?vista=decision" />
+          <SalesMetric label="Saldo por cobrar" value={money(receivables.reduce((sum, row) => sum + row.balance, 0))} href="/cobranza?vista=cxc" />
+        </div>
+        {goals.length > 0 ? (
+          <div className="mt-4 border-t border-[var(--line)] pt-4">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Metas del mes</p>
+            <ul className="mt-2 flex flex-wrap gap-2">
+              {goals.map((goal) => (
+                <li key={goal.id} className="rounded-full border border-[var(--line)] bg-[#f7fafc] px-3 py-1.5 text-sm text-[var(--ink)]">
+                  {goal.goalType.name}: objetivo {goal.target}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+      </Card>
+      <section className="grid items-stretch gap-4 xl:grid-cols-2">
+        <Block
+          title="Cotizaciones por seguimiento"
+          empty="No hay cotizaciones con precio esperando seguimiento."
+          bandejaHref="/cotizaciones?vista=decision"
+          rows={quotes.map((row) => ({
+            href: `/cotizaciones/${row.id}`,
+            label: row.folio,
+            detail: <>{QUOTE_STATUS_LABEL[row.status] ?? row.status} · {panelClientLink(row.client)}</>,
+          }))}
+        />
+        <Block
+          title="Entregas pendientes"
+          empty="No hay entregas pendientes."
+          bandejaHref="/ventas"
+          rows={deliveries.map((row) => {
+            const pendingReceive = row.lines.reduce((sum, line) => sum + Math.max(0, line.qtySold - line.qtyReceived), 0);
+            const pendingDeliver = row.lines.reduce((sum, line) => sum + Math.max(0, line.qtyReceived - line.qtyDelivered), 0);
+            const detail = pendingReceive > 0 ? `por recibir ${pendingReceive}` : `por entregar ${pendingDeliver}`;
+            return { href: `/ventas/${row.id}`, label: row.folio, detail: <>{panelClientLink(row.client)} · {detail}</> };
+          })}
+        />
+        <Block
+          title="Cobranza"
+          empty="No hay saldos pendientes en tu cartera."
+          bandejaHref="/cobranza?vista=cxc"
+          rows={receivables.map((row) => ({
+            href: `/cobranza/${row.id}`,
+            label: row.document.folio,
+            detail: <>{panelClientLink(row.client)} · {money(row.balance)}</>,
+          }))}
+        />
+        <Block
+          title="Facturación pendiente"
+          empty="No hay operaciones con factura obligatoria pendiente."
+          bandejaHref="/facturacion?vista=solicitudes"
+          rows={invoices.map((row) => ({
+            href: `/cotizaciones/${row.id}`,
+            label: row.folio,
+            detail: panelClientLink(row.client),
+          }))}
+        />
+        <Block
+          title="Agenda / próximas actividades"
+          empty="No tienes actividades próximas."
+          bandejaHref="/agenda"
+          rows={activities.map((row) => {
+            const when = row.scheduledAt.toLocaleDateString("es-MX", { timeZone: "America/Mexico_City" });
+            const href = row.clientId ? `/clientes/${row.clientId}` : row.prospectId ? `/prospectos/${row.prospectId}` : "/agenda";
+            const detail = row.client
+              ? <>{panelClientLink(row.client)} · {when}</>
+              : row.prospectId
+                ? <><TextLink href={`/prospectos/${row.prospectId}`}>Prospecto</TextLink> · {when}</>
+                : when;
+            return { href, label: row.note, detail };
+          })}
+        />
       </section>
-      {goals.length > 0 ? (
-        <Card className="mb-4 p-4">
-          <h2 className="font-medium">Mi desempeño — metas del mes</h2>
-          <ul className="mt-2 space-y-1 text-sm">
-            {goals.map((goal) => <li key={goal.id}>{goal.goalType.name}: objetivo {goal.target}</li>)}
-          </ul>
-        </Card>
-      ) : null}
-      <div className="grid gap-3">
-        <Block title="Servicios de tu cartera" empty="No hay servicios activos ni atenciones en espera de ingreso para tus clientes." bandejaHref="/servicios/activos" rows={serviciosCartera.slice(0, 10).map((row) => {
-          if (row.kind === "operacion") {
-            return {
-              key: row.id,
-              href: row.href,
-              label: row.folio,
-              detail: `${row.clientName} · ${row.equipmentFolio} · ${row.status}`,
-            };
-          }
-          return {
-            key: row.id,
-            href: row.href,
-            label: row.equipmentFolio,
-            detail: (
-              <>
-                {row.clientName} · {row.kind === "espera_ingreso" ? "Espera ingreso físico" : "Cancelada"}
-              </>
-            ),
-          };
-        })} />
-        <Block title="Cotizaciones por seguimiento" empty="Nada por seguir." bandejaHref="/cotizaciones" rows={quotes.map((row) => ({ href: `/cotizaciones/${row.id}`, label: row.folio, detail: <>{QUOTE_STATUS_LABEL[row.status] ?? row.status} · {panelClientLink(row.client)}</> }))} />
-        <Block title="Esperando precio (CEO/Administrador)" empty="No hay cotizaciones sin precio." bandejaHref="/cotizaciones?vista=pendientes" rows={waitingPrice.map((row) => ({ href: `/cotizaciones/${row.id}`, label: row.folio, detail: panelClientLink(row.client) }))} />
-        <Block title="Entregas pendientes" empty="Sin mercancía ni entregas por cerrar." bandejaHref="/ventas" rows={deliveries.map((row) => {
-          const pendingReceive = row.lines.reduce((sum, line) => sum + Math.max(0, line.qtySold - line.qtyReceived), 0);
-          const pendingDeliver = row.lines.reduce((sum, line) => sum + Math.max(0, line.qtyReceived - line.qtyDelivered), 0);
-          const detail = pendingReceive > 0 ? `por recibir ${pendingReceive}` : `por entregar ${pendingDeliver}`;
-          return { href: `/ventas/${row.id}`, label: row.folio, detail: <>{panelClientLink(row.client)} · {detail}</> };
-        })} />
-        <Block title="Cobranza" empty="Sin saldos propios." bandejaHref="/cobranza?vista=cxc" rows={receivables.map((row) => ({ href: `/cobranza/${row.id}`, label: row.document.folio, detail: <>{panelClientLink(row.client)} · {money(row.balance)}</> }))} />
-        <Block title="Facturación pendiente" empty="No hay operaciones con factura obligatoria sin emitir." bandejaHref="/facturacion?vista=solicitudes" rows={invoices.map((row) => ({ href: `/cotizaciones/${row.id}`, label: row.folio, detail: panelClientLink(row.client) }))} />
-        <Block title="Agenda / próximas actividades" empty="Sin actividades próximas." bandejaHref="/agenda" rows={activities.map((row) => {
-          const when = row.scheduledAt.toLocaleDateString("es-MX", { timeZone: "America/Mexico_City" });
-          const href = row.clientId ? `/clientes/${row.clientId}` : row.prospectId ? `/prospectos/${row.prospectId}` : "/agenda";
-          const detail = row.client
-            ? <>{panelClientLink(row.client)} · {when}</>
-            : row.prospectId
-              ? <><TextLink href={`/prospectos/${row.prospectId}`}>Prospecto</TextLink> · {when}</>
-              : when;
-          return { href, label: row.note, detail };
-        })} />
-      </div>
     </>
   );
 }
@@ -385,6 +475,7 @@ async function CeoExecutive({ companyId, name, vista }: { companyId: string; nam
     overdue,
     invoiced,
     validations,
+    exitWithoutDocumentRequests,
     invoices,
     payments,
     dueReceivables,
@@ -400,6 +491,18 @@ async function CeoExecutive({ companyId, name, vista }: { companyId: string; nam
     prisma.technicalCase.count({ where: { serviceCompanyId: companyId, status: { notIn: CLOSED }, slaDueAt: { lt: new Date() } } }),
     prisma.billingDocument.aggregate({ where: { companyId, status: "EMITIDA", kind: { not: "REMISION" } }, _sum: { total: true } }),
     prisma.technicalCase.findMany({ where: { serviceCompanyId: companyId, status: "PENDIENTE_VALIDACION" }, take: 12 }),
+    prisma.technicalCase.findMany({
+      where: {
+        serviceCompanyId: companyId,
+        kind: "OS",
+        status: "TERMINADA",
+        exitWithoutDocumentRequestedAt: { not: null },
+        exitWithoutDocumentAuthorizedAt: null,
+      },
+      include: { equipment: { include: { client: true } } },
+      orderBy: { exitWithoutDocumentRequestedAt: "asc" },
+      take: 12,
+    }),
     prisma.billingDocument.findMany({ where: { companyId, status: "SOLICITADA", kind: { not: "REMISION" } }, take: 12 }),
     prisma.payment.findMany({ where: { companyId, status: "PENDIENTE" }, orderBy: { createdAt: "asc" }, take: 12 }),
     prisma.receivable.findMany({ where: { companyId, balance: { gt: 0 }, dueAt: { lt: new Date() } }, include: { document: true }, take: 12 }),
@@ -435,6 +538,7 @@ async function CeoExecutive({ companyId, name, vista }: { companyId: string; nam
           <KpiCard label="O.C. por autorizar" value={String(orders.length)} href="/compras?vista=autorizar" />
           <KpiCard label="SLA vencidos" value={String(overdue)} href="/operacion" />
           <KpiCard label="Pagos por validar" value={String(payments.length)} href="/pagos?vista=pendientes" />
+          <KpiCard label="Salidas sin documento" value={String(exitWithoutDocumentRequests.length)} href="/panel?vista=autorizacion" />
         </section>
       ) : null}
       <div className="grid gap-3">
@@ -450,6 +554,23 @@ async function CeoExecutive({ companyId, name, vista }: { companyId: string; nam
             <Block title="Nómina" empty="Sin preliminar." bandejaHref="/nomina" rows={payrolls.map((row) => ({ href: `/nomina/${row.id}`, label: row.folio, detail: "Autorizar" }))} />
             <Block title="Comisiones" empty="Sin preliminar." bandejaHref="/comisiones" rows={commissions.map((row) => ({ href: `/comisiones/${row.id}`, label: row.month, detail: "Validar" }))} />
             <Block title="Horas extra" empty="Nada espera autorización final." bandejaHref="/personal/horas" rows={overtime.map((row) => ({ href: "/personal/horas", label: row.collaborator.user.name, detail: `${row.hours} h` }))} />
+            <Block
+              title="Salidas sin documento solicitadas"
+              empty="Ninguna OS espera tu autorización de salida."
+              bandejaHref="/operacion"
+              rows={exitWithoutDocumentRequests.map((row) => ({
+                href: `/operacion/${row.id}`,
+                label: row.folio,
+                detail: (
+                  <>
+                    {row.equipment.client.name} · {row.equipment.folio}
+                    <span className="ml-2 inline-flex">
+                      <AuthorizeExitWithoutDocumentButton caseId={row.id} version={row.version} />
+                    </span>
+                  </>
+                ),
+              }))}
+            />
           </>
         ) : null}
         {show("tecnico") ? (

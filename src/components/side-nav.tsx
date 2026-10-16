@@ -45,7 +45,7 @@ export function SideNav({
     return () => window.removeEventListener("hashchange", sync);
   }, [path]);
   return (
-    <nav className="space-y-1 px-3 pb-5">
+    <nav className="space-y-2 px-3 pb-6" aria-label="Secciones">
       {groups.map((group) => {
         if (group.direct && group.title && group.links.length === 1) {
           const link = group.links[0]!;
@@ -53,7 +53,7 @@ export function SideNav({
           return (
             <div
               key={link.href}
-              className={`flex min-h-10 items-center rounded-lg transition-colors ${active ? "bg-[var(--accent)] text-white" : "text-[var(--muted)] hover:bg-[#edf5f8]"}`}
+              className={`flex min-h-10 items-center rounded-xl transition-colors ${active ? "bg-[var(--accent)] text-white shadow-[0_5px_14px_rgba(10,71,126,0.18)]" : "text-[var(--muted)] hover:bg-[#edf5f8]"}`}
             >
               <Link
                 href={link.href}
@@ -78,8 +78,8 @@ export function SideNav({
         const links = group.links.map((link) => {
             const active = isLinkActive(path, search, link.href, locationHash);
             return (
-              <div key={link.href} className={`flex min-h-10 items-center rounded-lg transition-colors ${active ? "bg-[var(--accent)] text-white" : "text-[#263b55] hover:bg-[var(--accent-soft)]"}`}>
-                <Link href={link.href} className="block min-w-0 flex-1 px-3 py-2 text-[14px] font-medium">
+              <div key={link.href} className={`flex min-h-10 items-center rounded-xl transition-colors ${active ? "bg-[var(--accent)] text-white shadow-[0_5px_14px_rgba(10,71,126,0.18)]" : "text-[#263b55] hover:bg-[var(--accent-soft)]"}`}>
+                <Link href={link.href} className="block min-w-0 flex-1 px-3 py-2.5 text-[14px] font-medium" aria-current={active ? "page" : undefined}>
                   {link.label}
                 </Link>
                 {link.createHref ? (

@@ -32,7 +32,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
   {
     title: null,
     links: [
-      { href: "/panel", show: (role) => can(role, "panel.view") },
+      { href: "/panel", show: (role, code) => role !== "TECNICO" && can(role, "panel.view", code) },
     ],
   },
   {

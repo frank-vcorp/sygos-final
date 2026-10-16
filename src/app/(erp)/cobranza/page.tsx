@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { ClientNameLink } from "@/components/client-entity-links";
-import { ActiveFilters, Badge, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, SegmentedNav, Table, Td, Th } from "@/components/ui";
+import { ActiveFilters, Badge, Button, controlClass, Empty, FilterBar, MobileCard, PageHeader, RecordLink, ResponsiveData, Table, Td, Th } from "@/components/ui";
 import { homePath } from "@/lib/home";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
@@ -14,11 +14,12 @@ export default async function CobranzaPage({ searchParams }: { searchParams: Pro
   const { vista } = await searchParams;
   const canEditClient = can(session.role, "client.edit", session.activeCompanyCode);
   const own = session.role === "VENTAS" ? { sellerUserId: session.userId } : {};
+  const selectedVista = vista === "cxc" || vista === "vencidas" ? vista : "todas";
   const now = new Date();
   const balanceFilter =
-    vista === "cxc"
+    selectedVista === "cxc"
       ? { balance: { gt: 0 } }
-      : vista === "vencidas"
+      : selectedVista === "vencidas"
         ? { balance: { gt: 0 }, dueAt: { lt: now } }
         : {};
   const rows = await prisma.receivable.findMany({
@@ -34,21 +35,21 @@ export default async function CobranzaPage({ searchParams }: { searchParams: Pro
     const late = (row: typeof a) => row.balance > 0 && row.dueAt.getTime() < Date.now() ? Date.now() - row.dueAt.getTime() : 0;
     return late(b) - late(a);
   });
-  const tabs = session.role === "VENTAS"
-    ? []
-    : [
-        { href: "/cobranza", label: "Todas", active: !vista },
-        { href: "/cobranza?vista=cxc", label: "Con saldo", active: vista === "cxc" },
-        { href: "/cobranza?vista=vencidas", label: "Vencidas", active: vista === "vencidas" },
-      ];
   return (
     <>
       <PageHeader title={session.role === "VENTAS" ? "Mi cobranza" : "Cobranza"} subtitle="Saldos de esta empresa. Vencida es saldo después de la fecha." />
-      {tabs.length > 0 ? <SegmentedNav items={tabs} /> : null}
+      <FilterBar action="/cobranza">
+        <select name="vista" defaultValue={selectedVista} aria-label="Vista de cobranza" className={`${controlClass} sm:w-[190px]`}>
+          <option value="todas">Todas</option>
+          <option value="cxc">Con saldo</option>
+          <option value="vencidas">Vencidas</option>
+        </select>
+        <Button type="submit" tone="ghost">Buscar</Button>
+      </FilterBar>
       <ActiveFilters
         items={[
-          ...(vista === "cxc" ? [{ label: "Con saldo", clearHref: "/cobranza" }] : []),
-          ...(vista === "vencidas" ? [{ label: "Vencidas", clearHref: "/cobranza" }] : []),
+          ...(selectedVista === "cxc" ? [{ label: "Con saldo", clearHref: "/cobranza" }] : []),
+          ...(selectedVista === "vencidas" ? [{ label: "Vencidas", clearHref: "/cobranza" }] : []),
         ]}
       />
       {ordered.length === 0 ? <Empty title="Sin cuentas por cobrar" body="Aparecen cuando Coordinación emite una factura." /> : (

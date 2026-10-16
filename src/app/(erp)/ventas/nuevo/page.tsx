@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createQuoteAction } from "@/app/(erp)/cotizaciones/actions";
 import { QuoteDraft } from "@/components/quote-draft";
 import { SubmitButton } from "@/components/submit-button";
-import { FormActions, FormPanel, FormSection, PageHeader } from "@/components/ui";
+import { FormActions, FormPanel, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { homePath } from "@/lib/home";
 import { can } from "@/lib/permissions";
@@ -19,13 +19,11 @@ export default async function NuevaVentaEquipoPage({ searchParams }: { searchPar
       where: { companyId: session.activeCompanyId, active: true, isSystem: false, ...(session.role === "VENTAS" ? { ownerUserId: session.userId } : {}) },
       include: { contacts: { where: { active: true }, orderBy: [{ isPrimary: "desc" }, { name: "asc" }] } },
       orderBy: { name: "asc" },
-      take: 200,
     }),
     prisma.equipment.findMany({
       where: { originCompanyId: session.activeCompanyId, kind: "EQUI", ...(session.role === "VENTAS" ? { client: { ownerUserId: session.userId } } : {}) },
       orderBy: { createdAt: "desc" },
-      take: 300,
-      select: { id: true, folio: true, model: true, clientId: true, kind: true },
+      select: { id: true, folio: true, model: true, clientId: true, kind: true, typeName: true, brandName: true, serial: true },
     }),
     prisma.catalogType.findMany({ orderBy: { name: "asc" } }),
     prisma.catalogBrand.findMany({ orderBy: { name: "asc" } }),
@@ -36,20 +34,20 @@ export default async function NuevaVentaEquipoPage({ searchParams }: { searchPar
     <>
       <PageHeader
         title="Nueva venta de equipo"
-        subtitle="Cotización tipo venta de equipo. Se guarda sin precio; al autorizarla aparece en tu bandeja de ventas."
+        subtitle="Prepara la propuesta para el cliente. Al autorizarla aparecerá en tu bandeja de ventas."
         back={{ href: "/ventas", label: "Venta de equipos" }}
       />
       <FormPanel action={createQuoteAction}>
-        <input type="hidden" name="quoteType" value="VENTA_EQUIPO" />
         <input type="hidden" name="origin" value="ventas" />
-        <FormSection title="Propuesta comercial" description="Cliente, equipo (EQUI) y líneas a vender. Coordinación asigna precio antes de enviar al cliente." columns={1}>
-          <div className="max-w-md rounded-lg border border-[var(--line)] bg-[#f7fafc] px-4 py-3">
-            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Tipo</p>
-            <p className="mt-1 text-sm font-medium text-[#0b1f3a]">Venta de equipo</p>
+        <div className="grid gap-5 p-5 md:p-7">
+          <div className="rounded-xl border border-[#cbe3ef] bg-[#f1f8fc] px-4 py-3 text-sm text-[var(--ink)]">
+            <strong>Venta de equipo</strong> · Coordinación asignará el precio antes de enviarla al cliente.
           </div>
           <QuoteDraft
+            fixedQuoteType="VENTA_EQUIPO"
             allowQuickClient={can(session.role, "client.create", session.activeCompanyCode)}
             allowQuickEquipment={allowQuickEquipment}
+            quickEquipmentKinds={allowQuickEquipment ? ["EQUI" as const] : []}
             canEditClient={can(session.role, "client.edit", session.activeCompanyCode)}
             companyCode={session.activeCompanyCode ?? "SYSTRON"}
             defaultClientId={clients.some((client) => client.id === clientId) ? clientId : ""}
@@ -59,7 +57,7 @@ export default async function NuevaVentaEquipoPage({ searchParams }: { searchPar
             brands={brands.map((brand) => brand.name)}
             models={models.map((row) => ({ type: row.type.name, brand: row.brand.name, model: row.name }))}
           />
-        </FormSection>
+        </div>
         <FormActions note="Al autorizarla, la propuesta aparece en tu bandeja de ventas de equipos.">
           <SubmitButton pendingLabel="Guardando…">Guardar sin precio</SubmitButton>
         </FormActions>

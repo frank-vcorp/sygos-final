@@ -25,6 +25,10 @@ function formatClosedAt(date: Date) {
   });
 }
 
+function serviceSeries(attentionType: string) {
+  return attentionType === "REPARACION" ? "OS" : "DX";
+}
+
 export function ServiciosSupervisorList({
   rows,
   hideAssignee = false,
@@ -46,6 +50,7 @@ export function ServiciosSupervisorList({
           <thead>
             <tr>
               {showTipo ? <Th>Tipo</Th> : null}
+              <Th>Servicio</Th>
               <Th>Folio / equipo</Th>
               <Th>Cliente</Th>
               <Th>Prioridad</Th>
@@ -72,11 +77,12 @@ export function ServiciosSupervisorList({
                       </Td>
                     ) : null}
                     <Td>
-                      <RecordLink href={row.href}>{row.equipmentFolio}</RecordLink>
-                      <span className="text-[var(--muted)]">
-                        {row.kind === "espera_ingreso" ? " · pendiente de ingreso" : " · sin operación"}
+                      <RecordLink href={row.href}>{serviceSeries(row.attentionType)}</RecordLink>
+                      <span className="block text-xs text-[var(--muted)]">
+                        {row.kind === "espera_ingreso" ? `Pendiente de ingreso físico · el folio ${serviceSeries(row.attentionType)} se genera al recibir` : "Atención cancelada · sin operación"}
                       </span>
                     </Td>
+                    <Td>{row.equipmentFolio}</Td>
                     <Td>{row.clientName}</Td>
                     <Td>{row.priorityName}</Td>
                     <Td>
@@ -98,9 +104,9 @@ export function ServiciosSupervisorList({
                   ) : null}
                   <Td>
                     <RecordLink href={row.href}>{row.folio}</RecordLink>
-                    <span className="text-[var(--muted)]"> · {row.equipmentFolio}</span>
                     {historial ? null : <Markers markers={markers} />}
                   </Td>
+                  <Td>{row.equipmentFolio}</Td>
                   <Td>{row.clientName}</Td>
                   <Td>{row.priorityName}</Td>
                   <Td>
@@ -131,7 +137,7 @@ export function ServiciosSupervisorList({
             <div key={`att-${row.id}`}>
               <MobileCard
                 href={row.href}
-                title={row.equipmentFolio}
+                title={`${serviceSeries(row.attentionType)} · pendiente`}
                 meta={
                   <>
                     {showTipo ? <Badge>{servicioTipoLabel(row.attentionType)}</Badge> : null}
@@ -139,11 +145,12 @@ export function ServiciosSupervisorList({
                   </>
                 }
               >
+                <p>{row.equipmentFolio}</p>
                 <p>{row.clientName}</p>
                 <p>{row.priorityName}</p>
                 <p className="line-clamp-2">{row.reportedFault}</p>
                 {row.kind === "espera_ingreso" ? (
-                  <p>Alta: {row.createdAt.toLocaleDateString("es-MX", { timeZone: "America/Mexico_City" })}</p>
+                  <p>Folio {serviceSeries(row.attentionType)}: se genera al confirmar la entrada física · Alta: {row.createdAt.toLocaleDateString("es-MX", { timeZone: "America/Mexico_City" })}</p>
                 ) : (
                   <p>Cierre: {formatClosedAt(row.closedAt)}</p>
                 )}

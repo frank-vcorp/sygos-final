@@ -343,6 +343,8 @@ model Attention {
   reportedFault       String
   antecedent          String?
   deliveryInstructions String?
+  initialLog          String?
+  createdByUserId     String?
   sellerUserId        String?
   originalCaseId      String?
   originQuoteId       String?
@@ -381,6 +383,10 @@ model TechnicalCase {
   originalCaseId      String?
   spawnedFromId       String?
   paidAt              DateTime?
+  exitWithoutDocumentRequestedAt       DateTime?
+  exitWithoutDocumentRequestedByUserId String?
+  exitWithoutDocumentAuthorizedAt      DateTime?
+  exitWithoutDocumentAuthorizedByUserId  String?
   quotePending        Boolean   @default(false)
   returnReason        String?
   slaDueAt            DateTime?
@@ -539,6 +545,7 @@ model Quote {
   preliminaryModel   String?
   preliminarySerial  String?
   reference          String?
+  sellerConceptComplement String?
   creditDays         Int?
   discountPct        Float    @default(0)
   sellerUserId       String?
@@ -670,6 +677,8 @@ model BillingDocument {
   total             Float
   creditDays        Int       @default(0)
   rfcSnapshot       String?
+  cfdiUseSnapshot   String?
+  paymentMethodSnapshot String?
   issuedAt          DateTime?
   dueAt             DateTime?
   fiscalStatus      String    @default("NO_APLICA")

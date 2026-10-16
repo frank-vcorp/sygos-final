@@ -14,6 +14,7 @@ export function RelateEquipmentForm({
   priorities,
   companyCode,
   allowQuickEquipment,
+  quickEquipmentKinds,
   types,
   brands,
   models,
@@ -26,6 +27,7 @@ export function RelateEquipmentForm({
   priorities: Array<{ id: string; name: string }>;
   companyCode: string;
   allowQuickEquipment: boolean;
+  quickEquipmentKinds: Array<"EQUI" | "MOT">;
   types: string[];
   brands: string[];
   models: ModelRow[];
@@ -48,6 +50,7 @@ export function RelateEquipmentForm({
           brands={brands}
           models={models}
           allowQuickEquipment={allowQuickEquipment}
+          quickEquipmentKinds={quickEquipmentKinds}
           emptyOptionLabel="Selecciona"
         />
         <Field label="Prioridad del servicio">

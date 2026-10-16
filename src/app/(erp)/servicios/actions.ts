@@ -45,7 +45,7 @@ export async function startServiceAction(formData: FormData) {
       reportedFault: requiredText(formData.get("reportedFault"), "Falla reportada"),
       antecedent: optionalText(formData.get("antecedent")),
       originalCaseId: optionalText(formData.get("originalCaseId")),
-      deliveryInstructions: optionalText(formData.get("deliveryInstructions")),
+      initialLog: optionalText(formData.get("initialLog")),
     });
     const equipment = await import("@/lib/db").then(({ prisma }) => prisma.equipment.findUnique({ where: { id: attention.equipmentId } }));
     await setFlash({ tone: "ok", message: "Servicio abierto. El SLA inicia cuando se confirme la entrada física." });

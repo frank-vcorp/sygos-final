@@ -14,6 +14,7 @@ import {
   FormActions,
   FormPanel,
   FormSection,
+  MoneyInput,
   TextLink,
 } from "@/components/ui";
 import { prisma } from "@/lib/db";
@@ -108,7 +109,7 @@ export default async function CompraPage({ params }: { params: Promise<{ id: str
           <input type="hidden" name="purchaseId" value={row.id} />
           <input type="hidden" name="version" value={row.version} />
           <FormSection title="Cuadrar importe" columns={1}>
-            <Field label="Importe"><input name="amount" type="number" min="0.01" step="0.01" defaultValue={row.amount} className={controlClass} /></Field>
+            <Field label="Importe"><MoneyInput name="amount" min="0.01" defaultValue={row.amount} /></Field>
           </FormSection>
           <FormActions><Button type="submit" tone="ghost">Guardar importe</Button></FormActions>
         </FormPanel>
@@ -146,7 +147,7 @@ export default async function CompraPage({ params }: { params: Promise<{ id: str
               emptyLabel="Sin proveedor"
             />
             <Field label="Concepto"><input name="concept" defaultValue={row.concept} className={controlClass} /></Field>
-            <Field label="Importe"><input name="amount" type="number" step="0.01" defaultValue={row.amount} className={controlClass} /></Field>
+            <Field label="Importe"><MoneyInput name="amount" defaultValue={row.amount} /></Field>
           </FormSection>
           <FormActions><Button type="submit" tone="ghost">Enviar de nuevo al CEO</Button></FormActions>
         </FormPanel>
