@@ -673,6 +673,8 @@ model BillingDocument {
   total             Float
   creditDays        Int       @default(0)
   rfcSnapshot       String?
+  cfdiUseSnapshot   String?
+  paymentMethodSnapshot String?
   issuedAt          DateTime?
   dueAt             DateTime?
   fiscalStatus      String    @default("NO_APLICA")

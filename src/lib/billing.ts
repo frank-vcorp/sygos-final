@@ -93,13 +93,28 @@ export async function requestFromQuote(actor: Actor, quoteId: string, kind: "FAC
   return document;
 }
 
-export async function issueDocument(actor: Actor, documentId: string) {
+export type DocumentFiscalOverrides = { cfdiUse: string | null; paymentMethod: string | null };
+
+function fiscalForDocument(
+  client: { cfdiUse: string | null; paymentMethod: string | null },
+  overrides?: DocumentFiscalOverrides,
+): { cfdiUse: string; paymentMethod: string } {
+  const cfdiUse = overrides?.cfdiUse ?? client.cfdiUse;
+  const paymentMethod = overrides?.paymentMethod ?? client.paymentMethod;
+  if (!cfdiUse || !paymentMethod) {
+    throw new Error("Define el uso de CFDI y el método de pago antes de emitir (heredan del cliente si están capturados).");
+  }
+  return { cfdiUse, paymentMethod };
+}
+
+export async function issueDocument(actor: Actor, documentId: string, overrides?: DocumentFiscalOverrides) {
   const document = await prisma.billingDocument.findFirst({
     where: { id: documentId, companyId: actor.activeCompanyId },
     include: { client: true, receivable: true },
   });
   if (!document || document.status !== "SOLICITADA") throw new Error("Ese documento no está pendiente de emisión.");
   if (document.receivable) throw new Error("Ese documento ya generó una cuenta por cobrar.");
+  const fiscal = document.kind === "REMISION" ? null : fiscalForDocument(document.client, overrides);
   const issuedAt = new Date();
   const dueAt = addDays(issuedAt, document.creditDays);
   await prisma.billingDocument.update({
@@ -111,6 +126,8 @@ export async function issueDocument(actor: Actor, documentId: string) {
       issuedAt,
       dueAt,
       issuedByUserId: actor.userId,
+      cfdiUseSnapshot: fiscal?.cfdiUse ?? null,
+      paymentMethodSnapshot: fiscal?.paymentMethod ?? null,
       version: { increment: 1 },
     },
   });
@@ -158,9 +175,22 @@ export async function issueDocument(actor: Actor, documentId: string) {
   });
 }
 
-export async function retryFiscal(actor: Actor, documentId: string) {
-  const document = await prisma.billingDocument.findFirst({ where: { id: documentId, companyId: actor.activeCompanyId } });
+export async function retryFiscal(actor: Actor, documentId: string, overrides?: DocumentFiscalOverrides) {
+  const document = await prisma.billingDocument.findFirst({
+    where: { id: documentId, companyId: actor.activeCompanyId },
+    include: { client: true },
+  });
   if (!document || document.fiscalStatus === "TIMBRADA" || document.fiscalStatus === "NO_APLICA") throw new Error("Ese documento no tiene un timbrado por reintentar.");
+  if (document.kind !== "REMISION") {
+    const fiscal = fiscalForDocument(document.client, {
+      cfdiUse: overrides?.cfdiUse ?? document.cfdiUseSnapshot,
+      paymentMethod: overrides?.paymentMethod ?? document.paymentMethodSnapshot,
+    });
+    await prisma.billingDocument.update({
+      where: { id: document.id },
+      data: { cfdiUseSnapshot: fiscal.cfdiUse, paymentMethodSnapshot: fiscal.paymentMethod, fiscalError: null },
+    });
+  }
   await stampBillingDocument(document.id);
   await recordHistory({
     companyId: actor.activeCompanyId,

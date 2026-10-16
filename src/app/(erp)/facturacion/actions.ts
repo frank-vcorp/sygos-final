@@ -7,7 +7,15 @@ import { optionalText, requiredText } from "@/lib/form";
 import { moneyFromForm } from "@/lib/money";
 import { can, type Action } from "@/lib/permissions";
 import { issueDocument, issueFreeInvoice, requestFromQuote, requestIntercompany, retryFiscal } from "@/lib/billing";
+import { parseCfdiUse } from "@/lib/sat-cfdi-use";
+import { parsePaymentMethod } from "@/lib/sat-payment-method";
 import { requireCompany } from "@/lib/session";
+
+function fiscalFromForm(formData: FormData) {
+  const cfdiUse = parseCfdiUse(formData.get("cfdiUse"));
+  const paymentMethod = parsePaymentMethod(formData.get("paymentMethod"));
+  return { cfdiUse, paymentMethod };
+}
 
 async function guard(action: Action) {
   const session = await requireCompany();
@@ -62,7 +70,7 @@ export async function issueDocumentAction(formData: FormData) {
   const id = requiredText(formData.get("documentId"), "Documento");
   try {
     const session = await guard("invoice.issue");
-    await issueDocument(session, id);
+    await issueDocument(session, id, fiscalFromForm(formData));
     await setFlash({ tone: "ok", message: "Documento emitido." });
   } catch (error) {
     if (isRedirect(error)) throw error;
@@ -76,7 +84,7 @@ export async function retryFiscalAction(formData: FormData) {
   const id = requiredText(formData.get("documentId"), "Documento");
   try {
     const session = await guard("invoice.issue");
-    await retryFiscal(session, id);
+    await retryFiscal(session, id, fiscalFromForm(formData));
     await setFlash({ tone: "ok", message: "Reintento registrado sobre el mismo documento." });
   } catch (error) {
     if (isRedirect(error)) throw error;
