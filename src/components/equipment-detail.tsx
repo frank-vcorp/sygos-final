@@ -240,11 +240,6 @@ export async function EquipmentDetail({ id, expectedKind, showLabel = false }: {
           </Card>
         ) : null}
 
-        {awaitingAttentionForReceipt ? (
-          <p className="rounded-md border border-[#efd0d0] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]">
-            Falta la atención de ventas (diagnóstico o reparación) antes de confirmar la entrada física.
-          </p>
-        ) : null}
         {oneStepWarehouseReceipt && receiptPreset ? (
           <div className="hidden">
             <MovementForm
