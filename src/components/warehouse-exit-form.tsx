@@ -2,9 +2,7 @@
 
 import { useState } from "react";
 import { movementAction } from "@/app/(erp)/equipos/actions";
-import { MovementForm } from "@/components/custody-forms";
 import { Button, controlClass, Field } from "@/components/ui";
-import type { Custody, MovementKind } from "@/lib/custody";
 
 type ReceiverMode = "vendedor" | "paqueteria";
 
@@ -22,9 +20,6 @@ export function WarehouseExitForm({
   enablingDocumentLabel,
   canTestExit,
   testReason,
-  showSupplierExit,
-  suppliers,
-  allowQuickSupplier,
 }: {
   equipmentId: string;
   equipmentFolio: string;
@@ -39,9 +34,6 @@ export function WarehouseExitForm({
   enablingDocumentLabel: string | null;
   canTestExit: boolean;
   testReason: string;
-  showSupplierExit: boolean;
-  suppliers: Array<{ id: string; name: string }>;
-  allowQuickSupplier: boolean;
 }) {
   const [mode, setMode] = useState<"definitive" | "test">(canTestExit && !canDefinitiveExit ? "test" : "definitive");
   const [receiverMode, setReceiverMode] = useState<ReceiverMode>("vendedor");
@@ -114,25 +106,6 @@ export function WarehouseExitForm({
           <Field label="Observaciones"><textarea name="notes" rows={2} className={controlClass} /></Field>
           <Button type="submit">Confirmar salida a pruebas</Button>
         </form>
-      ) : null}
-
-      {showSupplierExit ? (
-        <details className="rounded-lg border border-[var(--line)] p-3">
-          <summary className="cursor-pointer text-sm font-medium">Salida a proveedor externo</summary>
-          <div className="mt-3">
-            <MovementForm
-              variant="plain"
-              equipmentId={equipmentId}
-              equipmentFolio={equipmentFolio}
-              kind={kind}
-              custody="EN_RESGUARDO"
-              version={version}
-              suppliers={suppliers}
-              allowQuickSupplier={allowQuickSupplier}
-              restrictMovements={["SALIDA_PROVEEDOR"]}
-            />
-          </div>
-        </details>
       ) : null}
     </div>
   );

@@ -303,9 +303,6 @@ export async function EquipmentDetail({ id, expectedKind, showLabel = false }: {
                     enablingDocumentLabel={warehouseExit.enablingDocumentLabel}
                     canTestExit={warehouseExit.canTestExit}
                     testReason={warehouseExit.testReason}
-                    showSupplierExit={movementOptions.includes("SALIDA_PROVEEDOR")}
-                    suppliers={suppliers.map((supplier) => ({ id: supplier.id, name: supplier.name }))}
-                    allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)}
                   />
                 ) : (
                   <MovementForm
