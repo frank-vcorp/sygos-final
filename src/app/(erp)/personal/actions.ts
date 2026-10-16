@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { setFlash } from "@/lib/flash";
 import { optionalText, parseVersion, requiredText } from "@/lib/form";
+import { optionalMoneyFromForm } from "@/lib/money";
 import { can, type Action } from "@/lib/permissions";
 import { addLaborDocument, adjustVacationBalance, changeBoss, changeSalary, deactivateCollaborator, decideVacation, enrollFingerprint, manualAttendance, registerCollaborator, requestOvertime, requestVacation, reviewOvertime, updateSchedule } from "@/lib/personnel";
 import { requireCompany } from "@/lib/session";
@@ -29,11 +30,11 @@ export async function hireAction(formData: FormData) {
       hireKind: formData.get("hireKind") === "MIGRADO" ? "MIGRADO" : "NUEVO",
       hiredAt: requiredText(formData.get("hiredAt"), "Fecha de ingreso"),
       bossUserId: optionalText(formData.get("bossUserId")),
-      dailyStamped: Number(formData.get("dailyStamped") || 0),
-      dailyCash: Number(formData.get("dailyCash") || 0),
+      dailyStamped: optionalMoneyFromForm(formData.get("dailyStamped")) ?? 0,
+      dailyCash: optionalMoneyFromForm(formData.get("dailyCash")) ?? 0,
       vacationBalance: Number(formData.get("vacationBalance") || 0),
       rfc: optionalText(formData.get("rfc")),
-      overtimeRate: Number(formData.get("overtimeRate") || 0),
+      overtimeRate: optionalMoneyFromForm(formData.get("overtimeRate")) ?? 0,
     });
     await setFlash({ tone: "ok", message: "Colaborador registrado." });
     redirect(`/personal/${row.id}`);
@@ -77,7 +78,7 @@ export async function salaryAction(formData: FormData) {
   const id = requiredText(formData.get("collaboratorId"), "Colaborador");
   try {
     const session = await guard("personnel.authorize");
-    await changeSalary(session, id, parseVersion(formData.get("version")), Number(formData.get("dailyStamped") || 0), Number(formData.get("dailyCash") || 0), Number(formData.get("overtimeRate") || 0));
+    await changeSalary(session, id, parseVersion(formData.get("version")), optionalMoneyFromForm(formData.get("dailyStamped")) ?? 0, optionalMoneyFromForm(formData.get("dailyCash")) ?? 0, optionalMoneyFromForm(formData.get("overtimeRate")) ?? 0);
     await setFlash({ tone: "ok", message: "Salario actualizado." });
   } catch (error) {
     await setFlash({ tone: "error", message: bubble(error) });

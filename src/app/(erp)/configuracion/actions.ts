@@ -179,7 +179,7 @@ export async function updatePriorityAction(formData: FormData) {
   const updated = await prisma.priority.updateMany({
     where: { id, companyId: session.activeCompanyId },
     data: {
-      price: optionalMoney(formData.get("price")),
+      price: optionalMoneyFromForm(formData.get("price")),
       incrementPct: optionalMoney(formData.get("incrementPct")),
       targetMinDays: optionalInt(formData.get("targetMinDays")),
       targetMaxDays: optionalInt(formData.get("targetMaxDays")),
@@ -192,14 +192,6 @@ export async function updatePriorityAction(formData: FormData) {
   }
   await setFlash({ tone: "ok", message: "Prioridad actualizada. Los casos ya abiertos conservan la fotografía anterior." });
   redirect("/configuracion");
-}
-
-function optionalMoney(value: FormDataEntryValue | null) {
-  const text = optionalText(value);
-  if (!text) return null;
-  const amount = Number(text);
-  if (!Number.isFinite(amount) || amount < 0) throw new Error("El importe no es válido.");
-  return amount;
 }
 
 function isRedirect(error: unknown) {

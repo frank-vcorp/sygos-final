@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { setFlash } from "@/lib/flash";
 import { parseVersion, requiredText } from "@/lib/form";
+import { moneyFromForm } from "@/lib/money";
 import { can, type Action } from "@/lib/permissions";
 import { addPayrollAdjustment, adjustAguinaldo, authorizePayroll, editPayrollAdjustment, generateAguinaldo, generatePayroll, retryPayrollFiscal } from "@/lib/personnel";
 import { requireCompany } from "@/lib/session";
@@ -75,7 +76,7 @@ export async function extraAction(formData: FormData) {
   const id = requiredText(formData.get("periodId"), "Nómina");
   try {
     const session = await guard("personnel.manage");
-    await addPayrollAdjustment(session, id, requiredText(formData.get("collaboratorId"), "Colaborador"), formData.get("kind") === "DESCUENTO" ? "DESCUENTO" : "INGRESO", formData.get("component") === "EFECTIVO" ? "EFECTIVO" : "TIMBRADO", Number(formData.get("amount")), requiredText(formData.get("note"), "Nota"));
+    await addPayrollAdjustment(session, id, requiredText(formData.get("collaboratorId"), "Colaborador"), formData.get("kind") === "DESCUENTO" ? "DESCUENTO" : "INGRESO", formData.get("component") === "EFECTIVO" ? "EFECTIVO" : "TIMBRADO", moneyFromForm(formData.get("amount")), requiredText(formData.get("note"), "Nota"));
     await setFlash({ tone: "ok", message: "Concepto extraordinario agregado. La prima no entra por aquí." });
   } catch (error) {
     await setFlash({ tone: "error", message: bubble(error) });
@@ -88,7 +89,7 @@ export async function editExtraAction(formData: FormData) {
   const id = requiredText(formData.get("periodId"), "Nómina");
   try {
     const session = await guard("personnel.authorize");
-    await editPayrollAdjustment(session, requiredText(formData.get("adjustmentId"), "Concepto"), Number(formData.get("amount")));
+    await editPayrollAdjustment(session, requiredText(formData.get("adjustmentId"), "Concepto"), moneyFromForm(formData.get("amount")));
     await setFlash({ tone: "ok", message: "Concepto actualizado." });
   } catch (error) {
     await setFlash({ tone: "error", message: bubble(error) });
@@ -101,7 +102,7 @@ export async function aguinaldoAdjustAction(formData: FormData) {
   const id = requiredText(formData.get("periodId"), "Nómina");
   try {
     const session = await guard("personnel.authorize");
-    await adjustAguinaldo(session, requiredText(formData.get("lineId"), "Línea"), Number(formData.get("stamped")), Number(formData.get("cash")));
+    await adjustAguinaldo(session, requiredText(formData.get("lineId"), "Línea"), moneyFromForm(formData.get("stamped"), "Timbrado"), moneyFromForm(formData.get("cash"), "Efectivo"));
     await setFlash({ tone: "ok", message: "Aguinaldo ajustado." });
   } catch (error) {
     await setFlash({ tone: "error", message: bubble(error) });

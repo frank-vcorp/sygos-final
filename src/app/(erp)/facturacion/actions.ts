@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { setFlash } from "@/lib/flash";
 import { clientIdFromForm } from "@/lib/form-quick-entities";
 import { optionalText, requiredText } from "@/lib/form";
+import { moneyFromForm } from "@/lib/money";
 import { can, type Action } from "@/lib/permissions";
 import { issueDocument, issueFreeInvoice, requestFromQuote, requestIntercompany, retryFiscal } from "@/lib/billing";
 import { requireCompany } from "@/lib/session";
@@ -92,7 +93,7 @@ export async function freeInvoiceAction(formData: FormData) {
     const document = await issueFreeInvoice(session, {
       clientId,
       concept: requiredText(formData.get("concept"), "Concepto"),
-      amount: Number(formData.get("amount")),
+      amount: moneyFromForm(formData.get("amount")),
       creditDays: optionalText(formData.get("creditDays")) ? Number(formData.get("creditDays")) : null,
     });
     await setFlash({ tone: "ok", message: `${document.folio} emitida como factura libre.` });

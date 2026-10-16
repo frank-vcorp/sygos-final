@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { setFlash } from "@/lib/flash";
 import { clientIdFromForm } from "@/lib/form-quick-entities";
 import { optionalText, parseVersion, requiredText } from "@/lib/form";
+import { moneyFromForm } from "@/lib/money";
 import { can, type Action } from "@/lib/permissions";
 import { QUOTE_TYPES, type QuoteType, applyDiscount, createSellerQuote, decideQuote, linkIntercompanyQuote, prepareQuoteFromCase, relateQuoteEquipment, setPrices, updateGeneratedQuoteConcepts, updateSellerQuoteConceptComplement } from "@/lib/quotes";
 import { sendMail } from "@/lib/sendgrid";
@@ -113,7 +114,7 @@ export async function setPricesAction(formData: FormData) {
     const session = await guard("quote.price");
     const prices = formData.getAll("lineId").map((lineId, index) => ({
       lineId: String(lineId),
-      amount: Number(formData.getAll("amount")[index]),
+      amount: moneyFromForm(formData.getAll("amount")[index], "Precio"),
     }));
     await setPrices(session, requiredText(formData.get("quoteId"), "Cotización"), parseVersion(formData.get("version")), prices);
     await setFlash({ tone: "ok", message: "Precio asignado." });
