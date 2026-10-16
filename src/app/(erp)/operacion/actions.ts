@@ -75,7 +75,10 @@ export async function validateAction(formData: FormData) {
 export async function finishRepairAction(formData: FormData) {
   "use server";
   const outcome = formData.get("outcome") === "SIN_REPARACION" ? "SIN_REPARACION" : "TERMINADA";
-  await run(formData, (session) => finishRepair(session, requiredText(formData.get("caseId"), "Operación"), parseVersion(formData.get("version")), outcome, requiredText(formData.get("resultText"), "Resultado")), "Cierre técnico registrado.");
+  const resultText = outcome === "SIN_REPARACION"
+    ? requiredText(formData.get("resultText"), "Motivo")
+    : optionalText(formData.get("resultText")) ?? "";
+  await run(formData, (session) => finishRepair(session, requiredText(formData.get("caseId"), "Operación"), parseVersion(formData.get("version")), outcome, resultText), "Cierre técnico registrado.");
 }
 
 export async function reopenAction(formData: FormData) {

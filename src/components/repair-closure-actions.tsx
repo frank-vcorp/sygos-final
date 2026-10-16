@@ -15,13 +15,17 @@ export function RepairClosureActions({
   version: number;
   finishRepairAction: FinishRepairAction;
 }) {
-  const [finishOpen, setFinishOpen] = useState(false);
   const [withoutRepairOpen, setWithoutRepairOpen] = useState(false);
 
   return (
     <>
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="button" onClick={() => setFinishOpen(true)}>Terminar reparación</Button>
+        <form action={finishRepairAction} className="inline">
+          <input type="hidden" name="caseId" value={caseId} />
+          <input type="hidden" name="version" value={version} />
+          <input type="hidden" name="outcome" value="TERMINADA" />
+          <Button type="submit">Terminar reparación</Button>
+        </form>
         <Button
           type="button"
           tone="ghost"
@@ -31,36 +35,6 @@ export function RepairClosureActions({
           Sin reparación
         </Button>
       </div>
-
-      <FormOverlayDialog
-        open={finishOpen}
-        onClose={() => setFinishOpen(false)}
-        title="Terminar reparación"
-        titleId="repair-finish-dialog"
-      >
-        <form action={finishRepairAction} className="grid gap-3">
-          <input type="hidden" name="caseId" value={caseId} />
-          <input type="hidden" name="version" value={version} />
-          <input type="hidden" name="outcome" value="TERMINADA" />
-          <div>
-            <label htmlFor="repair-finish-summary" className="text-sm font-medium text-[#0b1f3a]">
-              Resumen del trabajo realizado
-            </label>
-            <textarea
-              id="repair-finish-summary"
-              name="resultText"
-              required
-              rows={4}
-              className={`mt-1 ${controlClass}`}
-              placeholder="Qué se reparó, pruebas y entrega"
-            />
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button type="button" tone="ghost" onClick={() => setFinishOpen(false)}>Cancelar</Button>
-            <Button type="submit">Confirmar cierre</Button>
-          </div>
-        </form>
-      </FormOverlayDialog>
 
       <FormOverlayDialog
         open={withoutRepairOpen}
