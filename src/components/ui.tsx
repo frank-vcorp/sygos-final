@@ -65,7 +65,7 @@ export function EntityDetailHeader({
         {meta ? <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">{meta}</div> : null}
         {primaryAction || secondaryActions ? (
           <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-[var(--line)] pt-4">
-            {primaryAction ? <div className="flex flex-wrap items-center gap-2">{primaryAction}</div> : null}
+            {primaryAction ? <div className="w-full min-w-0">{primaryAction}</div> : null}
             {secondaryActions ? (
               <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2 text-sm">
                 {secondaryActions}
