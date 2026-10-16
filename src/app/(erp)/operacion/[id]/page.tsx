@@ -5,7 +5,6 @@ import {
   assignCaseAction,
   createPresolicitudAction,
   deletePresolicitudAction,
-  externalDocumentAction,
   finishDiagnosisAction,
   finishRepairAction,
   issuePartAction,
@@ -22,7 +21,6 @@ import {
 import { ClientNameLink } from "@/components/client-entity-links";
 import { DiagnosisValidationActions } from "@/components/diagnosis-validation-actions";
 import { HistoryTimeline } from "@/components/history-timeline";
-import { SupplierPicker } from "@/components/supplier-picker";
 import {
   Badge,
   Button,
@@ -100,22 +98,6 @@ export default async function OperacionDetallePage({ params }: { params: Promise
       ? suggestedAssigneeRaw
       : null;
   const defaultAssigneeId = row.assigneeUserId ?? suggestedAssigneeId ?? "";
-  const awaitingStart = row.status === "EN_ESPERA" || row.status === "DEVUELTO";
-  const canStartPending =
-    !readOnly
-    && awaitingStart
-    && Boolean(row.assigneeUserId)
-    && !row.externalSupplierId
-    && (session.role === "TECNICO"
-      ? row.assigneeUserId === session.userId
-      : session.role === "SUPERVISOR_TECNICO"
-        ? row.assigneeUserId === session.userId
-        : canWork);
-  const showAssignmentPanel = canManage && !closed && (awaitingStart || !row.assigneeUserId);
-  const suppliers = owns && row.serviceCompany.code === "SYSTRON"
-    ? await prisma.supplier.findMany({ where: { companyId: session.activeCompanyId, active: true, isSystem: false }, orderBy: { name: "asc" } })
-    : [];
-  const currentSupplier = row.externalSupplierId ? suppliers.find((supplier) => supplier.id === row.externalSupplierId) : null;
   const history = await historyFor("OPERACION", row.id);
   const [seller, relatedQuotes, relatedBilling, relatedSales] = await Promise.all([
     row.attention.sellerUserId
@@ -149,6 +131,17 @@ export default async function OperacionDetallePage({ params }: { params: Promise
   const warranty = row.attention.attentionType === "DIAGNOSTICO_GARANTIA" && row.kind === "DIAGNOSTICO";
   const canManage = !readOnly && ["ADMINISTRADOR", "CEO", "SUPERVISOR_TECNICO", "GERENTE_OPERATIVO_SYSTRON", "GERENTE_OPERATIVO_SERVOMOTORES"].includes(session.role);
   const canWork = !readOnly && (session.role === "ADMINISTRADOR" || session.role === "CEO" || session.role === "SUPERVISOR_TECNICO" || (session.role === "GERENTE_OPERATIVO_SERVOMOTORES" && session.activeCompanyCode === "SERVOMOTORES") || (session.role === "TECNICO" && row.assigneeUserId === session.userId));
+  const awaitingStart = row.status === "EN_ESPERA" || row.status === "DEVUELTO";
+  const canStartPending =
+    !readOnly
+    && awaitingStart
+    && Boolean(row.assigneeUserId)
+    && (session.role === "TECNICO"
+      ? row.assigneeUserId === session.userId
+      : session.role === "SUPERVISOR_TECNICO"
+        ? row.assigneeUserId === session.userId
+        : canWork);
+  const showHeaderAssignment = canManage && !closed && awaitingStart;
   const presolicitudOnly = fieldPresolicitudOnly(session.role);
   const canEditPresolicitud =
     !readOnly &&
@@ -179,8 +172,26 @@ export default async function OperacionDetallePage({ params }: { params: Promise
 
   let primaryAction: React.ReactNode = null;
   if (!readOnly) {
-    if (canManage && awaitingStart && !row.assigneeUserId && !row.externalSupplierId) {
-      primaryAction = <DetailAnchorButton href="#asignacion-operacion">Asignar responsable</DetailAnchorButton>;
+    if (showHeaderAssignment) {
+      primaryAction = (
+        <form action={assignCaseAction} className="flex flex-wrap items-center gap-2">
+          <input type="hidden" name="caseId" value={row.id} />
+          <input type="hidden" name="version" value={row.version} />
+          <select
+            name="assigneeUserId"
+            required
+            aria-label="Técnico responsable"
+            className={`${controlClass} min-h-11 min-w-[12rem] max-w-full sm:min-w-[14rem]`}
+            defaultValue={defaultAssigneeId}
+          >
+            {!defaultAssigneeId ? <option value="">Selecciona técnico</option> : null}
+            {candidates.map((user) => (
+              <option key={user.id} value={user.id}>{user.name}</option>
+            ))}
+          </select>
+          <Button type="submit">Asignar</Button>
+        </form>
+      );
     } else if (canStartPending) {
       primaryAction = (
         <form action={startCaseAction} className="inline">
@@ -375,9 +386,7 @@ export default async function OperacionDetallePage({ params }: { params: Promise
               />
             </EntityMetaItem>
             <EntityMetaItem label="Vendedor">{seller?.name ?? "Sin vendedor asignado"}</EntityMetaItem>
-            <EntityMetaItem label="Responsable">
-              {row.externalSupplierId ? "Servicio externo" : row.assignee?.name ?? "Sin asignar"}
-            </EntityMetaItem>
+            <EntityMetaItem label="Responsable">{row.assignee?.name ?? "Sin asignar"}</EntityMetaItem>
             <EntityMetaItem label="Prioridad">{row.attention.priorityName}</EntityMetaItem>
             <EntityMetaItem label="SLA">{row.slaDueAt ? formatWhen(row.slaDueAt) : "Aún no inicia"}</EntityMetaItem>
             <EntityMetaItem label="Atención">
@@ -558,74 +567,6 @@ export default async function OperacionDetallePage({ params }: { params: Promise
           ) : null}
           {!readOnly ? (
             <>
-            <Card id="asignacion-operacion" className="scroll-mt-24 p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--muted)]">Asignación</p>
-                  <p className="mt-1 truncate font-medium text-[#0b1f3a]">{row.assignee?.name ?? "Sin responsable"}</p>
-                  {row.externalSupplierId ? <p className="mt-1 truncate text-xs text-[var(--muted)]">Proveedor: {currentSupplier?.name ?? "Servicio externo"}</p> : null}
-                  {suggestedAssigneeId && !row.assigneeUserId ? (
-                    <p className="mt-1 text-xs text-[var(--muted)]">
-                      Sugerido: {candidates.find((user) => user.id === suggestedAssigneeId)?.name ?? "técnico del último cierre en este equipo"}.
-                    </p>
-                  ) : null}
-                </div>
-                <Badge tone={row.assigneeUserId || row.externalSupplierId ? "ok" : "warn"}>
-                  {row.assigneeUserId || row.externalSupplierId ? "Asignado" : "Pendiente"}
-                </Badge>
-              </div>
-              {showAssignmentPanel ? (
-                <form action={assignCaseAction} className="mt-3 space-y-3 border-t border-[var(--line)] pt-3">
-                  <input type="hidden" name="caseId" value={row.id} />
-                  <input type="hidden" name="version" value={row.version} />
-                  <Field
-                    label="Responsable interno"
-                    hint="Técnicos y supervisor. El técnico que cerró el último servicio en este equipo queda preseleccionado."
-                  >
-                    <select name="assigneeUserId" required className={controlClass} defaultValue={defaultAssigneeId}>
-                      {!defaultAssigneeId ? <option value="">Selecciona responsable</option> : null}
-                      {candidates.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
-                    </select>
-                  </Field>
-                  {row.serviceCompany.code === "SYSTRON" ? (
-                    <SupplierPicker
-                      label="O servicio externo"
-                      suppliers={suppliers}
-                      defaultSupplierId={row.externalSupplierId ?? ""}
-                      allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)}
-                      allowEmpty
-                      emptyLabel="Sin proveedor"
-                    />
-                  ) : null}
-                  <Button type="submit">{row.assigneeUserId ? "Actualizar asignación" : "Asignar responsable"}</Button>
-                </form>
-              ) : canManage && !closed ? (
-                <details className="mt-3 border-t border-[var(--line)] pt-3">
-                  <summary className="cursor-pointer text-sm font-semibold text-[var(--accent)]">Cambiar asignación</summary>
-                  <form action={assignCaseAction} className="mt-3 space-y-3">
-                    <input type="hidden" name="caseId" value={row.id} />
-                    <input type="hidden" name="version" value={row.version} />
-                    <Field label="Responsable interno">
-                      <select name="assigneeUserId" className={controlClass} defaultValue={defaultAssigneeId}>
-                        <option value="">Sin asignar</option>
-                        {candidates.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
-                      </select>
-                    </Field>
-                    {row.serviceCompany.code === "SYSTRON" ? (
-                      <SupplierPicker
-                        label="O servicio externo"
-                        suppliers={suppliers}
-                        defaultSupplierId={row.externalSupplierId ?? ""}
-                        allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)}
-                        allowEmpty
-                        emptyLabel="Sin proveedor"
-                      />
-                    ) : null}
-                    <Button type="submit" tone="ghost">Guardar asignación</Button>
-                  </form>
-                </details>
-              ) : null}
-            </Card>
             {canWork && row.kind === "OS" && ["EN_REPARACION", "EN_ESPERA_REFACCIONES"].includes(row.status) ? (
               <FormPanel id="cerrar-reparacion" action={finishRepairAction} className="scroll-mt-24">
                 <input type="hidden" name="caseId" value={row.id} />
@@ -642,18 +583,6 @@ export default async function OperacionDetallePage({ params }: { params: Promise
                   </Field>
                 </FormSection>
                 <FormActions><Button type="submit">Cerrar técnicamente</Button></FormActions>
-              </FormPanel>
-            ) : null}
-            {row.externalSupplierId && canManage ? (
-              <FormPanel action={externalDocumentAction}>
-                <input type="hidden" name="caseId" value={row.id} />
-                <input type="hidden" name="version" value={row.version} />
-                <FormSection title="Documento del proveedor" description="Capturarlo no valida el diagnóstico." columns={1}>
-                  <Field label="Contenido">
-                    <textarea name="document" required rows={3} className={controlClass} defaultValue={row.externalDocument ?? ""} />
-                  </Field>
-                </FormSection>
-                <FormActions><Button type="submit" tone="ghost">Guardar documento</Button></FormActions>
               </FormPanel>
             ) : null}
             {closed && canManage ? (

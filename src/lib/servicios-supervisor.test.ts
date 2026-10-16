@@ -19,10 +19,11 @@ describe("technicianActiveCaseWhere", () => {
   it("excluye cierres técnicos y pendiente de validación del gerente", () => {
     const where = technicianActiveCaseWhere("tec-1");
     assert.equal(where.assigneeUserId, "tec-1");
+    const excluded = where.status.notIn as readonly string[];
     for (const status of TECHNICIAN_HANDOFF_CASE) {
-      assert.ok(where.status.notIn.includes(status));
+      assert.ok(excluded.includes(status));
     }
-    assert.ok(where.status.notIn.includes("TERMINADA"));
-    assert.ok(!where.status.notIn.includes("EN_REPARACION"));
+    assert.ok(excluded.includes("TERMINADA"));
+    assert.ok(!excluded.includes("EN_REPARACION"));
   });
 });

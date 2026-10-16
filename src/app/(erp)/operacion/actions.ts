@@ -47,7 +47,7 @@ async function run(formData: FormData, work: (session: Awaited<ReturnType<typeof
 
 export async function assignCaseAction(formData: FormData) {
   "use server";
-  await run(formData, async (session) => assignCase(session, requiredText(formData.get("caseId"), "Operación"), parseVersion(formData.get("version")), optionalText(formData.get("assigneeUserId")), await supplierIdFromForm(session, formData)), "Asignación actualizada.");
+  await run(formData, async (session) => assignCase(session, requiredText(formData.get("caseId"), "Operación"), parseVersion(formData.get("version")), optionalText(formData.get("assigneeUserId")), null), "Asignación actualizada.");
 }
 
 export async function startCaseAction(formData: FormData) {

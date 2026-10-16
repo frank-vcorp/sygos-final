@@ -5,6 +5,7 @@ import { verifyFacturapi } from "@/lib/facturapi";
 import { verifySendGrid } from "@/lib/sendgrid";
 import { setFlash } from "@/lib/flash";
 import { ConcurrencyError, optionalInt, optionalText, parseVersion, requiredText } from "@/lib/form";
+import { optionalMoneyFromForm } from "@/lib/money";
 import { recordHistory } from "@/lib/history";
 import { can } from "@/lib/permissions";
 import { parseRegimen } from "@/lib/sat-regimen";
@@ -180,7 +181,7 @@ export async function updatePriorityAction(formData: FormData) {
     where: { id, companyId: session.activeCompanyId },
     data: {
       price: optionalMoneyFromForm(formData.get("price")),
-      incrementPct: optionalMoney(formData.get("incrementPct")),
+      incrementPct: optionalPercent(formData.get("incrementPct")),
       targetMinDays: optionalInt(formData.get("targetMinDays")),
       targetMaxDays: optionalInt(formData.get("targetMaxDays")),
       slaMaxDays,
@@ -192,6 +193,14 @@ export async function updatePriorityAction(formData: FormData) {
   }
   await setFlash({ tone: "ok", message: "Prioridad actualizada. Los casos ya abiertos conservan la fotografía anterior." });
   redirect("/configuracion");
+}
+
+function optionalPercent(value: FormDataEntryValue | null) {
+  const text = optionalText(value);
+  if (!text) return null;
+  const n = Number(text);
+  if (!Number.isFinite(n) || n < 0) throw new Error("El incremento no es válido.");
+  return n;
 }
 
 function isRedirect(error: unknown) {
