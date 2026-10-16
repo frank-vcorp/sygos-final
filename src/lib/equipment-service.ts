@@ -7,6 +7,7 @@ import { recordHistory } from "./history";
 import { rememberCatalog } from "./catalog";
 import { isAttentionType, type AttentionType } from "./priorities";
 import { SALES_NOT_ASSIGNED_MESSAGE } from "./sales-assignment";
+import { assertDefinitiveWarehouseExit, assertTestWarehouseExit } from "./warehouse-exit";
 import { assertWarrantyOrigin, openCase, openPendingCases, resolveWarrantyOriginForEquipment } from "./technical";
 
 type Actor = {
@@ -398,6 +399,7 @@ export async function registerMovement(
     enablingDocument: string | null;
     supplierId: string | null;
     notes: string | null;
+    technicalCaseId?: string | null;
   },
 ) {
   const equipment = await prisma.equipment.findUnique({ where: { id: input.equipmentId } });
@@ -412,11 +414,23 @@ export async function registerMovement(
   if (equipment.kind === "MOT" && equipment.originCompanyId !== actor.activeCompanyId && actor.activeCompanyCode === "SYSTRON") {
     throw new Error("SYSTRON no registra la custodia de este MOT.");
   }
-  if ((input.kind === "SALIDA" || input.kind === "EGRESO") && (!input.enablingDocument || !input.deliveryMode || !input.receiverName)) {
-    throw new Error("La salida definitiva exige documento habilitante, modalidad de entrega y persona que recibe.");
+  let enablingDocument = input.enablingDocument;
+  if (input.kind === "SALIDA" || input.kind === "EGRESO") {
+    if (!input.technicalCaseId) {
+      throw new Error("La salida definitiva debe ligarse a la OS terminada.");
+    }
+    const doc = await assertDefinitiveWarehouseExit(input.technicalCaseId, input.equipmentId);
+    enablingDocument = doc.enablingDocument;
+    if (!input.deliveryMode || !input.receiverName) {
+      throw new Error("Indica si entrega el vendedor asignado o paquetería.");
+    }
+    if (input.deliveryMode !== "Vendedor asignado" && input.deliveryMode !== "Paquetería") {
+      throw new Error("La entrega solo puede ser al vendedor asignado o por paquetería.");
+    }
   }
-  if (input.kind === "SALIDA_PRUEBA" && !input.receiverName) {
-    throw new Error("Indica el receptor o el contexto de la salida a prueba.");
+  if (input.kind === "SALIDA_PRUEBA") {
+    if (!input.receiverName) throw new Error("Indica quién recibe el equipo en prueba.");
+    await assertTestWarehouseExit(input.equipmentId, actor.activeCompanyId);
   }
   if (input.kind === "SALIDA_PROVEEDOR") {
     if (!input.supplierId) throw new Error("Selecciona el proveedor.");
@@ -465,7 +479,7 @@ export async function registerMovement(
         receiverName: input.receiverName,
         deliveryMode: input.deliveryMode,
         contact: input.contact,
-        enablingDocument: input.enablingDocument,
+        enablingDocument,
         supplierId: input.supplierId,
         notes: input.notes,
         authorUserId: actor.userId,

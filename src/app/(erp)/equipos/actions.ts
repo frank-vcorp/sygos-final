@@ -125,6 +125,7 @@ export async function movementAction(formData: FormData) {
       enablingDocument: optionalText(formData.get("enablingDocument")),
       supplierId: await supplierIdFromForm(session, formData),
       notes: optionalText(formData.get("notes")),
+      technicalCaseId: optionalText(formData.get("technicalCaseId")),
     });
     await setFlash({
       tone: "ok",

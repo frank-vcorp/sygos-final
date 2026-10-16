@@ -101,6 +101,7 @@ export function MovementForm({
   receiptPreset,
   formId,
   hideSubmit = false,
+  restrictMovements,
 }: {
   equipmentId: string;
   equipmentFolio: string;
@@ -112,6 +113,7 @@ export function MovementForm({
   variant?: "card" | "plain";
   formId?: string;
   hideSubmit?: boolean;
+  restrictMovements?: MovementKind[];
   receiptPreset?: {
     movement: MovementKind;
     reason: string;
@@ -120,7 +122,7 @@ export function MovementForm({
     clientName: string;
   };
 }) {
-  const movements = allowedMovements(kind, custody);
+  const movements = restrictMovements ?? allowedMovements(kind, custody);
   if (movements.length === 0) return null;
   if (receiptPreset) {
     const body = (

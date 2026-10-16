@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { CancelMovementForm, MovementForm } from "@/components/custody-forms";
 import { EquipmentAttentionLauncher } from "@/components/equipment-attention-launcher";
 import { EquipmentCustodyActions } from "@/components/equipment-custody-actions";
+import { WarehouseExitForm } from "@/components/warehouse-exit-form";
+import { loadWarehouseExitContext } from "@/lib/warehouse-exit";
 import { EquipmentLabel } from "@/components/equipment-label";
 import { HistoryTimeline } from "@/components/history-timeline";
 import { Badge, Card, DetailAnchorButton, DetailFormSubmitButton, EntityDetailHeader, EntityMetaItem, MobileCard, Table, Td, TextLink, Th } from "@/components/ui";
@@ -123,6 +125,21 @@ export async function EquipmentDetail({ id, expectedKind, showLabel = false }: {
   const warehouseReceiptFormId = "warehouse-receipt-form";
   const oneStepWarehouseReceipt =
     custodyDetail && canMove && simplifiedReceipt && !awaitingAttentionForReceipt;
+  const useWarehouseExit =
+    custodyDetail
+    && canMove
+    && hasReceipt
+    && !awaitingAttentionForReceipt
+    && !oneStepWarehouseReceipt
+    && equipment.custody === "EN_RESGUARDO";
+  const warehouseExit = useWarehouseExit
+    ? await loadWarehouseExitContext({
+      equipmentId: equipment.id,
+      equipmentKind: expectedKind,
+      custody: equipment.custody as Custody,
+      companyId: session.activeCompanyId,
+    })
+    : null;
   let primaryAction: React.ReactNode = null;
   const clientDisplayName = intercompany ? "SYSTRON · intercompañía" : equipment.client.name;
   if (awaitingAttentionForReceipt && canAttend) {
@@ -141,7 +158,7 @@ export async function EquipmentDetail({ id, expectedKind, showLabel = false }: {
   } else if (canMove && simplifiedReceipt && !awaitingAttentionForReceipt) {
     primaryAction = <DetailAnchorButton href="#custodia-equipo">Confirmar entrada física</DetailAnchorButton>;
   } else if (canMove && movementOptions.length > 0 && !awaitingAttentionForReceipt) {
-    primaryAction = <DetailAnchorButton href="#custodia-equipo">Registrar movimiento</DetailAnchorButton>;
+    primaryAction = <DetailAnchorButton href="#custodia-equipo">{useWarehouseExit ? "Registrar salida" : "Registrar movimiento"}</DetailAnchorButton>;
   }
   let custodyPrimaryAction: React.ReactNode = null;
   if (custodyDetail && !awaitingAttentionForReceipt) {
@@ -150,7 +167,7 @@ export async function EquipmentDetail({ id, expectedKind, showLabel = false }: {
     } else if (canMove && movementOptions.length > 0) {
       custodyPrimaryAction = (
         <DetailAnchorButton href="#custodia-equipo">
-          {simplifiedReceipt ? "Confirmar entrada física" : "Registrar movimiento"}
+          {simplifiedReceipt ? "Confirmar entrada física" : useWarehouseExit ? "Registrar salida" : "Registrar movimiento"}
         </DetailAnchorButton>
       );
     }
@@ -268,10 +285,29 @@ export async function EquipmentDetail({ id, expectedKind, showLabel = false }: {
             <EquipmentCustodyActions
               showMovement={canMove && movementOptions.length > 0 && !awaitingAttentionForReceipt && !oneStepWarehouseReceipt}
               showAttention={false}
-              movementButtonLabel={simplifiedReceipt ? "Confirmar entrada física" : "Registrar movimiento"}
-              movementTitle={simplifiedReceipt ? "Confirmar entrada física" : "Registrar movimiento"}
+              movementButtonLabel={simplifiedReceipt ? "Confirmar entrada física" : useWarehouseExit ? "Registrar salida" : "Registrar movimiento"}
+              movementTitle={simplifiedReceipt ? "Confirmar entrada física" : useWarehouseExit ? "Registrar salida" : "Registrar movimiento"}
               movement={
-                oneStepWarehouseReceipt ? null : (
+                oneStepWarehouseReceipt ? null : useWarehouseExit && warehouseExit ? (
+                  <WarehouseExitForm
+                    equipmentId={equipment.id}
+                    equipmentFolio={equipment.folio}
+                    kind={expectedKind}
+                    version={equipment.version}
+                    exitMovement={warehouseExit.exitMovement}
+                    definitiveReason={warehouseExit.definitiveReason}
+                    sellerName={warehouseExit.sellerName}
+                    canDefinitiveExit={warehouseExit.canDefinitiveExit}
+                    definitiveBlockedMessage={warehouseExit.definitiveBlockedMessage}
+                    technicalCaseId={warehouseExit.technicalCaseId}
+                    enablingDocumentLabel={warehouseExit.enablingDocumentLabel}
+                    canTestExit={warehouseExit.canTestExit}
+                    testReason={warehouseExit.testReason}
+                    showSupplierExit={movementOptions.includes("SALIDA_PROVEEDOR")}
+                    suppliers={suppliers.map((supplier) => ({ id: supplier.id, name: supplier.name }))}
+                    allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)}
+                  />
+                ) : (
                   <MovementForm
                     variant="plain"
                     equipmentId={equipment.id}

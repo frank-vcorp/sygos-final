@@ -383,6 +383,10 @@ model TechnicalCase {
   originalCaseId      String?
   spawnedFromId       String?
   paidAt              DateTime?
+  exitWithoutDocumentRequestedAt       DateTime?
+  exitWithoutDocumentRequestedByUserId String?
+  exitWithoutDocumentAuthorizedAt      DateTime?
+  exitWithoutDocumentAuthorizedByUserId  String?
   quotePending        Boolean   @default(false)
   returnReason        String?
   slaDueAt            DateTime?

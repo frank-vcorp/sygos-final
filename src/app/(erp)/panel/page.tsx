@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ClientNameLink } from "@/components/client-entity-links";
+import { AuthorizeExitWithoutDocumentButton } from "@/components/exit-without-document-actions";
 import { ActionLink, Card, KpiCard, PageHeader, RecordLink, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
@@ -474,6 +475,7 @@ async function CeoExecutive({ companyId, name, vista }: { companyId: string; nam
     overdue,
     invoiced,
     validations,
+    exitWithoutDocumentRequests,
     invoices,
     payments,
     dueReceivables,
@@ -489,6 +491,18 @@ async function CeoExecutive({ companyId, name, vista }: { companyId: string; nam
     prisma.technicalCase.count({ where: { serviceCompanyId: companyId, status: { notIn: CLOSED }, slaDueAt: { lt: new Date() } } }),
     prisma.billingDocument.aggregate({ where: { companyId, status: "EMITIDA", kind: { not: "REMISION" } }, _sum: { total: true } }),
     prisma.technicalCase.findMany({ where: { serviceCompanyId: companyId, status: "PENDIENTE_VALIDACION" }, take: 12 }),
+    prisma.technicalCase.findMany({
+      where: {
+        serviceCompanyId: companyId,
+        kind: "OS",
+        status: "TERMINADA",
+        exitWithoutDocumentRequestedAt: { not: null },
+        exitWithoutDocumentAuthorizedAt: null,
+      },
+      include: { equipment: { include: { client: true } } },
+      orderBy: { exitWithoutDocumentRequestedAt: "asc" },
+      take: 12,
+    }),
     prisma.billingDocument.findMany({ where: { companyId, status: "SOLICITADA", kind: { not: "REMISION" } }, take: 12 }),
     prisma.payment.findMany({ where: { companyId, status: "PENDIENTE" }, orderBy: { createdAt: "asc" }, take: 12 }),
     prisma.receivable.findMany({ where: { companyId, balance: { gt: 0 }, dueAt: { lt: new Date() } }, include: { document: true }, take: 12 }),
@@ -524,6 +538,7 @@ async function CeoExecutive({ companyId, name, vista }: { companyId: string; nam
           <KpiCard label="O.C. por autorizar" value={String(orders.length)} href="/compras?vista=autorizar" />
           <KpiCard label="SLA vencidos" value={String(overdue)} href="/operacion" />
           <KpiCard label="Pagos por validar" value={String(payments.length)} href="/pagos?vista=pendientes" />
+          <KpiCard label="Salidas sin documento" value={String(exitWithoutDocumentRequests.length)} href="/panel?vista=autorizacion" />
         </section>
       ) : null}
       <div className="grid gap-3">
@@ -539,6 +554,23 @@ async function CeoExecutive({ companyId, name, vista }: { companyId: string; nam
             <Block title="Nómina" empty="Sin preliminar." bandejaHref="/nomina" rows={payrolls.map((row) => ({ href: `/nomina/${row.id}`, label: row.folio, detail: "Autorizar" }))} />
             <Block title="Comisiones" empty="Sin preliminar." bandejaHref="/comisiones" rows={commissions.map((row) => ({ href: `/comisiones/${row.id}`, label: row.month, detail: "Validar" }))} />
             <Block title="Horas extra" empty="Nada espera autorización final." bandejaHref="/personal/horas" rows={overtime.map((row) => ({ href: "/personal/horas", label: row.collaborator.user.name, detail: `${row.hours} h` }))} />
+            <Block
+              title="Salidas sin documento solicitadas"
+              empty="Ninguna OS espera tu autorización de salida."
+              bandejaHref="/operacion"
+              rows={exitWithoutDocumentRequests.map((row) => ({
+                href: `/operacion/${row.id}`,
+                label: row.folio,
+                detail: (
+                  <>
+                    {row.equipment.client.name} · {row.equipment.folio}
+                    <span className="ml-2 inline-flex">
+                      <AuthorizeExitWithoutDocumentButton caseId={row.id} version={row.version} />
+                    </span>
+                  </>
+                ),
+              }))}
+            />
           </>
         ) : null}
         {show("tecnico") ? (

@@ -25,6 +25,7 @@ import { setFlash } from "@/lib/flash";
 import { supplierIdFromForm } from "@/lib/form-quick-entities";
 import { optionalText, parseVersion, requiredText } from "@/lib/form";
 import { requireCompany } from "@/lib/session";
+import { authorizeExitWithoutDocument, requestExitWithoutDocument } from "@/lib/warehouse-exit";
 
 function back(formData: FormData) {
   const id = String(formData.get("caseId") ?? "");
@@ -145,6 +146,24 @@ export async function receivePartAction(formData: FormData) {
 export async function issuePartAction(formData: FormData) {
   "use server";
   await run(formData, (session) => issuePartRequest(session, requiredText(formData.get("requestId"), "Solicitud"), parseVersion(formData.get("version")), Number(formData.get("quantity"))), "Surtido registrado.");
+}
+
+export async function requestExitWithoutDocumentAction(formData: FormData) {
+  "use server";
+  await run(
+    formData,
+    (session) => requestExitWithoutDocument(session, requiredText(formData.get("caseId"), "Operación"), parseVersion(formData.get("version"))),
+    "Solicitud enviada al CEO.",
+  );
+}
+
+export async function authorizeExitWithoutDocumentAction(formData: FormData) {
+  "use server";
+  await run(
+    formData,
+    (session) => authorizeExitWithoutDocument(session, requiredText(formData.get("caseId"), "Operación"), parseVersion(formData.get("version"))),
+    "Salida sin documento autorizada. Almacén ya puede registrar la entrega.",
+  );
 }
 
 function isRedirect(error: unknown) {

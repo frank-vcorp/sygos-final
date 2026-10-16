@@ -20,6 +20,7 @@ import {
 } from "../actions";
 import { ClientNameLink } from "@/components/client-entity-links";
 import { DiagnosisValidationActions } from "@/components/diagnosis-validation-actions";
+import { RequestExitWithoutDocumentButton } from "@/components/exit-without-document-actions";
 import { RepairClosureActions } from "@/components/repair-closure-actions";
 import { SupervisorReassignControl } from "@/components/supervisor-reassign-control";
 import { HistoryTimeline, type HistoryTimelineItem } from "@/components/history-timeline";
@@ -51,6 +52,7 @@ import { redirectIfSalesNotAssigned } from "@/lib/sales-assignment";
 import { serviciosBandejaHref } from "@/lib/servicios-catalog";
 import { HISTORIAL_CASE } from "@/lib/servicios-supervisor";
 import { requireCompany } from "@/lib/session";
+import { definitiveExitAuthorized, findEnablingBillingDocument } from "@/lib/warehouse-exit";
 
 export default async function OperacionDetallePage({ params }: { params: Promise<{ id: string }> }) {
   const session = await requireCompany();
@@ -101,6 +103,15 @@ export default async function OperacionDetallePage({ params }: { params: Promise
       ? suggestedAssigneeRaw
       : null;
   const defaultAssigneeId = row.assigneeUserId ?? suggestedAssigneeId ?? "";
+  const enablingBilling = await findEnablingBillingDocument(row.id);
+  const exitAuthorized = definitiveExitAuthorized(row);
+  const exitPending = Boolean(row.exitWithoutDocumentRequestedAt && !row.exitWithoutDocumentAuthorizedAt);
+  const showExitWithoutDocument =
+    row.kind === "OS"
+    && row.status === "TERMINADA"
+    && row.equipment.custody === "EN_RESGUARDO"
+    && (session.role === "VENTAS" && row.attention.sellerUserId === session.userId || exitPending || exitAuthorized);
+
   const [caseHistory, seller, relatedQuotes, relatedBilling, relatedSales] = await Promise.all([
     historyFor("OPERACION", row.id),
     row.attention.sellerUserId
@@ -523,6 +534,22 @@ export default async function OperacionDetallePage({ params }: { params: Promise
           <div id="refacciones" className="scroll-mt-6">{partsSection}</div>
         </div>
         <aside className="space-y-4 lg:sticky lg:top-4 lg:self-start">
+          {showExitWithoutDocument && !enablingBilling ? (
+            <Card className="p-4 text-sm">
+              <h2 className="font-medium">Salida sin documento</h2>
+              <p className="mt-1 text-[var(--muted)]">
+                Si aún no hay remisión ni factura, solicita autorización al CEO para que almacén registre la entrega.
+              </p>
+              <div className="mt-3">
+                <RequestExitWithoutDocumentButton
+                  caseId={row.id}
+                  version={row.version}
+                  pending={exitPending}
+                  authorized={exitAuthorized}
+                />
+              </div>
+            </Card>
+          ) : null}
           <HistoryTimeline
             items={historyTimelineItems}
             title={historyTimelineItems.length > caseHistoryItems.length ? "Historial completo" : undefined}
