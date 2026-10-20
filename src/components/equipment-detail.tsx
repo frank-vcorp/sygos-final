@@ -107,8 +107,20 @@ export async function EquipmentDetail({
   const hasReceipt = equipment.movements.some((row) => !row.cancelledAt && isReceipt(row.kind as MovementKind));
   const movementOptions = allowedMovements(expectedKind, equipment.custody as Custody);
   const openAttention = equipment.attentions.find((row) => row.status === "ABIERTA");
+  /** Atención pendiente de primera entrada (ventas ya capturó servicio). */
+  const entradaAttention =
+    openAttention
+    ?? equipment.attentions.find((row) => row.status === "EN_PROCESO" && !row.slaStartedAt);
   const receiptMovement = movementOptions.find((movement) => isReceipt(movement));
+  const entradaReceiptMovement: MovementKind | undefined =
+    receiptMovement
+    ?? (expectedKind === "EQUI" && equipment.custody === "SIN_CUSTODIA"
+      ? "ENTRADA"
+      : expectedKind === "MOT" && equipment.custody === "PENDIENTE_INGRESO"
+        ? "INGRESO"
+        : undefined);
   const receiptReason = openAttention ? receiptReasonFromAttention(openAttention.attentionType) : null;
+  const entradaReceiptReason = entradaAttention ? receiptReasonFromAttention(entradaAttention.attentionType) : null;
   const simplifiedReceipt =
     receiptMovement
     && receiptReason
@@ -138,13 +150,24 @@ export async function EquipmentDetail({
           clientName: intercompany ? "SYSTRON · intercompañía" : equipment.client.name,
         }
       : undefined;
+  const almacenEntradaPreset =
+    entradaAttention && entradaReceiptMovement && entradaReceiptReason
+      ? {
+          movement: entradaReceiptMovement,
+          reason: entradaReceiptReason,
+          serviceLabel: ATTENTION_LABEL[entradaAttention.attentionType as AttentionType] ?? entradaAttention.attentionType,
+          reportedFault: entradaAttention.reportedFault,
+          clientName: intercompany ? "SYSTRON · intercompañía" : equipment.client.name,
+        }
+      : undefined;
 
   const backLabel = listHref === "/custodia" ? "Almacén" : expectedKind === "EQUI" ? "Equipos" : "Motores";
   const inEntradasBandeja =
     (expectedKind === "EQUI" && equipment.custody === "SIN_CUSTODIA")
     || (expectedKind === "MOT" && equipment.custody === "PENDIENTE_INGRESO");
-  const showPassToResguardo =
-    almacenCustody && canMove && inEntradasBandeja && !awaitingAttentionForReceipt && Boolean(receiptPreset);
+  /** Rol Almacén: equipos de la pestaña Entradas (sin entrada física aún). */
+  const showAlmacenPasarResguardo = almacenCustody && canMove && inEntradasBandeja;
+  const showPassToResguardo = showAlmacenPasarResguardo;
   const useWarehouseExit =
     custodyDetail
     && canMove
@@ -190,10 +213,10 @@ export async function EquipmentDetail({
   }
 
   const showCustodyMovementBar =
-    custodyDetail
-    && !awaitingAttentionForReceipt
-    && (showPassToResguardo || (canMove && movementOptions.length > 0));
-  const custodyBarSticky = showCustodyMovementBar && (almacenCustody || movementOptions.length > 0);
+    showAlmacenPasarResguardo
+    || (custodyDetail && !awaitingAttentionForReceipt && canMove && movementOptions.length > 0);
+  const custodyBarSticky =
+    showCustodyMovementBar && (showAlmacenPasarResguardo || almacenCustody || movementOptions.length > 0);
 
   return (
     <>
@@ -280,7 +303,7 @@ export async function EquipmentDetail({
         ) : null}
 
         <div id="custodia-equipo" className="scroll-mt-24">
-          {almacenCustody && showPassToResguardo ? (
+          {showAlmacenPasarResguardo ? (
             <div className="mb-3">
               <h2 className="text-lg font-semibold text-[#0b1f3a]">Entrada pendiente</h2>
               <p className="mt-1 text-sm text-[var(--muted)]">El servicio ya fue definido por Ventas. Al pasar a resguardo se inicia el SLA y el folio DX u OS.</p>
@@ -298,27 +321,35 @@ export async function EquipmentDetail({
           {showCustodyMovementBar ? (
             <div className={custodyBarSticky ? "sticky top-3 z-20 rounded-xl border border-[var(--line)] bg-white/95 p-2 shadow-[0_8px_24px_rgba(20,45,75,0.12)] backdrop-blur" : ""}>
               <EquipmentCustodyActions
-                showMovement={showPassToResguardo || (canMove && movementOptions.length > 0)}
+                showMovement={showAlmacenPasarResguardo || (canMove && movementOptions.length > 0)}
                 showAttention={false}
                 movementButtonLabel={
-                  showPassToResguardo ? "Pasar a resguardo" : useWarehouseExit ? "Registrar salida" : "Registrar movimiento"
+                  showAlmacenPasarResguardo ? "Pasar a resguardo" : useWarehouseExit ? "Registrar salida" : "Registrar movimiento"
                 }
                 movementTitle={
-                  showPassToResguardo ? "Pasar a resguardo" : useWarehouseExit ? "Registrar salida" : "Registrar movimiento"
+                  showAlmacenPasarResguardo ? "Pasar a resguardo" : useWarehouseExit ? "Registrar salida" : "Registrar movimiento"
                 }
                 movement={
-                  showPassToResguardo && receiptPreset ? (
-                    <PassToResguardoForm
-                      equipmentId={equipment.id}
-                      equipmentFolio={equipment.folio}
-                      kind={expectedKind}
-                      version={equipment.version}
-                      movement={receiptPreset.movement}
-                      reason={receiptPreset.reason}
-                      serviceLabel={receiptPreset.serviceLabel}
-                      reportedFault={receiptPreset.reportedFault}
-                      clientName={receiptPreset.clientName}
-                    />
+                  showAlmacenPasarResguardo ? (
+                    almacenEntradaPreset ? (
+                      <PassToResguardoForm
+                        equipmentId={equipment.id}
+                        equipmentFolio={equipment.folio}
+                        kind={expectedKind}
+                        version={equipment.version}
+                        movement={almacenEntradaPreset.movement}
+                        reason={almacenEntradaPreset.reason}
+                        serviceLabel={almacenEntradaPreset.serviceLabel}
+                        reportedFault={almacenEntradaPreset.reportedFault}
+                        clientName={almacenEntradaPreset.clientName}
+                      />
+                    ) : (
+                      <p className="rounded-md border border-[#efd0d0] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]">
+                        {awaitingAttentionForReceipt
+                          ? "Ventas aún no registra el servicio para este equipo. No puedes pasarlo a resguardo."
+                          : "No hay datos de servicio para confirmar la entrada. Revisa con ventas."}
+                      </p>
+                    )
                   ) : useWarehouseExit && warehouseExit ? (
                     almacenCustody ? (
                       <WarehouseExitFormAlmacen
