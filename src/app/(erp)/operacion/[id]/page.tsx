@@ -46,7 +46,7 @@ import { historyFor } from "@/lib/history";
 import { can } from "@/lib/permissions";
 import { ATTENTION_LABEL, type AttentionType } from "@/lib/priorities";
 import { diagnosisPresolicitudEditable, fieldPresolicitudOnly, PRESOLICITUD_LABEL } from "@/lib/part-presolicitud";
-import { CASE_STATUS_LABEL, lastTechnicianWhoClosedEquipmentCase } from "@/lib/technical";
+import { canCloseRepair, CASE_STATUS_LABEL, lastTechnicianWhoClosedEquipmentCase } from "@/lib/technical";
 import { homePath } from "@/lib/home";
 import { redirectIfSalesNotAssigned } from "@/lib/sales-assignment";
 import { serviciosBandejaHref } from "@/lib/servicios-catalog";
@@ -202,6 +202,8 @@ export default async function OperacionDetallePage({ params }: { params: Promise
   const warranty = row.attention.attentionType === "DIAGNOSTICO_GARANTIA" && row.kind === "DIAGNOSTICO";
   const canManage = !readOnly && ["ADMINISTRADOR", "CEO", "SUPERVISOR_TECNICO", "GERENTE_OPERATIVO_SYSTRON", "GERENTE_OPERATIVO_SERVOMOTORES"].includes(session.role);
   const canWork = !readOnly && (session.role === "ADMINISTRADOR" || session.role === "CEO" || session.role === "SUPERVISOR_TECNICO" || (session.role === "GERENTE_OPERATIVO_SERVOMOTORES" && session.activeCompanyCode === "SERVOMOTORES") || (session.role === "TECNICO" && row.assigneeUserId === session.userId));
+  const canCloseOsRepair =
+    !readOnly && canCloseRepair(session, row.assigneeUserId, row.equipment.client.ownerUserId);
   const awaitingStart = row.status === "EN_ESPERA" || row.status === "DEVUELTO";
   const canStartPending =
     !readOnly
@@ -297,7 +299,7 @@ export default async function OperacionDetallePage({ params }: { params: Promise
           validateAction={validateAction}
         />
       );
-    } else if (canWork && row.kind === "OS" && ["EN_REPARACION", "EN_ESPERA_REFACCIONES"].includes(row.status)) {
+    } else if (canCloseOsRepair && row.kind === "OS" && ["EN_REPARACION", "EN_ESPERA_REFACCIONES"].includes(row.status)) {
       primaryAction = (
         <RepairClosureActions
           caseId={row.id}

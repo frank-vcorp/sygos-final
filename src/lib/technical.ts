@@ -140,7 +140,11 @@ export async function resolveWarrantyOriginForEquipment(equipmentId: string) {
 async function loadCase(id: string) {
   const row = await prisma.technicalCase.findUnique({
     where: { id },
-    include: { attention: true, serviceCompany: true, equipment: { include: { originCompany: true } } },
+    include: {
+      attention: true,
+      serviceCompany: true,
+      equipment: { include: { originCompany: true, client: { select: { ownerUserId: true } } } },
+    },
   });
   if (!row) throw new Error("No se encontró la operación técnica.");
   return row;
@@ -162,6 +166,16 @@ function canExecute(actor: Actor, assigneeUserId: string | null) {
   if (actor.role === "SUPERVISOR_TECNICO") return true;
   if (actor.role === "TECNICO" && assigneeUserId === actor.userId) return true;
   return false;
+}
+
+/** Cierre de OS: taller (canExecute) o vendedor con el cliente en cartera. */
+export function canCloseRepair(
+  actor: Pick<Actor, "userId" | "role">,
+  assigneeUserId: string | null,
+  clientOwnerUserId: string | null | undefined,
+) {
+  if (canExecute(actor, assigneeUserId)) return true;
+  return actor.role === "VENTAS" && clientOwnerUserId === actor.userId;
 }
 
 export async function assignCase(actor: Actor, caseId: string, version: number, assigneeUserId: string | null, supplierId: string | null) {
@@ -369,7 +383,9 @@ export async function finishRepair(actor: Actor, caseId: string, version: number
   const row = await loadCase(caseId);
   assertServiceCompany(actor, row.serviceCompanyId);
   if (row.kind !== "OS") throw new Error("Esta no es una orden de servicio.");
-  if (!canExecute(actor, row.assigneeUserId)) throw new Error("Solo quien ejecuta puede cerrar la reparación.");
+  if (!canCloseRepair(actor, row.assigneeUserId, row.equipment.client.ownerUserId)) {
+    throw new Error("No puedes cerrar esta reparación.");
+  }
   if (!["EN_REPARACION", "EN_ESPERA_REFACCIONES"].includes(row.status)) throw new Error("La reparación no está en ejecución.");
   if (row.status === "EN_ESPERA_REFACCIONES" && outcome === "TERMINADA") {
     throw new Error("Hay refacciones pendientes. No se cierra como reparación terminada.");
