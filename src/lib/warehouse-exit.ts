@@ -6,12 +6,26 @@ const CLOSED_CASE = new Set(["VALIDADO", "TERMINADA", "SIN_REPARACION"]);
 
 const ENABLING_BILLING_KINDS = ["REMISION", "FACTURA", "FACTURA_INTERCOMPANIA"] as const;
 
+/** IDs de caso que habilitan salida: la OS y el DX origen (la cotización suele ligar al DX). */
+export function enablingBillingCaseIds(os: { id: string; spawnedFromId: string | null }) {
+  return os.spawnedFromId ? [os.id, os.spawnedFromId] : [os.id];
+}
+
 export async function findEnablingBillingDocument(technicalCaseId: string) {
+  const os = await prisma.technicalCase.findUnique({
+    where: { id: technicalCaseId },
+    select: { id: true, spawnedFromId: true, equipmentId: true },
+  });
+  if (!os) return null;
+  const caseIds = enablingBillingCaseIds(os);
   return prisma.billingDocument.findFirst({
     where: {
-      technicalCaseId,
       status: "EMITIDA",
       kind: { in: [...ENABLING_BILLING_KINDS] },
+      OR: [
+        { technicalCaseId: { in: caseIds } },
+        { equipmentId: os.equipmentId, quote: { technicalCaseId: { in: caseIds } } },
+      ],
     },
     orderBy: { issuedAt: "desc" },
     select: { id: true, folio: true, kind: true },
@@ -89,7 +103,11 @@ export async function loadWarehouseExitContext(input: {
   let blockedMessage: string | null = null;
 
   if (input.forAlmacenRole) {
-    const attentionType = input.openAttentionType ?? null;
+    const attentionType =
+      input.openAttentionType
+      ?? osCase?.attention.attentionType
+      ?? diagnosisCase?.attention.attentionType
+      ?? null;
     if (input.custody !== "EN_RESGUARDO") {
       blockedMessage = "El equipo debe estar en resguardo para registrar la salida.";
     } else if (attentionType === "REPARACION") {

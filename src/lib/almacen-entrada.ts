@@ -28,6 +28,13 @@ export function entradaServiceBadge(attentionType: string | null | undefined, qu
   return serviceSeries(resolved);
 }
 
+/** Atención vigente tras entrada física (queda EN_PROCESO, no solo ABIERTA). */
+export function pickCustodyFlowAttention(attentions: readonly EntradaAttention[]): EntradaAttention | null {
+  const inFlight = attentions.find((row) => row.status === "ABIERTA" || row.status === "EN_PROCESO");
+  if (inFlight) return inFlight;
+  return pickEntradaAttention(attentions);
+}
+
 /** Atención usable para primera entrada física (incluye casos fuera de ABIERTA estricta). */
 export function pickEntradaAttention(attentions: readonly EntradaAttention[]): EntradaAttention | null {
   if (attentions.length === 0) return null;

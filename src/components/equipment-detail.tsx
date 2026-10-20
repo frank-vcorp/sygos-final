@@ -10,7 +10,7 @@ import { loadWarehouseExitContext } from "@/lib/warehouse-exit";
 import { EquipmentLabel } from "@/components/equipment-label";
 import { HistoryTimeline } from "@/components/history-timeline";
 import { Badge, Card, DetailAnchorButton, EntityDetailHeader, EntityMetaItem, MobileCard, Table, Td, TextLink, Th } from "@/components/ui";
-import { buildAlmacenEntradaPreset } from "@/lib/almacen-entrada";
+import { buildAlmacenEntradaPreset, pickCustodyFlowAttention } from "@/lib/almacen-entrada";
 import { allowedMovements, CUSTODY_LABEL, isInitialWarehouseReceipt, isReceipt, MOVEMENT_LABEL, receiptReasonFromAttention, type Custody, type MovementKind } from "@/lib/custody";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
@@ -108,6 +108,7 @@ export async function EquipmentDetail({
   const hasReceipt = equipment.movements.some((row) => !row.cancelledAt && isReceipt(row.kind as MovementKind));
   const movementOptions = allowedMovements(expectedKind, equipment.custody as Custody);
   const openAttention = equipment.attentions.find((row) => row.status === "ABIERTA");
+  const custodyFlowAttention = pickCustodyFlowAttention(equipment.attentions);
   const receiptMovement = movementOptions.find((movement) => isReceipt(movement));
   const receiptReason = openAttention ? receiptReasonFromAttention(openAttention.attentionType) : null;
   const simplifiedReceipt =
@@ -182,7 +183,7 @@ export async function EquipmentDetail({
       custody: equipment.custody as Custody,
       companyId: session.activeCompanyId,
       forAlmacenRole: almacenCustody,
-      openAttentionType: openAttention?.attentionType ?? null,
+      openAttentionType: custodyFlowAttention?.attentionType ?? null,
     })
     : null;
   let primaryAction: React.ReactNode = null;
