@@ -98,7 +98,17 @@ export default async function CustodiaPage({ searchParams }: { searchParams: Pro
                   const ref = hideClient ? "SYSTRON · intercompañía" : row.client.name;
                   return (
                     <tr key={row.id}>
-                      <Td><RecordLink href={row.kind === "MOT" ? `/motores/${row.id}` : `/equipos/${row.id}`}>{row.folio}</RecordLink></Td>
+                      <Td>
+                        <RecordLink
+                          href={
+                            row.kind === "MOT"
+                              ? `/motores/${row.id}${view ? `?vista=${view}` : ""}`
+                              : `/equipos/${row.id}${view ? `?vista=${view}` : ""}`
+                          }
+                        >
+                          {row.folio}
+                        </RecordLink>
+                      </Td>
                       <Td>{ref}</Td>
                       <Td><Badge>{CUSTODY_LABEL[row.custody as Custody]}</Badge></Td>
                     </tr>
@@ -109,7 +119,7 @@ export default async function CustodiaPage({ searchParams }: { searchParams: Pro
           }
           cards={rows.map((row) => {
             const hideClient = !systron && row.originCompany.code === "SYSTRON";
-            const href = row.kind === "MOT" ? `/motores/${row.id}` : `/equipos/${row.id}`;
+            const href = row.kind === "MOT" ? `/motores/${row.id}?vista=${view}` : `/equipos/${row.id}?vista=${view}`;
             return (
               <MobileCard
                 key={row.id}
