@@ -14,10 +14,11 @@ export function WarehouseExitForm({
   exitMovement,
   definitiveReason,
   sellerName,
+  canDefinitiveExit,
+  definitiveBlockedMessage,
   technicalCaseId,
   enablingDocumentLabel,
-  exitKind,
-  blockedMessage,
+  canTestExit,
   testReason,
 }: {
   equipmentId: string;
@@ -27,62 +28,72 @@ export function WarehouseExitForm({
   exitMovement: "SALIDA" | "EGRESO";
   definitiveReason: string;
   sellerName: string;
+  canDefinitiveExit: boolean;
+  definitiveBlockedMessage: string | null;
   technicalCaseId: string | null;
   enablingDocumentLabel: string | null;
-  exitKind: "test" | "definitive" | null;
-  blockedMessage: string | null;
+  canTestExit: boolean;
   testReason: string;
 }) {
+  const [mode, setMode] = useState<"definitive" | "test">(canTestExit && !canDefinitiveExit ? "test" : "definitive");
   const [receiverMode, setReceiverMode] = useState<ReceiverMode>("vendedor");
+
   const receiverName = receiverMode === "vendedor" ? sellerName : "Paquetería";
   const deliveryMode = receiverMode === "vendedor" ? "Vendedor asignado" : "Paquetería";
-
-  if (blockedMessage || !exitKind) {
-    return (
-      <p className="rounded-md border border-[#efd0d0] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]">
-        {blockedMessage ?? "No puedes registrar la salida todavía."}
-      </p>
-    );
-  }
 
   return (
     <div className="grid gap-4">
       <p className="text-sm text-[var(--muted)]">
-        Equipo <span className="font-medium text-[var(--ink)]">{equipmentFolio}</span>.
-        {exitKind === "test"
-          ? " Con diagnóstico en curso, la salida será a prueba."
-          : " Con OS terminada, la salida será definitiva."}
+        Equipo <span className="font-medium text-[var(--ink)]">{equipmentFolio}</span>. La entrada ya quedó registrada; aquí solo registras salidas.
       </p>
+      <div className="flex flex-wrap gap-2">
+        {canDefinitiveExit || definitiveBlockedMessage ? (
+          <Button type="button" tone={mode === "definitive" ? "primary" : "ghost"} onClick={() => setMode("definitive")}>
+            Salida definitiva
+          </Button>
+        ) : null}
+        {canTestExit ? (
+          <Button type="button" tone={mode === "test" ? "primary" : "ghost"} onClick={() => setMode("test")}>
+            Salida a pruebas
+          </Button>
+        ) : null}
+      </div>
 
-      {exitKind === "definitive" && technicalCaseId && enablingDocumentLabel ? (
-        <form action={movementAction} className="grid gap-3">
-          <input type="hidden" name="equipmentId" value={equipmentId} />
-          <input type="hidden" name="kind" value={kind} />
-          <input type="hidden" name="version" value={version} />
-          <input type="hidden" name="movement" value={exitMovement} />
-          <input type="hidden" name="reason" value={definitiveReason} />
-          <input type="hidden" name="technicalCaseId" value={technicalCaseId} />
-          <input type="hidden" name="enablingDocument" value={enablingDocumentLabel} />
-          <input type="hidden" name="receiverName" value={receiverName} />
-          <input type="hidden" name="deliveryMode" value={deliveryMode} />
-          <p className="text-sm text-[var(--muted)]">Documento: {enablingDocumentLabel}</p>
-          <Field label="Entrega a">
-            <select
-              className={controlClass}
-              value={receiverMode}
-              onChange={(event) => setReceiverMode(event.target.value as ReceiverMode)}
-            >
-              <option value="vendedor">{sellerName} (vendedor asignado)</option>
-              <option value="paqueteria">Paquetería</option>
-            </select>
-          </Field>
-          <Field label="Fecha y hora"><input name="occurredAt" type="datetime-local" className={controlClass} /></Field>
-          <Field label="Observaciones"><textarea name="notes" rows={2} className={controlClass} /></Field>
-          <Button type="submit">Registrar salida</Button>
-        </form>
+      {mode === "definitive" ? (
+        canDefinitiveExit && technicalCaseId && enablingDocumentLabel ? (
+          <form action={movementAction} className="grid gap-3">
+            <input type="hidden" name="equipmentId" value={equipmentId} />
+            <input type="hidden" name="kind" value={kind} />
+            <input type="hidden" name="version" value={version} />
+            <input type="hidden" name="movement" value={exitMovement} />
+            <input type="hidden" name="reason" value={definitiveReason} />
+            <input type="hidden" name="technicalCaseId" value={technicalCaseId} />
+            <input type="hidden" name="enablingDocument" value={enablingDocumentLabel} />
+            <input type="hidden" name="receiverName" value={receiverName} />
+            <input type="hidden" name="deliveryMode" value={deliveryMode} />
+            <p className="text-sm text-[var(--muted)]">Documento: {enablingDocumentLabel}</p>
+            <Field label="Entrega a">
+              <select
+                className={controlClass}
+                value={receiverMode}
+                onChange={(event) => setReceiverMode(event.target.value as ReceiverMode)}
+              >
+                <option value="vendedor">{sellerName} (vendedor asignado)</option>
+                <option value="paqueteria">Paquetería</option>
+              </select>
+            </Field>
+            <Field label="Fecha y hora"><input name="occurredAt" type="datetime-local" className={controlClass} /></Field>
+            <Field label="Observaciones"><textarea name="notes" rows={2} className={controlClass} /></Field>
+            <Button type="submit">Confirmar salida definitiva</Button>
+          </form>
+        ) : (
+          <p className="rounded-md border border-[#efd0d0] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]">
+            {definitiveBlockedMessage ?? "No puedes registrar la salida definitiva todavía."}
+          </p>
+        )
       ) : null}
 
-      {exitKind === "test" ? (
+      {mode === "test" && canTestExit ? (
         <form action={movementAction} className="grid gap-3">
           <input type="hidden" name="equipmentId" value={equipmentId} />
           <input type="hidden" name="kind" value={kind} />
@@ -90,10 +101,10 @@ export function WarehouseExitForm({
           <input type="hidden" name="movement" value="SALIDA_PRUEBA" />
           <input type="hidden" name="reason" value={testReason} />
           <input type="hidden" name="receiverName" value={sellerName} />
-          <p className="text-sm text-[var(--muted)]">Recibe: {sellerName}.</p>
+          <p className="text-sm text-[var(--muted)]">Solo aplica mientras el diagnóstico está en curso. Recibe: {sellerName}.</p>
           <Field label="Fecha y hora"><input name="occurredAt" type="datetime-local" className={controlClass} /></Field>
           <Field label="Observaciones"><textarea name="notes" rows={2} className={controlClass} /></Field>
-          <Button type="submit">Registrar salida</Button>
+          <Button type="submit">Confirmar salida a pruebas</Button>
         </form>
       ) : null}
     </div>

@@ -14,7 +14,9 @@ export default async function CustodiaPage({ searchParams }: { searchParams: Pro
     redirect("/inicio");
   }
   const { vista } = await searchParams;
-  const view = FILTERS.includes(vista as (typeof FILTERS)[number]) ? vista : "pendientes";
+  const almacenBandeja = session.role === "ALMACEN";
+  let view = FILTERS.includes(vista as (typeof FILTERS)[number]) ? vista : "pendientes";
+  if (!almacenBandeja && view === "definitiva") view = "pendientes";
   const systron = session.activeCompanyCode === "SYSTRON";
   const systronCompany = systron ? null : await prisma.company.findUnique({ where: { code: "SYSTRON" } });
   const baseWhere = systron
@@ -55,7 +57,7 @@ export default async function CustodiaPage({ searchParams }: { searchParams: Pro
         take: 100,
       });
   const title = systron ? "Almacén" : "Custodia";
-  const tabs = systron
+  const tabsAll = systron
     ? [
         ["pendientes", "Entradas"],
         ["resguardo", "En resguardo"],
@@ -68,6 +70,8 @@ export default async function CustodiaPage({ searchParams }: { searchParams: Pro
         ["fuera", "Salida a prueba"],
         ["definitiva", "Salida definitiva"],
       ];
+  const tabs = almacenBandeja ? tabsAll : tabsAll.filter(([key]) => key !== "definitiva");
+  const vistaQuery = (key: string) => (almacenBandeja ? `?vista=${key}` : "");
   return (
     <>
       <PageHeader
@@ -102,8 +106,8 @@ export default async function CustodiaPage({ searchParams }: { searchParams: Pro
                         <RecordLink
                           href={
                             row.kind === "MOT"
-                              ? `/motores/${row.id}${view ? `?vista=${view}` : ""}`
-                              : `/equipos/${row.id}${view ? `?vista=${view}` : ""}`
+                              ? `/motores/${row.id}${vistaQuery(view)}`
+                              : `/equipos/${row.id}${vistaQuery(view)}`
                           }
                         >
                           {row.folio}
@@ -119,7 +123,7 @@ export default async function CustodiaPage({ searchParams }: { searchParams: Pro
           }
           cards={rows.map((row) => {
             const hideClient = !systron && row.originCompany.code === "SYSTRON";
-            const href = row.kind === "MOT" ? `/motores/${row.id}?vista=${view}` : `/equipos/${row.id}?vista=${view}`;
+            const href = row.kind === "MOT" ? `/motores/${row.id}${vistaQuery(view)}` : `/equipos/${row.id}${vistaQuery(view)}`;
             return (
               <MobileCard
                 key={row.id}

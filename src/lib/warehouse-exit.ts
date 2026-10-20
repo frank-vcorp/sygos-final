@@ -29,7 +29,9 @@ export async function loadWarehouseExitContext(input: {
   equipmentKind: "EQUI" | "MOT";
   custody: Custody;
   companyId: string;
-  openAttentionType: string | null;
+  /** Solo rol Almacén: elige prueba vs definitiva según atención abierta. */
+  forAlmacenRole?: boolean;
+  openAttentionType?: string | null;
 }) {
   const exitMovement: "SALIDA" | "EGRESO" = input.equipmentKind === "MOT" ? "EGRESO" : "SALIDA";
   const osCase = await prisma.technicalCase.findFirst({
@@ -83,22 +85,24 @@ export async function loadWarehouseExitContext(input: {
 
   const canTestExit = input.custody === "EN_RESGUARDO" && Boolean(diagnosisCase);
 
-  const attentionType = input.openAttentionType ?? null;
   let exitKind: "test" | "definitive" | null = null;
   let blockedMessage: string | null = null;
 
-  if (input.custody !== "EN_RESGUARDO") {
-    blockedMessage = "El equipo debe estar en resguardo para registrar la salida.";
-  } else if (attentionType === "REPARACION") {
-    exitKind = "definitive";
-    if (!canDefinitiveExit) blockedMessage = definitiveBlockedMessage ?? "No puedes registrar la salida definitiva todavía.";
-  } else if (attentionType === "DIAGNOSTICO" || attentionType === "DIAGNOSTICO_GARANTIA") {
-    exitKind = "test";
-    if (!canTestExit) blockedMessage = "La salida a prueba solo aplica con un diagnóstico en curso.";
-  } else if (attentionType) {
-    blockedMessage = "Este tipo de servicio no permite registrar salida desde almacén.";
-  } else {
-    blockedMessage = "No hay una atención abierta para este equipo.";
+  if (input.forAlmacenRole) {
+    const attentionType = input.openAttentionType ?? null;
+    if (input.custody !== "EN_RESGUARDO") {
+      blockedMessage = "El equipo debe estar en resguardo para registrar la salida.";
+    } else if (attentionType === "REPARACION") {
+      exitKind = "definitive";
+      if (!canDefinitiveExit) blockedMessage = definitiveBlockedMessage ?? "No puedes registrar la salida definitiva todavía.";
+    } else if (attentionType === "DIAGNOSTICO" || attentionType === "DIAGNOSTICO_GARANTIA") {
+      exitKind = "test";
+      if (!canTestExit) blockedMessage = "La salida a prueba solo aplica con un diagnóstico en curso.";
+    } else if (attentionType) {
+      blockedMessage = "Este tipo de servicio no permite registrar salida desde almacén.";
+    } else {
+      blockedMessage = "No hay una atención abierta para este equipo.";
+    }
   }
 
   return {

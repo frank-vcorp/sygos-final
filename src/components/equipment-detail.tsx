@@ -5,6 +5,7 @@ import { EquipmentAttentionLauncher } from "@/components/equipment-attention-lau
 import { EquipmentCustodyActions } from "@/components/equipment-custody-actions";
 import { PassToResguardoForm } from "@/components/pass-to-resguardo-form";
 import { WarehouseExitForm } from "@/components/warehouse-exit-form";
+import { WarehouseExitFormAlmacen } from "@/components/warehouse-exit-form-almacen";
 import { loadWarehouseExitContext } from "@/lib/warehouse-exit";
 import { EquipmentLabel } from "@/components/equipment-label";
 import { HistoryTimeline } from "@/components/history-timeline";
@@ -32,10 +33,12 @@ export async function EquipmentDetail({
   fromCustodiaVista?: string;
 }) {
   const session = await requireCompany();
+  const almacenUx = session.role === "ALMACEN";
   const custodyDetail =
     can(session.role, "custody.confirm", session.activeCompanyCode)
     && ((expectedKind === "EQUI" && session.activeCompanyCode === "SYSTRON")
       || (expectedKind === "MOT" && session.activeCompanyCode === "SERVOMOTORES"));
+  const almacenCustody = almacenUx && custodyDetail;
   const allowed = expectedKind === "EQUI"
     ? can(session.role, "equi.view", session.activeCompanyCode) || custodyDetail
     : can(session.role, "mot.view", session.activeCompanyCode) || custodyDetail;
@@ -45,7 +48,7 @@ export async function EquipmentDetail({
     && (session.role === "VENTAS" || can(session.role, "equipment.catalog", session.activeCompanyCode));
   const mayMotList = can(session.role, "equipment.catalog", session.activeCompanyCode) && can(session.role, "mot.view", session.activeCompanyCode);
   let listHref = expectedKind === "EQUI" ? (mayEquiList ? "/equipos" : "/custodia") : (mayMotList ? "/motores" : "/custodia");
-  if (listHref === "/custodia" && fromCustodiaVista) {
+  if (almacenUx && listHref === "/custodia" && fromCustodiaVista) {
     listHref = `/custodia?vista=${fromCustodiaVista}`;
   }
   try {
@@ -141,7 +144,7 @@ export async function EquipmentDetail({
     (expectedKind === "EQUI" && equipment.custody === "SIN_CUSTODIA")
     || (expectedKind === "MOT" && equipment.custody === "PENDIENTE_INGRESO");
   const showPassToResguardo =
-    custodyDetail && canMove && inEntradasBandeja && !awaitingAttentionForReceipt && Boolean(receiptPreset);
+    almacenCustody && canMove && inEntradasBandeja && !awaitingAttentionForReceipt && Boolean(receiptPreset);
   const useWarehouseExit =
     custodyDetail
     && canMove
@@ -155,6 +158,7 @@ export async function EquipmentDetail({
       equipmentKind: expectedKind,
       custody: equipment.custody as Custody,
       companyId: session.activeCompanyId,
+      forAlmacenRole: almacenCustody,
       openAttentionType: openAttention?.attentionType ?? null,
     })
     : null;
@@ -175,10 +179,21 @@ export async function EquipmentDetail({
     primaryAction = <DetailAnchorButton href="#custodia-equipo">Registrar movimiento</DetailAnchorButton>;
   }
 
+  let custodyPrimaryAction: React.ReactNode = null;
+  if (custodyDetail && !almacenCustody && !awaitingAttentionForReceipt && canMove && movementOptions.length > 0) {
+    const label = simplifiedReceipt
+      ? "Confirmar entrada física"
+      : useWarehouseExit
+        ? "Registrar salida"
+        : "Registrar movimiento";
+    custodyPrimaryAction = <DetailAnchorButton href="#custodia-equipo">{label}</DetailAnchorButton>;
+  }
+
   const showCustodyMovementBar =
     custodyDetail
     && !awaitingAttentionForReceipt
     && (showPassToResguardo || (canMove && movementOptions.length > 0));
+  const custodyBarSticky = showCustodyMovementBar && (almacenCustody || movementOptions.length > 0);
 
   return (
     <>
@@ -207,7 +222,7 @@ export async function EquipmentDetail({
             {intercompany && sellerUser ? <EntityMetaItem label="Contacto SYSTRON">{sellerUser.name}</EntityMetaItem> : null}
           </>
         }
-        primaryAction={custodyDetail ? null : primaryAction}
+        primaryAction={almacenCustody ? null : custodyDetail ? custodyPrimaryAction : primaryAction}
       />
       {custodyDetail && hasReceipt ? (
         <div className="mb-6">
@@ -265,19 +280,23 @@ export async function EquipmentDetail({
         ) : null}
 
         <div id="custodia-equipo" className="scroll-mt-24">
-          {custodyDetail && showPassToResguardo ? (
+          {almacenCustody && showPassToResguardo ? (
             <div className="mb-3">
               <h2 className="text-lg font-semibold text-[#0b1f3a]">Entrada pendiente</h2>
               <p className="mt-1 text-sm text-[var(--muted)]">El servicio ya fue definido por Ventas. Al pasar a resguardo se inicia el SLA y el folio DX u OS.</p>
             </div>
           ) : custodyDetail ? (
             <div className="mb-3">
-              <h2 className="text-lg font-semibold text-[#0b1f3a]">Custodia</h2>
-              <p className="mt-1 text-sm text-[var(--muted)]">Movimientos físicos posteriores a la recepción.</p>
+              <h2 className="text-lg font-semibold text-[#0b1f3a]">{almacenCustody ? "Custodia" : "Recepción física"}</h2>
+              <p className="mt-1 text-sm text-[var(--muted)]">
+                {almacenCustody
+                  ? "Movimientos físicos posteriores a la recepción."
+                  : "El servicio ya fue definido por Ventas. Confirma la entrada para iniciar el SLA y generar el folio DX u OS."}
+              </p>
             </div>
           ) : null}
           {showCustodyMovementBar ? (
-            <div className="sticky top-3 z-20 rounded-xl border border-[var(--line)] bg-white/95 p-2 shadow-[0_8px_24px_rgba(20,45,75,0.12)] backdrop-blur">
+            <div className={custodyBarSticky ? "sticky top-3 z-20 rounded-xl border border-[var(--line)] bg-white/95 p-2 shadow-[0_8px_24px_rgba(20,45,75,0.12)] backdrop-blur" : ""}>
               <EquipmentCustodyActions
                 showMovement={showPassToResguardo || (canMove && movementOptions.length > 0)}
                 showAttention={false}
@@ -301,20 +320,38 @@ export async function EquipmentDetail({
                       clientName={receiptPreset.clientName}
                     />
                   ) : useWarehouseExit && warehouseExit ? (
-                    <WarehouseExitForm
-                      equipmentId={equipment.id}
-                      equipmentFolio={equipment.folio}
-                      kind={expectedKind}
-                      version={equipment.version}
-                      exitMovement={warehouseExit.exitMovement}
-                      definitiveReason={warehouseExit.definitiveReason}
-                      sellerName={warehouseExit.sellerName}
-                      technicalCaseId={warehouseExit.technicalCaseId}
-                      enablingDocumentLabel={warehouseExit.enablingDocumentLabel}
-                      exitKind={warehouseExit.exitKind}
-                      blockedMessage={warehouseExit.blockedMessage}
-                      testReason={warehouseExit.testReason}
-                    />
+                    almacenCustody ? (
+                      <WarehouseExitFormAlmacen
+                        equipmentId={equipment.id}
+                        equipmentFolio={equipment.folio}
+                        kind={expectedKind}
+                        version={equipment.version}
+                        exitMovement={warehouseExit.exitMovement}
+                        definitiveReason={warehouseExit.definitiveReason}
+                        sellerName={warehouseExit.sellerName}
+                        technicalCaseId={warehouseExit.technicalCaseId}
+                        enablingDocumentLabel={warehouseExit.enablingDocumentLabel}
+                        exitKind={warehouseExit.exitKind}
+                        blockedMessage={warehouseExit.blockedMessage}
+                        testReason={warehouseExit.testReason}
+                      />
+                    ) : (
+                      <WarehouseExitForm
+                        equipmentId={equipment.id}
+                        equipmentFolio={equipment.folio}
+                        kind={expectedKind}
+                        version={equipment.version}
+                        exitMovement={warehouseExit.exitMovement}
+                        definitiveReason={warehouseExit.definitiveReason}
+                        sellerName={warehouseExit.sellerName}
+                        canDefinitiveExit={warehouseExit.canDefinitiveExit}
+                        definitiveBlockedMessage={warehouseExit.definitiveBlockedMessage}
+                        technicalCaseId={warehouseExit.technicalCaseId}
+                        enablingDocumentLabel={warehouseExit.enablingDocumentLabel}
+                        canTestExit={warehouseExit.canTestExit}
+                        testReason={warehouseExit.testReason}
+                      />
+                    )
                   ) : (
                     <MovementForm
                       variant="plain"
