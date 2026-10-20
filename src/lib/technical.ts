@@ -160,7 +160,9 @@ function canAssign(actor: Actor) {
   return ["ADMINISTRADOR", "CEO", "SUPERVISOR_TECNICO", "GERENTE_OPERATIVO_SYSTRON", "GERENTE_OPERATIVO_SERVOMOTORES"].includes(actor.role);
 }
 
-function canExecute(actor: Actor, assigneeUserId: string | null) {
+type RepairActor = Pick<Actor, "userId" | "role" | "activeCompanyCode">;
+
+function canExecute(actor: RepairActor, assigneeUserId: string | null) {
   if (actor.role === "ADMINISTRADOR" || actor.role === "CEO") return true;
   if (actor.role === "GERENTE_OPERATIVO_SERVOMOTORES" && actor.activeCompanyCode === "SERVOMOTORES") return true;
   if (actor.role === "SUPERVISOR_TECNICO") return true;
@@ -170,7 +172,7 @@ function canExecute(actor: Actor, assigneeUserId: string | null) {
 
 /** Cierre de OS: taller (canExecute) o vendedor con el cliente en cartera. */
 export function canCloseRepair(
-  actor: Pick<Actor, "userId" | "role">,
+  actor: RepairActor,
   assigneeUserId: string | null,
   clientOwnerUserId: string | null | undefined,
 ) {
