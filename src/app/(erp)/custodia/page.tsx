@@ -7,6 +7,13 @@ import { requireCompany } from "@/lib/session";
 import { isOsDefinitiveCustodyExit } from "@/lib/warehouse-exit";
 
 const FILTERS = ["pendientes", "resguardo", "fuera", "definitiva"] as const;
+type CustodiaVista = (typeof FILTERS)[number];
+
+function custodiaVista(vista: string | undefined, almacenBandeja: boolean): CustodiaVista {
+  const raw: CustodiaVista = vista && FILTERS.includes(vista as CustodiaVista) ? (vista as CustodiaVista) : "pendientes";
+  if (!almacenBandeja && raw === "definitiva") return "pendientes";
+  return raw;
+}
 
 export default async function CustodiaPage({ searchParams }: { searchParams: Promise<{ vista?: string }> }) {
   const session = await requireCompany();
@@ -15,8 +22,7 @@ export default async function CustodiaPage({ searchParams }: { searchParams: Pro
   }
   const { vista } = await searchParams;
   const almacenBandeja = session.role === "ALMACEN";
-  let view = FILTERS.includes(vista as (typeof FILTERS)[number]) ? vista : "pendientes";
-  if (!almacenBandeja && view === "definitiva") view = "pendientes";
+  const view = custodiaVista(vista, almacenBandeja);
   const systron = session.activeCompanyCode === "SYSTRON";
   const systronCompany = systron ? null : await prisma.company.findUnique({ where: { code: "SYSTRON" } });
   const baseWhere = systron
