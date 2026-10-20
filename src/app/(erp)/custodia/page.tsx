@@ -4,8 +4,9 @@ import { CUSTODY_LABEL, type Custody } from "@/lib/custody";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
+import { isOsDefinitiveCustodyExit } from "@/lib/warehouse-exit";
 
-const FILTERS = ["pendientes", "resguardo", "fuera"] as const;
+const FILTERS = ["pendientes", "resguardo", "fuera", "definitiva"] as const;
 
 export default async function CustodiaPage({ searchParams }: { searchParams: Promise<{ vista?: string }> }) {
   const session = await requireCompany();
@@ -15,34 +16,57 @@ export default async function CustodiaPage({ searchParams }: { searchParams: Pro
   const { vista } = await searchParams;
   const view = FILTERS.includes(vista as (typeof FILTERS)[number]) ? vista : "pendientes";
   const systron = session.activeCompanyCode === "SYSTRON";
-  const custody = view === "pendientes" ? (systron ? "SIN_CUSTODIA" : "PENDIENTE_INGRESO") : view === "resguardo" ? "EN_RESGUARDO" : "FUERA_A_PRUEBA";
   const systronCompany = systron ? null : await prisma.company.findUnique({ where: { code: "SYSTRON" } });
-  const rows = await prisma.equipment.findMany({
-    where: {
-      custody,
-      ...(systron
-        ? { kind: "EQUI", originCompanyId: session.activeCompanyId }
-        : {
-            kind: "MOT",
-            OR: [{ originCompanyId: session.activeCompanyId }, ...(systronCompany ? [{ originCompanyId: systronCompany.id }] : [])],
-            ...(view === "resguardo" ? { holderCompanyId: session.activeCompanyId } : {}),
-          }),
-    },
-    include: { client: { select: { name: true } }, originCompany: { select: { code: true } } },
-    orderBy: { updatedAt: "asc" },
-    take: 100,
-  });
+  const baseWhere = systron
+    ? { kind: "EQUI" as const, originCompanyId: session.activeCompanyId }
+    : {
+        kind: "MOT" as const,
+        OR: [{ originCompanyId: session.activeCompanyId }, ...(systronCompany ? [{ originCompanyId: systronCompany.id }] : [])],
+        ...(view === "resguardo" ? { holderCompanyId: session.activeCompanyId } : {}),
+      };
+
+  const rows = view === "definitiva"
+    ? (
+        await prisma.equipment.findMany({
+          where: { custody: "FUERA", ...baseWhere },
+          include: {
+            client: { select: { name: true } },
+            originCompany: { select: { code: true } },
+            movements: { where: { cancelledAt: null }, orderBy: { occurredAt: "desc" }, take: 1 },
+          },
+          orderBy: { updatedAt: "desc" },
+          take: 100,
+        })
+      ).filter((row) => isOsDefinitiveCustodyExit(row.movements[0]))
+    : await prisma.equipment.findMany({
+        where: {
+          custody:
+            view === "pendientes"
+              ? systron
+                ? "SIN_CUSTODIA"
+                : "PENDIENTE_INGRESO"
+              : view === "resguardo"
+                ? "EN_RESGUARDO"
+                : "FUERA_A_PRUEBA",
+          ...baseWhere,
+        },
+        include: { client: { select: { name: true } }, originCompany: { select: { code: true } } },
+        orderBy: { updatedAt: "asc" },
+        take: 100,
+      });
   const title = systron ? "Almacén" : "Custodia";
   const tabs = systron
     ? [
         ["pendientes", "Entradas"],
         ["resguardo", "En resguardo"],
         ["fuera", "Salida a prueba"],
+        ["definitiva", "Salida definitiva"],
       ]
     : [
         ["pendientes", "Ingresos"],
         ["resguardo", "En resguardo"],
         ["fuera", "Salida a prueba"],
+        ["definitiva", "Salida definitiva"],
       ];
   return (
     <>
@@ -50,13 +74,13 @@ export default async function CustodiaPage({ searchParams }: { searchParams: Pro
         title={title}
         subtitle={systron
           ? "EQUI de SYSTRON. Los MOT enviados a Servomotores no aparecen aquí."
-          : "Ingreso, resguardo y salida a prueba de MOT. El egreso definitivo se confirma en el detalle."}
+          : "Ingreso, resguardo, salida a prueba y egreso definitivo de MOT."}
       />
       <SegmentedNav items={tabs.map(([key, label]) => ({ href: `/custodia?vista=${key}`, label, active: view === key }))} />
       <ActiveFilters
         items={
           view !== "pendientes"
-            ? [{ label: tabs.find(([key]) => key === view)?.[1] ?? "Vista", clearHref: "/custodia" }]
+            ? [{ label: tabs.find(([key]) => key === view)?.[1] ?? "Vista", clearHref: "/custodia?vista=pendientes" }]
             : []
         }
       />

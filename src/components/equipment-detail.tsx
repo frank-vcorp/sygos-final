@@ -3,11 +3,12 @@ import { notFound } from "next/navigation";
 import { CancelMovementForm, MovementForm } from "@/components/custody-forms";
 import { EquipmentAttentionLauncher } from "@/components/equipment-attention-launcher";
 import { EquipmentCustodyActions } from "@/components/equipment-custody-actions";
+import { PassToResguardoButton } from "@/components/pass-to-resguardo-button";
 import { WarehouseExitForm } from "@/components/warehouse-exit-form";
 import { loadWarehouseExitContext } from "@/lib/warehouse-exit";
 import { EquipmentLabel } from "@/components/equipment-label";
 import { HistoryTimeline } from "@/components/history-timeline";
-import { Badge, Card, DetailAnchorButton, DetailFormSubmitButton, EntityDetailHeader, EntityMetaItem, MobileCard, Table, Td, TextLink, Th } from "@/components/ui";
+import { Badge, Card, DetailAnchorButton, EntityDetailHeader, EntityMetaItem, MobileCard, Table, Td, TextLink, Th } from "@/components/ui";
 import { allowedMovements, CUSTODY_LABEL, isInitialWarehouseReceipt, isReceipt, MOVEMENT_LABEL, receiptReasonFromAttention, type Custody, type MovementKind } from "@/lib/custody";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
@@ -122,15 +123,14 @@ export async function EquipmentDetail({ id, expectedKind, showLabel = false }: {
       : undefined;
 
   const backLabel = listHref === "/custodia" ? "Almacén" : expectedKind === "EQUI" ? "Equipos" : "Motores";
-  const warehouseReceiptFormId = "warehouse-receipt-form";
-  const oneStepWarehouseReceipt =
-    custodyDetail && canMove && simplifiedReceipt && !awaitingAttentionForReceipt;
+  const showPassToResguardo =
+    custodyDetail && canMove && simplifiedReceipt && !awaitingAttentionForReceipt && receiptPreset;
   const useWarehouseExit =
     custodyDetail
     && canMove
     && hasReceipt
     && !awaitingAttentionForReceipt
-    && !oneStepWarehouseReceipt
+    && !showPassToResguardo
     && equipment.custody === "EN_RESGUARDO";
   const warehouseExit = useWarehouseExit
     ? await loadWarehouseExitContext({
@@ -138,6 +138,7 @@ export async function EquipmentDetail({ id, expectedKind, showLabel = false }: {
       equipmentKind: expectedKind,
       custody: equipment.custody as Custody,
       companyId: session.activeCompanyId,
+      openAttentionType: openAttention?.attentionType ?? null,
     })
     : null;
   let primaryAction: React.ReactNode = null;
@@ -153,25 +154,14 @@ export async function EquipmentDetail({ id, expectedKind, showLabel = false }: {
         priorities={priorities.map((row) => ({ id: row.id, attentionType: row.attentionType, name: row.name }))}
       />
     );
-  } else if (oneStepWarehouseReceipt) {
-    primaryAction = <DetailFormSubmitButton form={warehouseReceiptFormId}>Confirmar entrada física</DetailFormSubmitButton>;
-  } else if (canMove && simplifiedReceipt && !awaitingAttentionForReceipt) {
-    primaryAction = <DetailAnchorButton href="#custodia-equipo">Confirmar entrada física</DetailAnchorButton>;
-  } else if (canMove && movementOptions.length > 0 && !awaitingAttentionForReceipt) {
-    primaryAction = <DetailAnchorButton href="#custodia-equipo">{useWarehouseExit ? "Registrar salida" : "Registrar movimiento"}</DetailAnchorButton>;
+  } else if (canMove && movementOptions.length > 0 && !awaitingAttentionForReceipt && !custodyDetail) {
+    primaryAction = <DetailAnchorButton href="#custodia-equipo">Registrar movimiento</DetailAnchorButton>;
   }
-  let custodyPrimaryAction: React.ReactNode = null;
-  if (custodyDetail && !awaitingAttentionForReceipt) {
-    if (oneStepWarehouseReceipt) {
-      custodyPrimaryAction = primaryAction;
-    } else if (canMove && movementOptions.length > 0) {
-      custodyPrimaryAction = (
-        <DetailAnchorButton href="#custodia-equipo">
-          {simplifiedReceipt ? "Confirmar entrada física" : useWarehouseExit ? "Registrar salida" : "Registrar movimiento"}
-        </DetailAnchorButton>
-      );
-    }
-  }
+
+  const showCustodyMovementBar =
+    custodyDetail
+    && !awaitingAttentionForReceipt
+    && (showPassToResguardo || (canMove && movementOptions.length > 0));
 
   return (
     <>
@@ -200,7 +190,7 @@ export async function EquipmentDetail({ id, expectedKind, showLabel = false }: {
             {intercompany && sellerUser ? <EntityMetaItem label="Contacto SYSTRON">{sellerUser.name}</EntityMetaItem> : null}
           </>
         }
-        primaryAction={custodyDetail ? custodyPrimaryAction : primaryAction}
+        primaryAction={custodyDetail ? null : primaryAction}
       />
       {custodyDetail && hasReceipt ? (
         <div className="mb-6">
@@ -257,70 +247,69 @@ export async function EquipmentDetail({ id, expectedKind, showLabel = false }: {
           </Card>
         ) : null}
 
-        {oneStepWarehouseReceipt && receiptPreset ? (
-          <div className="hidden">
-            <MovementForm
-              variant="plain"
-              equipmentId={equipment.id}
-              equipmentFolio={equipment.folio}
-              kind={expectedKind}
-              custody={equipment.custody as Custody}
-              version={equipment.version}
-              suppliers={suppliers.map((supplier) => ({ id: supplier.id, name: supplier.name }))}
-              allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)}
-              formId={warehouseReceiptFormId}
-              hideSubmit
-              receiptPreset={receiptPreset}
-            />
-          </div>
-        ) : null}
         <div id="custodia-equipo" className="scroll-mt-24">
-          {custodyDetail ? (
+          {custodyDetail && showPassToResguardo ? (
             <div className="mb-3">
-              <h2 className="text-lg font-semibold text-[#0b1f3a]">Recepción física</h2>
-              <p className="mt-1 text-sm text-[var(--muted)]">El servicio ya fue definido por Ventas. Confirma la entrada para iniciar el SLA y generar el folio DX u OS.</p>
+              <h2 className="text-lg font-semibold text-[#0b1f3a]">Entrada pendiente</h2>
+              <p className="mt-1 text-sm text-[var(--muted)]">El servicio ya fue definido por Ventas. Al pasar a resguardo se inicia el SLA y el folio DX u OS.</p>
+            </div>
+          ) : custodyDetail ? (
+            <div className="mb-3">
+              <h2 className="text-lg font-semibold text-[#0b1f3a]">Custodia</h2>
+              <p className="mt-1 text-sm text-[var(--muted)]">Movimientos físicos posteriores a la recepción.</p>
             </div>
           ) : null}
-          <div className={custodyDetail && !oneStepWarehouseReceipt ? "sticky top-3 z-20 rounded-xl border border-[var(--line)] bg-white/95 p-2 shadow-[0_8px_24px_rgba(20,45,75,0.12)] backdrop-blur" : ""}>
-            <EquipmentCustodyActions
-              showMovement={canMove && movementOptions.length > 0 && !awaitingAttentionForReceipt && !oneStepWarehouseReceipt}
-              showAttention={false}
-              movementButtonLabel={simplifiedReceipt ? "Confirmar entrada física" : useWarehouseExit ? "Registrar salida" : "Registrar movimiento"}
-              movementTitle={simplifiedReceipt ? "Confirmar entrada física" : useWarehouseExit ? "Registrar salida" : "Registrar movimiento"}
-              movement={
-                oneStepWarehouseReceipt ? null : useWarehouseExit && warehouseExit ? (
-                  <WarehouseExitForm
-                    equipmentId={equipment.id}
-                    equipmentFolio={equipment.folio}
-                    kind={expectedKind}
-                    version={equipment.version}
-                    exitMovement={warehouseExit.exitMovement}
-                    definitiveReason={warehouseExit.definitiveReason}
-                    sellerName={warehouseExit.sellerName}
-                    canDefinitiveExit={warehouseExit.canDefinitiveExit}
-                    definitiveBlockedMessage={warehouseExit.definitiveBlockedMessage}
-                    technicalCaseId={warehouseExit.technicalCaseId}
-                    enablingDocumentLabel={warehouseExit.enablingDocumentLabel}
-                    canTestExit={warehouseExit.canTestExit}
-                    testReason={warehouseExit.testReason}
-                  />
-                ) : (
-                  <MovementForm
-                    variant="plain"
-                    equipmentId={equipment.id}
-                    equipmentFolio={equipment.folio}
-                    kind={expectedKind}
-                    custody={equipment.custody as Custody}
-                    version={equipment.version}
-                    suppliers={suppliers.map((supplier) => ({ id: supplier.id, name: supplier.name }))}
-                    allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)}
-                    receiptPreset={receiptPreset}
-                  />
-                )
-              }
-              attention={null}
-            />
-          </div>
+          {showCustodyMovementBar ? (
+            <div className="sticky top-3 z-20 rounded-xl border border-[var(--line)] bg-white/95 p-2 shadow-[0_8px_24px_rgba(20,45,75,0.12)] backdrop-blur">
+              {showPassToResguardo && receiptPreset ? (
+                <PassToResguardoButton
+                  equipmentId={equipment.id}
+                  kind={expectedKind}
+                  version={equipment.version}
+                  movement={receiptPreset.movement}
+                  reason={receiptPreset.reason}
+                />
+              ) : (
+                <EquipmentCustodyActions
+                  showMovement={canMove && movementOptions.length > 0}
+                  showAttention={false}
+                  movementButtonLabel={useWarehouseExit ? "Registrar salida" : "Registrar movimiento"}
+                  movementTitle={useWarehouseExit ? "Registrar salida" : "Registrar movimiento"}
+                  movement={
+                    useWarehouseExit && warehouseExit ? (
+                      <WarehouseExitForm
+                        equipmentId={equipment.id}
+                        equipmentFolio={equipment.folio}
+                        kind={expectedKind}
+                        version={equipment.version}
+                        exitMovement={warehouseExit.exitMovement}
+                        definitiveReason={warehouseExit.definitiveReason}
+                        sellerName={warehouseExit.sellerName}
+                        technicalCaseId={warehouseExit.technicalCaseId}
+                        enablingDocumentLabel={warehouseExit.enablingDocumentLabel}
+                        exitKind={warehouseExit.exitKind}
+                        blockedMessage={warehouseExit.blockedMessage}
+                        testReason={warehouseExit.testReason}
+                      />
+                    ) : (
+                      <MovementForm
+                        variant="plain"
+                        equipmentId={equipment.id}
+                        equipmentFolio={equipment.folio}
+                        kind={expectedKind}
+                        custody={equipment.custody as Custody}
+                        version={equipment.version}
+                        suppliers={suppliers.map((supplier) => ({ id: supplier.id, name: supplier.name }))}
+                        allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)}
+                        receiptPreset={receiptPreset}
+                      />
+                    )
+                  }
+                  attention={null}
+                />
+              )}
+            </div>
+          ) : null}
         </div>
 
         {!custodyDetail || equipment.attentions.length > 1 ? <section>
