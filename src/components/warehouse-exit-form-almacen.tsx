@@ -39,10 +39,21 @@ export function WarehouseExitFormAlmacen({
   const deliveryMode = receiverMode === "vendedor" ? "Vendedor asignado" : "Paquetería";
 
   if (blockedMessage || !exitKind) {
+    const needsBillingHint =
+      blockedMessage?.includes("documento")
+      || blockedMessage?.includes("remisión")
+      || blockedMessage?.includes("factura")
+      || blockedMessage?.includes("CEO")
+      || blockedMessage?.includes("orden de servicio");
     return (
-      <p className="rounded-md border border-[#efd0d0] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]">
-        {blockedMessage ?? "No puedes registrar la salida todavía."}
-      </p>
+      <div className="grid gap-2 rounded-md border border-[#efd0d0] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]">
+        <p>{blockedMessage ?? "No puedes registrar la salida todavía."}</p>
+        {needsBillingHint ? (
+          <p className="text-[var(--ink)]">
+            Salida definitiva: requiere <strong>remisión o factura</strong> de la OS terminada. Sin documento, <strong>ventas</strong> debe pedir autorización al <strong>CEO</strong> y almacén espera la aprobación.
+          </p>
+        ) : null}
+      </div>
     );
   }
 

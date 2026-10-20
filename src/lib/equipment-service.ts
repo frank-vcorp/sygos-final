@@ -445,12 +445,23 @@ export async function registerMovement(
   const kind = equipment.kind === "MOT" ? "MOT" : "EQUI";
   const initialWarehouseReceipt = isInitialWarehouseReceipt(kind, equipment.custody as Custody, input.kind);
   const custody = nextCustody(kind, equipment.custody as Custody, input.kind);
-  const attention = await prisma.attention.findFirst({
-    where: { equipmentId: equipment.id, status: "ABIERTA" },
-    orderBy: { createdAt: "desc" },
-  });
+  const attention =
+    await prisma.attention.findFirst({
+      where: {
+        equipmentId: equipment.id,
+        OR: [
+          { status: "ABIERTA" },
+          { status: "EN_PROCESO", slaStartedAt: null },
+        ],
+      },
+      orderBy: { createdAt: "desc" },
+    })
+    ?? await prisma.attention.findFirst({
+      where: { equipmentId: equipment.id },
+      orderBy: { createdAt: "desc" },
+    });
   const receipt = isReceipt(input.kind);
-  if (receipt && attention) {
+  if (receipt && attention?.status === "ABIERTA") {
     const expected = receiptReasonFromAttention(attention.attentionType);
     if (expected && input.reason !== expected) {
       throw new Error(`El motivo debe ser «${expected}» según la atención abierta.`);

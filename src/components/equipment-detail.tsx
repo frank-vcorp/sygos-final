@@ -10,6 +10,7 @@ import { loadWarehouseExitContext } from "@/lib/warehouse-exit";
 import { EquipmentLabel } from "@/components/equipment-label";
 import { HistoryTimeline } from "@/components/history-timeline";
 import { Badge, Card, DetailAnchorButton, EntityDetailHeader, EntityMetaItem, MobileCard, Table, Td, TextLink, Th } from "@/components/ui";
+import { buildAlmacenEntradaPreset } from "@/lib/almacen-entrada";
 import { allowedMovements, CUSTODY_LABEL, isInitialWarehouseReceipt, isReceipt, MOVEMENT_LABEL, receiptReasonFromAttention, type Custody, type MovementKind } from "@/lib/custody";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
@@ -107,20 +108,8 @@ export async function EquipmentDetail({
   const hasReceipt = equipment.movements.some((row) => !row.cancelledAt && isReceipt(row.kind as MovementKind));
   const movementOptions = allowedMovements(expectedKind, equipment.custody as Custody);
   const openAttention = equipment.attentions.find((row) => row.status === "ABIERTA");
-  /** Atención pendiente de primera entrada (ventas ya capturó servicio). */
-  const entradaAttention =
-    openAttention
-    ?? equipment.attentions.find((row) => row.status === "EN_PROCESO" && !row.slaStartedAt);
   const receiptMovement = movementOptions.find((movement) => isReceipt(movement));
-  const entradaReceiptMovement: MovementKind | undefined =
-    receiptMovement
-    ?? (expectedKind === "EQUI" && equipment.custody === "SIN_CUSTODIA"
-      ? "ENTRADA"
-      : expectedKind === "MOT" && equipment.custody === "PENDIENTE_INGRESO"
-        ? "INGRESO"
-        : undefined);
   const receiptReason = openAttention ? receiptReasonFromAttention(openAttention.attentionType) : null;
-  const entradaReceiptReason = entradaAttention ? receiptReasonFromAttention(entradaAttention.attentionType) : null;
   const simplifiedReceipt =
     receiptMovement
     && receiptReason
@@ -150,23 +139,34 @@ export async function EquipmentDetail({
           clientName: intercompany ? "SYSTRON · intercompañía" : equipment.client.name,
         }
       : undefined;
-  const almacenEntradaPreset =
-    entradaAttention && entradaReceiptMovement && entradaReceiptReason
-      ? {
-          movement: entradaReceiptMovement,
-          reason: entradaReceiptReason,
-          serviceLabel: ATTENTION_LABEL[entradaAttention.attentionType as AttentionType] ?? entradaAttention.attentionType,
-          reportedFault: entradaAttention.reportedFault,
-          clientName: intercompany ? "SYSTRON · intercompañía" : equipment.client.name,
-        }
-      : undefined;
-
   const backLabel = listHref === "/custodia" ? "Almacén" : expectedKind === "EQUI" ? "Equipos" : "Motores";
   const inEntradasBandeja =
     (expectedKind === "EQUI" && equipment.custody === "SIN_CUSTODIA")
     || (expectedKind === "MOT" && equipment.custody === "PENDIENTE_INGRESO");
   /** Rol Almacén: equipos de la pestaña Entradas (sin entrada física aún). */
   const showAlmacenPasarResguardo = almacenCustody && canMove && inEntradasBandeja;
+  const pendingQuote = showAlmacenPasarResguardo
+    ? await prisma.quote.findFirst({
+        where: {
+          equipmentId: equipment.id,
+          companyId: session.activeCompanyId,
+          status: "AUTORIZADA_PENDIENTE_EQUIPO",
+          quoteType: { in: ["DIAGNOSTICO", "REPARACION"] },
+        },
+        include: { lines: true },
+        orderBy: { createdAt: "desc" },
+      })
+    : null;
+  const almacenEntradaPreset = showAlmacenPasarResguardo
+    ? buildAlmacenEntradaPreset({
+        kind: expectedKind,
+        custody: equipment.custody,
+        clientName: intercompany ? "SYSTRON · intercompañía" : equipment.client.name,
+        attentions: equipment.attentions,
+        quoteType: pendingQuote?.quoteType ?? null,
+        quoteConcept: pendingQuote?.lines.find((line) => line.authorized)?.concept ?? pendingQuote?.lines[0]?.concept ?? null,
+      })
+    : undefined;
   const showPassToResguardo = showAlmacenPasarResguardo;
   const useWarehouseExit =
     custodyDetail
@@ -330,26 +330,18 @@ export async function EquipmentDetail({
                   showAlmacenPasarResguardo ? "Pasar a resguardo" : useWarehouseExit ? "Registrar salida" : "Registrar movimiento"
                 }
                 movement={
-                  showAlmacenPasarResguardo ? (
-                    almacenEntradaPreset ? (
-                      <PassToResguardoForm
-                        equipmentId={equipment.id}
-                        equipmentFolio={equipment.folio}
-                        kind={expectedKind}
-                        version={equipment.version}
-                        movement={almacenEntradaPreset.movement}
-                        reason={almacenEntradaPreset.reason}
-                        serviceLabel={almacenEntradaPreset.serviceLabel}
-                        reportedFault={almacenEntradaPreset.reportedFault}
-                        clientName={almacenEntradaPreset.clientName}
-                      />
-                    ) : (
-                      <p className="rounded-md border border-[#efd0d0] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]">
-                        {awaitingAttentionForReceipt
-                          ? "Ventas aún no registra el servicio para este equipo. No puedes pasarlo a resguardo."
-                          : "No hay datos de servicio para confirmar la entrada. Revisa con ventas."}
-                      </p>
-                    )
+                  showAlmacenPasarResguardo && almacenEntradaPreset ? (
+                    <PassToResguardoForm
+                      equipmentId={equipment.id}
+                      equipmentFolio={equipment.folio}
+                      kind={expectedKind}
+                      version={equipment.version}
+                      movement={almacenEntradaPreset.movement}
+                      reason={almacenEntradaPreset.reason}
+                      serviceLabel={almacenEntradaPreset.serviceLabel}
+                      reportedFault={almacenEntradaPreset.reportedFault}
+                      clientName={almacenEntradaPreset.clientName}
+                    />
                   ) : useWarehouseExit && warehouseExit ? (
                     almacenCustody ? (
                       <WarehouseExitFormAlmacen
