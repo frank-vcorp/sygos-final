@@ -3,6 +3,7 @@ import { ATTENTION_LABEL, type AttentionType } from "@/lib/priorities";
 import { serviceSeries } from "@/lib/servicios-catalog";
 
 type EntradaAttention = {
+  id?: string;
   status: string;
   slaStartedAt: Date | null;
   attentionType: string;

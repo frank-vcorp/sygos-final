@@ -184,6 +184,7 @@ export async function EquipmentDetail({
       companyId: session.activeCompanyId,
       forAlmacenRole: almacenCustody,
       openAttentionType: custodyFlowAttention?.attentionType ?? null,
+      openAttentionId: custodyFlowAttention?.id ?? null,
     })
     : null;
   let primaryAction: React.ReactNode = null;

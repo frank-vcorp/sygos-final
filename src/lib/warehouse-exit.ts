@@ -38,6 +38,71 @@ export function definitiveExitAuthorized(caseRow: {
   return caseRow.exitWithoutDocumentAuthorizedAt != null;
 }
 
+export function isDiagnosisAttentionType(attentionType: string | null | undefined) {
+  return attentionType === "DIAGNOSTICO" || attentionType === "DIAGNOSTICO_GARANTIA";
+}
+
+/** DX vigente gana sobre una OS terminada de un ciclo anterior en el mismo equipo. */
+export function resolveAlmacenExitAttentionType(input: {
+  openAttentionType?: string | null;
+  openAttentionId?: string | null;
+  diagnosisCase?: { attention: { attentionType: string } } | null;
+  osCase?: { attentionId: string; attention: { attentionType: string } } | null;
+}): string | null {
+  if (input.openAttentionType) return input.openAttentionType;
+  if (input.diagnosisCase) return input.diagnosisCase.attention.attentionType;
+  if (input.osCase) {
+    if (input.openAttentionId && input.osCase.attentionId !== input.openAttentionId) return null;
+    return input.osCase.attention.attentionType;
+  }
+  return null;
+}
+
+/** Diagnóstico en curso o validado sin orden de reparación en la misma atención. */
+export async function findDiagnosisCaseForTestExit(
+  equipmentId: string,
+  serviceCompanyId: string,
+  attentionId?: string | null,
+) {
+  const attentionFilter = attentionId ? { attentionId } : {};
+  const open = await prisma.technicalCase.findFirst({
+    where: {
+      equipmentId,
+      serviceCompanyId,
+      kind: "DIAGNOSTICO",
+      status: { notIn: [...CLOSED_CASE] },
+      ...attentionFilter,
+    },
+    orderBy: { createdAt: "desc" },
+    include: { attention: true },
+  });
+  if (open) return open;
+
+  const validated = await prisma.technicalCase.findFirst({
+    where: {
+      equipmentId,
+      serviceCompanyId,
+      kind: "DIAGNOSTICO",
+      status: "VALIDADO",
+      ...attentionFilter,
+    },
+    orderBy: { updatedAt: "desc" },
+    include: { attention: true },
+  });
+  if (!validated) return null;
+
+  const repairOnAttention = await prisma.technicalCase.findFirst({
+    where: {
+      attentionId: validated.attentionId,
+      kind: "OS",
+      status: {
+        in: ["EN_ESPERA", "EN_REPARACION", "EN_ESPERA_REFACCIONES", "TERMINADA", "SIN_REPARACION"],
+      },
+    },
+  });
+  return repairOnAttention ? null : validated;
+}
+
 export async function loadWarehouseExitContext(input: {
   equipmentId: string;
   equipmentKind: "EQUI" | "MOT";
@@ -46,6 +111,7 @@ export async function loadWarehouseExitContext(input: {
   /** Solo rol Almacén: elige prueba vs definitiva según atención abierta. */
   forAlmacenRole?: boolean;
   openAttentionType?: string | null;
+  openAttentionId?: string | null;
 }) {
   const exitMovement: "SALIDA" | "EGRESO" = input.equipmentKind === "MOT" ? "EGRESO" : "SALIDA";
   const osCase = await prisma.technicalCase.findFirst({
@@ -63,6 +129,8 @@ export async function loadWarehouseExitContext(input: {
     orderBy: { createdAt: "desc" },
     include: { attention: true },
   });
+  const osForDelivery =
+    osCase && (!input.openAttentionId || osCase.attentionId === input.openAttentionId) ? osCase : null;
 
   let canDefinitiveExit = false;
   let definitiveBlockedMessage: string | null = null;
@@ -72,50 +140,64 @@ export async function loadWarehouseExitContext(input: {
 
   if (input.custody !== "EN_RESGUARDO") {
     definitiveBlockedMessage = "La salida definitiva aplica con el equipo en resguardo.";
-  } else if (!osCase) {
+  } else if (!osForDelivery) {
     definitiveBlockedMessage = "No hay una orden de servicio terminada para entregar.";
   } else {
-    technicalCaseId = osCase.id;
-    const expectedReason = receiptReasonFromAttention(osCase.attention.attentionType);
+    technicalCaseId = osForDelivery.id;
+    const expectedReason = receiptReasonFromAttention(osForDelivery.attention.attentionType);
     definitiveReason = expectedReason ?? "Reparación";
-    const billing = await findEnablingBillingDocument(osCase.id);
+    const billing = await findEnablingBillingDocument(osForDelivery.id);
     if (billing) {
       canDefinitiveExit = true;
       enablingDocumentLabel = `${billing.kind} ${billing.folio}`;
-    } else if (definitiveExitAuthorized(osCase)) {
+    } else if (definitiveExitAuthorized(osForDelivery)) {
       canDefinitiveExit = true;
       enablingDocumentLabel = "Salida autorizada por CEO (sin documento)";
-    } else if (osCase.exitWithoutDocumentRequestedAt) {
+    } else if (osForDelivery.exitWithoutDocumentRequestedAt) {
       definitiveBlockedMessage = "El vendedor solicitó salida sin documento. Espera la autorización del CEO.";
     } else {
       definitiveBlockedMessage = "Falta remisión o factura emitida, o que ventas solicite autorización al CEO.";
     }
   }
 
-  const sellerUserId = osCase?.attention.sellerUserId ?? diagnosisCase?.attention.sellerUserId ?? null;
+  const diagnosisForTest = await findDiagnosisCaseForTestExit(
+    input.equipmentId,
+    input.companyId,
+    input.openAttentionId,
+  );
+
+  const sellerUserId =
+    diagnosisForTest?.attention.sellerUserId
+    ?? osForDelivery?.attention.sellerUserId
+    ?? diagnosisCase?.attention.sellerUserId
+    ?? null;
   const seller = sellerUserId
     ? await prisma.user.findUnique({ where: { id: sellerUserId }, select: { name: true } })
     : null;
 
-  const canTestExit = input.custody === "EN_RESGUARDO" && Boolean(diagnosisCase);
+  const attentionType = resolveAlmacenExitAttentionType({
+    openAttentionType: input.openAttentionType,
+    openAttentionId: input.openAttentionId,
+    diagnosisCase,
+    osCase,
+  });
+  const canTestExit =
+    input.custody === "EN_RESGUARDO" && isDiagnosisAttentionType(attentionType) && Boolean(diagnosisForTest);
 
   let exitKind: "test" | "definitive" | null = null;
   let blockedMessage: string | null = null;
 
   if (input.forAlmacenRole) {
-    const attentionType =
-      input.openAttentionType
-      ?? osCase?.attention.attentionType
-      ?? diagnosisCase?.attention.attentionType
-      ?? null;
     if (input.custody !== "EN_RESGUARDO") {
       blockedMessage = "El equipo debe estar en resguardo para registrar la salida.";
+    } else if (isDiagnosisAttentionType(attentionType)) {
+      exitKind = "test";
+      if (!canTestExit) {
+        blockedMessage = "La salida a prueba solo aplica con un diagnóstico en curso (sin reparación abierta en esta atención).";
+      }
     } else if (attentionType === "REPARACION") {
       exitKind = "definitive";
       if (!canDefinitiveExit) blockedMessage = definitiveBlockedMessage ?? "No puedes registrar la salida definitiva todavía.";
-    } else if (attentionType === "DIAGNOSTICO" || attentionType === "DIAGNOSTICO_GARANTIA") {
-      exitKind = "test";
-      if (!canTestExit) blockedMessage = "La salida a prueba solo aplica con un diagnóstico en curso.";
     } else if (attentionType) {
       blockedMessage = "Este tipo de servicio no permite registrar salida desde almacén.";
     } else {
@@ -160,17 +242,10 @@ export async function assertDefinitiveWarehouseExit(technicalCaseId: string, equ
 }
 
 export async function assertTestWarehouseExit(equipmentId: string, serviceCompanyId: string) {
-  const row = await prisma.technicalCase.findFirst({
-    where: {
-      equipmentId,
-      serviceCompanyId,
-      kind: "DIAGNOSTICO",
-      status: { notIn: [...CLOSED_CASE] },
-    },
-    include: { equipment: true },
-  });
+  const row = await findDiagnosisCaseForTestExit(equipmentId, serviceCompanyId);
   if (!row) throw new Error("La salida a prueba solo aplica con un diagnóstico en curso.");
-  if (row.equipment.custody !== "EN_RESGUARDO") {
+  const equipment = await prisma.equipment.findUnique({ where: { id: equipmentId } });
+  if (!equipment || equipment.custody !== "EN_RESGUARDO") {
     throw new Error("El equipo debe estar en resguardo.");
   }
 }
