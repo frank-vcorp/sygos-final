@@ -1,7 +1,7 @@
 import { SlaCountdown } from "@/components/sla-countdown";
 import { Badge, MobileCard, RecordLink, ResponsiveData, Table, Td, Th } from "@/components/ui";
 import { CASE_STATUS_LABEL } from "@/lib/case-labels";
-import { servicioTipoLabel } from "@/lib/servicios-catalog";
+import { serviceSeries, servicioTipoLabel } from "@/lib/servicios-catalog";
 import { servicioRowHighlight, type SupervisorServicioRow } from "@/lib/servicios-supervisor";
 
 function Markers({ markers }: { markers: string[] }) {
@@ -23,10 +23,6 @@ function formatClosedAt(date: Date) {
     dateStyle: "medium",
     timeStyle: "short",
   });
-}
-
-function serviceSeries(attentionType: string) {
-  return attentionType === "REPARACION" ? "OS" : "DX";
 }
 
 export function ServiciosSupervisorList({

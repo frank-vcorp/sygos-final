@@ -1,5 +1,6 @@
 import { receiptReasonFromAttention, type MovementKind } from "@/lib/custody";
 import { ATTENTION_LABEL, type AttentionType } from "@/lib/priorities";
+import { serviceSeries } from "@/lib/servicios-catalog";
 
 type EntradaAttention = {
   status: string;
@@ -10,10 +11,21 @@ type EntradaAttention = {
 
 export type EntradaServiceBadge = "DX" | "OS";
 
-export function entradaServiceBadge(attentionType: string | null | undefined, quoteType?: string | null): EntradaServiceBadge | null {
-  if (attentionType === "REPARACION" || quoteType === "REPARACION") return "OS";
-  if (attentionType === "DIAGNOSTICO" || attentionType === "DIAGNOSTICO_GARANTIA" || quoteType === "DIAGNOSTICO") return "DX";
+export function resolveEntradaAttentionType(
+  attentions: readonly EntradaAttention[],
+  quoteType?: string | null,
+): string | null {
+  const attention = pickEntradaAttention(attentions);
+  if (attention) return attention.attentionType;
+  if (quoteType === "REPARACION") return "REPARACION";
+  if (quoteType === "DIAGNOSTICO") return "DIAGNOSTICO";
   return null;
+}
+
+export function entradaServiceBadge(attentionType: string | null | undefined, quoteType?: string | null): EntradaServiceBadge | null {
+  const resolved = attentionType ?? (quoteType === "REPARACION" ? "REPARACION" : quoteType === "DIAGNOSTICO" ? "DIAGNOSTICO" : null);
+  if (!resolved) return null;
+  return serviceSeries(resolved);
 }
 
 /** Atención usable para primera entrada física (incluye casos fuera de ABIERTA estricta). */

@@ -4,7 +4,9 @@ import { CUSTODY_LABEL, type Custody } from "@/lib/custody";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
-import { entradaServiceBadge, pickEntradaAttention } from "@/lib/almacen-entrada";
+import { EntradaServicioCell } from "@/components/entrada-servicio-cell";
+import { resolveEntradaAttentionType } from "@/lib/almacen-entrada";
+import { serviceSeries } from "@/lib/servicios-catalog";
 import { isOsDefinitiveCustodyExit } from "@/lib/warehouse-exit";
 
 const FILTERS = ["pendientes", "resguardo", "fuera", "definitiva"] as const;
@@ -94,11 +96,11 @@ export default async function CustodiaPage({ searchParams }: { searchParams: Pro
         )
       : new Map<string, string>();
 
-  function servicioEntradaBadge(row: (typeof rows)[number]) {
-    const attention = "attentions" in row ? pickEntradaAttention(row.attentions as Array<{ attentionType: string; status: string; slaStartedAt: Date | null }>) : null;
-    const quoteType = pendingQuotesByEquipment.get(row.id) ?? null;
-    const badge = entradaServiceBadge(attention?.attentionType ?? null, quoteType);
-    return badge ? <Badge tone="neutral">{badge}</Badge> : <span className="text-sm text-[var(--muted)]">—</span>;
+  function entradaAttentionType(row: (typeof rows)[number]) {
+    const attentions = "attentions" in row
+      ? (row.attentions as Array<{ attentionType: string; status: string; slaStartedAt: Date | null }>)
+      : [];
+    return resolveEntradaAttentionType(attentions, pendingQuotesByEquipment.get(row.id) ?? null);
   }
   const title = systron ? "Almacén" : "Custodia";
   const tabsAll = systron
@@ -164,7 +166,7 @@ export default async function CustodiaPage({ searchParams }: { searchParams: Pro
                           {row.folio}
                         </RecordLink>
                       </Td>
-                      {view === "pendientes" && almacenBandeja ? <Td>{servicioEntradaBadge(row)}</Td> : null}
+                      {view === "pendientes" && almacenBandeja ? <Td><EntradaServicioCell attentionType={entradaAttentionType(row)} /></Td> : null}
                       <Td>{ref}</Td>
                       <Td><Badge>{CUSTODY_LABEL[row.custody as Custody]}</Badge></Td>
                     </tr>
@@ -176,19 +178,27 @@ export default async function CustodiaPage({ searchParams }: { searchParams: Pro
           cards={rows.map((row) => {
             const hideClient = !systron && row.originCompany.code === "SYSTRON";
             const href = row.kind === "MOT" ? `/motores/${row.id}${vistaQuery(view)}` : `/equipos/${row.id}${vistaQuery(view)}`;
+            const attType = view === "pendientes" && almacenBandeja ? entradaAttentionType(row) : null;
+            const series = attType ? serviceSeries(attType) : null;
             return (
               <MobileCard
                 key={row.id}
                 href={href}
-                title={row.folio}
+                title={series ? `${series} · pendiente` : row.folio}
                 meta={
                   <>
-                    {view === "pendientes" && almacenBandeja ? servicioEntradaBadge(row) : null}
+                    {series ? <Badge tone="neutral">Espera ingreso</Badge> : null}
                     <Badge>{CUSTODY_LABEL[row.custody as Custody]}</Badge>
                   </>
                 }
               >
+                {series ? <p className="font-medium">{row.folio}</p> : null}
                 <p>{hideClient ? "SYSTRON · intercompañía" : row.client.name}</p>
+                {series ? (
+                  <p className="text-xs text-[var(--muted)]">
+                    Folio {series}: se genera al confirmar la entrada física
+                  </p>
+                ) : null}
               </MobileCard>
             );
           })}
