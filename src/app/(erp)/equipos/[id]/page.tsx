@@ -1,5 +1,5 @@
 import { EquipmentDetail } from "@/components/equipment-detail";
-import { SalidaDocumentPopup } from "@/components/salida-document-popup";
+import { SalidaDocumentOverlay } from "@/components/salida-document-overlay";
 
 const CUSTODIA_VISTAS = new Set(["pendientes", "resguardo", "fuera", "definitiva"]);
 
@@ -15,7 +15,7 @@ export default async function EquipoPage({
   const fromCustodiaVista = vista && CUSTODIA_VISTAS.has(vista) ? vista : undefined;
   return (
     <>
-      <SalidaDocumentPopup movementId={documentoSalida} />
+      <SalidaDocumentOverlay movementId={documentoSalida} />
       <EquipmentDetail
         id={id}
         expectedKind="EQUI"

@@ -10,6 +10,7 @@ export function FormOverlayDialog({
   titleId,
   children,
   wide,
+  documentWide,
 }: {
   open: boolean;
   onClose: () => void;
@@ -17,6 +18,8 @@ export function FormOverlayDialog({
   titleId: string;
   children: React.ReactNode;
   wide?: boolean;
+  /** Documento imprimible (p. ej. salida de almacén). */
+  documentWide?: boolean;
 }) {
   useEffect(() => {
     if (!open) return;
@@ -37,7 +40,9 @@ export function FormOverlayDialog({
       aria-labelledby={titleId}
     >
       <div
-        className={`max-h-[min(92vh,44rem)] w-full overflow-y-auto rounded-xl border border-[var(--line)] bg-white shadow-xl ${wide ? "max-w-2xl" : "max-w-lg"}`}
+        className={`w-full overflow-y-auto rounded-xl border border-[var(--line)] bg-white shadow-xl ${
+          documentWide ? "max-h-[min(94vh,56rem)] max-w-4xl" : wide ? "max-h-[min(92vh,44rem)] max-w-2xl" : "max-h-[min(92vh,44rem)] max-w-lg"
+        }`}
       >
         <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-[var(--line)] bg-white px-4 py-3">
           <h3 id={titleId} className="text-sm font-semibold text-[#0b1f3a]">{title}</h3>

@@ -131,7 +131,7 @@ export async function movementAction(formData: FormData) {
       await setFlash({
         tone: "ok",
         message: result.folio
-          ? `${result.folio} confirmado. Se abrió el documento de salida en otra ventana.`
+          ? `${result.folio} confirmado. Imprime el documento de salida en la ventana emergente.`
           : "Salida registrada.",
       });
       redirect(`${back}?documentoSalida=${result.id}`);
