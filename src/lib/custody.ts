@@ -82,6 +82,17 @@ export function isReceipt(movement: MovementKind): boolean {
   return movement === "ENTRADA" || movement === "INGRESO";
 }
 
+/** Salidas con folio e impresión de documento (almacén). */
+export function isWarehouseExitDocument(movement: MovementKind): boolean {
+  return movement === "SALIDA" || movement === "EGRESO" || movement === "SALIDA_PRUEBA";
+}
+
+export function warehouseExitFolioSeries(movement: MovementKind): string | null {
+  if (movement === "EGRESO") return "EGR";
+  if (movement === "SALIDA" || movement === "SALIDA_PRUEBA") return "SAL";
+  return null;
+}
+
 /** Primera recepción en almacén (no retornos posteriores). */
 export function isInitialWarehouseReceipt(kind: "EQUI" | "MOT", custody: Custody, movement: MovementKind): boolean {
   if (!isReceipt(movement)) return false;

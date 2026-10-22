@@ -1,6 +1,6 @@
 import { resolveClientIdForProcess } from "./client-quick-create";
 import { prisma } from "./db";
-import { isInitialWarehouseReceipt, isReceipt, nextCustody, reasonsFor, receiptReasonFromAttention, type Custody, type MovementKind } from "./custody";
+import { isInitialWarehouseReceipt, isReceipt, isWarehouseExitDocument, nextCustody, reasonsFor, receiptReasonFromAttention, warehouseExitFolioSeries, type Custody, type MovementKind } from "./custody";
 import { allocateFolio } from "./folios";
 import { ConcurrencyError } from "./form";
 import { recordHistory } from "./history";
@@ -467,7 +467,12 @@ export async function registerMovement(
       throw new Error(`El motivo debe ser «${expected}» según la atención abierta.`);
     }
   }
-  const folio = receipt ? await allocateFolio(actor.activeCompanyId, input.kind === "INGRESO" ? "ING" : "ENT") : null;
+  const exitSeries = warehouseExitFolioSeries(input.kind);
+  const folio = receipt
+    ? await allocateFolio(actor.activeCompanyId, input.kind === "INGRESO" ? "ING" : "ENT")
+    : exitSeries
+      ? await allocateFolio(actor.activeCompanyId, exitSeries)
+      : null;
   let movementId = "";
   await prisma.$transaction(async (tx) => {
     const updated = await tx.equipment.updateMany({
@@ -530,7 +535,12 @@ export async function registerMovement(
       authorUserId: actor.userId,
     });
   }
-  return { id: movementId, folio, initialWarehouseReceipt };
+  return {
+    id: movementId,
+    folio,
+    initialWarehouseReceipt,
+    warehouseExitDocument: isWarehouseExitDocument(input.kind),
+  };
 }
 
 export async function cancelMovement(actor: Actor, movementId: string, reason: string) {

@@ -127,6 +127,15 @@ export async function movementAction(formData: FormData) {
       notes: optionalText(formData.get("notes")),
       technicalCaseId: optionalText(formData.get("technicalCaseId")),
     });
+    if (result.warehouseExitDocument) {
+      await setFlash({
+        tone: "ok",
+        message: result.folio
+          ? `${result.folio} confirmado. Imprime el documento de salida para firma.`
+          : "Salida registrada.",
+      });
+      redirect(`/documentos/salida/${result.id}`);
+    }
     await setFlash({
       tone: "ok",
       message: result.folio

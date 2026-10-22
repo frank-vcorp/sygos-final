@@ -11,7 +11,7 @@ import { EquipmentLabel } from "@/components/equipment-label";
 import { HistoryTimeline } from "@/components/history-timeline";
 import { Badge, Card, DetailAnchorButton, EntityDetailHeader, EntityMetaItem, MobileCard, Table, Td, TextLink, Th } from "@/components/ui";
 import { buildAlmacenEntradaPreset, pickCustodyFlowAttention } from "@/lib/almacen-entrada";
-import { allowedMovements, CUSTODY_LABEL, isInitialWarehouseReceipt, isReceipt, MOVEMENT_LABEL, receiptReasonFromAttention, type Custody, type MovementKind } from "@/lib/custody";
+import { allowedMovements, CUSTODY_LABEL, isInitialWarehouseReceipt, isReceipt, isWarehouseExitDocument, MOVEMENT_LABEL, receiptReasonFromAttention, type Custody, type MovementKind } from "@/lib/custody";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
 import { historyFor } from "@/lib/history";
@@ -214,12 +214,14 @@ export async function EquipmentDetail({
     custodyPrimaryAction = <DetailAnchorButton href="#custodia-equipo">{label}</DetailAnchorButton>;
   }
 
+  const almacenSalidaEnCabecera = almacenCustody && useWarehouseExit && warehouseExit;
   const showCustodyMovementBar =
     !showAlmacenPasarResguardo
     && custodyDetail
     && !awaitingAttentionForReceipt
     && canMove
-    && movementOptions.length > 0;
+    && movementOptions.length > 0
+    && !almacenSalidaEnCabecera;
   const custodyBarSticky = showCustodyMovementBar && (almacenCustody || movementOptions.length > 0);
   const almacenResguardoAction =
     showAlmacenPasarResguardo && almacenEntradaPreset
@@ -238,6 +240,25 @@ export async function EquipmentDetail({
         />
       )
       : null;
+  const almacenSalidaAction = almacenSalidaEnCabecera
+    ? (
+      <WarehouseExitFormAlmacen
+        direct
+        equipmentId={equipment.id}
+        equipmentFolio={equipment.folio}
+        kind={expectedKind}
+        version={equipment.version}
+        exitMovement={warehouseExit!.exitMovement}
+        definitiveReason={warehouseExit!.definitiveReason}
+        sellerName={warehouseExit!.sellerName}
+        technicalCaseId={warehouseExit!.technicalCaseId}
+        enablingDocumentLabel={warehouseExit!.enablingDocumentLabel}
+        exitKind={warehouseExit!.exitKind}
+        blockedMessage={warehouseExit!.blockedMessage}
+        testReason={warehouseExit!.testReason}
+      />
+    )
+    : null;
 
   return (
     <>
@@ -266,7 +287,7 @@ export async function EquipmentDetail({
             {intercompany && sellerUser ? <EntityMetaItem label="Contacto SYSTRON">{sellerUser.name}</EntityMetaItem> : null}
           </>
         }
-        primaryAction={almacenResguardoAction ?? (almacenCustody ? null : custodyDetail ? custodyPrimaryAction : primaryAction)}
+        primaryAction={almacenResguardoAction ?? almacenSalidaAction ?? (almacenCustody ? null : custodyDetail ? custodyPrimaryAction : primaryAction)}
       />
       {custodyDetail && hasReceipt ? (
         <div className="mb-6">
@@ -417,6 +438,11 @@ export async function EquipmentDetail({
                         {!movement.cancelledAt && movement.folio && isReceipt(movement.kind as MovementKind) ? (
                           <span className="ml-2">
                             <TextLink href={`/documentos/entrada/${movement.id}`}>Documento de recepción</TextLink>
+                          </span>
+                        ) : null}
+                        {!movement.cancelledAt && movement.folio && isWarehouseExitDocument(movement.kind as MovementKind) ? (
+                          <span className="ml-2">
+                            <TextLink href={`/documentos/salida/${movement.id}`}>Documento de salida</TextLink>
                           </span>
                         ) : null}
                         {canMove && latestOpen?.id === movement.id && movement.kind !== "ENTRADA" && movement.kind !== "INGRESO" && !movement.cancelledAt ? (
