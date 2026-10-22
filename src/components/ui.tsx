@@ -12,14 +12,14 @@ export function PageHeader({
   back?: { href: string; label: string };
 }) {
   return (
-    <div className="mb-7 flex flex-wrap items-end justify-between gap-4">
+    <div className="mb-7 flex flex-wrap items-end justify-between gap-4 border-b border-[var(--line)] pb-5">
       <div>
         {back ? (
           <Link href={back.href} className="mb-1 inline-flex text-sm text-[var(--muted)] hover:text-[var(--accent)]">
             ← {back.label}
           </Link>
         ) : null}
-        <h1 className="text-2xl font-semibold tracking-tight text-[#0b1f3a] md:text-[30px] md:leading-tight">{title}</h1>
+        <h1 className="text-2xl font-bold tracking-tight text-[var(--ink)] md:text-[32px] md:leading-tight">{title}</h1>
         {subtitle ? <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--muted)]">{subtitle}</p> : null}
       </div>
       {action}
@@ -52,7 +52,7 @@ export function EntityDetailHeader({
           ← {back.label}
         </Link>
       ) : null}
-      <div className="rounded-xl border border-[var(--line)] bg-white p-5 shadow-[0_1px_2px_rgba(20,37,30,0.05)] md:p-6">
+      <div className="rounded-2xl border border-[var(--line)] bg-white p-5 shadow-[0_12px_32px_rgba(20,45,75,0.055)] md:p-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
@@ -64,9 +64,13 @@ export function EntityDetailHeader({
         </div>
         {meta ? <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2 lg:grid-cols-3">{meta}</div> : null}
         {primaryAction || secondaryActions ? (
-          <div className="mt-4 flex flex-col gap-3 border-t border-[var(--line)] pt-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-            <div className="flex flex-wrap gap-2">{primaryAction}</div>
-            {secondaryActions ? <div className="flex flex-wrap items-center gap-3 text-sm">{secondaryActions}</div> : null}
+          <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-[var(--line)] pt-4">
+            {primaryAction ? <div className="w-full min-w-0">{primaryAction}</div> : null}
+            {secondaryActions ? (
+              <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2 text-sm">
+                {secondaryActions}
+              </div>
+            ) : null}
           </div>
         ) : null}
       </div>
@@ -84,14 +88,22 @@ export function EntityMetaItem({ label, children }: { label: string; children: R
 }
 
 /** Botón de ancla hacia el bloque de captura de la acción principal en la misma página. */
+const detailPrimaryButtonClass =
+  "inline-flex min-h-11 items-center justify-center rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2";
+
 export function DetailAnchorButton({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <a
-      href={href}
-      className="inline-flex min-h-11 items-center justify-center rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2"
-    >
+    <a href={href} className={detailPrimaryButtonClass}>
       {children}
     </a>
+  );
+}
+
+export function DetailFormSubmitButton({ form, children }: { form: string; children: React.ReactNode }) {
+  return (
+    <button type="submit" form={form} className={detailPrimaryButtonClass}>
+      {children}
+    </button>
   );
 }
 
@@ -107,13 +119,13 @@ export function KpiCard({ label, value, href }: { label: string; value: string; 
     return (
       <Link
         href={href}
-        className="block rounded-lg border border-[var(--line)] bg-white p-4 outline-none transition-colors hover:border-[var(--accent)] focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2"
+        className="block rounded-xl border border-[var(--line)] bg-white p-5 shadow-[0_4px_16px_rgba(20,45,75,0.035)] outline-none transition-all hover:-translate-y-0.5 hover:border-[#91b7cf] hover:shadow-[0_10px_24px_rgba(20,45,75,0.09)] focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2"
       >
         {body}
       </Link>
     );
   }
-  return <div className="rounded-lg border border-[var(--line)] bg-white p-4">{body}</div>;
+  return <div className="rounded-xl border border-[var(--line)] bg-white p-5 shadow-[0_4px_16px_rgba(20,45,75,0.035)]">{body}</div>;
 }
 
 export function Button({
@@ -228,7 +240,7 @@ export function Field({
 }) {
   return (
     <label className={`block ${className}`.trim()}>
-      <span className="mb-1 block text-sm font-medium">{label}</span>
+      <span className="mb-1.5 block text-sm font-semibold text-[var(--ink)]">{label}</span>
       {children}
       {hint ? <span className="mt-1 block text-xs text-[var(--muted)]">{hint}</span> : null}
     </label>
@@ -236,10 +248,12 @@ export function Field({
 }
 
 export const controlClass =
-  "min-h-11 w-full rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm outline-none focus:border-[var(--accent)] focus-visible:ring-2 focus-visible:ring-[var(--accent-soft)]";
+  "min-h-11 w-full rounded-lg border border-[#cbd8e6] bg-white px-3.5 py-2.5 text-sm outline-none focus:border-[#087d99] focus-visible:ring-2 focus-visible:ring-[#c7e9f2]";
+
+export { MoneyInput } from "@/components/money-input";
 
 export function FilterBar({ children, action, className = "" }: { children: React.ReactNode; action: string; className?: string }) {
-  return <form className={`mb-4 flex flex-col gap-2 rounded-lg border border-[var(--line)] bg-white p-3 sm:flex-row sm:flex-wrap sm:items-center ${className}`} action={action}>{children}</form>;
+  return <form className={`mb-4 flex flex-col gap-2 rounded-xl border border-[var(--line)] bg-white p-3 shadow-[0_4px_14px_rgba(20,45,75,0.04)] sm:flex-row sm:flex-wrap sm:items-center ${className}`} action={action}>{children}</form>;
 }
 
 export function SegmentedNav({ items }: { items: Array<{ href: string; label: string; active: boolean }> }) {
@@ -253,7 +267,7 @@ export function SegmentedNav({ items }: { items: Array<{ href: string; label: st
 }
 
 export function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <section className={`rounded-xl border border-[var(--line)] bg-white shadow-[0_1px_2px_rgba(20,37,30,0.05)] ${className}`}>{children}</section>;
+  return <section className={`rounded-2xl border border-[var(--line)] bg-white shadow-[0_8px_28px_rgba(20,45,75,0.045)] ${className}`}>{children}</section>;
 }
 
 export function Empty({ title, body, action }: { title: string; body: string; action?: React.ReactNode }) {
@@ -357,7 +371,7 @@ export function DetailGrid({ children }: { children: React.ReactNode }) {
 
 export function FormPanel({ children, className = "", ...props }: React.ComponentProps<"form">) {
   return (
-    <form {...props} className={`max-w-5xl overflow-hidden rounded-xl border border-[var(--line)] bg-white shadow-[0_8px_30px_rgba(7,59,120,0.06)] ${className}`}>
+    <form {...props} data-form-panel="" className={`max-w-5xl overflow-visible rounded-2xl border border-[var(--line)] bg-white shadow-[0_18px_44px_rgba(20,45,75,0.07)] ${className}`}>
       {children}
     </form>
   );
@@ -376,9 +390,9 @@ export function FormSection({
 }) {
   const grids = { 1: "", 2: "md:grid-cols-2", 3: "md:grid-cols-2 xl:grid-cols-3" };
   return (
-    <section className="border-b border-[var(--line)] p-5 md:p-7">
-      <div className="mb-5">
-        <h2 className="text-lg font-semibold text-[#0b1f3a]">{title}</h2>
+    <section className="border-b border-[var(--line)] p-5 last:border-b-0 md:p-8">
+      <div className="mb-6 border-l-[3px] border-[#0a8295] pl-4">
+        <h2 className="text-lg font-bold tracking-tight text-[var(--ink)]">{title}</h2>
         {description ? <p className="mt-1 max-w-2xl text-sm leading-6 text-[var(--muted)]">{description}</p> : null}
       </div>
       <div className={`grid gap-4 ${grids[columns]}`}>{children}</div>
@@ -406,9 +420,9 @@ export function FormBlock({
       ? "border-[var(--line)] bg-[#f7fafc]"
       : "border-[var(--line)] bg-white";
   return (
-    <section className={`rounded-xl border ${surface} p-4 md:p-5`}>
-      <header className="mb-4">
-        <h3 className="text-sm font-semibold tracking-tight text-[#0b1f3a]">{title}</h3>
+    <section className={`rounded-2xl border ${surface} p-4 md:p-5`}>
+      <header className="mb-4 border-l-[3px] border-[#0a8295] pl-3">
+        <h3 className="text-sm font-bold tracking-tight text-[#0b1f3a]">{title}</h3>
         {description ? <p className="mt-1 text-xs leading-5 text-[var(--muted)]">{description}</p> : null}
       </header>
       <div className={`grid gap-4 ${grids[columns]}`}>{children}</div>
@@ -418,7 +432,7 @@ export function FormBlock({
 
 export function FormActions({ children, note }: { children: React.ReactNode; note?: string }) {
   return (
-    <footer className="flex flex-col-reverse gap-3 bg-[#f7fafc] px-5 py-4 sm:flex-row sm:items-center sm:justify-between md:px-7">
+    <footer data-form-actions className="sticky bottom-0 z-30 flex flex-col-reverse gap-2 rounded-b-2xl border-t border-[var(--line)] bg-[#f3f8fb]/95 px-5 py-3 shadow-[0_-12px_28px_rgba(20,45,75,0.12)] backdrop-blur-md sm:flex-row sm:items-center sm:justify-between sm:gap-3 md:px-7 print:static print:shadow-none" style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
       {note ? <p className="text-xs text-[var(--muted)]">{note}</p> : <span />}
       <div className="flex flex-col gap-2 sm:flex-row">{children}</div>
     </footer>
@@ -426,7 +440,7 @@ export function FormActions({ children, note }: { children: React.ReactNode; not
 }
 
 export function Th({ children }: { children: React.ReactNode }) {
-  return <th className="border-b border-[var(--line)] px-3 py-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">{children}</th>;
+  return <th className="border-b border-[var(--line)] px-4 py-3 text-xs font-bold uppercase tracking-[0.08em] text-[var(--muted)]">{children}</th>;
 }
 
 export function Td({
@@ -438,7 +452,7 @@ export function Td({
   colSpan?: number;
   className?: string;
 }) {
-  const cellClass = ["border-b border-[var(--line)] px-3 py-2 align-middle", className].filter(Boolean).join(" ");
+  const cellClass = ["border-b border-[var(--line)] px-4 py-3 align-middle", className].filter(Boolean).join(" ");
   return (
     <td colSpan={colSpan} className={cellClass}>
       {children}

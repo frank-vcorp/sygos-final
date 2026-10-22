@@ -5,6 +5,7 @@ import { verifyFacturapi } from "@/lib/facturapi";
 import { verifySendGrid } from "@/lib/sendgrid";
 import { setFlash } from "@/lib/flash";
 import { ConcurrencyError, optionalInt, optionalText, parseVersion, requiredText } from "@/lib/form";
+import { optionalMoneyFromForm } from "@/lib/money";
 import { recordHistory } from "@/lib/history";
 import { can } from "@/lib/permissions";
 import { parseRegimen } from "@/lib/sat-regimen";
@@ -179,8 +180,8 @@ export async function updatePriorityAction(formData: FormData) {
   const updated = await prisma.priority.updateMany({
     where: { id, companyId: session.activeCompanyId },
     data: {
-      price: optionalMoney(formData.get("price")),
-      incrementPct: optionalMoney(formData.get("incrementPct")),
+      price: optionalMoneyFromForm(formData.get("price")),
+      incrementPct: optionalPercent(formData.get("incrementPct")),
       targetMinDays: optionalInt(formData.get("targetMinDays")),
       targetMaxDays: optionalInt(formData.get("targetMaxDays")),
       slaMaxDays,
@@ -194,12 +195,12 @@ export async function updatePriorityAction(formData: FormData) {
   redirect("/configuracion");
 }
 
-function optionalMoney(value: FormDataEntryValue | null) {
+function optionalPercent(value: FormDataEntryValue | null) {
   const text = optionalText(value);
   if (!text) return null;
-  const amount = Number(text);
-  if (!Number.isFinite(amount) || amount < 0) throw new Error("El importe no es válido.");
-  return amount;
+  const n = Number(text);
+  if (!Number.isFinite(n) || n < 0) throw new Error("El incremento no es válido.");
+  return n;
 }
 
 function isRedirect(error: unknown) {

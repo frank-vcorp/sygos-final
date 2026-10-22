@@ -35,3 +35,31 @@ export function money(value: number | null | undefined): string {
   if (value == null) return "—";
   return value.toLocaleString("es-MX", { style: "currency", currency: "MXN" });
 }
+
+/** Valor mostrado en captura de importes (sin símbolo $; el prefijo va en el control). */
+export function formatMoneyInput(value: number): string {
+  return value.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/** Interpreta texto capturado o enviado por formulario (acepta comas de miles y 2 decimales). */
+export function parseMoneyInput(text: string | null | undefined): number | null {
+  if (text == null) return null;
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+  const cleaned = trimmed.replace(/\$/g, "").replace(/\s/g, "").replace(/,/g, "");
+  const n = Number(cleaned);
+  if (!Number.isFinite(n)) return null;
+  return roundMoney(n);
+}
+
+export function moneyFromForm(value: FormDataEntryValue | null, label = "Importe"): number {
+  const raw = typeof value === "string" ? value : value != null ? String(value) : null;
+  const amount = parseMoneyInput(raw);
+  if (amount == null) throw new Error(`${label} es obligatorio.`);
+  return amount;
+}
+
+export function optionalMoneyFromForm(value: FormDataEntryValue | null): number | null {
+  const raw = typeof value === "string" ? value : value != null ? String(value) : null;
+  return parseMoneyInput(raw);
+}

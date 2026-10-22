@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { ActionLink, ActiveFilters, Button, controlClass, Empty, FilterBar, MobileCard, PageHeader, RecordLink, ResponsiveData, Table, Td, Th } from "@/components/ui";
+import { ActionLink, ActiveFilters, Badge, Button, controlClass, Empty, FilterBar, MobileCard, PageHeader, RecordLink, ResponsiveData, Table, Td, Th } from "@/components/ui";
 import { listHref } from "@/lib/list-url";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
@@ -30,14 +30,14 @@ export default async function ProspectosPage({ searchParams }: { searchParams: P
   });
   return (
     <>
-      <PageHeader title="Prospectos" subtitle={session.activeCompanyName ?? ""} action={<ActionLink href="/prospectos/nuevo">Nuevo prospecto</ActionLink>} />
+      <PageHeader title="Prospectos" subtitle="Da seguimiento a oportunidades abiertas y convierte en cliente cuando estén listas." action={<ActionLink href="/prospectos/nuevo">Nuevo prospecto</ActionLink>} />
       <FilterBar action="/prospectos">
         <input name="q" defaultValue={query} placeholder="Empresa o nombre" className={`${controlClass} sm:flex-1`} />
         <select name="estado" defaultValue={status} className={`${controlClass} sm:w-auto`}>
           <option value="ABIERTOS">Abiertos</option>
           {Object.entries(LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select>
-        <Button type="submit" tone="ghost">Filtrar</Button>
+        <Button type="submit" tone="ghost">Buscar</Button>
       </FilterBar>
       <ActiveFilters
         items={[
@@ -45,10 +45,10 @@ export default async function ProspectosPage({ searchParams }: { searchParams: P
           ...(query ? [{ label: `Búsqueda: ${query}`, clearHref: listHref("/prospectos", { estado: status !== "ABIERTOS" ? status : undefined }) }] : []),
         ]}
       />
-      {prospects.length === 0 ? <Empty title="No hay prospectos" body="Nada coincide con el filtro en esta empresa." /> : (
+      {prospects.length === 0 ? <Empty title={query || status !== "ABIERTOS" ? "Sin coincidencias" : "Aún no hay prospectos abiertos"} body={query || status !== "ABIERTOS" ? "Prueba otra búsqueda o consulta los abiertos." : "Registra una oportunidad para comenzar su seguimiento."} action={query || status !== "ABIERTOS" ? <ActionLink href="/prospectos" tone="ghost">Ver abiertos</ActionLink> : <ActionLink href="/prospectos/nuevo">Nuevo prospecto</ActionLink>} /> : (
         <ResponsiveData
-          table={<Table><thead><tr><Th>Prospecto</Th><Th>Estado</Th><Th>Fuente</Th></tr></thead><tbody>{prospects.map((prospect) => <tr key={prospect.id}><Td><RecordLink href={`/prospectos/${prospect.id}`}>{prospect.name}</RecordLink></Td><Td>{LABEL[prospect.status] ?? prospect.status}</Td><Td>{prospect.source ?? "—"}</Td></tr>)}</tbody></Table>}
-          cards={prospects.map((prospect) => <MobileCard key={prospect.id} href={`/prospectos/${prospect.id}`} title={prospect.name} meta={LABEL[prospect.status] ?? prospect.status}><p>Fuente: {prospect.source ?? "—"}</p></MobileCard>)}
+          table={<Table><thead><tr><Th>Prospecto</Th><Th>Estado</Th><Th>Fuente</Th></tr></thead><tbody>{prospects.map((prospect) => <tr key={prospect.id}><Td><RecordLink href={`/prospectos/${prospect.id}`}>{prospect.name}</RecordLink></Td><Td><Badge tone={prospect.status === "CONVERTIDO" ? "ok" : prospect.status === "DESCARTADO" ? "neutral" : prospect.status === "EN_SEGUIMIENTO" ? "warn" : "neutral"}>{LABEL[prospect.status] ?? prospect.status}</Badge></Td><Td>{prospect.source ?? "—"}</Td></tr>)}</tbody></Table>}
+          cards={prospects.map((prospect) => <MobileCard key={prospect.id} href={`/prospectos/${prospect.id}`} title={prospect.name} meta={<Badge tone={prospect.status === "CONVERTIDO" ? "ok" : prospect.status === "EN_SEGUIMIENTO" ? "warn" : "neutral"}>{LABEL[prospect.status] ?? prospect.status}</Badge>}><p>Fuente: {prospect.source ?? "—"}</p></MobileCard>)}
         />
       )}
     </>

@@ -36,7 +36,7 @@ export function AttentionForm({
       <input type="hidden" name="equipmentId" value={equipmentId} />
       <input type="hidden" name="kind" value={kind} />
       <input type="hidden" name="version" value={version} />
-      <Field label="Tipo de atención">
+      <Field label="Tipo de servicio">
         <select name="attentionType" required className={controlClass}>
           <option value="">Selecciona</option>
           {ATTENTION_TYPES.map((type) => (
@@ -74,17 +74,17 @@ export function AttentionForm({
   if (variant === "card") {
     return (
       <FormPanel action={createAttentionAction}>
-        <FormSection title="Nueva atención" description="Es un episodio de servicio. No crea otro equipo ni otro folio." columns={1}>
+        <FormSection title="Nuevo servicio" description="Es un episodio de servicio. No crea otro equipo ni otro folio." columns={1}>
           {fields}
         </FormSection>
-        <FormActions><Button type="submit">Crear atención</Button></FormActions>
+        <FormActions><Button type="submit">Crear servicio</Button></FormActions>
       </FormPanel>
     );
   }
   return (
     <form action={createAttentionAction} className="grid gap-3">
       {fields}
-      <Button type="submit">Crear atención</Button>
+      <Button type="submit">Crear servicio</Button>
     </form>
   );
 }
@@ -99,6 +99,9 @@ export function MovementForm({
   allowQuickSupplier = false,
   variant = "card",
   receiptPreset,
+  formId,
+  hideSubmit = false,
+  restrictMovements,
 }: {
   equipmentId: string;
   equipmentFolio: string;
@@ -108,6 +111,9 @@ export function MovementForm({
   suppliers: Array<{ id: string; name: string }>;
   allowQuickSupplier?: boolean;
   variant?: "card" | "plain";
+  formId?: string;
+  hideSubmit?: boolean;
+  restrictMovements?: MovementKind[];
   receiptPreset?: {
     movement: MovementKind;
     reason: string;
@@ -116,7 +122,7 @@ export function MovementForm({
     clientName: string;
   };
 }) {
-  const movements = allowedMovements(kind, custody);
+  const movements = restrictMovements ?? allowedMovements(kind, custody);
   if (movements.length === 0) return null;
   if (receiptPreset) {
     const body = (
@@ -140,16 +146,16 @@ export function MovementForm({
     );
     if (variant === "card") {
       return (
-        <FormPanel action={movementAction}>
+        <FormPanel action={movementAction} id={formId}>
           {body}
-          <FormActions><Button type="submit">Confirmar {MOVEMENT_LABEL[receiptPreset.movement].toLowerCase()} física</Button></FormActions>
+          {hideSubmit ? null : <FormActions><Button type="submit">Confirmar {MOVEMENT_LABEL[receiptPreset.movement].toLowerCase()} física</Button></FormActions>}
         </FormPanel>
       );
     }
     return (
-      <form action={movementAction} className="grid gap-3">
+      <form action={movementAction} id={formId} className="grid gap-3">
         {body}
-        <Button type="submit">Confirmar {MOVEMENT_LABEL[receiptPreset.movement].toLowerCase()} física</Button>
+        {hideSubmit ? null : <Button type="submit">Confirmar {MOVEMENT_LABEL[receiptPreset.movement].toLowerCase()} física</Button>}
       </form>
     );
   }

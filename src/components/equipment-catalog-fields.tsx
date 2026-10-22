@@ -5,10 +5,10 @@ import { CatalogCombobox, type CatalogComboboxOption } from "@/components/catalo
 
 type ModelRow = { type: string; brand: string; model: string };
 
-export function EquipmentCatalogFields({ types, brands, models }: { types: string[]; brands: string[]; models: ModelRow[] }) {
-  const [model, setModel] = useState("");
-  const [brand, setBrand] = useState("");
-  const [typeName, setTypeName] = useState("");
+export function EquipmentCatalogFields({ types, brands, models, initialValues }: { types: string[]; brands: string[]; models: ModelRow[]; initialValues?: { model: string; brand: string; typeName: string } }) {
+  const [model, setModel] = useState(initialValues?.model ?? "");
+  const [brand, setBrand] = useState(initialValues?.brand ?? "");
+  const [typeName, setTypeName] = useState(initialValues?.typeName ?? "");
   const brandRef = useRef<HTMLInputElement>(null);
   const typeRef = useRef<HTMLInputElement>(null);
 

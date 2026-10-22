@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { saveFacturapiAction, saveSendgridAction, toggleInventoryAction, updateCompanyAction, updatePriorityAction, verifyFacturapiAction, verifySendgridAction } from "./actions";
 import { WhatsAppPanel } from "@/components/whatsapp-panel";
 import { RegimenSelect } from "@/components/regimen-select";
-import { ActionLink, Button, controlClass, Field, FormActions, FormPanel, FormSection, PageHeader } from "@/components/ui";
+import { ActionLink, Button, controlClass, Field, FormActions, FormPanel, FormSection, MoneyInput, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { ATTENTION_LABEL, type AttentionType } from "@/lib/priorities";
@@ -60,7 +60,7 @@ export default async function ConfiguracionPage() {
                 title={`${ATTENTION_LABEL[priority.attentionType as AttentionType] ?? priority.attentionType} · ${priority.name}`}
                 description="Precio, objetivos de entrega y SLA máximo para nuevas atenciones."
               >
-                <Field label="Precio"><input name="price" defaultValue={priority.price ?? ""} className={controlClass} /></Field>
+                <Field label="Precio"><MoneyInput name="price" defaultValue={priority.price ?? ""} /></Field>
                 <Field label="Incremento %"><input name="incrementPct" defaultValue={priority.incrementPct ?? ""} className={controlClass} /></Field>
                 <Field label="Objetivo mín."><input name="targetMinDays" defaultValue={priority.targetMinDays ?? ""} className={controlClass} /></Field>
                 <Field label="Objetivo máx."><input name="targetMaxDays" defaultValue={priority.targetMaxDays ?? ""} className={controlClass} /></Field>

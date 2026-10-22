@@ -25,6 +25,7 @@ import { setFlash } from "@/lib/flash";
 import { supplierIdFromForm } from "@/lib/form-quick-entities";
 import { optionalText, parseVersion, requiredText } from "@/lib/form";
 import { requireCompany } from "@/lib/session";
+import { authorizeExitWithoutDocument, requestExitWithoutDocument } from "@/lib/warehouse-exit";
 
 function back(formData: FormData) {
   const id = String(formData.get("caseId") ?? "");
@@ -47,7 +48,7 @@ async function run(formData: FormData, work: (session: Awaited<ReturnType<typeof
 
 export async function assignCaseAction(formData: FormData) {
   "use server";
-  await run(formData, async (session) => assignCase(session, requiredText(formData.get("caseId"), "Operación"), parseVersion(formData.get("version")), optionalText(formData.get("assigneeUserId")), await supplierIdFromForm(session, formData)), "Asignación actualizada.");
+  await run(formData, async (session) => assignCase(session, requiredText(formData.get("caseId"), "Operación"), parseVersion(formData.get("version")), optionalText(formData.get("assigneeUserId")), null), "Asignación actualizada.");
 }
 
 export async function startCaseAction(formData: FormData) {
@@ -62,7 +63,7 @@ export async function logAction(formData: FormData) {
 
 export async function finishDiagnosisAction(formData: FormData) {
   "use server";
-  await run(formData, (session) => finishDiagnosis(session, requiredText(formData.get("caseId"), "Operación"), parseVersion(formData.get("version")), requiredText(formData.get("resultText"), "Resultado")), "Diagnóstico terminado.");
+  await run(formData, (session) => finishDiagnosis(session, requiredText(formData.get("caseId"), "Operación"), parseVersion(formData.get("version"))), "Diagnóstico terminado.");
 }
 
 export async function validateAction(formData: FormData) {
@@ -75,7 +76,10 @@ export async function validateAction(formData: FormData) {
 export async function finishRepairAction(formData: FormData) {
   "use server";
   const outcome = formData.get("outcome") === "SIN_REPARACION" ? "SIN_REPARACION" : "TERMINADA";
-  await run(formData, (session) => finishRepair(session, requiredText(formData.get("caseId"), "Operación"), parseVersion(formData.get("version")), outcome, requiredText(formData.get("resultText"), "Resultado")), "Cierre técnico registrado.");
+  const resultText = outcome === "SIN_REPARACION"
+    ? requiredText(formData.get("resultText"), "Motivo")
+    : optionalText(formData.get("resultText")) ?? "";
+  await run(formData, (session) => finishRepair(session, requiredText(formData.get("caseId"), "Operación"), parseVersion(formData.get("version")), outcome, resultText), "Cierre técnico registrado.");
 }
 
 export async function reopenAction(formData: FormData) {
@@ -142,6 +146,24 @@ export async function receivePartAction(formData: FormData) {
 export async function issuePartAction(formData: FormData) {
   "use server";
   await run(formData, (session) => issuePartRequest(session, requiredText(formData.get("requestId"), "Solicitud"), parseVersion(formData.get("version")), Number(formData.get("quantity"))), "Surtido registrado.");
+}
+
+export async function requestExitWithoutDocumentAction(formData: FormData) {
+  "use server";
+  await run(
+    formData,
+    (session) => requestExitWithoutDocument(session, requiredText(formData.get("caseId"), "Operación"), parseVersion(formData.get("version"))),
+    "Solicitud enviada al CEO.",
+  );
+}
+
+export async function authorizeExitWithoutDocumentAction(formData: FormData) {
+  "use server";
+  await run(
+    formData,
+    (session) => authorizeExitWithoutDocument(session, requiredText(formData.get("caseId"), "Operación"), parseVersion(formData.get("version"))),
+    "Salida sin documento autorizada. Almacén ya puede registrar la entrega.",
+  );
 }
 
 function isRedirect(error: unknown) {

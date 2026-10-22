@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import { aguinaldoAdjustAction, authorizePayrollAction, editExtraAction, extraAction, retryPayrollAction } from "../actions";
-import { Badge, Button, controlClass, DetailAnchorButton, EntityDetailHeader, EntityMetaItem, Field, FormActions, FormPanel, FormSection, MobileCard, RecordLink } from "@/components/ui";
+import { Badge, Button, controlClass, DetailAnchorButton, EntityDetailHeader, EntityMetaItem, Field, FormActions, FormPanel, FormSection, MobileCard, MoneyInput, RecordLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
 import { can } from "@/lib/permissions";
@@ -74,8 +74,8 @@ export default async function NominaDetallePage({ params }: { params: Promise<{ 
                   <form action={aguinaldoAdjustAction} className="flex flex-wrap gap-2">
                     <input type="hidden" name="periodId" value={row.id} />
                     <input type="hidden" name="lineId" value={line.id} />
-                    <input name="stamped" type="number" step="0.01" defaultValue={line.aguinaldoStamped} className="w-28 rounded-md border border-[var(--line)] px-2 py-2" />
-                    <input name="cash" type="number" step="0.01" defaultValue={line.aguinaldoCash} className="w-28 rounded-md border border-[var(--line)] px-2 py-2" />
+                    <MoneyInput name="stamped" defaultValue={line.aguinaldoStamped} wrapperClassName="w-28" className="min-h-9 rounded-md px-2 py-2" />
+                    <MoneyInput name="cash" defaultValue={line.aguinaldoCash} wrapperClassName="w-28" className="min-h-9 rounded-md px-2 py-2" />
                     <Button type="submit" tone="ghost">Ajustar aguinaldo</Button>
                   </form>
                 ) : undefined
@@ -96,7 +96,7 @@ export default async function NominaDetallePage({ params }: { params: Promise<{ 
             <Field label="Colaborador"><select name="collaboratorId" className={controlClass}>{row.lines.filter((line) => !line.collaborator.exemptBenefits).map((line) => <option key={line.id} value={line.collaboratorId}>{line.collaborator.user.name}</option>)}</select></Field>
             <Field label="Tipo"><select name="kind" className={controlClass}><option value="INGRESO">Ingreso extra</option><option value="DESCUENTO">Descuento extra</option></select></Field>
             <Field label="Componente"><select name="component" className={controlClass}><option value="TIMBRADO">Timbrado</option><option value="EFECTIVO">Efectivo</option></select></Field>
-            <Field label="Importe"><input name="amount" type="number" min="0.01" step="0.01" required className={controlClass} /></Field>
+            <Field label="Importe"><MoneyInput name="amount" min="0.01" required /></Field>
             <Field label="Nota"><input name="note" required className={controlClass} /></Field>
           </FormSection>
           <FormActions><Button type="submit" tone="ghost">Agregar movimiento</Button></FormActions>
@@ -110,7 +110,7 @@ export default async function NominaDetallePage({ params }: { params: Promise<{ 
               <form action={editExtraAction} className="mt-1 flex gap-2">
                 <input type="hidden" name="periodId" value={row.id} />
                 <input type="hidden" name="adjustmentId" value={item.id} />
-                <input name="amount" type="number" step="0.01" defaultValue={item.amount} className="w-28 rounded-md border border-[var(--line)] px-2 py-2" />
+                <MoneyInput name="amount" defaultValue={item.amount} wrapperClassName="w-28" className="min-h-9 rounded-md px-2 py-2" />
                 <Button type="submit" tone="ghost">Corregir</Button>
               </form>
             ) : null}

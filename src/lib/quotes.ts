@@ -3,6 +3,8 @@ import { allocateFolio } from "./folios";
 import { ConcurrencyError } from "./form";
 import { recordHistory } from "./history";
 import { finalFromBase } from "./money";
+import { ATTENTION_LABEL, type AttentionType } from "./priorities";
+import { technicalServiceConcept } from "./quote-concept";
 import type { Role } from "./roles";
 import { QUOTE_STATUS_LABEL, QUOTE_TYPE_LABEL, QUOTE_TYPES, type QuoteType } from "./quote-meta";
 import { SALES_NOT_ASSIGNED_MESSAGE } from "./sales-assignment";
@@ -18,16 +20,18 @@ export function seesEconomicDetail(role: Role, companyCode: string, quoteCompany
   return role === "ADMINISTRADOR" || role === "CEO" || role === "COORDINACION_ADMINISTRACION" || role === "GERENTE_OPERATIVO_SERVOMOTORES";
 }
 
+function automaticQuoteConcept(row: {
+  equipment: { typeName: string | null; brandName: string | null; model: string | null; serial: string | null };
+}) {
+  return technicalServiceConcept(row.equipment);
+}
+
 export async function createSellerQuote(
   actor: Actor,
   input: {
     clientId: string;
     quoteType: QuoteType;
     equipmentId: string | null;
-    preliminaryType: string | null;
-    preliminaryBrand: string | null;
-    preliminaryModel: string | null;
-    preliminarySerial: string | null;
     reference: string | null;
     concepts: Array<{ concept: string; quantity: number }>;
     contactIds: string[];
@@ -40,12 +44,10 @@ export async function createSellerQuote(
   if (!client) throw new Error("Selecciona un cliente activo de esta empresa.");
   if (actor.role === "VENTAS" && client.ownerUserId !== actor.userId) throw new Error(SALES_NOT_ASSIGNED_MESSAGE);
   if (input.equipmentId) {
-    const equipment = await prisma.equipment.findFirst({ where: { id: input.equipmentId, originCompanyId: actor.activeCompanyId } });
-    if (!equipment) throw new Error("El equipo no pertenece a esta empresa.");
-  } else if (input.quoteType !== "CAMPO" && input.quoteType !== "VENTA_EQUIPO") {
-    if (!input.preliminaryType || !input.preliminaryBrand || !input.preliminaryModel) {
-      throw new Error("Sin equipo físico hay que capturar tipo, marca y modelo preliminares.");
-    }
+    const equipment = await prisma.equipment.findFirst({ where: { id: input.equipmentId, originCompanyId: actor.activeCompanyId, clientId: client.id } });
+    if (!equipment) throw new Error("Selecciona un equipo de este cliente.");
+  } else if (input.quoteType === "DIAGNOSTICO" || input.quoteType === "REPARACION") {
+    throw new Error("Selecciona o registra un equipo para esta cotización.");
   }
   if (input.contactIds.length === 0) throw new Error("Selecciona al menos un contacto.");
   const contacts = await prisma.contact.count({ where: { id: { in: input.contactIds }, clientId: client.id, active: true } });
@@ -59,10 +61,6 @@ export async function createSellerQuote(
       quoteType: input.quoteType,
       status: "PENDIENTE_COTIZAR",
       equipmentId: input.equipmentId,
-      preliminaryType: input.preliminaryType,
-      preliminaryBrand: input.preliminaryBrand,
-      preliminaryModel: input.preliminaryModel,
-      preliminarySerial: input.preliminarySerial,
       reference: input.reference,
       sellerUserId: actor.role === "VENTAS" || actor.role === "GERENTE_OPERATIVO_SERVOMOTORES" ? actor.userId : client.ownerUserId,
       lines: { create: input.concepts.map((line) => ({ concept: line.concept, quantity: line.quantity })) },
@@ -90,7 +88,14 @@ export async function ensureQuoteFromCase(actor: { userId: string; activeCompany
     where: { id: caseId },
     include: { attention: true, equipment: true },
   });
-  if (!row?.quotePending) throw new Error("Esta operación no está pendiente de cotizar.");
+  if (!row) throw new Error("No se encontró la operación técnica.");
+  const recoverValidatedDiagnosis =
+    row.status === "VALIDADO" && row.kind === "DIAGNOSTICO" && row.attention.attentionType === "DIAGNOSTICO";
+  if (!row.quotePending && !recoverValidatedDiagnosis) throw new Error("Esta operación no está pendiente de cotizar.");
+  // Recupera diagnósticos validados antes de esta regla, que quedaron sin pendiente comercial.
+  if (!row.quotePending) {
+    await prisma.technicalCase.update({ where: { id: row.id }, data: { quotePending: true } });
+  }
   const clientId = row.equipment.originCompanyId === actor.activeCompanyId ? row.equipment.clientId : row.attention.adminClientId;
   const client = await prisma.client.findUnique({
     where: { id: clientId },
@@ -98,7 +103,7 @@ export async function ensureQuoteFromCase(actor: { userId: string; activeCompany
   });
   if (!client) throw new Error("Falta el cliente de la cotización.");
   const repair = row.kind === "OS";
-  const concept = (row.resultText || row.attention.reportedFault).trim();
+  const concept = automaticQuoteConcept(row);
   const folio = await allocateFolio(actor.activeCompanyId, "COT");
   const quote = await prisma.quote.create({
     data: {
@@ -138,13 +143,21 @@ export async function ensureQuoteFromCase(actor: { userId: string; activeCompany
 }
 
 async function ensureOriginQuote(
-  row: { id: string; folio: string; equipmentId: string; resultText: string | null; attention: { reportedFault: string; sellerUserId: string | null }; equipment: { originCompanyId: string; clientId: string } },
+  row: {
+    id: string;
+    folio: string;
+    kind: string;
+    equipmentId: string;
+    resultText: string | null;
+    attention: { attentionType: string; reportedFault: string; sellerUserId: string | null };
+    equipment: { originCompanyId: string; clientId: string; typeName: string | null; brandName: string | null; model: string | null; serial: string | null };
+  },
   baseQuoteId: string,
   authorUserId: string,
 ) {
   const existing = await prisma.quote.findFirst({ where: { technicalCaseId: row.id, companyId: row.equipment.originCompanyId } });
   if (existing) return existing;
-  const concept = (row.resultText || row.attention.reportedFault).trim();
+  const concept = automaticQuoteConcept(row);
   const folio = await allocateFolio(row.equipment.originCompanyId, "COT");
   const quote = await prisma.quote.create({
     data: {
@@ -212,13 +225,99 @@ export async function setPrices(
   });
 }
 
-export async function applyDiscount(actor: Actor, quoteId: string, version: number, discountPct: number) {
-  if (!Number.isFinite(discountPct) || discountPct < 0 || discountPct > 100) throw new Error("El descuento no es válido.");
-  if (actor.role === "VENTAS") {
-    const user = await prisma.user.findUnique({ where: { id: actor.userId } });
-    const limit = user?.discountLimitPct ?? 0;
-    if (discountPct > limit) throw new Error(`Tu límite de descuento es ${limit}%.`);
+/** The CEO may correct the generated wording before a technical quote is priced. */
+export async function updateGeneratedQuoteConcepts(
+  actor: Actor,
+  quoteId: string,
+  version: number,
+  concepts: Array<{ lineId: string; concept: string }>,
+) {
+  if (actor.role !== "CEO") throw new Error("Solo el CEO puede ajustar el concepto de una cotización generada.");
+  const quote = await prisma.quote.findFirst({
+    where: { id: quoteId, companyId: actor.activeCompanyId, technicalCaseId: { not: null }, status: "PENDIENTE_COTIZAR" },
+    include: { lines: true },
+  });
+  if (!quote) throw new Error("Solo se ajusta el concepto de una cotización generada que aún no tiene precio.");
+  if (concepts.length !== quote.lines.length || new Set(concepts.map((item) => item.lineId)).size !== concepts.length) {
+    throw new Error("La cotización tiene conceptos incompletos.");
   }
+  const changes = concepts.map((item) => {
+    const line = quote.lines.find((candidate) => candidate.id === item.lineId);
+    const concept = item.concept.trim();
+    if (!line || !concept) throw new Error("Cada concepto debe tener una descripción.");
+    return { line, concept };
+  });
+  const changed = changes.filter(({ line, concept }) => line.concept !== concept);
+  if (changed.length === 0) return;
+  await prisma.$transaction(async (tx) => {
+    for (const { line, concept } of changed) {
+      await tx.quoteLine.update({ where: { id: line.id }, data: { concept } });
+    }
+    const updated = await tx.quote.updateMany({ where: { id: quote.id, version }, data: { version: { increment: 1 } } });
+    if (updated.count === 0) throw new ConcurrencyError();
+  });
+  await recordHistory({
+    companyId: actor.activeCompanyId,
+    entityType: "COTIZACION",
+    entityId: quote.id,
+    action: "CONCEPTO",
+    summary: `CEO ajustó el concepto antes de asignar precio: ${changed.map(({ line, concept }) => `${line.concept} → ${concept}`).join(" | ")}.`,
+    authorUserId: actor.userId,
+  });
+}
+
+/** The assigned seller may add the commercial note shown in italics below the technical concept. */
+export async function updateSellerQuoteConceptComplement(
+  actor: Actor,
+  quoteId: string,
+  version: number,
+  complement: string | null,
+) {
+  if (actor.role !== "VENTAS") throw new Error("Solo el Vendedor puede modificar el complemento del concepto.");
+  const quote = await prisma.quote.findFirst({
+    where: {
+      id: quoteId,
+      companyId: actor.activeCompanyId,
+      sellerUserId: actor.userId,
+      status: { in: ["PENDIENTE_COTIZAR", "PENDIENTE_DECISION"] },
+    },
+  });
+  if (!quote) throw new Error("Esta cotización ya no permite modificar el complemento del concepto.");
+  const next = complement?.trim() || null;
+  if (next && next.length > 500) throw new Error("El complemento puede tener hasta 500 caracteres.");
+  if (next === quote.sellerConceptComplement) return;
+  const updated = await prisma.quote.updateMany({
+    where: { id: quote.id, version },
+    data: { sellerConceptComplement: next, version: { increment: 1 } },
+  });
+  if (updated.count === 0) throw new ConcurrencyError();
+  await recordHistory({
+    companyId: actor.activeCompanyId,
+    entityType: "COTIZACION",
+    entityId: quote.id,
+    action: "COMPLEMENTO_CONCEPTO",
+    summary: next ? "Vendedor actualizó el complemento comercial del concepto." : "Vendedor eliminó el complemento comercial del concepto.",
+    authorUserId: actor.userId,
+  });
+}
+
+export function assertSellerDiscountAllowed(discountPct: number, limitPct: number | null | undefined) {
+  if (!Number.isFinite(discountPct) || discountPct < 0 || discountPct > 100) throw new Error("El descuento no es válido.");
+  if (discountPct === 0) return;
+  if (limitPct == null) {
+    throw new Error("Tu usuario no tiene límite de descuento configurado. Pide a administración que lo asigne.");
+  }
+  if (discountPct > limitPct) throw new Error(`Tu límite de descuento es ${limitPct}%.`);
+}
+
+async function sellerDiscountLimit(userId: string) {
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { discountLimitPct: true } });
+  return user?.discountLimitPct ?? null;
+}
+
+export async function applyDiscount(actor: Actor, quoteId: string, version: number, discountPct: number) {
+  if (actor.role !== "VENTAS") throw new Error("Solo el Vendedor puede aplicar descuentos.");
+  assertSellerDiscountAllowed(discountPct, await sellerDiscountLimit(actor.userId));
   const updated = await prisma.quote.updateMany({
     where: { id: quoteId, companyId: actor.activeCompanyId, status: "PENDIENTE_DECISION", version },
     data: { discountPct, version: { increment: 1 } },
@@ -232,6 +331,8 @@ export async function decideQuote(
   version: number,
   authorized: boolean,
   lineIds: string[],
+  rejectionReason?: string | null,
+  discountPct?: number | null,
 ) {
   const quote = await prisma.quote.findFirst({
     where: { id: quoteId, companyId: actor.activeCompanyId },
@@ -239,6 +340,7 @@ export async function decideQuote(
   });
   if (!quote || quote.status !== "PENDIENTE_DECISION") throw new Error("La cotización no está pendiente de decisión.");
   if (quote.lines.some((line) => line.unitPrice == null)) throw new Error("Falta el precio.");
+  if (!authorized && !rejectionReason) throw new Error("Indica por qué el cliente no autorizó la cotización.");
   const chosen = authorized ? quote.lines.filter((line) => quote.quoteType !== "VENTA_EQUIPO" || lineIds.includes(line.id)) : [];
   if (authorized && chosen.length === 0) throw new Error("Selecciona al menos una línea autorizada.");
   const serviceQuote = quote.quoteType === "DIAGNOSTICO" || quote.quoteType === "REPARACION";
@@ -254,10 +356,15 @@ export async function decideQuote(
   const status = !authorized ? "NO_AUTORIZADA" : needsEquipment ? "AUTORIZADA_PENDIENTE_EQUIPO" : "AUTORIZADA";
   const creditDays = quote.client.creditDays;
   const saleFolio = status === "AUTORIZADA" && quote.quoteType === "VENTA_EQUIPO" ? await allocateFolio(quote.companyId, "VTA") : null;
+  let nextDiscountPct = quote.discountPct;
+  if (actor.role === "VENTAS" && discountPct != null && Number.isFinite(discountPct)) {
+    assertSellerDiscountAllowed(discountPct, await sellerDiscountLimit(actor.userId));
+    nextDiscountPct = discountPct;
+  }
   await prisma.$transaction(async (tx) => {
     const updated = await tx.quote.updateMany({
       where: { id: quote.id, version },
-      data: { status, creditDays, version: { increment: 1 } },
+      data: { status, creditDays, discountPct: nextDiscountPct, version: { increment: 1 } },
     });
     if (updated.count === 0) throw new ConcurrencyError();
     await tx.quoteLine.updateMany({ where: { quoteId: quote.id }, data: { authorized: false } });
@@ -287,7 +394,9 @@ export async function decideQuote(
     entityType: "COTIZACION",
     entityId: quote.id,
     action: "DECISION",
-    summary: authorized ? `Decisión: ${status}. El crédito queda congelado.` : "El cliente no autorizó. Se conserva el historial.",
+    summary: authorized
+      ? `Decisión: ${status}. El crédito queda congelado.`
+      : `El cliente no autorizó. Motivo: ${rejectionReason}. Se conserva el historial.`,
     authorUserId: actor.userId,
   });
   if (!authorized && diagnosis?.kind === "DIAGNOSTICO") {

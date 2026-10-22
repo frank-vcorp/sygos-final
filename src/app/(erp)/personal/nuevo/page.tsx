@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { hireAction } from "../actions";
-import { Button, controlClass, Field, FormActions, FormPanel, FormSection, PageHeader } from "@/components/ui";
+import { Button, controlClass, Field, FormActions, FormPanel, FormSection, MoneyInput, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
@@ -33,10 +33,10 @@ export default async function NuevoColaboradorPage() {
           </Field>
         </FormSection>
         <FormSection title="Compensación" description="Salarios diarios y hora extra. El saldo de vacaciones aplica en altas migradas.">
-          <Field label="Salario diario timbrado"><input name="dailyStamped" type="number" min="0" step="0.01" defaultValue="0" className={controlClass} /></Field>
-          <Field label="Salario diario en efectivo"><input name="dailyCash" type="number" min="0" step="0.01" defaultValue="0" className={controlClass} /></Field>
+          <Field label="Salario diario timbrado"><MoneyInput name="dailyStamped" min="0" defaultValue="0" /></Field>
+          <Field label="Salario diario en efectivo"><MoneyInput name="dailyCash" min="0" defaultValue="0" /></Field>
           <Field label="Saldo inicial de vacaciones, si es migrado"><input name="vacationBalance" type="number" min="0" step="0.5" defaultValue="0" className={controlClass} /></Field>
-          <Field label="Tarifa base de hora extra"><input name="overtimeRate" type="number" min="0" step="0.01" defaultValue="0" className={controlClass} /></Field>
+          <Field label="Tarifa base de hora extra"><MoneyInput name="overtimeRate" min="0" defaultValue="0" /></Field>
         </FormSection>
         <FormSection title="Timbrado" description="RFC requerido cuando se genere nómina.">
           <Field label="RFC para timbrar"><input name="rfc" className={controlClass} /></Field>

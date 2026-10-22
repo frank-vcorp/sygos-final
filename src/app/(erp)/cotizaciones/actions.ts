@@ -4,8 +4,9 @@ import { redirect } from "next/navigation";
 import { setFlash } from "@/lib/flash";
 import { clientIdFromForm } from "@/lib/form-quick-entities";
 import { optionalText, parseVersion, requiredText } from "@/lib/form";
+import { moneyFromForm } from "@/lib/money";
 import { can, type Action } from "@/lib/permissions";
-import { QUOTE_TYPES, type QuoteType, applyDiscount, createSellerQuote, decideQuote, linkIntercompanyQuote, prepareQuoteFromCase, relateQuoteEquipment, setPrices } from "@/lib/quotes";
+import { QUOTE_TYPES, type QuoteType, applyDiscount, createSellerQuote, decideQuote, linkIntercompanyQuote, prepareQuoteFromCase, relateQuoteEquipment, setPrices, updateGeneratedQuoteConcepts, updateSellerQuoteConceptComplement } from "@/lib/quotes";
 import { sendMail } from "@/lib/sendgrid";
 import { prisma } from "@/lib/db";
 import { requireCompany } from "@/lib/session";
@@ -50,10 +51,6 @@ export async function createQuoteAction(formData: FormData) {
       clientId,
       quoteType: quoteType as QuoteType,
       equipmentId: optionalText(formData.get("equipmentId")),
-      preliminaryType: optionalText(formData.get("preliminaryType")),
-      preliminaryBrand: optionalText(formData.get("preliminaryBrand")),
-      preliminaryModel: optionalText(formData.get("preliminaryModel")),
-      preliminarySerial: optionalText(formData.get("preliminarySerial")),
       reference: optionalText(formData.get("reference")),
       concepts,
       contactIds,
@@ -117,10 +114,49 @@ export async function setPricesAction(formData: FormData) {
     const session = await guard("quote.price");
     const prices = formData.getAll("lineId").map((lineId, index) => ({
       lineId: String(lineId),
-      amount: Number(formData.getAll("amount")[index]),
+      amount: moneyFromForm(formData.getAll("amount")[index], "Precio"),
     }));
     await setPrices(session, requiredText(formData.get("quoteId"), "Cotización"), parseVersion(formData.get("version")), prices);
     await setFlash({ tone: "ok", message: "Precio asignado." });
+    redirect(target);
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    await setFlash({ tone: "error", message: messageOf(error) });
+    redirect(target);
+  }
+}
+
+export async function updateGeneratedConceptAction(formData: FormData) {
+  "use server";
+  const target = back(formData);
+  try {
+    const session = await guard("quote.price");
+    const concepts = formData.getAll("lineId").map((lineId, index) => ({
+      lineId: String(lineId),
+      concept: requiredText(formData.getAll("concept")[index], "Concepto"),
+    }));
+    await updateGeneratedQuoteConcepts(session, requiredText(formData.get("quoteId"), "Cotización"), parseVersion(formData.get("version")), concepts);
+    await setFlash({ tone: "ok", message: "Concepto actualizado. Ya puedes asignar el precio." });
+    redirect(target);
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    await setFlash({ tone: "error", message: messageOf(error) });
+    redirect(target);
+  }
+}
+
+export async function updateSellerConceptComplementAction(formData: FormData) {
+  "use server";
+  const target = back(formData);
+  try {
+    const session = await guard("quote.follow");
+    await updateSellerQuoteConceptComplement(
+      session,
+      requiredText(formData.get("quoteId"), "Cotización"),
+      parseVersion(formData.get("version")),
+      optionalText(formData.get("sellerConceptComplement")),
+    );
+    await setFlash({ tone: "ok", message: "Complemento del concepto actualizado." });
     redirect(target);
   } catch (error) {
     if (isRedirect(error)) throw error;
@@ -149,12 +185,16 @@ export async function decideAction(formData: FormData) {
   const target = back(formData);
   try {
     const session = await guard("quote.follow");
+    const rawDiscount = optionalText(formData.get("discountPct"));
+    const discountPct = rawDiscount != null && rawDiscount !== "" ? Number(rawDiscount) : null;
     await decideQuote(
       session,
       requiredText(formData.get("quoteId"), "Cotización"),
       parseVersion(formData.get("version")),
       formData.get("decision") === "si",
       formData.getAll("authorizedLine").map(String),
+      optionalText(formData.get("reason")),
+      discountPct,
     );
     await setFlash({ tone: "ok", message: "Decisión registrada." });
     redirect(target);

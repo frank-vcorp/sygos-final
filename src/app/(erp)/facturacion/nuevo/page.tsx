@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { freeInvoiceAction } from "../actions";
 import { ClientPicker } from "@/components/client-picker";
-import { Button, controlClass, Field, FormActions, FormPanel, FormSection, PageHeader } from "@/components/ui";
+import { Button, controlClass, Field, FormActions, FormPanel, FormSection, MoneyInput, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
@@ -12,7 +12,6 @@ export default async function FacturaLibrePage() {
   const clients = await prisma.client.findMany({
     where: { companyId: session.activeCompanyId, active: true, isSystem: false },
     orderBy: { name: "asc" },
-    take: 200,
   });
   return (
     <>
@@ -26,7 +25,7 @@ export default async function FacturaLibrePage() {
             />
           </div>
           <Field label="Concepto"><input name="concept" required className={controlClass} /></Field>
-          <Field label="Importe con IVA"><input name="amount" required type="number" min="0.01" step="0.01" className={controlClass} /></Field>
+          <Field label="Importe con IVA"><MoneyInput name="amount" required min="0.01" /></Field>
           <Field label="Días de crédito"><input name="creditDays" type="number" min="0" className={controlClass} /></Field>
         </FormSection>
         <FormActions note="La emisión queda registrada en facturación y cobranza.">

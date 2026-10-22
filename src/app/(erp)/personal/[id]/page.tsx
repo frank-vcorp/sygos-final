@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { bajaAction, bossAction, documentAction, laborIdAction, salaryAction, scheduleAction, vacationBalanceAction, vacationDecisionAction, vacationRequestAction } from "../actions";
 import { HistoryTimeline } from "@/components/history-timeline";
-import { Badge, Button, Card, controlClass, DetailAnchorButton, EntityDetailHeader, EntityMetaItem, Field, FormActions, FormPanel, FormSection, RecordLink } from "@/components/ui";
+import { Badge, Button, Card, controlClass, DetailAnchorButton, EntityDetailHeader, EntityMetaItem, Field, FormActions, FormPanel, FormSection, MoneyInput, RecordLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { historyFor } from "@/lib/history";
 import { formatWhen } from "@/lib/form";
@@ -68,9 +68,9 @@ export default async function ColaboradorPage({ params }: { params: Promise<{ id
           <input type="hidden" name="collaboratorId" value={row.id} />
           <input type="hidden" name="version" value={row.version} />
           <FormSection title="Salario">
-            <Field label="Timbrado"><input name="dailyStamped" type="number" step="0.01" defaultValue={row.dailyStamped} className={controlClass} /></Field>
-            <Field label="Efectivo"><input name="dailyCash" type="number" step="0.01" defaultValue={row.dailyCash} className={controlClass} /></Field>
-            <Field label="Tarifa de hora extra"><input name="overtimeRate" type="number" step="0.01" defaultValue={row.overtimeRate} className={controlClass} /></Field>
+            <Field label="Timbrado"><MoneyInput name="dailyStamped" defaultValue={row.dailyStamped} /></Field>
+            <Field label="Efectivo"><MoneyInput name="dailyCash" defaultValue={row.dailyCash} /></Field>
+            <Field label="Tarifa de hora extra"><MoneyInput name="overtimeRate" defaultValue={row.overtimeRate} /></Field>
           </FormSection>
           <FormActions><Button type="submit" tone="ghost">Guardar salario</Button></FormActions>
         </FormPanel>

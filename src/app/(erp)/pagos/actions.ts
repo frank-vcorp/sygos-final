@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { confirmIntercompanyPayment, registerClientPayment, registerIntercompanyPayment, validatePayment } from "@/lib/billing";
 import { setFlash } from "@/lib/flash";
 import { requiredText } from "@/lib/form";
+import { moneyFromForm } from "@/lib/money";
 import { can, type Action } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
 
@@ -31,7 +32,7 @@ export async function registerPaymentAction(formData: FormData) {
     const payment = await registerClientPayment(session, {
       clientId: receivable.clientId,
       receivableId,
-      amount: Number(formData.get("amount")),
+      amount: moneyFromForm(formData.get("amount")),
       method,
       receipt: requiredText(formData.get("receipt"), "Comprobante"),
       destination: requiredText(formData.get("destination"), "Destino"),
@@ -63,7 +64,7 @@ export async function intercompanyPaymentAction(formData: FormData) {
     const session = await guard("payment.validate");
     const payment = await registerIntercompanyPayment(session, {
       payableId: requiredText(formData.get("payableId"), "Cuenta por pagar"),
-      amount: Number(formData.get("amount")),
+      amount: moneyFromForm(formData.get("amount")),
       receipt: requiredText(formData.get("receipt"), "Comprobante"),
       destination: requiredText(formData.get("destination"), "Cuenta de origen"),
     });

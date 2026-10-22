@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { CompanyLogo } from "@/components/brand-logo";
 import { PrintButton } from "@/components/print-button";
+import { QuoteConcept } from "@/components/quote-concept";
 import { TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { linesForTotal, money, quoteTotals } from "@/lib/money";
@@ -64,9 +65,9 @@ export default async function CotizacionDocumentoPage({ params }: { params: Prom
             </tr>
           </thead>
           <tbody>
-            {lines.map((line) => (
+            {lines.map((line, index) => (
               <tr key={line.id} className="border-b border-[var(--line)]">
-                <td className="px-3 py-3">{line.concept}</td>
+                <td className="px-3 py-3"><QuoteConcept concept={line.concept} complement={index === 0 ? quote.sellerConceptComplement : null} /></td>
                 <td className="px-3 py-3 text-center">{line.quantity}</td>
                 <td className="px-3 py-3 text-right">{money(line.unitPrice)}</td>
                 <td className="px-3 py-3 text-right font-medium">{line.unitPrice == null ? "Pendiente" : money(line.unitPrice * line.quantity)}</td>

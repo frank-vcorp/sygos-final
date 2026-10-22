@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { setFlash } from "@/lib/flash";
 import { parseVersion, requiredText } from "@/lib/form";
+import { optionalMoneyFromForm } from "@/lib/money";
 import { can, type Action } from "@/lib/permissions";
 import { adjustCommission, generateCommissions, payCommissions } from "@/lib/personnel";
 import { requireCompany } from "@/lib/session";
@@ -36,7 +37,7 @@ export async function commissionAdjustAction(formData: FormData) {
   const id = requiredText(formData.get("runId"), "Comisión");
   try {
     const session = await guard("personnel.authorize");
-    await adjustCommission(session, requiredText(formData.get("lineId"), "Línea"), Number(formData.get("adjustment") || 0));
+    await adjustCommission(session, requiredText(formData.get("lineId"), "Línea"), optionalMoneyFromForm(formData.get("adjustment")) ?? 0);
     await setFlash({ tone: "ok", message: "Ajuste guardado. El cálculo original se conserva." });
   } catch (error) {
     await setFlash({ tone: "error", message: bubble(error) });

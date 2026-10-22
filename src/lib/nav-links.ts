@@ -1,3 +1,4 @@
+import { ALMACEN_NAV_GROUPS } from "@/lib/nav-links-almacen";
 import { CEO_NAV_GROUPS } from "@/lib/nav-links-ceo";
 import { COORDINATION_NAV_GROUPS } from "@/lib/nav-links-coordination";
 import { can } from "@/lib/permissions";
@@ -32,7 +33,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
   {
     title: null,
     links: [
-      { href: "/panel", show: (role) => can(role, "panel.view") },
+      { href: "/panel", show: (role, code) => role !== "TECNICO" && can(role, "panel.view", code) },
     ],
   },
   {
@@ -106,6 +107,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
 export function navGroupsForRole(role: Role): NavGroupDef[] {
   if (role === "CEO") return CEO_NAV_GROUPS;
   if (role === "COORDINACION_ADMINISTRACION") return COORDINATION_NAV_GROUPS;
+  if (role === "ALMACEN") return ALMACEN_NAV_GROUPS;
   return NAV_GROUPS;
 }
 

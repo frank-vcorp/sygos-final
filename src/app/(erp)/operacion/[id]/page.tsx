@@ -1,10 +1,10 @@
 import { notFound, redirect } from "next/navigation";
+import Link from "next/link";
 import { prepareFromCaseAction } from "@/app/(erp)/cotizaciones/actions";
 import {
   assignCaseAction,
   createPresolicitudAction,
   deletePresolicitudAction,
-  externalDocumentAction,
   finishDiagnosisAction,
   finishRepairAction,
   issuePartAction,
@@ -19,8 +19,11 @@ import {
   validateAction,
 } from "../actions";
 import { ClientNameLink } from "@/components/client-entity-links";
-import { HistoryTimeline } from "@/components/history-timeline";
-import { SupplierPicker } from "@/components/supplier-picker";
+import { DiagnosisValidationActions } from "@/components/diagnosis-validation-actions";
+import { RequestExitWithoutDocumentButton } from "@/components/exit-without-document-actions";
+import { RepairClosureActions } from "@/components/repair-closure-actions";
+import { SupervisorReassignControl } from "@/components/supervisor-reassign-control";
+import { HistoryTimeline, type HistoryTimelineItem } from "@/components/history-timeline";
 import {
   Badge,
   Button,
@@ -38,22 +41,24 @@ import {
 } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
+import { buildAttentionHistoryTimeline, seesFullAttentionHistory } from "@/lib/attention-history";
 import { historyFor } from "@/lib/history";
 import { can } from "@/lib/permissions";
 import { ATTENTION_LABEL, type AttentionType } from "@/lib/priorities";
 import { diagnosisPresolicitudEditable, fieldPresolicitudOnly, PRESOLICITUD_LABEL } from "@/lib/part-presolicitud";
-import { CASE_STATUS_LABEL } from "@/lib/technical";
+import { canCloseRepair, CASE_STATUS_LABEL, lastTechnicianWhoClosedEquipmentCase } from "@/lib/technical";
 import { homePath } from "@/lib/home";
 import { redirectIfSalesNotAssigned } from "@/lib/sales-assignment";
 import { serviciosBandejaHref } from "@/lib/servicios-catalog";
 import { HISTORIAL_CASE } from "@/lib/servicios-supervisor";
 import { requireCompany } from "@/lib/session";
+import { definitiveExitAuthorized, findEnablingBillingDocument } from "@/lib/warehouse-exit";
 
 export default async function OperacionDetallePage({ params }: { params: Promise<{ id: string }> }) {
   const session = await requireCompany();
   if (session.role === "ALMACEN") redirect(homePath(session.role, session.activeCompanyCode));
   const { id } = await params;
-  const row = await prisma.technicalCase.findUnique({
+  const loadedRow = await prisma.technicalCase.findUnique({
     where: { id },
     include: {
       attention: true,
@@ -65,7 +70,8 @@ export default async function OperacionDetallePage({ params }: { params: Promise
       presolicitudes: { orderBy: { createdAt: "asc" } },
     },
   });
-  if (!row) notFound();
+  if (!loadedRow) notFound();
+  const row = loadedRow!;
   const reflected = session.activeCompanyCode === "SYSTRON" && row.serviceCompany.code === "SERVOMOTORES" && row.equipment.originCompanyId === session.activeCompanyId;
   const owns = row.serviceCompanyId === session.activeCompanyId;
   if (!owns && !reflected) notFound();
@@ -89,13 +95,106 @@ export default async function OperacionDetallePage({ params }: { params: Promise
         orderBy: { name: "asc" },
       })
     : [];
-  const suppliers = owns && row.serviceCompany.code === "SYSTRON"
-    ? await prisma.supplier.findMany({ where: { companyId: session.activeCompanyId, active: true, isSystem: false }, orderBy: { name: "asc" } })
-    : [];
-  const history = await historyFor("OPERACION", row.id);
-  const derived = await prisma.technicalCase.findFirst({ where: { spawnedFromId: row.id }, select: { id: true, folio: true } });
-  const parent = row.spawnedFromId ? await prisma.technicalCase.findUnique({ where: { id: row.spawnedFromId }, select: { id: true, folio: true, kind: true } }) : null;
-  const original = row.originalCaseId ? await prisma.technicalCase.findUnique({ where: { id: row.originalCaseId }, select: { id: true, folio: true } }) : null;
+  const suggestedAssigneeRaw = owns
+    ? await lastTechnicianWhoClosedEquipmentCase(row.equipmentId, row.serviceCompanyId, row.id)
+    : null;
+  const suggestedAssigneeId =
+    suggestedAssigneeRaw && candidates.some((user) => user.id === suggestedAssigneeRaw)
+      ? suggestedAssigneeRaw
+      : null;
+  const defaultAssigneeId = row.assigneeUserId ?? suggestedAssigneeId ?? "";
+  const enablingBilling = await findEnablingBillingDocument(row.id);
+  const exitAuthorized = definitiveExitAuthorized(row);
+  const exitPending = Boolean(row.exitWithoutDocumentRequestedAt && !row.exitWithoutDocumentAuthorizedAt);
+  const showExitWithoutDocument =
+    row.kind === "OS"
+    && row.status === "TERMINADA"
+    && row.equipment.custody === "EN_RESGUARDO"
+    && (session.role === "VENTAS" && row.attention.sellerUserId === session.userId || exitPending || exitAuthorized);
+
+  const [caseHistory, seller, relatedQuotes, relatedBilling, relatedSales] = await Promise.all([
+    historyFor("OPERACION", row.id),
+    row.attention.sellerUserId
+      ? prisma.user.findUnique({ where: { id: row.attention.sellerUserId }, select: { id: true, name: true } })
+      : null,
+    prisma.quote.findMany({
+      where: {
+        OR: [
+          { technicalCaseId: row.id },
+          ...(row.attention.originQuoteId ? [{ id: row.attention.originQuoteId }] : []),
+        ],
+      },
+      select: { id: true, folio: true, status: true },
+      orderBy: { createdAt: "asc" },
+    }),
+    prisma.billingDocument.findMany({
+      where: { technicalCaseId: row.id },
+      select: { id: true, folio: true, kind: true, status: true },
+      orderBy: { createdAt: "asc" },
+    }),
+    prisma.sale.findMany({
+      where: { quote: { technicalCaseId: row.id } },
+      select: { id: true, folio: true, quoteId: true },
+      orderBy: { createdAt: "asc" },
+    }),
+  ]);
+  const caseHistoryItems: HistoryTimelineItem[] = caseHistory.map((item) => ({
+    id: item.id,
+    createdAt: item.createdAt,
+    summary: item.summary,
+    authorName: item.author?.name,
+  }));
+  let historyTimelineItems: HistoryTimelineItem[] = caseHistoryItems;
+  if (seesFullAttentionHistory(session.role)) {
+    const attentionContext = await prisma.attention.findUnique({
+      where: { id: row.attentionId },
+      include: {
+        movements: { where: { cancelledAt: null }, orderBy: { occurredAt: "asc" } },
+        technicalCases: { orderBy: { createdAt: "asc" }, select: { id: true, folio: true, kind: true, status: true, createdAt: true } },
+      },
+    });
+    if (attentionContext) {
+      const caseIds = attentionContext.technicalCases.map((item) => item.id);
+      const quoteIds = relatedQuotes.map((item) => item.id);
+      const [attentionHistory, operationHistory, quoteHistoryRows] = await Promise.all([
+        historyFor("ATENCION", attentionContext.id),
+        prisma.functionalHistory.findMany({
+          where: { entityType: "OPERACION", entityId: { in: caseIds } },
+          orderBy: { createdAt: "asc" },
+          include: { author: { select: { name: true } } },
+        }),
+        quoteIds.length > 0
+          ? prisma.functionalHistory.findMany({
+              where: { entityType: "COTIZACION", entityId: { in: quoteIds } },
+              orderBy: { createdAt: "asc" },
+              include: { author: { select: { name: true } } },
+            })
+          : Promise.resolve([]),
+      ]);
+      const quoteFolioById = new Map(relatedQuotes.map((item) => [item.id, item.folio]));
+      const quoteHistories = quoteIds.map((quoteId) => ({
+        quoteFolio: quoteFolioById.get(quoteId) ?? "Cotización",
+        items: quoteHistoryRows.filter((item) => item.entityId === quoteId),
+      }));
+      const authorIds = [
+        attentionContext.createdByUserId,
+        ...attentionContext.movements.map((item) => item.authorUserId),
+      ].filter((id): id is string => Boolean(id));
+      const authorRows = authorIds.length > 0
+        ? await prisma.user.findMany({ where: { id: { in: authorIds } }, select: { id: true, name: true } })
+        : [];
+      const authorNames = new Map(authorRows.map((item) => [item.id, item.name]));
+      historyTimelineItems = buildAttentionHistoryTimeline({
+        attention: attentionContext,
+        movements: attentionContext.movements,
+        technicalCases: attentionContext.technicalCases,
+        attentionHistory,
+        operationHistory,
+        quoteHistories,
+        authorNames,
+      });
+    }
+  }
   const repairAfterDiagnosis = row.kind === "OS" && row.attention.attentionType === "DIAGNOSTICO";
   const equipmentHref = row.equipment.kind === "MOT" ? `/motores/${row.equipmentId}` : `/equipos/${row.equipmentId}`;
   const historial = (HISTORIAL_CASE as readonly string[]).includes(row.status);
@@ -103,6 +202,24 @@ export default async function OperacionDetallePage({ params }: { params: Promise
   const warranty = row.attention.attentionType === "DIAGNOSTICO_GARANTIA" && row.kind === "DIAGNOSTICO";
   const canManage = !readOnly && ["ADMINISTRADOR", "CEO", "SUPERVISOR_TECNICO", "GERENTE_OPERATIVO_SYSTRON", "GERENTE_OPERATIVO_SERVOMOTORES"].includes(session.role);
   const canWork = !readOnly && (session.role === "ADMINISTRADOR" || session.role === "CEO" || session.role === "SUPERVISOR_TECNICO" || (session.role === "GERENTE_OPERATIVO_SERVOMOTORES" && session.activeCompanyCode === "SERVOMOTORES") || (session.role === "TECNICO" && row.assigneeUserId === session.userId));
+  const canCloseOsRepair =
+    !readOnly && canCloseRepair(session, row.assigneeUserId, row.equipment.client.ownerUserId);
+  const awaitingStart = row.status === "EN_ESPERA" || row.status === "DEVUELTO";
+  const canStartPending =
+    !readOnly
+    && awaitingStart
+    && Boolean(row.assigneeUserId)
+    && (session.role === "TECNICO"
+      ? row.assigneeUserId === session.userId
+      : session.role === "SUPERVISOR_TECNICO"
+        ? row.assigneeUserId === session.userId
+        : canWork);
+  const showInitialAssignment = canManage && !closed && awaitingStart && !row.assigneeUserId;
+  const showSupervisorReassign =
+    !readOnly
+    && session.role === "SUPERVISOR_TECNICO"
+    && !closed
+    && Boolean(row.assigneeUserId);
   const presolicitudOnly = fieldPresolicitudOnly(session.role);
   const canEditPresolicitud =
     !readOnly &&
@@ -116,10 +233,44 @@ export default async function OperacionDetallePage({ params }: { params: Promise
   const back = can(session.role, "attention.catalog", session.activeCompanyCode)
     ? { href: serviciosBandejaHref({ vista: historial ? "historial" : "activos" }), label: "Servicios" }
     : { href: "/operacion", label: "En proceso" };
+  const equipmentIdentity = [row.equipment.typeName, row.equipment.brandName, row.equipment.model].filter(Boolean).join(" · ");
+  const relatedLinks = [
+    { label: "Cliente", href: `/clientes/${row.equipment.client.id}` },
+    { label: "Equipo", href: equipmentHref },
+    ...(relatedQuotes.length > 0
+      ? [{ label: `Cotizaciones${relatedQuotes.length > 1 ? ` (${relatedQuotes.length})` : ""}`, href: relatedQuotes.length === 1 ? `/cotizaciones/${relatedQuotes[0].id}` : "/cotizaciones" }]
+      : []),
+    ...(relatedSales.length > 0
+      ? [{ label: `Ventas${relatedSales.length > 1 ? ` (${relatedSales.length})` : ""}`, href: relatedSales.length === 1 ? `/ventas/${relatedSales[0].id}` : "/ventas" }]
+      : []),
+    ...(relatedBilling.length > 0
+      ? [{ label: `Facturación${relatedBilling.length > 1 ? ` (${relatedBilling.length})` : ""}`, href: relatedBilling.length === 1 ? `/facturacion/${relatedBilling[0].id}` : "/facturacion" }]
+      : []),
+  ];
+
+  const headerAssignmentForm = showInitialAssignment ? (
+    <form action={assignCaseAction} className="inline-flex max-w-full items-center gap-2">
+      <input type="hidden" name="caseId" value={row.id} />
+      <input type="hidden" name="version" value={row.version} />
+      <select
+        name="assigneeUserId"
+        required
+        aria-label="Técnico responsable"
+        className={`${controlClass} min-h-9 min-w-[9.5rem] max-w-[11rem] py-1.5 text-sm`}
+        defaultValue={defaultAssigneeId}
+      >
+        {!defaultAssigneeId ? <option value="">Técnico</option> : null}
+        {candidates.map((user) => (
+          <option key={user.id} value={user.id}>{user.name}</option>
+        ))}
+      </select>
+      <Button type="submit" className="min-h-9 shrink-0 px-3 py-1.5 text-sm">Asignar</Button>
+    </form>
+  ) : null;
 
   let primaryAction: React.ReactNode = null;
   if (!readOnly) {
-    if (canWork && (row.status === "EN_ESPERA" || row.status === "DEVUELTO")) {
+    if (canStartPending) {
       primaryAction = (
         <form action={startCaseAction} className="inline">
           <input type="hidden" name="caseId" value={row.id} />
@@ -128,15 +279,34 @@ export default async function OperacionDetallePage({ params }: { params: Promise
         </form>
       );
     } else if (canWork && row.kind === "DIAGNOSTICO" && ["EN_DIAGNOSTICO", "DEVUELTO"].includes(row.status)) {
-      primaryAction = <DetailAnchorButton href="#terminar-diagnostico">Terminar diagnóstico</DetailAnchorButton>;
+      primaryAction = (
+        <form action={finishDiagnosisAction} className="inline">
+          <input type="hidden" name="caseId" value={row.id} />
+          <input type="hidden" name="version" value={row.version} />
+          <Button type="submit">Concluir diagnóstico</Button>
+        </form>
+      );
     } else if (
       canManage &&
       row.kind === "DIAGNOSTICO" &&
       (row.status === "PENDIENTE_VALIDACION" || (row.serviceCompany.code === "SERVOMOTORES" && row.status === "VALIDADO" && warranty && !row.warrantyDecision))
     ) {
-      primaryAction = <DetailAnchorButton href="#validacion">Validar diagnóstico</DetailAnchorButton>;
-    } else if (canWork && row.kind === "OS" && ["EN_REPARACION", "EN_ESPERA_REFACCIONES"].includes(row.status)) {
-      primaryAction = <DetailAnchorButton href="#cerrar-reparacion">Terminar reparación</DetailAnchorButton>;
+      primaryAction = (
+        <DiagnosisValidationActions
+          caseId={row.id}
+          version={row.version}
+          warranty={warranty}
+          validateAction={validateAction}
+        />
+      );
+    } else if (canCloseOsRepair && row.kind === "OS" && ["EN_REPARACION", "EN_ESPERA_REFACCIONES"].includes(row.status)) {
+      primaryAction = (
+        <RepairClosureActions
+          caseId={row.id}
+          version={row.version}
+          finishRepairAction={finishRepairAction}
+        />
+      );
     } else if (row.quotePending && can(session.role, "quote.price", session.activeCompanyCode)) {
       primaryAction = (
         <form action={prepareFromCaseAction} className="inline">
@@ -149,15 +319,148 @@ export default async function OperacionDetallePage({ params }: { params: Promise
     }
   }
 
+  const partsSection = row.kind === "DIAGNOSTICO" ? (
+    <Card className="p-4 text-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="font-medium">Refacciones</h2>
+          <p className="mt-1 text-[var(--muted)]">
+            Presolicitud durante el diagnóstico. Si el cliente autoriza, pasan a la orden de servicio.
+          </p>
+        </div>
+        {canEditPresolicitud ? <Badge tone="ok">Presolicitud disponible</Badge> : null}
+      </div>
+      {row.presolicitudes.length === 0 ? (
+        <p className="mt-3 rounded-lg border border-dashed border-[var(--line)] px-3 py-4 text-[var(--muted)]">Sin presolicitudes registradas.</p>
+      ) : (
+        <ul className="mt-3 space-y-3">
+          {row.presolicitudes.map((item) => (
+            <li key={item.id} className="rounded-lg border border-[var(--line)] p-3">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <p className="font-medium">{item.partNumber} · {item.description}</p>
+                <Badge tone={item.status === "ACTIVA" ? "warn" : "neutral"}>{PRESOLICITUD_LABEL[item.status] ?? item.status}</Badge>
+              </div>
+              <p className="mt-1 text-[var(--muted)]">
+                Cantidad {item.qtyRequested}
+                {item.link ? (
+                  <>
+                    {" · "}
+                    <a href={item.link} className="text-[var(--accent)]" target="_blank" rel="noreferrer">Referencia</a>
+                  </>
+                ) : null}
+              </p>
+              {canEditPresolicitud && item.status === "ACTIVA" ? (
+                <details className="mt-3 rounded-lg bg-[#f7fafc] p-3">
+                  <summary className="cursor-pointer text-sm font-semibold text-[var(--accent)]">Editar presolicitud</summary>
+                  <div className="mt-3 space-y-2">
+                    <form action={updatePresolicitudAction} className="grid gap-2">
+                      <input type="hidden" name="caseId" value={row.id} />
+                      <input type="hidden" name="presolicitudId" value={item.id} />
+                      <Field label="Número de parte"><input name="partNumber" required defaultValue={item.partNumber} className={controlClass} /></Field>
+                      <Field label="Descripción"><input name="description" required defaultValue={item.description} className={controlClass} /></Field>
+                      <Field label="Liga opcional"><input name="link" defaultValue={item.link ?? ""} className={controlClass} /></Field>
+                      <Field label="Cantidad"><input name="quantity" type="number" min={1} required defaultValue={item.qtyRequested} className={controlClass} /></Field>
+                      <Button type="submit" tone="ghost">Guardar cambios</Button>
+                    </form>
+                    <form action={deletePresolicitudAction}>
+                      <input type="hidden" name="caseId" value={row.id} />
+                      <input type="hidden" name="presolicitudId" value={item.id} />
+                      <Button type="submit" tone="ghost">Quitar presolicitud</Button>
+                    </form>
+                  </div>
+                </details>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
+      {canEditPresolicitud ? (
+        <details className="mt-3 rounded-lg border border-[var(--line)] bg-[#f7fafc] p-3" open={row.presolicitudes.length === 0}>
+          <summary className="cursor-pointer text-sm font-semibold text-[var(--accent)]">Presolicitar refacción</summary>
+          <form action={createPresolicitudAction} className="mt-3 grid gap-2">
+            <input type="hidden" name="caseId" value={row.id} />
+            <Field label="Número de parte"><input name="partNumber" required className={controlClass} /></Field>
+            <Field label="Descripción"><input name="description" required className={controlClass} /></Field>
+            <Field label="Liga opcional"><input name="link" className={controlClass} /></Field>
+            <Field label="Cantidad"><input name="quantity" type="number" min={1} required className={controlClass} /></Field>
+            <Button type="submit">Registrar presolicitud</Button>
+          </form>
+        </details>
+      ) : null}
+    </Card>
+  ) : (
+    <Card className="p-4 text-sm">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="font-medium">Refacciones</h2>
+          <p className="mt-1 text-[var(--muted)]">Solicitudes formales asociadas a esta orden de servicio.</p>
+        </div>
+        {canOperatePartRequests ? <Badge tone="ok">Captura disponible</Badge> : null}
+      </div>
+      {row.requests.length === 0 ? <p className="mt-3 rounded-lg border border-dashed border-[var(--line)] px-3 py-4 text-[var(--muted)]">Sin solicitudes registradas.</p> : (
+        <ul className="mt-3 space-y-3">
+          {row.requests.map((request) => (
+            <li key={request.id} className="rounded-lg border border-[var(--line)] p-3">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <p className="font-medium">{request.partNumber} · {request.description}</p>
+                <Badge tone={request.status === "SURTIDA" ? "ok" : "warn"}>{request.status}</Badge>
+              </div>
+              <p className="mt-1 text-[var(--muted)]">Solicitada {request.qtyRequested} · recibida {request.qtyReceived} · surtida {request.qtyIssued}</p>
+              {canOperatePartRequests ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <form action={receivePartAction} className="flex gap-1">
+                    <input type="hidden" name="caseId" value={row.id} />
+                    <input type="hidden" name="requestId" value={request.id} />
+                    <input type="hidden" name="version" value={request.version} />
+                    <input name="quantity" type="number" min={1} required aria-label="Cantidad recibida" placeholder="Cant." className="w-20 rounded-md border border-[var(--line)] px-2 py-1" />
+                    <Button type="submit" tone="ghost">Recibir</Button>
+                  </form>
+                  <form action={issuePartAction} className="flex gap-1">
+                    <input type="hidden" name="caseId" value={row.id} />
+                    <input type="hidden" name="requestId" value={request.id} />
+                    <input type="hidden" name="version" value={request.version} />
+                    <input name="quantity" type="number" min={1} required aria-label="Cantidad surtida" placeholder="Cant." className="w-20 rounded-md border border-[var(--line)] px-2 py-1" />
+                    <Button type="submit" tone="ghost">Surtir</Button>
+                  </form>
+                </div>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
+      {canOperatePartRequests ? (
+        <details className="mt-3 rounded-lg border border-[var(--line)] bg-[#f7fafc] p-3" open={row.requests.length === 0}>
+          <summary className="cursor-pointer text-sm font-semibold text-[var(--accent)]">Solicitar refacción</summary>
+          <form action={requestPartAction} className="mt-3 grid gap-2">
+            <input type="hidden" name="caseId" value={row.id} />
+            <Field label="Número de parte"><input name="partNumber" required className={controlClass} /></Field>
+            <Field label="Descripción"><input name="description" required className={controlClass} /></Field>
+            <Field label="Liga opcional"><input name="link" className={controlClass} /></Field>
+            <Field label="Cantidad"><input name="quantity" type="number" min={1} required className={controlClass} /></Field>
+            <Button type="submit">Registrar solicitud</Button>
+          </form>
+        </details>
+      ) : presolicitudOnly && !closed ? (
+        <p className="mt-3 rounded-lg bg-[#f7fafc] px-3 py-3 text-[var(--muted)]">En reparación las solicitudes formales las registra gerencia o almacén.</p>
+      ) : null}
+    </Card>
+  );
+
   return (
     <>
       <EntityDetailHeader
         back={back}
-        title={row.folio}
+        title={`Atención · ${row.folio}`}
         subtitle={`${row.kind === "OS" ? "Orden de servicio" : "Diagnóstico"} · ${row.serviceCompany.name}`}
         status={<Badge tone={row.quotePending || slaOverdue ? "warn" : "neutral"}>{CASE_STATUS_LABEL[row.status] ?? row.status}</Badge>}
         meta={
           <>
+            <EntityMetaItem label="Identificación del equipo">
+              <TextLink href={equipmentHref}>{equipmentIdentity || row.equipment.folio}</TextLink>
+              <span className="block text-xs text-[var(--muted)]">
+                {row.equipment.folio}{row.equipment.serial ? ` · Serie ${row.equipment.serial}` : ""}
+              </span>
+            </EntityMetaItem>
             <EntityMetaItem label="Cliente">
               <ClientNameLink
                 clientId={row.equipment.client.id}
@@ -166,12 +469,20 @@ export default async function OperacionDetallePage({ params }: { params: Promise
                 canEdit={canEditClient}
               />
             </EntityMetaItem>
-            <EntityMetaItem label="Equipo">
-              <TextLink href={equipmentHref}>{row.equipment.folio}</TextLink>
-              <span className="text-[var(--muted)]"> · {row.equipment.model}</span>
-            </EntityMetaItem>
+            <EntityMetaItem label="Vendedor">{seller?.name ?? "Sin vendedor asignado"}</EntityMetaItem>
             <EntityMetaItem label="Responsable">
-              {row.externalSupplierId ? "Servicio externo" : row.assignee?.name ?? "Sin asignar"}
+              <span className="inline-flex flex-wrap items-center gap-x-1">
+                {row.assignee?.name ?? "Sin asignar"}
+                {showSupervisorReassign && row.assigneeUserId ? (
+                  <SupervisorReassignControl
+                    caseId={row.id}
+                    version={row.version}
+                    assigneeUserId={row.assigneeUserId}
+                    candidates={candidates}
+                    assignCaseAction={assignCaseAction}
+                  />
+                ) : null}
+              </span>
             </EntityMetaItem>
             <EntityMetaItem label="Prioridad">{row.attention.priorityName}</EntityMetaItem>
             <EntityMetaItem label="SLA">{row.slaDueAt ? formatWhen(row.slaDueAt) : "Aún no inicia"}</EntityMetaItem>
@@ -180,44 +491,29 @@ export default async function OperacionDetallePage({ params }: { params: Promise
             </EntityMetaItem>
           </>
         }
-        primaryAction={primaryAction}
+        primaryAction={
+          primaryAction || headerAssignmentForm
+            ? (
+              <div className="flex flex-wrap items-center gap-2">
+                {primaryAction}
+                {headerAssignmentForm}
+              </div>
+            )
+            : null
+        }
+        secondaryActions={
+          <nav className="flex max-w-full flex-wrap items-center justify-end gap-2" aria-label="Relaciones de la atención">
+            {relatedLinks.map((item) => (
+              <Link key={item.href} href={item.href} className="rounded-full border border-[var(--line)] bg-white px-3 py-1.5 text-xs font-semibold text-[#38506c] transition hover:border-[#91b7cf] hover:text-[var(--accent)]">
+                {item.label}
+              </Link>
+            ))}
+          </nav>
+        }
       />
       {readOnly ? <p className="mb-4 text-sm text-[var(--muted)]">Consulta de solo lectura. SYSTRON no modifica el estado ni la bitácora de Servomotores.</p> : null}
       <DetailGrid>
         <div className="space-y-4">
-          <Card className="p-4 text-sm">
-            <p className="font-medium text-[#0b1f3a]">Contexto del servicio</p>
-            {parent?.kind === "DIAGNOSTICO" ? <p className="mt-1">Diagnóstico de origen: <TextLink href={`/operacion/${parent.id}`}>{parent.folio}</TextLink></p> : null}
-            <p className="mt-1">
-              {repairAfterDiagnosis ? "Prioridad del diagnóstico" : "Prioridad congelada"}: {row.attention.priorityName}
-              {row.attention.priorityPrice != null ? ` · $${row.attention.priorityPrice.toLocaleString("es-MX")}` : ""}
-              {row.attention.priorityIncrementPct != null ? ` · incremento ${row.attention.priorityIncrementPct}%` : ""}
-            </p>
-            <p className="mt-1">Falla reportada: {row.attention.reportedFault}</p>
-            {row.resultText ? <p className="mt-1">Resultado: {row.resultText}</p> : null}
-            {row.returnReason ? <p className="mt-1">Devolución: {row.returnReason}</p> : null}
-            {row.warrantyDecision ? <p className="mt-1">Decisión técnica de garantía: {row.warrantyDecision === "VALIDA" ? "Válida" : "No procedente"}</p> : null}
-            {row.commercialDecision ? <p className="mt-1">Decisión comercial: {row.commercialDecision === "VALIDA" ? "Aceptada como garantía" : "A cotización"} · {row.commercialReason}</p> : null}
-            {row.externalDocument ? <p className="mt-1">Documento externo: {row.externalDocument}</p> : null}
-            {original ? <p className="mt-1">Reparación de origen: <TextLink href={`/operacion/${original.id}`}>{original.folio}</TextLink></p> : null}
-            {derived ? <p className="mt-1">Reparación en garantía: <TextLink href={`/operacion/${derived.id}`}>{derived.folio}</TextLink></p> : null}
-            {row.quotePending && !can(session.role, "quote.price", session.activeCompanyCode) ? (
-              <p className="mt-3 text-[var(--muted)]">Queda pendiente de cotizar.</p>
-            ) : null}
-            {row.paidAt ? <p className="mt-1">Marcada como pagada {formatWhen(row.paidAt)}.</p> : null}
-          </Card>
-          {canWork && row.kind === "DIAGNOSTICO" && ["EN_DIAGNOSTICO", "DEVUELTO"].includes(row.status) ? (
-            <FormPanel id="terminar-diagnostico" action={finishDiagnosisAction} className="scroll-mt-24">
-              <input type="hidden" name="caseId" value={row.id} />
-              <input type="hidden" name="version" value={row.version} />
-              <FormSection title="Terminar diagnóstico" description="Resume el hallazgo técnico. La bitácora queda aparte para avances durante el trabajo." columns={1}>
-                <Field label="Resultado del diagnóstico">
-                  <textarea name="resultText" required rows={4} className={controlClass} placeholder="Hallazgo, pruebas y conclusión" />
-                </Field>
-              </FormSection>
-              <FormActions><Button type="submit">Terminar diagnóstico</Button></FormActions>
-            </FormPanel>
-          ) : null}
           <Card className="p-4">
             <h2 className="font-medium">Bitácora</h2>
             <p className="mt-1 text-sm text-[var(--muted)]">Las entradas no se editan ni se borran. Una corrección es una entrada nueva.</p>
@@ -237,8 +533,36 @@ export default async function OperacionDetallePage({ params }: { params: Promise
               </form>
             ) : null}
           </Card>
+          <div id="refacciones" className="scroll-mt-6">{partsSection}</div>
         </div>
-        <div className="space-y-4">
+        <aside className="space-y-4 lg:sticky lg:top-4 lg:self-start">
+          {showExitWithoutDocument && !enablingBilling ? (
+            <Card className="p-4 text-sm">
+              <h2 className="font-medium">Salida sin documento</h2>
+              <p className="mt-1 text-[var(--muted)]">
+                Si aún no hay remisión ni factura, solicita autorización al CEO para que almacén registre la entrega.
+              </p>
+              <div className="mt-3">
+                <RequestExitWithoutDocumentButton
+                  caseId={row.id}
+                  version={row.version}
+                  pending={exitPending}
+                  authorized={exitAuthorized}
+                />
+              </div>
+            </Card>
+          ) : null}
+          <HistoryTimeline
+            items={historyTimelineItems}
+            title={historyTimelineItems.length > caseHistoryItems.length ? "Historial completo" : undefined}
+            description={
+              historyTimelineItems.length > caseHistoryItems.length
+                ? "Atención, movimientos, diagnóstico, cotización y esta operación."
+                : undefined
+            }
+          />
+          {false ? (
+            <>
           {row.kind === "DIAGNOSTICO" ? (
             <Card className="p-4 text-sm">
               <h2 className="font-medium">Refacciones previstas</h2>
@@ -283,7 +607,7 @@ export default async function OperacionDetallePage({ params }: { params: Promise
                             <Field label="Cantidad">
                               <input name="quantity" type="number" min={1} required defaultValue={item.qtyRequested} className={controlClass} />
                             </Field>
-                            <Button type="submit" tone="ghost">
+                            <Button type="submit" tone="ghost" className="sticky bottom-3 z-30 shadow-[0_8px_22px_rgba(20,45,75,0.14)]">
                               Guardar
                             </Button>
                           </form>
@@ -369,82 +693,10 @@ export default async function OperacionDetallePage({ params }: { params: Promise
               ) : null}
             </Card>
           ) : null}
+            </>
+          ) : null}
           {!readOnly ? (
             <>
-            {canManage && !closed ? (
-              <FormPanel action={assignCaseAction}>
-                <input type="hidden" name="caseId" value={row.id} />
-                <input type="hidden" name="version" value={row.version} />
-                <FormSection title="Asignación" description="Responsable interno o proveedor externo en SYSTRON.">
-                  <Field label="Responsable interno">
-                    <select name="assigneeUserId" className={controlClass} defaultValue={row.assigneeUserId ?? ""}>
-                      <option value="">Sin asignar</option>
-                      {candidates.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}
-                    </select>
-                  </Field>
-                  {row.serviceCompany.code === "SYSTRON" ? (
-                    <div className="md:col-span-2">
-                      <SupplierPicker
-                        label="O servicio externo"
-                        suppliers={suppliers}
-                        defaultSupplierId={row.externalSupplierId ?? ""}
-                        allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)}
-                        allowEmpty
-                        emptyLabel="Sin proveedor"
-                      />
-                    </div>
-                  ) : null}
-                </FormSection>
-                <FormActions><Button type="submit" tone="ghost">Guardar asignación</Button></FormActions>
-              </FormPanel>
-            ) : null}
-            {canManage && row.kind === "DIAGNOSTICO" && (row.status === "PENDIENTE_VALIDACION" || (row.serviceCompany.code === "SERVOMOTORES" && row.status === "VALIDADO" && warranty && !row.warrantyDecision)) ? (
-              <FormPanel id="validacion" action={validateAction} className="scroll-mt-24">
-                <input type="hidden" name="caseId" value={row.id} />
-                <input type="hidden" name="version" value={row.version} />
-                <FormSection title="Validación" columns={1}>
-                  <Field label="Decisión">
-                    <select name="decision" className={controlClass}>
-                      {warranty ? <option value="VALIDA">Garantía válida</option> : <option value="VALIDAR">Validar</option>}
-                      {warranty ? <option value="NO_PROCEDENTE">Garantía no procedente</option> : null}
-                      <option value="DEVOLVER">Devolver a corrección</option>
-                    </select>
-                  </Field>
-                  <Field label="Motivo si devuelves"><input name="reason" className={controlClass} /></Field>
-                </FormSection>
-                <FormActions><Button type="submit">Registrar validación</Button></FormActions>
-              </FormPanel>
-            ) : null}
-            {canWork && row.kind === "OS" && ["EN_REPARACION", "EN_ESPERA_REFACCIONES"].includes(row.status) ? (
-              <FormPanel id="cerrar-reparacion" action={finishRepairAction} className="scroll-mt-24">
-                <input type="hidden" name="caseId" value={row.id} />
-                <input type="hidden" name="version" value={row.version} />
-                <FormSection title="Cierre técnico" columns={1}>
-                  <Field label="Resultado">
-                    <select name="outcome" className={controlClass}>
-                      <option value="TERMINADA">Reparación terminada</option>
-                      <option value="SIN_REPARACION">Sin reparación</option>
-                    </select>
-                  </Field>
-                  <Field label="Resumen">
-                    <textarea name="resultText" required rows={3} className={controlClass} />
-                  </Field>
-                </FormSection>
-                <FormActions><Button type="submit">Cerrar técnicamente</Button></FormActions>
-              </FormPanel>
-            ) : null}
-            {row.externalSupplierId && canManage ? (
-              <FormPanel action={externalDocumentAction}>
-                <input type="hidden" name="caseId" value={row.id} />
-                <input type="hidden" name="version" value={row.version} />
-                <FormSection title="Documento del proveedor" description="Capturarlo no valida el diagnóstico." columns={1}>
-                  <Field label="Contenido">
-                    <textarea name="document" required rows={3} className={controlClass} defaultValue={row.externalDocument ?? ""} />
-                  </Field>
-                </FormSection>
-                <FormActions><Button type="submit" tone="ghost">Guardar documento</Button></FormActions>
-              </FormPanel>
-            ) : null}
             {closed && canManage ? (
               <FormPanel action={reopenAction}>
                 <input type="hidden" name="caseId" value={row.id} />
@@ -479,8 +731,7 @@ export default async function OperacionDetallePage({ params }: { params: Promise
             ) : null}
             </>
           ) : null}
-          <HistoryTimeline items={history.map((item) => ({ id: item.id, createdAt: item.createdAt, summary: item.summary, authorName: item.author?.name }))} />
-        </div>
+        </aside>
       </DetailGrid>
     </>
   );

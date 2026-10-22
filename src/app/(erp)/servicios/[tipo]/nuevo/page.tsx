@@ -31,13 +31,11 @@ export default async function NuevoServicioPage({
     prisma.client.findMany({
       where: { companyId: session.activeCompanyId, active: true, isSystem: false, ...(session.role === "VENTAS" ? { ownerUserId: session.userId } : {}) },
       orderBy: { name: "asc" },
-      take: 200,
     }),
     prisma.equipment.findMany({
       where: { originCompanyId: session.activeCompanyId, ...(session.role === "VENTAS" ? { client: { ownerUserId: session.userId } } : {}) },
       orderBy: { createdAt: "desc" },
-      take: 300,
-      select: { id: true, folio: true, model: true, clientId: true, kind: true },
+      select: { id: true, folio: true, model: true, clientId: true, kind: true, typeName: true, brandName: true, serial: true },
     }),
     prisma.priority.findMany({ where: { companyId: session.activeCompanyId, attentionType, active: true }, orderBy: { sortOrder: "asc" } }),
     prisma.catalogType.findMany({ orderBy: { name: "asc" } }),
@@ -51,13 +49,17 @@ export default async function NuevoServicioPage({
       : Promise.resolve([]),
   ]);
   const defaultClientId = clientIdParam && clients.some((row) => row.id === clientIdParam) ? clientIdParam : "";
+  const quickEquipmentKinds: Array<"EQUI" | "MOT"> = [
+    ...(can(session.role, "equi.create", session.activeCompanyCode) ? ["EQUI" as const] : []),
+    ...(can(session.role, "mot.create", session.activeCompanyCode) ? ["MOT" as const] : []),
+  ];
 
   return (
     <>
       <PageHeader
         back={{ href: `/servicios/${tipo}`, label: ATTENTION_LABEL[attentionType as AttentionType] }}
         title={`Nuevo ${ATTENTION_LABEL[attentionType as AttentionType]}`}
-        subtitle="Elige cliente y equipo, o registra uno nuevo. El SLA inicia con la entrada física en taller."
+        subtitle="Elige cliente y equipo, o registra uno nuevo. El servicio inicia con la entrada física en taller."
       />
       <ServiceStartForm
         action={startServiceAction}
@@ -72,7 +74,8 @@ export default async function NuevoServicioPage({
         defaultClientId={defaultClientId}
         companyCode={session.activeCompanyCode ?? "SYSTRON"}
         allowQuickClient={can(session.role, "client.create", session.activeCompanyCode)}
-        allowQuickEquipment={can(session.role, "equi.create", session.activeCompanyCode) || can(session.role, "mot.create", session.activeCompanyCode)}
+        allowQuickEquipment={quickEquipmentKinds.length > 0}
+        quickEquipmentKinds={quickEquipmentKinds}
         warranty={warranty}
       />
     </>

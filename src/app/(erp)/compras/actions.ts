@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { setFlash } from "@/lib/flash";
 import { supplierIdFromForm } from "@/lib/form-quick-entities";
 import { optionalText, parseVersion, requiredText } from "@/lib/form";
+import { moneyFromForm } from "@/lib/money";
 import { can, type Action } from "@/lib/permissions";
 import { cancelOrder, changeAuthorizedOrder, decideOrder, discardDirectPurchase, editDirectPurchase, processPurchase, registerDirectPurchase, registerOrder } from "@/lib/purchases";
 import { requireCompany } from "@/lib/session";
@@ -29,7 +30,7 @@ export async function directPurchaseAction(formData: FormData) {
     const purchase = await registerDirectPurchase(session, {
       supplierId,
       concept: requiredText(formData.get("concept"), "Concepto"),
-      amount: Number(formData.get("amount")),
+      amount: moneyFromForm(formData.get("amount")),
       destination: requiredText(formData.get("destination"), "Destino"),
       destinationRef: optionalText(formData.get("destinationRef")),
       quantity: Number(formData.get("quantity") || 1),
@@ -49,7 +50,7 @@ export async function orderAction(formData: FormData) {
     const purchase = await registerOrder(session, {
       supplierId: await supplierIdFromForm(session, formData),
       concept: requiredText(formData.get("concept"), "Concepto"),
-      amount: Number(formData.get("amount")),
+      amount: moneyFromForm(formData.get("amount")),
       destination: requiredText(formData.get("destination"), "Destino"),
       destinationRef: optionalText(formData.get("destinationRef")),
       quantity: Number(formData.get("quantity") || 1),
@@ -80,7 +81,7 @@ export async function editDirectAction(formData: FormData) {
   const id = requiredText(formData.get("purchaseId"), "Compra");
   try {
     const session = await guard("finance.manage");
-    await editDirectPurchase(session, id, parseVersion(formData.get("version")), Number(formData.get("amount")));
+    await editDirectPurchase(session, id, parseVersion(formData.get("version")), moneyFromForm(formData.get("amount")));
     await setFlash({ tone: "ok", message: "Compra cuadrada." });
   } catch (error) {
     await setFlash({ tone: "error", message: bubble(error) });
@@ -109,7 +110,7 @@ export async function changeOrderAction(formData: FormData) {
     await changeAuthorizedOrder(session, id, parseVersion(formData.get("version")), {
       supplierId: await supplierIdFromForm(session, formData),
       concept: requiredText(formData.get("concept"), "Concepto"),
-      amount: Number(formData.get("amount")),
+      amount: moneyFromForm(formData.get("amount")),
     });
     await setFlash({ tone: "ok", message: "El cambio volvió a autorización del CEO." });
   } catch (error) {

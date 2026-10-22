@@ -19,6 +19,11 @@ export function servicioTipoLabel(attentionType: string): string {
   return ATTENTION_LABEL[attentionType as AttentionType] ?? attentionType;
 }
 
+/** Folio operativo visible en bandejas (DX diagnóstico, OS reparación). */
+export function serviceSeries(attentionType: string) {
+  return attentionType === "REPARACION" ? "OS" : "DX";
+}
+
 export function parseServicioTipo(tipo: string | undefined): AttentionType | null {
   if (!tipo || tipo === "todos") return null;
   const mapped = SERVICIO_TIPO_PARAM[tipo as ServicioTipoParam];
