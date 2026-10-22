@@ -7,7 +7,7 @@ import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
 import { EntradaServicioCell } from "@/components/entrada-servicio-cell";
-import { pickCustodyFlowAttention, resolveEntradaAttentionType } from "@/lib/almacen-entrada";
+import { resolveEntradaAttentionType } from "@/lib/almacen-entrada";
 import { serviceSeries } from "@/lib/servicios-catalog";
 import { isOsDefinitiveCustodyExit } from "@/lib/warehouse-exit";
 
@@ -141,8 +141,8 @@ export default async function CustodiaPage({ searchParams }: { searchParams: Pro
     ? rows.map((row) => {
       const hideClient = !systron && row.originCompany.code === "SYSTRON";
       const mapped = mapEquipmentToAlmacenRow(row, { vistaQuery: vistaHref, hideClient });
-      const attention = pickCustodyFlowAttention(row.attentions) ?? row.attentions[0];
-      const sellerId = attention?.sellerUserId;
+      const attentionRow = row.attentions.find((a) => a.status === "ABIERTA" || a.status === "EN_PROCESO") ?? row.attentions[0];
+      const sellerId = attentionRow?.sellerUserId ?? null;
       return { ...mapped, sellerName: sellerId ? sellers.get(sellerId) ?? null : null };
     })
     : [];

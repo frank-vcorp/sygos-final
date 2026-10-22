@@ -1,4 +1,3 @@
-import { pickCustodyFlowAttention } from "@/lib/almacen-entrada";
 import {
   equipmentDetailHref,
   formatEquipmentBandejaLabel,
@@ -49,7 +48,10 @@ export function mapEquipmentToAlmacenRow(
   },
   options: { vistaQuery?: string; hideClient?: boolean },
 ): AlmacenBandejaRow {
-  const attention = pickCustodyFlowAttention(equipment.attentions) ?? equipment.attentions[0] ?? null;
+  const attention =
+    equipment.attentions.find((row) => row.status === "ABIERTA" || row.status === "EN_PROCESO")
+    ?? equipment.attentions[0]
+    ?? null;
   const cases = attention?.technicalCases ?? [];
   const os = cases.find((c) => c.kind === "OS") ?? null;
   const diagnosis =
