@@ -4,6 +4,7 @@ import { CancelMovementForm, MovementForm } from "@/components/custody-forms";
 import { EquipmentAttentionLauncher } from "@/components/equipment-attention-launcher";
 import { EquipmentCustodyActions } from "@/components/equipment-custody-actions";
 import { PassToResguardoForm } from "@/components/pass-to-resguardo-form";
+import { ReingresoPruebaForm } from "@/components/reingreso-prueba-form";
 import { WarehouseExitForm } from "@/components/warehouse-exit-form";
 import { WarehouseExitFormAlmacen } from "@/components/warehouse-exit-form-almacen";
 import { loadWarehouseExitContext } from "@/lib/warehouse-exit";
@@ -215,13 +216,19 @@ export async function EquipmentDetail({
   }
 
   const almacenSalidaEnCabecera = almacenCustody && useWarehouseExit && warehouseExit;
+  const almacenReingresoEnCabecera =
+    almacenCustody
+    && canMove
+    && equipment.custody === "FUERA_A_PRUEBA"
+    && movementOptions.includes("RETORNO");
   const showCustodyMovementBar =
     !showAlmacenPasarResguardo
     && custodyDetail
     && !awaitingAttentionForReceipt
     && canMove
     && movementOptions.length > 0
-    && !almacenSalidaEnCabecera;
+    && !almacenSalidaEnCabecera
+    && !almacenReingresoEnCabecera;
   const custodyBarSticky = showCustodyMovementBar && (almacenCustody || movementOptions.length > 0);
   const almacenResguardoAction =
     showAlmacenPasarResguardo && almacenEntradaPreset
@@ -259,6 +266,15 @@ export async function EquipmentDetail({
       />
     )
     : null;
+  const almacenReingresoAction = almacenReingresoEnCabecera
+    ? (
+      <ReingresoPruebaForm
+        equipmentId={equipment.id}
+        kind={expectedKind}
+        version={equipment.version}
+      />
+    )
+    : null;
 
   return (
     <>
@@ -287,7 +303,12 @@ export async function EquipmentDetail({
             {intercompany && sellerUser ? <EntityMetaItem label="Contacto SYSTRON">{sellerUser.name}</EntityMetaItem> : null}
           </>
         }
-        primaryAction={almacenResguardoAction ?? almacenSalidaAction ?? (almacenCustody ? null : custodyDetail ? custodyPrimaryAction : primaryAction)}
+        primaryAction={
+          almacenResguardoAction
+          ?? almacenSalidaAction
+          ?? almacenReingresoAction
+          ?? (almacenCustody ? null : custodyDetail ? custodyPrimaryAction : primaryAction)
+        }
       />
       {custodyDetail && hasReceipt ? (
         <div className="mb-6">
