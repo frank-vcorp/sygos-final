@@ -58,6 +58,54 @@ export function resolveAlmacenExitAttentionType(input: {
   return null;
 }
 
+/** Rol almacén: OS terminada en la atención vigente habilita salida definitiva aunque el tipo siga siendo diagnóstico. */
+export function resolveAlmacenWarehouseExit(input: {
+  custody: Custody;
+  hasOsForDelivery: boolean;
+  canDefinitiveExit: boolean;
+  definitiveBlockedMessage: string | null;
+  attentionType: string | null;
+  canTestExit: boolean;
+  validatedDxOnAttention: boolean;
+}): { exitKind: "test" | "definitive" | null; blockedMessage: string | null } {
+  if (input.custody !== "EN_RESGUARDO") {
+    return {
+      exitKind: null,
+      blockedMessage: "El equipo debe estar en resguardo para registrar la salida.",
+    };
+  }
+  if (input.hasOsForDelivery) {
+    return {
+      exitKind: "definitive",
+      blockedMessage: input.canDefinitiveExit
+        ? null
+        : (input.definitiveBlockedMessage ?? "No puedes registrar la salida definitiva todavía."),
+    };
+  }
+  if (isDiagnosisAttentionType(input.attentionType)) {
+    return {
+      exitKind: "test",
+      blockedMessage: input.canTestExit
+        ? null
+        : input.validatedDxOnAttention
+          ? "La salida a prueba solo aplica durante el diagnóstico (antes de validar el DX)."
+          : "La salida a prueba solo aplica mientras el diagnóstico está en curso (folio DX abierto, sin validar).",
+    };
+  }
+  if (input.attentionType === "REPARACION") {
+    return {
+      exitKind: "definitive",
+      blockedMessage: input.canDefinitiveExit
+        ? null
+        : (input.definitiveBlockedMessage ?? "No puedes registrar la salida definitiva todavía."),
+    };
+  }
+  if (input.attentionType) {
+    return { exitKind: null, blockedMessage: "Este tipo de servicio no permite registrar salida desde almacén." };
+  }
+  return { exitKind: null, blockedMessage: "No hay una atención abierta para este equipo." };
+}
+
 /** DX abierto (aún no validado ni cerrado): salida a prueba solo durante diagnóstico. */
 export function diagnosisStatusAllowsTestExit(status: string) {
   return !CLOSED_CASE.has(status);
@@ -183,23 +231,17 @@ export async function loadWarehouseExitContext(input: {
   let blockedMessage: string | null = null;
 
   if (input.forAlmacenRole) {
-    if (input.custody !== "EN_RESGUARDO") {
-      blockedMessage = "El equipo debe estar en resguardo para registrar la salida.";
-    } else if (isDiagnosisAttentionType(attentionType)) {
-      exitKind = "test";
-      if (!canTestExit) {
-        blockedMessage = validatedDxOnAttention
-          ? "La salida a prueba solo aplica durante el diagnóstico (antes de validar el DX)."
-          : "La salida a prueba solo aplica mientras el diagnóstico está en curso (folio DX abierto, sin validar).";
-      }
-    } else if (attentionType === "REPARACION") {
-      exitKind = "definitive";
-      if (!canDefinitiveExit) blockedMessage = definitiveBlockedMessage ?? "No puedes registrar la salida definitiva todavía.";
-    } else if (attentionType) {
-      blockedMessage = "Este tipo de servicio no permite registrar salida desde almacén.";
-    } else {
-      blockedMessage = "No hay una atención abierta para este equipo.";
-    }
+    const almacenExit = resolveAlmacenWarehouseExit({
+      custody: input.custody,
+      hasOsForDelivery: Boolean(osForDelivery),
+      canDefinitiveExit,
+      definitiveBlockedMessage,
+      attentionType,
+      canTestExit,
+      validatedDxOnAttention: Boolean(validatedDxOnAttention),
+    });
+    exitKind = almacenExit.exitKind;
+    blockedMessage = almacenExit.blockedMessage;
   }
 
   return {

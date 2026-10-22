@@ -5,6 +5,7 @@ import {
   enablingBillingCaseIds,
   isDiagnosisAttentionType,
   resolveAlmacenExitAttentionType,
+  resolveAlmacenWarehouseExit,
 } from "./warehouse-exit";
 
 describe("warehouse exit billing", () => {
@@ -35,5 +36,19 @@ describe("almacén salida DX", () => {
       }),
       "DIAGNOSTICO",
     );
+  });
+
+  it("OS terminada en atención vigente prioriza salida definitiva sobre prueba", () => {
+    const result = resolveAlmacenWarehouseExit({
+      custody: "EN_RESGUARDO",
+      hasOsForDelivery: true,
+      canDefinitiveExit: true,
+      definitiveBlockedMessage: null,
+      attentionType: "DIAGNOSTICO",
+      canTestExit: true,
+      validatedDxOnAttention: false,
+    });
+    assert.equal(result.exitKind, "definitive");
+    assert.equal(result.blockedMessage, null);
   });
 });
