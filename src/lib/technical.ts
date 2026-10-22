@@ -503,13 +503,9 @@ export async function overrideWarranty(actor: Actor, caseId: string, version: nu
 }
 
 export async function requestPart(actor: Actor, caseId: string, input: { partNumber: string; description: string; link: string | null; quantity: number }) {
-  const { fieldPresolicitudOnly } = await import("./part-presolicitud");
   const row = await loadCase(caseId);
   assertServiceCompany(actor, row.serviceCompanyId);
   if (row.kind !== "OS") throw new Error("Las refacciones se solicitan desde la orden de servicio.");
-  if (fieldPresolicitudOnly(actor.role)) {
-    throw new Error("Usa presolicitudes en el diagnóstico. La solicitud formal en la orden la registra gerencia o almacén.");
-  }
   if (!canExecute(actor, row.assigneeUserId) && !canAssign(actor)) throw new Error("No puedes solicitar refacciones.");
   if (["TERMINADA", "SIN_REPARACION"].includes(row.status)) throw new Error("La orden ya está cerrada.");
   if (!Number.isInteger(input.quantity) || input.quantity < 1) throw new Error("La cantidad debe ser un entero mayor a cero.");

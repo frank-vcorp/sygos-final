@@ -25,7 +25,7 @@ async function loadDiagnosisCase(caseId: string) {
   return row;
 }
 
-/** Técnico y supervisor no formalizan solicitudes en la orden; solo presolicitud en diagnóstico. */
+/** Técnico y supervisor no reciben/surtan en almacén; en diagnóstico usan presolicitud. En OS sí pueden solicitar refacción. */
 export function fieldPresolicitudOnly(role: string) {
   return role === "TECNICO" || role === "SUPERVISOR_TECNICO";
 }
