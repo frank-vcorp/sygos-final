@@ -38,7 +38,7 @@ function StatusBadge({ status }: { status: StackedStatus }) {
       {status.tags?.map((tag) => (
         <span
           key={tag}
-          className={`max-w-full truncate text-[8px] font-semibold leading-[0.95rem] ${TAG_TEXT_CLASS[tagTone(tag)]}`}
+          className={`max-w-full truncate text-[10px] font-semibold leading-[1.1rem] ${TAG_TEXT_CLASS[tagTone(tag)]}`}
           title={tag}
         >
           {tag}
