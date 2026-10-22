@@ -227,7 +227,8 @@ export default async function OperacionDetallePage({ params }: { params: Promise
     diagnosisPresolicitudEditable(row.status) &&
     (session.role === "SUPERVISOR_TECNICO" ||
       (session.role === "TECNICO" && row.assigneeUserId === session.userId));
-  const canOperatePartRequests = canWork && !closed && !readOnly && !presolicitudOnly;
+  const canRequestPartOnOs = canWork && !closed && !readOnly && row.kind === "OS";
+  const canFulfillPartRequests = canWork && !closed && !readOnly && !presolicitudOnly;
   const canEditClient = can(session.role, "client.edit", session.activeCompanyCode);
   const slaOverdue = row.slaDueAt != null && row.slaDueAt.getTime() < Date.now() && !closed;
   const back = can(session.role, "attention.catalog", session.activeCompanyCode)
@@ -395,7 +396,7 @@ export default async function OperacionDetallePage({ params }: { params: Promise
           <h2 className="font-medium">Refacciones</h2>
           <p className="mt-1 text-[var(--muted)]">Solicitudes formales asociadas a esta orden de servicio.</p>
         </div>
-        {canOperatePartRequests ? <Badge tone="ok">Captura disponible</Badge> : null}
+        {canRequestPartOnOs ? <Badge tone="ok">Solicitud disponible</Badge> : null}
       </div>
       {row.requests.length === 0 ? <p className="mt-3 rounded-lg border border-dashed border-[var(--line)] px-3 py-4 text-[var(--muted)]">Sin solicitudes registradas.</p> : (
         <ul className="mt-3 space-y-3">
@@ -406,7 +407,7 @@ export default async function OperacionDetallePage({ params }: { params: Promise
                 <Badge tone={request.status === "SURTIDA" ? "ok" : "warn"}>{request.status}</Badge>
               </div>
               <p className="mt-1 text-[var(--muted)]">Solicitada {request.qtyRequested} · recibida {request.qtyReceived} · surtida {request.qtyIssued}</p>
-              {canOperatePartRequests ? (
+              {canFulfillPartRequests ? (
                 <div className="mt-3 flex flex-wrap gap-2">
                   <form action={receivePartAction} className="flex gap-1">
                     <input type="hidden" name="caseId" value={row.id} />
@@ -428,7 +429,7 @@ export default async function OperacionDetallePage({ params }: { params: Promise
           ))}
         </ul>
       )}
-      {canOperatePartRequests ? (
+      {canRequestPartOnOs ? (
         <details className="mt-3 rounded-lg border border-[var(--line)] bg-[#f7fafc] p-3" open={row.requests.length === 0}>
           <summary className="cursor-pointer text-sm font-semibold text-[var(--accent)]">Solicitar refacción</summary>
           <form action={requestPartAction} className="mt-3 grid gap-2">
@@ -440,8 +441,9 @@ export default async function OperacionDetallePage({ params }: { params: Promise
             <Button type="submit">Registrar solicitud</Button>
           </form>
         </details>
-      ) : presolicitudOnly && !closed ? (
-        <p className="mt-3 rounded-lg bg-[#f7fafc] px-3 py-3 text-[var(--muted)]">En reparación las solicitudes formales las registra gerencia o almacén.</p>
+      ) : null}
+      {presolicitudOnly && canRequestPartOnOs ? (
+        <p className="mt-3 text-xs text-[var(--muted)]">Recibir y surtir refacciones lo registra almacén o gerencia.</p>
       ) : null}
     </Card>
   );
@@ -655,7 +657,7 @@ export default async function OperacionDetallePage({ params }: { params: Promise
                     <li key={request.id}>
                       <p>{request.partNumber} · {request.description} · {request.status}</p>
                       <p className="text-[var(--muted)]">Solicitada {request.qtyRequested} · recibida {request.qtyReceived} · surtida {request.qtyIssued}</p>
-                      {canOperatePartRequests ? (
+                      {canFulfillPartRequests ? (
                         <div className="mt-1 flex flex-wrap gap-2">
                           <form action={receivePartAction} className="flex gap-1">
                             <input type="hidden" name="caseId" value={row.id} />
@@ -677,7 +679,7 @@ export default async function OperacionDetallePage({ params }: { params: Promise
                   ))}
                 </ul>
               )}
-              {canOperatePartRequests ? (
+              {canRequestPartOnOs ? (
                 <form action={requestPartAction} className="mt-3 grid gap-2">
                   <input type="hidden" name="caseId" value={row.id} />
                   <Field label="Número de parte"><input name="partNumber" required className={controlClass} /></Field>
@@ -686,10 +688,6 @@ export default async function OperacionDetallePage({ params }: { params: Promise
                   <Field label="Cantidad"><input name="quantity" type="number" min={1} required className={controlClass} /></Field>
                   <Button type="submit" tone="ghost">Solicitar refacción</Button>
                 </form>
-              ) : presolicitudOnly && !closed ? (
-                <p className="mt-3 text-[var(--muted)]">
-                  En reparación las solicitudes formales las registra gerencia o almacén. En diagnóstico usa presolicitudes arriba.
-                </p>
               ) : null}
             </Card>
           ) : null}
