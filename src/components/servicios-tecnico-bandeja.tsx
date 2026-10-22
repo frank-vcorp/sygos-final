@@ -14,12 +14,9 @@ import { salesPortfolioUserId } from "@/lib/sales-assignment";
 import type { Role } from "@/lib/roles";
 import { ServiciosSupervisorList } from "@/components/servicios-supervisor-list";
 import {
-  SERVICIO_TIPO_OPTIONS,
-  SERVICIO_TIPO_PARAM,
   serviciosBandejaHref,
   SERVICIOS_BANDEJA_ACTIVOS,
   SERVICIOS_BANDEJA_HISTORIAL,
-  type ServicioTipoParam,
   type ServiciosVista,
 } from "@/lib/servicios-catalog";
 import { listActiveServicios, listHistorialServicios } from "@/lib/servicios-supervisor";
@@ -84,20 +81,20 @@ function bandejaSubtitle(role: Role, vista: ServiciosVista, technician: boolean)
   const sales = role === "VENTAS";
   if (vista === "historial") {
     if (technician) {
-      return "Operaciones cerradas o canceladas en las que participaste. No incluye pendientes de ingreso.";
+      return "Operaciones cerradas o canceladas en las que participaste.";
     }
     if (sales) {
-      return "Operaciones cerradas o canceladas de tu cartera. No incluye pendientes de ingreso.";
+      return "Operaciones cerradas o canceladas de tu cartera.";
     }
-    return "Operaciones cerradas o canceladas del taller. No incluye pendientes de ingreso.";
+    return "Operaciones cerradas o canceladas del taller.";
   }
   if (technician) {
-    return "Solo operaciones abiertas asignadas a ti. Vencidas y en espera de refacciones se resaltan.";
+    return "Operaciones abiertas asignadas a ti. Los SLA vencidos y la espera de refacciones se resaltan en la fila.";
   }
   if (sales) {
-    return "Operaciones abiertas de tu cartera con ingreso confirmado. Vencidas y en espera de refacciones se resaltan.";
+    return "Operaciones abiertas de tu cartera con ingreso confirmado.";
   }
-  return "Operaciones abiertas con ingreso confirmado. Vencidas y en espera de refacciones se resaltan.";
+  return "Operaciones abiertas con ingreso confirmado.";
 }
 
 export async function ServiciosTecnicoBandeja({
@@ -107,7 +104,6 @@ export async function ServiciosTecnicoBandeja({
   technician,
   canCreate,
   vista,
-  tipo,
   estado,
   query,
   desde,
@@ -119,22 +115,17 @@ export async function ServiciosTecnicoBandeja({
   technician: boolean;
   canCreate: boolean;
   vista: ServiciosVista;
-  tipo?: string;
   estado?: string;
   query: string;
   desde?: string;
   hasta?: string;
 }) {
-  const tipoParam =
-    tipo && tipo !== "todos" && tipo in SERVICIO_TIPO_PARAM ? (tipo as ServicioTipoParam) : null;
-  const tipoLabel = tipoParam ? SERVICIO_TIPO_OPTIONS.find((opt) => opt.param === tipoParam)?.label : null;
   const estadoLabel =
     vista === "historial" && estado && estado !== "todos"
       ? HISTORIAL_ESTADO_OPTIONS.find((opt) => opt.value === estado)?.label
       : null;
   const navBase = {
     vista,
-    tipo: tipo && tipo !== "todos" ? tipo : "todos",
     q: query,
     desde,
     hasta,
@@ -151,11 +142,10 @@ export async function ServiciosTecnicoBandeja({
     vista === "historial"
       ? await listHistorialServicios(companyId, query, {
           ...listScope,
-          tipo: tipoParam,
           status: estado && estado !== "todos" ? estado : null,
           ...dateRange,
         })
-      : await listActiveServicios(companyId, query, { ...listScope, tipo: tipoParam, ...dateRange });
+      : await listActiveServicios(companyId, query, { ...listScope, ...dateRange });
 
   const formAction = vista === "historial" ? SERVICIOS_BANDEJA_HISTORIAL : SERVICIOS_BANDEJA_ACTIVOS;
 
@@ -187,23 +177,10 @@ export async function ServiciosTecnicoBandeja({
           placeholder="Folio, cliente, equipo o falla"
           className={`${controlClass} min-w-0 flex-1`}
         />
-        <select
-          name="tipo"
-          defaultValue={tipo && tipo !== "todos" ? tipo : "todos"}
-          aria-label="Tipo de servicio"
-          className={`${controlClass} sm:w-[190px]`}
-        >
-          <option value="todos">Todos los tipos</option>
-          {SERVICIO_TIPO_OPTIONS.map((opt) => (
-            <option key={opt.param} value={opt.param}>
-              {opt.label}
-            </option>
-          ))}
-        </select>
         <CalendarFilter
           desde={desde}
           hasta={hasta}
-          clearHref={serviciosBandejaHref({ vista, tipo, q: query, estado })}
+          clearHref={serviciosBandejaHref({ vista, q: query, estado })}
         />
         {vista === "historial" ? (
           <select
@@ -223,13 +200,12 @@ export async function ServiciosTecnicoBandeja({
       </FilterBar>
       <ActiveFilters
         items={[
-          ...(tipoParam && tipoLabel ? [{ label: tipoLabel, clearHref: serviciosBandejaHref({ vista, q: query, desde, hasta, estado }) }] : []),
-          ...(estadoLabel ? [{ label: estadoLabel, clearHref: serviciosBandejaHref({ vista, tipo, q: query, desde, hasta }) }] : []),
-          ...(query ? [{ label: `Búsqueda: ${query}`, clearHref: serviciosBandejaHref({ vista, tipo, desde, hasta, estado }) }] : []),
+          ...(estadoLabel ? [{ label: estadoLabel, clearHref: serviciosBandejaHref({ vista, q: query, desde, hasta }) }] : []),
+          ...(query ? [{ label: `Búsqueda: ${query}`, clearHref: serviciosBandejaHref({ vista, desde, hasta, estado }) }] : []),
           ...(desde || hasta
             ? [{
                 label: desde && hasta ? `Fechas: ${desde} – ${hasta}` : desde ? `Desde ${desde}` : `Hasta ${hasta}`,
-                clearHref: serviciosBandejaHref({ vista, tipo, q: query, estado }),
+                clearHref: serviciosBandejaHref({ vista, q: query, estado }),
               }]
             : []),
         ]}
@@ -240,28 +216,19 @@ export async function ServiciosTecnicoBandeja({
           title={query || desde || hasta ? "Sin coincidencias" : vista === "historial" ? "Sin historial" : "Sin servicios activos"}
           body={
             query || desde || hasta
-              ? `Nada coincide con los filtros${tipoLabel ? ` en ${tipoLabel.toLowerCase()}` : ""}.`
+              ? "Nada coincide con los filtros aplicados."
               : vista === "historial"
-                ? tipoLabel
-                  ? `No hay ${tipoLabel.toLowerCase()} en el historial.`
-                  : "Aún no hay servicios cerrados o cancelados que mostrar."
-                : tipoLabel
-                  ? `No hay ${tipoLabel.toLowerCase()} activos en este momento.`
-                  : "No hay servicios activos en este momento."
+                ? "Aún no hay servicios cerrados o cancelados que mostrar."
+                : "No hay servicios activos en este momento."
           }
           action={
             query || desde || hasta ? (
-              <TextLink href={serviciosBandejaHref({ vista, tipo })}>Quitar filtros</TextLink>
+              <TextLink href={serviciosBandejaHref({ vista })}>Quitar filtros</TextLink>
             ) : undefined
           }
         />
       ) : (
-        <ServiciosSupervisorList
-          rows={rows}
-          showTipo={!tipoParam}
-          hideAssignee={technician}
-          variant={vista === "historial" ? "historial" : "activos"}
-        />
+        <ServiciosSupervisorList rows={rows} role={role} variant={vista === "historial" ? "historial" : "activos"} />
       )}
       <ListCap shown={rows.length} />
     </>
