@@ -12,14 +12,35 @@ const TONE_CLASS: Record<StatusTone, string> = {
   info: "border-[#b8d4f0] bg-[#edf5fc] text-[#1d4f8c]",
 };
 
+const TAG_TEXT_CLASS: Record<StatusTone, string> = {
+  neutral: "text-[#5c6670]",
+  ok: "text-[#0a7a55]",
+  warn: "text-[#b45309]",
+  danger: "text-[#c81e1e]",
+  info: "text-[#1d5f9a]",
+};
+
+function tagTone(tag: string): StatusTone {
+  if (tag === "No autorizado") return "danger";
+  if (tag === "Autorizado") return "ok";
+  if (tag.toLowerCase().includes("refacciones")) return "info";
+  return "neutral";
+}
+
 function StatusBadge({ status }: { status: StackedStatus }) {
   return (
-    <div className="flex flex-col items-start gap-1">
-      <span className={`inline-flex rounded-md border px-2 py-0.5 text-xs font-semibold leading-5 ${TONE_CLASS[status.tone]}`}>
+    <div className="flex min-w-0 max-w-[9.5rem] flex-col items-start gap-px leading-none">
+      <span
+        className={`inline-flex max-w-full whitespace-nowrap rounded border px-1.5 py-px text-[10px] font-semibold leading-[1.15rem] ${TONE_CLASS[status.tone]}`}
+      >
         {status.label}
       </span>
       {status.tags?.map((tag) => (
-        <span key={tag} className="text-[10px] font-medium uppercase tracking-wide text-[var(--muted)]">
+        <span
+          key={tag}
+          className={`max-w-full truncate text-[8px] font-semibold leading-[0.95rem] ${TAG_TEXT_CLASS[tagTone(tag)]}`}
+          title={tag}
+        >
           {tag}
         </span>
       ))}
