@@ -403,7 +403,9 @@ export async function decideQuote(
     const { archivePartPresolicitudesForDiagnosis } = await import("./part-presolicitud");
     await archivePartPresolicitudesForDiagnosis(diagnosis.id);
   }
-  if (authorized && inShop && diagnosis) await openRepairOrder(diagnosis.id, actor.userId);
+  if (authorized && inShop && diagnosis && quote.quoteType === "REPARACION") {
+    await openRepairOrder(diagnosis.id, actor.userId);
+  }
 }
 
 export async function relateQuoteEquipment(actor: Actor, quoteId: string, version: number, equipmentId: string, priorityId: string) {
@@ -474,7 +476,7 @@ export async function openWaitingRepairs(equipmentId: string, authorUserId: stri
     where: {
       equipmentId,
       status: "AUTORIZADA_PENDIENTE_EQUIPO",
-      quoteType: { in: ["DIAGNOSTICO", "REPARACION"] },
+      quoteType: "REPARACION",
       technicalCaseId: { not: null },
     },
   });
