@@ -190,10 +190,12 @@ function buildServicioRow(
   quoteStatus: string | null,
   sellerName: string | null,
 ): ServicioBandejaRow {
-  const diagnosis = cases.find((c) => c.kind === "DIAGNOSTICO") ?? null;
   const os =
-    cases.find((c) => c.kind === "OS" && diagnosis && c.spawnedFromId === diagnosis.id)
-    ?? cases.find((c) => c.kind === "OS")
+    cases.find((c) => c.kind === "OS")
+    ?? null;
+  const diagnosis =
+    cases.find((c) => c.kind === "DIAGNOSTICO")
+    ?? (os?.spawnedFromId ? cases.find((c) => c.id === os.spawnedFromId) : null)
     ?? null;
   const primary = os ?? diagnosis ?? cases[0];
   const equipment = primary.equipment;
@@ -260,12 +262,38 @@ function groupCasesByEquipment(cases: CaseRecord[]) {
   return map;
 }
 
+const caseInclude = {
+  equipment: { include: { client: true } },
+  attention: { select: { priorityName: true, slaStartedAt: true, attentionType: true, sellerUserId: true } },
+  assignee: { select: { name: true } },
+} as const;
+
+async function attachParentDiagnoses(companyId: string, cases: CaseRecord[]): Promise<CaseRecord[]> {
+  const existing = new Set(cases.map((c) => c.id));
+  const parentIds = [
+    ...new Set(
+      cases
+        .filter((c) => c.kind === "OS" && c.spawnedFromId && !existing.has(c.spawnedFromId))
+        .map((c) => c.spawnedFromId as string),
+    ),
+  ];
+  if (parentIds.length === 0) return cases;
+  const parents = await prisma.technicalCase.findMany({
+    where: { id: { in: parentIds }, serviceCompanyId: companyId },
+    include: caseInclude,
+  });
+  return [...cases, ...(parents as CaseRecord[])];
+}
+
 async function mapCasesToBandejaRows(companyId: string, cases: CaseRecord[]): Promise<ServicioBandejaRow[]> {
   if (cases.length === 0) return [];
 
-  const caseIds = cases.map((c) => c.id);
-  const equipmentIds = [...new Set(cases.map((c) => c.equipmentId))];
-  const sellerIds = [...new Set(cases.map((c) => c.attention.sellerUserId).filter((id): id is string => Boolean(id)))];
+  const casesWithParents = await attachParentDiagnoses(companyId, cases);
+  const caseIds = casesWithParents.map((c) => c.id);
+  const equipmentIds = [...new Set(casesWithParents.map((c) => c.equipmentId))];
+  const sellerIds = [
+    ...new Set(casesWithParents.map((c) => c.attention.sellerUserId).filter((id): id is string => Boolean(id))),
+  ];
 
   const [quotes, sellers] = await Promise.all([
     prisma.quote.findMany({
@@ -283,7 +311,7 @@ async function mapCasesToBandejaRows(companyId: string, cases: CaseRecord[]): Pr
   ]);
   const sellerMap = new Map(sellers.map((u) => [u.id, u.name]));
 
-  const byEquipment = groupCasesByEquipment(cases);
+  const byEquipment = groupCasesByEquipment(casesWithParents);
   const rows: ServicioBandejaRow[] = [];
 
   for (const equipmentCases of byEquipment.values()) {
@@ -305,12 +333,6 @@ async function mapCasesToBandejaRows(companyId: string, cases: CaseRecord[]): Pr
 
   return rows;
 }
-
-const caseInclude = {
-  equipment: { include: { client: true } },
-  attention: { select: { priorityName: true, slaStartedAt: true, attentionType: true, sellerUserId: true } },
-  assignee: { select: { name: true } },
-} as const;
 
 export async function listActiveServicios(
   companyId: string,
