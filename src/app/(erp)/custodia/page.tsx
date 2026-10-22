@@ -1,11 +1,13 @@
 import { redirect } from "next/navigation";
+import { AlmacenBandejaList } from "@/components/almacen-bandeja-list";
 import { ActiveFilters, Badge, Card, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, SegmentedNav, Table, Td, Th } from "@/components/ui";
+import { mapEquipmentToAlmacenRow } from "@/lib/almacen-bandeja";
 import { CUSTODY_LABEL, type Custody } from "@/lib/custody";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
 import { EntradaServicioCell } from "@/components/entrada-servicio-cell";
-import { resolveEntradaAttentionType } from "@/lib/almacen-entrada";
+import { pickCustodyFlowAttention, resolveEntradaAttentionType } from "@/lib/almacen-entrada";
 import { serviceSeries } from "@/lib/servicios-catalog";
 import { isOsDefinitiveCustodyExit } from "@/lib/warehouse-exit";
 
@@ -36,13 +38,32 @@ export default async function CustodiaPage({ searchParams }: { searchParams: Pro
         ...(view === "resguardo" ? { holderCompanyId: session.activeCompanyId } : {}),
       };
 
+  const bandejaInclude = {
+    client: { select: { name: true } },
+    originCompany: { select: { code: true } },
+    attentions: {
+      orderBy: { createdAt: "desc" as const },
+      take: 8,
+      select: {
+        id: true,
+        status: true,
+        slaStartedAt: true,
+        attentionType: true,
+        sellerUserId: true,
+        technicalCases: {
+          orderBy: { createdAt: "asc" as const },
+          select: { id: true, folio: true, kind: true, spawnedFromId: true },
+        },
+      },
+    },
+  };
+
   const rows = view === "definitiva"
     ? (
         await prisma.equipment.findMany({
           where: { custody: "FUERA", ...baseWhere },
           include: {
-            client: { select: { name: true } },
-            originCompany: { select: { code: true } },
+            ...bandejaInclude,
             movements: { where: { cancelledAt: null }, orderBy: { occurredAt: "desc" }, take: 1 },
           },
           orderBy: { updatedAt: "desc" },
@@ -61,19 +82,7 @@ export default async function CustodiaPage({ searchParams }: { searchParams: Pro
                 : "FUERA_A_PRUEBA",
           ...baseWhere,
         },
-        include: {
-          client: { select: { name: true } },
-          originCompany: { select: { code: true } },
-          ...(view === "pendientes"
-            ? {
-                attentions: {
-                  orderBy: { createdAt: "desc" },
-                  take: 5,
-                  select: { attentionType: true, status: true, slaStartedAt: true },
-                },
-              }
-            : {}),
-        },
+        include: bandejaInclude,
         orderBy: { updatedAt: "asc" },
         take: 100,
       });
@@ -118,6 +127,26 @@ export default async function CustodiaPage({ searchParams }: { searchParams: Pro
       ];
   const tabs = almacenBandeja ? tabsAll : tabsAll.filter(([key]) => key !== "definitiva");
   const vistaQuery = (key: string) => (almacenBandeja ? `?vista=${key}` : "");
+  const vistaHref = almacenBandeja ? `?vista=${view}` : "";
+  const sellerIds = almacenBandeja
+    ? [...new Set(rows.flatMap((row) => row.attentions.map((a) => a.sellerUserId).filter(Boolean) as string[]))]
+    : [];
+  const sellers = sellerIds.length > 0
+    ? new Map(
+      (await prisma.user.findMany({ where: { id: { in: sellerIds } }, select: { id: true, name: true } }))
+        .map((u) => [u.id, u.name]),
+    )
+    : new Map<string, string>();
+  const almacenRows = almacenBandeja
+    ? rows.map((row) => {
+      const hideClient = !systron && row.originCompany.code === "SYSTRON";
+      const mapped = mapEquipmentToAlmacenRow(row, { vistaQuery: vistaHref, hideClient });
+      const attention = pickCustodyFlowAttention(row.attentions) ?? row.attentions[0];
+      const sellerId = attention?.sellerUserId;
+      return { ...mapped, sellerName: sellerId ? sellers.get(sellerId) ?? null : null };
+    })
+    : [];
+
   return (
     <>
       <PageHeader
@@ -137,6 +166,8 @@ export default async function CustodiaPage({ searchParams }: { searchParams: Pro
       {systron && can(session.role, "sale.receive", session.activeCompanyCode) ? <SaleQueue companyId={session.activeCompanyId} /> : null}
       {rows.length === 0 ? (
         <Empty title="Sin equipos en esta vista" body="La custodia cambia solo cuando alguien confirma el movimiento." />
+      ) : almacenBandeja ? (
+        <AlmacenBandejaList rows={almacenRows} />
       ) : (
         <ResponsiveData
           table={
