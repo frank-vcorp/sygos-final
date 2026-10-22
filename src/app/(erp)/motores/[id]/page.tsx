@@ -1,4 +1,5 @@
 import { EquipmentDetail } from "@/components/equipment-detail";
+import { SalidaDocumentPopup } from "@/components/salida-document-popup";
 
 const CUSTODIA_VISTAS = new Set(["pendientes", "resguardo", "fuera", "definitiva"]);
 
@@ -7,17 +8,20 @@ export default async function MotorPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ etiqueta?: string; vista?: string }>;
+  searchParams: Promise<{ etiqueta?: string; vista?: string; documentoSalida?: string }>;
 }) {
   const { id } = await params;
-  const { etiqueta, vista } = await searchParams;
+  const { etiqueta, vista, documentoSalida } = await searchParams;
   const fromCustodiaVista = vista && CUSTODIA_VISTAS.has(vista) ? vista : undefined;
   return (
-    <EquipmentDetail
-      id={id}
-      expectedKind="MOT"
-      showLabel={etiqueta === "1"}
-      fromCustodiaVista={fromCustodiaVista}
-    />
+    <>
+      <SalidaDocumentPopup movementId={documentoSalida} />
+      <EquipmentDetail
+        id={id}
+        expectedKind="MOT"
+        showLabel={etiqueta === "1"}
+        fromCustodiaVista={fromCustodiaVista}
+      />
+    </>
   );
 }

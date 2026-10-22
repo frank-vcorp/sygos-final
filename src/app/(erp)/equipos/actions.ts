@@ -131,10 +131,10 @@ export async function movementAction(formData: FormData) {
       await setFlash({
         tone: "ok",
         message: result.folio
-          ? `${result.folio} confirmado. Imprime el documento de salida para firma.`
+          ? `${result.folio} confirmado. Se abrió el documento de salida en otra ventana.`
           : "Salida registrada.",
       });
-      redirect(`/documentos/salida/${result.id}`);
+      redirect(`${back}?documentoSalida=${result.id}`);
     }
     await setFlash({
       tone: "ok",
