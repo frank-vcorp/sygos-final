@@ -215,10 +215,29 @@ export async function EquipmentDetail({
   }
 
   const showCustodyMovementBar =
-    showAlmacenPasarResguardo
-    || (custodyDetail && !awaitingAttentionForReceipt && canMove && movementOptions.length > 0);
-  const custodyBarSticky =
-    showCustodyMovementBar && (showAlmacenPasarResguardo || almacenCustody || movementOptions.length > 0);
+    !showAlmacenPasarResguardo
+    && custodyDetail
+    && !awaitingAttentionForReceipt
+    && canMove
+    && movementOptions.length > 0;
+  const custodyBarSticky = showCustodyMovementBar && (almacenCustody || movementOptions.length > 0);
+  const almacenResguardoAction =
+    showAlmacenPasarResguardo && almacenEntradaPreset
+      ? (
+        <PassToResguardoForm
+          direct
+          equipmentId={equipment.id}
+          equipmentFolio={equipment.folio}
+          kind={expectedKind}
+          version={equipment.version}
+          movement={almacenEntradaPreset.movement}
+          reason={almacenEntradaPreset.reason}
+          serviceLabel={almacenEntradaPreset.serviceLabel}
+          reportedFault={almacenEntradaPreset.reportedFault}
+          clientName={almacenEntradaPreset.clientName}
+        />
+      )
+      : null;
 
   return (
     <>
@@ -247,7 +266,7 @@ export async function EquipmentDetail({
             {intercompany && sellerUser ? <EntityMetaItem label="Contacto SYSTRON">{sellerUser.name}</EntityMetaItem> : null}
           </>
         }
-        primaryAction={almacenCustody ? null : custodyDetail ? custodyPrimaryAction : primaryAction}
+        primaryAction={almacenResguardoAction ?? (almacenCustody ? null : custodyDetail ? custodyPrimaryAction : primaryAction)}
       />
       {custodyDetail && hasReceipt ? (
         <div className="mb-6">
@@ -269,48 +288,8 @@ export async function EquipmentDetail({
           <p className="text-sm text-[var(--muted)]">Este MOT no entra al almacén SYSTRON. El estado físico lo confirma Servomotores.</p>
         ) : null}
 
-        {custodyDetail && openAttention ? (
-          <Card className="overflow-hidden">
-            <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--line)] bg-[#f7fafc] p-5">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Servicio asociado</p>
-                <h2 className="mt-1 text-lg font-semibold text-[#0b1f3a]">{activeServiceLabel}</h2>
-                <p className="mt-1 text-sm text-[var(--muted)]">{activeServiceFolio} · prioridad {openAttention.priorityName}</p>
-              </div>
-              {activeServiceHref ? <TextLink href={activeServiceHref}>Abrir atención →</TextLink> : null}
-            </div>
-            <div className="grid gap-4 p-5 text-sm sm:grid-cols-2">
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Falla reportada</p>
-                <p className="mt-1 leading-6">{openAttention.reportedFault}</p>
-              </div>
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">SLA</p>
-                <p className="mt-1 leading-6">{openAttention.slaStartedAt ? `Iniciado ${formatWhen(openAttention.slaStartedAt)}` : "Inicia al confirmar la entrada física"}</p>
-              </div>
-              {openAttention.antecedent ? (
-                <div className="sm:col-span-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Antecedente</p>
-                  <p className="mt-1 leading-6">{openAttention.antecedent}</p>
-                </div>
-              ) : null}
-              {openAttention.initialLog ? (
-                <div className="sm:col-span-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Bitácora inicial</p>
-                  <p className="mt-1 whitespace-pre-wrap leading-6">{openAttention.initialLog}</p>
-                </div>
-              ) : null}
-            </div>
-          </Card>
-        ) : null}
-
         <div id="custodia-equipo" className="scroll-mt-24">
-          {showAlmacenPasarResguardo ? (
-            <div className="mb-3">
-              <h2 className="text-lg font-semibold text-[#0b1f3a]">Entrada pendiente</h2>
-              <p className="mt-1 text-sm text-[var(--muted)]">El servicio ya fue definido por Ventas. Al pasar a resguardo se inicia el SLA y el folio DX u OS.</p>
-            </div>
-          ) : custodyDetail ? (
+          {custodyDetail && !showAlmacenPasarResguardo ? (
             <div className="mb-3">
               <h2 className="text-lg font-semibold text-[#0b1f3a]">{almacenCustody ? "Custodia" : "Recepción física"}</h2>
               <p className="mt-1 text-sm text-[var(--muted)]">
@@ -323,28 +302,12 @@ export async function EquipmentDetail({
           {showCustodyMovementBar ? (
             <div className={custodyBarSticky ? "sticky top-3 z-20 rounded-xl border border-[var(--line)] bg-white/95 p-2 shadow-[0_8px_24px_rgba(20,45,75,0.12)] backdrop-blur" : ""}>
               <EquipmentCustodyActions
-                showMovement={showAlmacenPasarResguardo || (canMove && movementOptions.length > 0)}
+                showMovement={canMove && movementOptions.length > 0}
                 showAttention={false}
-                movementButtonLabel={
-                  showAlmacenPasarResguardo ? "Pasar a resguardo" : useWarehouseExit ? "Registrar salida" : "Registrar movimiento"
-                }
-                movementTitle={
-                  showAlmacenPasarResguardo ? "Pasar a resguardo" : useWarehouseExit ? "Registrar salida" : "Registrar movimiento"
-                }
+                movementButtonLabel={useWarehouseExit ? "Registrar salida" : "Registrar movimiento"}
+                movementTitle={useWarehouseExit ? "Registrar salida" : "Registrar movimiento"}
                 movement={
-                  showAlmacenPasarResguardo && almacenEntradaPreset ? (
-                    <PassToResguardoForm
-                      equipmentId={equipment.id}
-                      equipmentFolio={equipment.folio}
-                      kind={expectedKind}
-                      version={equipment.version}
-                      movement={almacenEntradaPreset.movement}
-                      reason={almacenEntradaPreset.reason}
-                      serviceLabel={almacenEntradaPreset.serviceLabel}
-                      reportedFault={almacenEntradaPreset.reportedFault}
-                      clientName={almacenEntradaPreset.clientName}
-                    />
-                  ) : useWarehouseExit && warehouseExit ? (
+                  useWarehouseExit && warehouseExit ? (
                     almacenCustody ? (
                       <WarehouseExitFormAlmacen
                         equipmentId={equipment.id}
