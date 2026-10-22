@@ -14,6 +14,7 @@ export function PassToResguardoForm({
   serviceLabel,
   reportedFault,
   clientName,
+  direct = false,
 }: {
   equipmentId: string;
   equipmentFolio: string;
@@ -24,14 +25,31 @@ export function PassToResguardoForm({
   serviceLabel: string;
   reportedFault: string;
   clientName: string;
+  /** Un solo clic desde la cabecera del equipo (sin overlay ni resumen). */
+  direct?: boolean;
 }) {
-  return (
-    <form action={movementAction} className="grid gap-4">
+  const fields = (
+    <>
       <input type="hidden" name="equipmentId" value={equipmentId} />
       <input type="hidden" name="kind" value={kind} />
       <input type="hidden" name="version" value={version} />
       <input type="hidden" name="movement" value={movement} />
       <input type="hidden" name="reason" value={reason} />
+    </>
+  );
+
+  if (direct) {
+    return (
+      <form action={movementAction} className="inline">
+        {fields}
+        <Button type="submit">Pasar a resguardo</Button>
+      </form>
+    );
+  }
+
+  return (
+    <form action={movementAction} className="grid gap-4">
+      {fields}
       <p className="text-sm text-[var(--muted)]">
         El servicio ya lo definió ventas. Al pasar a resguardo se inicia el SLA y el folio DX u OS.
       </p>
