@@ -442,12 +442,12 @@ export async function EquipmentDetail({
               <Table>
                 <thead><tr><Th>Cuándo</Th><Th>Movimiento</Th><Th>Detalle</Th><Th>Autor</Th></tr></thead>
                 <tbody>
-                  {equipment.movements.map((movement) => (
+                  {equipment.movements.filter((movement) => !custodyDetail || !movement.cancelledAt).map((movement) => (
                     <tr key={movement.id}>
                       <Td>{formatWhen(movement.occurredAt)}</Td>
                       <Td>
                         {MOVEMENT_LABEL[movement.kind as MovementKind] ?? movement.kind}
-                        {movement.cancelledAt ? " · cancelado" : ""}
+                        {!custodyDetail && movement.cancelledAt ? " · cancelado" : ""}
                       </Td>
                       <Td>
                         {movement.folio ? <span className="font-medium">{movement.folio}</span> : null}
@@ -455,7 +455,7 @@ export async function EquipmentDetail({
                         {movement.reason}
                         {movement.receiverName ? ` · recibe ${movement.receiverName}` : ""}
                         {movement.enablingDocument ? ` · ${movement.enablingDocument}` : ""}
-                        {movement.cancelReason ? ` · ${movement.cancelReason}` : ""}
+                        {!custodyDetail && movement.cancelReason ? ` · ${movement.cancelReason}` : ""}
                         {!movement.cancelledAt && movement.folio && isReceipt(movement.kind as MovementKind) ? (
                           <span className="ml-2">
                             <TextLink href={`/documentos/entrada/${movement.id}`}>Documento de recepción</TextLink>
@@ -466,7 +466,7 @@ export async function EquipmentDetail({
                             <TextLink href={`/documentos/salida/${movement.id}`}>Documento de salida</TextLink>
                           </span>
                         ) : null}
-                        {canMove && latestOpen?.id === movement.id && movement.kind !== "ENTRADA" && movement.kind !== "INGRESO" && !movement.cancelledAt ? (
+                        {!custodyDetail && canMove && latestOpen?.id === movement.id && movement.kind !== "ENTRADA" && movement.kind !== "INGRESO" && !movement.cancelledAt ? (
                           <CancelMovementForm equipmentId={equipment.id} kind={expectedKind} movementId={movement.id} />
                         ) : null}
                       </Td>
