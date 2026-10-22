@@ -58,14 +58,19 @@ export function resolveAlmacenExitAttentionType(input: {
   return null;
 }
 
-/** Diagnóstico en curso o validado sin orden de reparación en la misma atención. */
+/** DX abierto (aún no validado ni cerrado): salida a prueba solo durante diagnóstico. */
+export function diagnosisStatusAllowsTestExit(status: string) {
+  return !CLOSED_CASE.has(status);
+}
+
+/** Diagnóstico en curso en la atención vigente (no aplica con DX ya validado). */
 export async function findDiagnosisCaseForTestExit(
   equipmentId: string,
   serviceCompanyId: string,
   attentionId?: string | null,
 ) {
   const attentionFilter = attentionId ? { attentionId } : {};
-  const open = await prisma.technicalCase.findFirst({
+  return prisma.technicalCase.findFirst({
     where: {
       equipmentId,
       serviceCompanyId,
@@ -76,31 +81,6 @@ export async function findDiagnosisCaseForTestExit(
     orderBy: { createdAt: "desc" },
     include: { attention: true },
   });
-  if (open) return open;
-
-  const validated = await prisma.technicalCase.findFirst({
-    where: {
-      equipmentId,
-      serviceCompanyId,
-      kind: "DIAGNOSTICO",
-      status: "VALIDADO",
-      ...attentionFilter,
-    },
-    orderBy: { updatedAt: "desc" },
-    include: { attention: true },
-  });
-  if (!validated) return null;
-
-  const repairOnAttention = await prisma.technicalCase.findFirst({
-    where: {
-      attentionId: validated.attentionId,
-      kind: "OS",
-      status: {
-        in: ["EN_ESPERA", "EN_REPARACION", "EN_ESPERA_REFACCIONES", "TERMINADA", "SIN_REPARACION"],
-      },
-    },
-  });
-  return repairOnAttention ? null : validated;
 }
 
 export async function loadWarehouseExitContext(input: {
@@ -165,6 +145,21 @@ export async function loadWarehouseExitContext(input: {
     input.companyId,
     input.openAttentionId,
   );
+  const validatedDxOnAttention =
+    !diagnosisForTest
+    && input.openAttentionId
+    && isDiagnosisAttentionType(input.openAttentionType)
+      ? await prisma.technicalCase.findFirst({
+        where: {
+          equipmentId: input.equipmentId,
+          serviceCompanyId: input.companyId,
+          attentionId: input.openAttentionId,
+          kind: "DIAGNOSTICO",
+          status: "VALIDADO",
+        },
+        select: { id: true },
+      })
+      : null;
 
   const sellerUserId =
     diagnosisForTest?.attention.sellerUserId
@@ -193,7 +188,9 @@ export async function loadWarehouseExitContext(input: {
     } else if (isDiagnosisAttentionType(attentionType)) {
       exitKind = "test";
       if (!canTestExit) {
-        blockedMessage = "La salida a prueba solo aplica con un diagnóstico en curso (sin reparación abierta en esta atención).";
+        blockedMessage = validatedDxOnAttention
+          ? "La salida a prueba solo aplica durante el diagnóstico (antes de validar el DX)."
+          : "La salida a prueba solo aplica mientras el diagnóstico está en curso (folio DX abierto, sin validar).";
       }
     } else if (attentionType === "REPARACION") {
       exitKind = "definitive";

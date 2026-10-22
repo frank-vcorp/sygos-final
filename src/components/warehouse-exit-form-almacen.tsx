@@ -62,7 +62,7 @@ export function WarehouseExitFormAlmacen({
       <p className="text-sm text-[var(--muted)]">
         Equipo <span className="font-medium text-[var(--ink)]">{equipmentFolio}</span>.
         {exitKind === "test"
-          ? " Con diagnóstico en curso, la salida será a prueba."
+          ? " Mientras el DX sigue abierto (sin validar), la salida será a prueba."
           : " Con OS terminada, la salida será definitiva."}
       </p>
 
