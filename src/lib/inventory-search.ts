@@ -147,6 +147,65 @@ export async function listTopInventoryRacks(prisma: PrismaClient, companyId: str
   return rows.map((row) => ({ rack: row.rack, count: Number(row.count) }));
 }
 
+export type InventoryFieldOption = { value: string; count: number };
+
+async function listTopInventoryTextField(
+  prisma: PrismaClient,
+  companyId: string,
+  field: "nivel" | "unit" | "mountType" | "catalogNumero",
+  limit: number,
+) {
+  const rows =
+    field === "nivel"
+      ? await prisma.$queryRaw<InventoryFieldOption[]>`
+          SELECT nivel AS value, COUNT(*) AS count
+          FROM Part
+          WHERE companyId = ${companyId} AND active = 1 AND TRIM(nivel) != ''
+          GROUP BY nivel
+          ORDER BY count DESC, value ASC
+          LIMIT ${limit}
+        `
+      : field === "unit"
+        ? await prisma.$queryRaw<InventoryFieldOption[]>`
+            SELECT unit AS value, COUNT(*) AS count
+            FROM Part
+            WHERE companyId = ${companyId} AND active = 1 AND TRIM(unit) != ''
+            GROUP BY unit
+            ORDER BY count DESC, value ASC
+            LIMIT ${limit}
+          `
+        : field === "mountType"
+          ? await prisma.$queryRaw<InventoryFieldOption[]>`
+              SELECT mountType AS value, COUNT(*) AS count
+              FROM Part
+              WHERE companyId = ${companyId} AND active = 1 AND TRIM(mountType) != ''
+              GROUP BY mountType
+              ORDER BY count DESC, value ASC
+              LIMIT ${limit}
+            `
+          : await prisma.$queryRaw<InventoryFieldOption[]>`
+              SELECT catalogNumero AS value, COUNT(*) AS count
+              FROM Part
+              WHERE companyId = ${companyId} AND active = 1 AND TRIM(catalogNumero) != ''
+              GROUP BY catalogNumero
+              ORDER BY count DESC, value ASC
+              LIMIT ${limit}
+            `;
+  return rows.map((row) => ({ value: row.value, count: Number(row.count) }));
+}
+
+export async function loadInventoryCreateCatalog(prisma: PrismaClient, companyId: string) {
+  const [families, racks, niveles, units, mountTypes, catalogNumeros] = await Promise.all([
+    listTopInventoryFamilies(prisma, companyId, 80),
+    listTopInventoryRacks(prisma, companyId, 40),
+    listTopInventoryTextField(prisma, companyId, "nivel", 40),
+    listTopInventoryTextField(prisma, companyId, "unit", 24),
+    listTopInventoryTextField(prisma, companyId, "mountType", 24),
+    listTopInventoryTextField(prisma, companyId, "catalogNumero", 60),
+  ]);
+  return { families, racks, niveles, units, mountTypes, catalogNumeros };
+}
+
 export async function fetchInventoryPartsForList(
   prisma: PrismaClient,
   companyId: string,

@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { InventoryPartCreateFields } from "@/components/inventory-part-create-fields";
 import { createPartAction, stockAction } from "./actions";
 import {
   ActionLink,
@@ -7,7 +8,6 @@ import {
   Button,
   controlClass,
   Empty,
-  Field,
   FilterBar,
   FormActions,
   FormPanel,
@@ -30,6 +30,7 @@ import {
   inventoryListHref,
   listTopInventoryFamilies,
   listTopInventoryRacks,
+  loadInventoryCreateCatalog,
   parseInventoryStockFilter,
   partInventoryAvailableQty,
   type InventoryListFilters,
@@ -74,10 +75,11 @@ export default async function InventarioPage({
   const filters: InventoryListFilters = { query, family, rack, stock };
   const hasCriteria = inventoryListHasCriteria(filters);
 
-  const [total, families, racks, parts] = await Promise.all([
+  const [total, families, racks, createCatalog, parts] = await Promise.all([
     prisma.part.count({ where: { companyId: company.id, active: true } }),
     listTopInventoryFamilies(prisma, company.id),
     listTopInventoryRacks(prisma, company.id),
+    loadInventoryCreateCatalog(prisma, company.id),
     hasCriteria ? fetchInventoryPartsForList(prisma, company.id, filters) : Promise.resolve([]),
   ]);
 
@@ -307,37 +309,12 @@ export default async function InventarioPage({
         </>
       )}
       <FormPanel action={createPartAction} className="mt-4">
-        <FormSection title="Nueva línea de inventario" description="Agrega al catálogo sin inventar existencia; el stock entra con movimientos.">
-          <Field label="Nombre de producto">
-            <input name="partNumber" required className={controlClass} />
-          </Field>
-          <Field label="Descripción">
-            <input name="description" className={controlClass} />
-          </Field>
-          <Field label="Número (catálogo)">
-            <input name="catalogNumero" className={controlClass} />
-          </Field>
-          <Field label="Familia">
-            <input name="family" className={controlClass} />
-          </Field>
-          <Field label="Rack">
-            <input name="rack" className={controlClass} placeholder="2 o ORGANIZADOR GRIS" />
-          </Field>
-          <Field label="Nivel">
-            <input name="nivel" className={controlClass} placeholder="6" />
-          </Field>
-          <Field label="Unidad">
-            <input name="unit" className={controlClass} />
-          </Field>
-          <Field label="Montaje">
-            <input name="mountType" className={controlClass} />
-          </Field>
-          <Field label="Mínimo informativo">
-            <input name="minQty" type="number" min={0} className={controlClass} />
-          </Field>
-          <Field label="Máximo informativo">
-            <input name="maxQty" type="number" min={0} className={controlClass} />
-          </Field>
+        <FormSection
+          title="Nueva línea de inventario"
+          description="Producto y descripción son libres; familia, rack, unidad y montaje se eligen del catálogo ya cargado (o agregas uno nuevo)."
+          columns={1}
+        >
+          <InventoryPartCreateFields catalog={createCatalog} />
         </FormSection>
         <FormActions note="La existencia inicial sigue en cero hasta un movimiento de entrada.">
           <Button type="submit">Agregar al catálogo</Button>
