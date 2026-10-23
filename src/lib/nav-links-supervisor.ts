@@ -27,6 +27,11 @@ export const SUPERVISOR_NAV_GROUPS: NavGroupDef[] = [
         label: "Horas extra",
         show: (role, code) => supervisor(role) && can(role, "overtime.capture", code),
       },
+      {
+        href: "/personal/vacaciones",
+        label: "Vacaciones",
+        show: (role, code) => supervisor(role) && can(role, "overtime.capture", code),
+      },
       { href: "/cuenta", label: "Usuario", show: supervisor },
     ],
   },

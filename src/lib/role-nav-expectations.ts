@@ -22,6 +22,7 @@ export const SYSTRON_NAV: Partial<Record<Role, readonly string[]>> = {
     "/servicios/activos",
     "/servicios/historial",
     "/personal/horas",
+    "/personal/vacaciones",
     "/cuenta",
   ],
   SUPERVISOR_TECNICO: [
@@ -29,6 +30,7 @@ export const SYSTRON_NAV: Partial<Record<Role, readonly string[]>> = {
     "/servicios/activos",
     "/servicios/historial",
     "/personal/horas",
+    "/personal/vacaciones",
     "/cuenta",
   ],
   GERENTE_OPERATIVO_SYSTRON: [
