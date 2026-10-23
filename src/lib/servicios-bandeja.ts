@@ -58,7 +58,7 @@ export function serviciosBandejaColumns(
   options?: ServicioBandejaColumnOptions,
 ): ServicioBandejaColumns {
   const ventas = role === "VENTAS";
-  const ventasTaller = ventas && options?.tallerColumns;
+  const ventasTaller = ventas && options?.tallerColumns === true;
   const showQuoteMonto = ventas && options?.quoteMonto !== false;
   const hideAdmin = (
     role === "TECNICO"
