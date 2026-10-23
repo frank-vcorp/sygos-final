@@ -123,7 +123,7 @@ export function ServiciosSupervisorList({
   return (
     <ResponsiveData
       table={
-        <Table stickyHeader>
+        <Table>
           <thead>
             <tr>
               {columns.diagnostico ? <Th>Diagnóstico</Th> : null}
