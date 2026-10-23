@@ -10,9 +10,21 @@ import { can } from "@/lib/permissions";
 import { QUOTE_STATUS_LABEL } from "@/lib/quotes";
 import { PART_REQUEST_STATUS_LABEL } from "@/lib/case-labels";
 import { homePath } from "@/lib/home";
+import {
+  formatAdministrativeDetail,
+  quoteCotizadaSinAutorizacion,
+  quotePendienteAutorizacion,
+  receivableEsVigente,
+  servicioCotizadaSinAutorizacion,
+  servicioOsValidadaPendienteEntrega,
+} from "@/lib/sales-panel";
+import { serviciosBandejaHref } from "@/lib/servicios-catalog";
+import { listActiveServicios, type ServicioBandejaRow } from "@/lib/servicios-supervisor";
 import { requireCompany } from "@/lib/session";
 
 const CLOSED = ["VALIDADO", "TERMINADA", "SIN_REPARACION"];
+
+type PanelRow = { key?: string; href: string; label: string; detail: ReactNode; highlight?: boolean };
 
 function Block({
   title,
@@ -22,7 +34,7 @@ function Block({
 }: {
   title: string;
   empty: string;
-  rows: Array<{ key?: string; href: string; label: string; detail: ReactNode }>;
+  rows: PanelRow[];
   bandejaHref?: string;
 }) {
   const shownLabel =
@@ -45,7 +57,10 @@ function Block({
       ) : (
         <ul className="divide-y divide-[var(--line)] text-sm">
           {rows.map((row) => (
-            <li key={row.key ?? row.href + row.label} className="flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-start sm:gap-4">
+            <li
+              key={row.key ?? row.href + row.label}
+              className={`flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-start sm:gap-4 ${row.highlight ? "bg-[#f0fdf4] ring-1 ring-inset ring-[#86efac]/60" : ""}`}
+            >
               <RecordLink href={row.href} className="shrink-0">{row.label}</RecordLink>
               <span className="min-w-0 leading-5 text-[var(--muted)]">{row.detail}</span>
             </li>
@@ -54,6 +69,58 @@ function Block({
       )}
     </Card>
   );
+}
+
+function GroupedBlock({
+  title,
+  sections,
+}: {
+  title: string;
+  sections: Array<{ subtitle: string; empty: string; bandejaHref?: string; rows: PanelRow[] }>;
+}) {
+  const total = sections.reduce((sum, section) => sum + section.rows.length, 0);
+  const shownLabel =
+    total === 0 ? "Sin pendientes" : total === 1 ? "1 pendiente mostrado" : `${total} pendientes mostrados`;
+  return (
+    <Card className="flex h-full flex-col overflow-hidden p-0">
+      <div className="border-b border-[var(--line)] bg-[#fbfdff] px-5 py-4">
+        <h2 className="text-base font-bold tracking-tight text-[var(--ink)]">{title}</h2>
+        <p className="mt-1 text-xs text-[var(--muted)]">{shownLabel}</p>
+      </div>
+      {sections.map((section, index) => (
+        <section key={section.subtitle} className={index > 0 ? "border-t border-[var(--line)]" : ""}>
+          <div className="flex flex-wrap items-start justify-between gap-3 bg-[#f8fbfd] px-5 py-3">
+            <h3 className="text-sm font-semibold text-[var(--ink)]">{section.subtitle}</h3>
+            {section.bandejaHref ? <TextLink href={section.bandejaHref}>Ver bandeja</TextLink> : null}
+          </div>
+          {section.rows.length === 0 ? (
+            <p className="m-5 rounded-lg bg-[#f5f8fb] px-4 py-3 text-sm text-[var(--muted)]">{section.empty}</p>
+          ) : (
+            <ul className="divide-y divide-[var(--line)] text-sm">
+              {section.rows.map((row) => (
+                <li
+                  key={row.key ?? row.href + row.label}
+                  className={`flex flex-col gap-1 px-5 py-4 sm:flex-row sm:items-start sm:gap-4 ${row.highlight ? "bg-[#f0fdf4] ring-1 ring-inset ring-[#86efac]/60" : ""}`}
+                >
+                  <RecordLink href={row.href} className="shrink-0">{row.label}</RecordLink>
+                  <span className="min-w-0 leading-5 text-[var(--muted)]">{row.detail}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      ))}
+    </Card>
+  );
+}
+
+function servicioPanelRows(rows: ServicioBandejaRow[], mapDetail: (row: ServicioBandejaRow) => ReactNode): PanelRow[] {
+  return rows.slice(0, 12).map((row) => ({
+    key: row.id,
+    href: row.osHref ?? row.diagnosisHref ?? `/operacion/${row.id}`,
+    label: row.osFolio ?? row.diagnosisFolio ?? row.equipmentLabel,
+    detail: mapDetail(row),
+  }));
 }
 
 function panelClientLink(client: { id: string; name: string; isSystem: boolean }) {
@@ -262,59 +329,94 @@ async function Sales({ companyId, userId }: { companyId: string; userId: string 
   const monthStart = new Date();
   monthStart.setDate(1);
   monthStart.setHours(0, 0, 0, 0);
-  const [quotes, receivables, activities, invoices, sales, goals, authorizedMonth, pendingDecision] = await Promise.all([
-    prisma.quote.findMany({
-      where: {
-        companyId,
-        sellerUserId: userId,
-        status: { in: ["PENDIENTE_DECISION", "AUTORIZADA", "AUTORIZADA_PENDIENTE_EQUIPO"] },
-      },
-      include: { client: true },
-      take: 12,
-      orderBy: { updatedAt: "desc" },
-    }),
+  const now = new Date();
+  const [
+    receivables,
+    goals,
+    invoicedMonth,
+    collectedMonth,
+    newClientsMonth,
+    portfolioQuotes,
+    activeServicios,
+    osSinFacturaQuotes,
+  ] = await Promise.all([
     prisma.receivable.findMany({
       where: { companyId, sellerUserId: userId, balance: { gt: 0 } },
       include: { document: true, client: true },
-      take: 12,
+      take: 100,
       orderBy: { dueAt: "asc" },
     }),
-    prisma.agendaActivity.findMany({
-      where: { companyId, authorUserId: userId, scheduledAt: { gte: new Date() } },
-      include: { client: { select: { id: true, name: true, isSystem: true } } },
-      orderBy: { scheduledAt: "asc" },
-      take: 6,
+    prisma.salesGoal.findMany({
+      where: { companyId, userId, year: now.getFullYear(), month: now.getMonth() + 1 },
+      include: { goalType: true },
+    }),
+    prisma.billingDocument.aggregate({
+      where: {
+        companyId,
+        status: "EMITIDA",
+        kind: { not: "REMISION" },
+        issuedAt: { gte: monthStart },
+        OR: [{ quote: { sellerUserId: userId } }, { client: { ownerUserId: userId, isSystem: false } }],
+      },
+      _sum: { total: true },
+    }),
+    prisma.paymentApplication.aggregate({
+      where: {
+        confirmedAt: { gte: monthStart },
+        payment: { companyId, status: "VALIDADO" },
+        receivable: { companyId, sellerUserId: userId },
+      },
+      _sum: { amount: true },
+    }),
+    prisma.client.count({
+      where: { companyId, ownerUserId: userId, isSystem: false, createdAt: { gte: monthStart } },
     }),
     prisma.quote.findMany({
       where: {
         companyId,
         sellerUserId: userId,
-        status: { startsWith: "AUTORIZADA" },
-        client: { requiresInvoice: true },
-        billingDocuments: { none: { kind: "FACTURA", status: "EMITIDA" } },
+        status: { in: ["PENDIENTE_COTIZAR", "PENDIENTE_DECISION", "NO_AUTORIZADA"] },
       },
       include: { client: true },
-      take: 12,
       orderBy: { updatedAt: "desc" },
+      take: 80,
     }),
-    prisma.sale.findMany({
-      where: { companyId, quote: { sellerUserId: userId } },
-      include: { client: true, lines: true },
-      take: 20,
-      orderBy: { createdAt: "desc" },
-    }),
-    prisma.salesGoal.findMany({
-      where: { companyId, userId, year: new Date().getFullYear(), month: new Date().getMonth() + 1 },
-      include: { goalType: true },
-    }),
-    prisma.quote.count({
-      where: { companyId, sellerUserId: userId, status: { startsWith: "AUTORIZADA" }, updatedAt: { gte: monthStart } },
-    }),
-    prisma.quote.count({
-      where: { companyId, sellerUserId: userId, status: "PENDIENTE_DECISION" },
+    listActiveServicios(companyId, "", { clientOwnerUserId: userId }),
+    prisma.quote.findMany({
+      where: {
+        companyId,
+        sellerUserId: userId,
+        technicalCase: { kind: "OS", status: "VALIDADO" },
+        billingDocuments: { none: { kind: { in: ["FACTURA", "FACTURA_LIBRE"] }, status: "EMITIDA" } },
+      },
+      include: { client: true, technicalCase: { select: { id: true, folio: true } } },
+      orderBy: { updatedAt: "desc" },
+      take: 12,
     }),
   ]);
-  const deliveries = sales.filter((sale) => sale.lines.some((line) => line.qtyReceived < line.qtySold || line.qtyDelivered < line.qtyReceived));
+
+  const overdueBalance = receivables
+    .filter((row) => row.balance > 0 && row.dueAt.getTime() < now.getTime())
+    .reduce((sum, row) => sum + row.balance, 0);
+
+  const servicioRows = activeServicios.filter((row): row is ServicioBandejaRow => row.kind === "servicio");
+  const cotizadasSinAutorizacionQuotes = portfolioQuotes.filter((row) => quoteCotizadaSinAutorizacion(row.status));
+  const pendienteAutorizacionQuotes = portfolioQuotes.filter((row) => quotePendienteAutorizacion(row.status));
+  const cotizadasSinAutorizacionServicios = servicioRows.filter(servicioCotizadaSinAutorizacion);
+  const entregasOsValidadas = servicioRows.filter(servicioOsValidadaPendienteEntrega);
+
+  const quoteRow = (row: (typeof portfolioQuotes)[number]): PanelRow => ({
+    key: row.id,
+    href: `/cotizaciones/${row.id}`,
+    label: row.folio,
+    detail: <>{QUOTE_STATUS_LABEL[row.status] ?? row.status} · {panelClientLink(row.client)}</>,
+  });
+
+  const servicioRowDetail = (row: ServicioBandejaRow) => (
+    <>
+      {row.clientName} · {formatAdministrativeDetail(row.administrative)} · {row.physical.label}
+    </>
+  );
 
   return (
     <>
@@ -326,12 +428,13 @@ async function Sales({ companyId, userId }: { companyId: string; userId: string 
       <Card className="mb-4 p-5">
         <div>
           <h2 className="text-base font-bold tracking-tight text-[var(--ink)]">Mi desempeño</h2>
-          <p className="mt-1 text-sm text-[var(--muted)]">Resumen de actividad comercial propia.</p>
+          <p className="mt-1 text-sm text-[var(--muted)]">Indicadores del mes en curso de tu cartera.</p>
         </div>
-        <div className="mt-4 grid gap-3 sm:grid-cols-3">
-          <SalesMetric label="Cotizaciones autorizadas este mes" value={authorizedMonth} href="/cotizaciones" />
-          <SalesMetric label="Esperando decisión" value={pendingDecision} href="/cotizaciones?vista=decision" />
-          <SalesMetric label="Saldo por cobrar" value={money(receivables.reduce((sum, row) => sum + row.balance, 0))} href="/cobranza?vista=cxc" />
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <SalesMetric label="Facturación" value={money(invoicedMonth._sum.total ?? 0)} href="/facturacion?vista=facturas" />
+          <SalesMetric label="Cobranza" value={money(collectedMonth._sum.amount ?? 0)} href="/cobranza?vista=cxc" />
+          <SalesMetric label="Saldo vencido" value={money(overdueBalance)} href="/cobranza?vista=vencidas" />
+          <SalesMetric label="Clientes nuevos" value={newClientsMonth} href="/clientes" />
         </div>
         {goals.length > 0 ? (
           <div className="mt-4 border-t border-[var(--line)] pt-4">
@@ -347,61 +450,71 @@ async function Sales({ companyId, userId }: { companyId: string; userId: string 
         ) : null}
       </Card>
       <section className="grid items-stretch gap-4 xl:grid-cols-2">
-        <Block
-          title="Cotizaciones por seguimiento"
-          empty="No hay cotizaciones con precio esperando seguimiento."
-          bandejaHref="/cotizaciones?vista=decision"
-          rows={quotes.map((row) => ({
-            href: `/cotizaciones/${row.id}`,
-            label: row.folio,
-            detail: <>{QUOTE_STATUS_LABEL[row.status] ?? row.status} · {panelClientLink(row.client)}</>,
-          }))}
+        <GroupedBlock
+          title="Cotizaciones / seguimientos"
+          sections={[
+            {
+              subtitle: "Cotizadas / sin autorización",
+              empty: "No hay cotizaciones cotizadas esperando autorización del cliente.",
+              bandejaHref: "/cotizaciones?vista=decision",
+              rows: [
+                ...cotizadasSinAutorizacionQuotes.map(quoteRow),
+                ...servicioPanelRows(
+                  cotizadasSinAutorizacionServicios.filter(
+                    (row) => !cotizadasSinAutorizacionQuotes.some((quote) => quote.folio === (row.osFolio ?? row.diagnosisFolio)),
+                  ),
+                  servicioRowDetail,
+                ),
+              ].slice(0, 12),
+            },
+            {
+              subtitle: "Pendientes de autorización",
+              empty: "No hay cotizaciones sin precio comercial.",
+              bandejaHref: "/cotizaciones?vista=pendientes",
+              rows: pendienteAutorizacionQuotes.map(quoteRow).slice(0, 12),
+            },
+          ]}
         />
         <Block
-          title="Entregas pendientes"
-          empty="No hay entregas pendientes."
-          bandejaHref="/ventas"
-          rows={deliveries.map((row) => {
-            const pendingReceive = row.lines.reduce((sum, line) => sum + Math.max(0, line.qtySold - line.qtyReceived), 0);
-            const pendingDeliver = row.lines.reduce((sum, line) => sum + Math.max(0, line.qtyReceived - line.qtyDelivered), 0);
-            const detail = pendingReceive > 0 ? `por recibir ${pendingReceive}` : `por entregar ${pendingDeliver}`;
-            return { href: `/ventas/${row.id}`, label: row.folio, detail: <>{panelClientLink(row.client)} · {detail}</> };
-          })}
-        />
-        <Block
-          title="Cobranza"
-          empty="No hay saldos pendientes en tu cartera."
-          bandejaHref="/cobranza?vista=cxc"
-          rows={receivables.map((row) => ({
-            href: `/cobranza/${row.id}`,
-            label: row.document.folio,
-            detail: <>{panelClientLink(row.client)} · {money(row.balance)}</>,
-          }))}
-        />
-        <Block
-          title="Facturación pendiente"
-          empty="No hay operaciones con factura obligatoria pendiente."
+          title="Facturación"
+          empty="No hay OS validadas sin factura emitida."
           bandejaHref="/facturacion?vista=solicitudes"
-          rows={invoices.map((row) => ({
-            href: `/cotizaciones/${row.id}`,
-            label: row.folio,
+          rows={osSinFacturaQuotes.map((row) => ({
+            key: row.id,
+            href: row.technicalCase ? `/operacion/${row.technicalCase.id}` : `/cotizaciones/${row.id}`,
+            label: row.technicalCase?.folio ?? row.folio,
             detail: panelClientLink(row.client),
           }))}
         />
         <Block
-          title="Agenda / próximas actividades"
-          empty="No tienes actividades próximas."
-          bandejaHref="/agenda"
-          rows={activities.map((row) => {
-            const when = row.scheduledAt.toLocaleDateString("es-MX", { timeZone: "America/Mexico_City" });
-            const href = row.clientId ? `/clientes/${row.clientId}` : row.prospectId ? `/prospectos/${row.prospectId}` : "/agenda";
-            const detail = row.client
-              ? <>{panelClientLink(row.client)} · {when}</>
-              : row.prospectId
-                ? <><TextLink href={`/prospectos/${row.prospectId}`}>Prospecto</TextLink> · {when}</>
-                : when;
-            return { href, label: row.note, detail };
+          title="Cobranza"
+          empty="No hay facturas con saldo pendiente."
+          bandejaHref="/cobranza?vista=cxc"
+          rows={receivables.slice(0, 12).map((row) => {
+            const vigente = receivableEsVigente(row.dueAt, row.balance);
+            return {
+              key: row.id,
+              href: `/cobranza/${row.id}`,
+              label: row.document.folio,
+              highlight: vigente,
+              detail: (
+                <>
+                  {panelClientLink(row.client)} · {money(row.balance)}
+                  {vigente ? " · vigente" : " · vencida"}
+                </>
+              ),
+            };
           })}
+        />
+        <Block
+          title="Entregas pendientes"
+          empty="No hay OS validadas pendientes de entrega."
+          bandejaHref={serviciosBandejaHref({ vista: "activos" })}
+          rows={servicioPanelRows(entregasOsValidadas, (row) => (
+            <>
+              {row.clientName} · {row.physical.label}
+            </>
+          ))}
         />
       </section>
     </>
