@@ -119,6 +119,8 @@ export function ServiciosSupervisorList({
               {columns.cliente ? <Th>Cliente</Th> : null}
               {columns.edoTecnico ? <Th>Edo. técnico</Th> : null}
               {columns.edoAdministrativo ? <Th>Edo. administrativo</Th> : null}
+              {columns.cotizacion ? <Th>Cotización</Th> : null}
+              {columns.cotizacionMonto ? <Th>Monto</Th> : null}
               {columns.edoFisico ? <Th>Edo. físico</Th> : null}
               {columns.vendedor ? <Th>Vendedor</Th> : null}
               {columns.tecnico ? <Th>Técnico</Th> : null}
@@ -145,7 +147,13 @@ export function ServiciosSupervisorList({
                         <StatusBadge status={{ label: "Cancelada", tone: "danger" }} />
                       </Td>
                     ) : null}
-                    {columns.edoAdministrativo ? <Td><span className="text-[var(--muted)]">—</span></Td> : null}
+                    {columns.edoAdministrativo ? (
+                      <Td>
+                        {columns.edoTecnico ? <span className="text-[var(--muted)]">—</span> : <StatusBadge status={{ label: "Cancelada", tone: "danger" }} />}
+                      </Td>
+                    ) : null}
+                    {columns.cotizacion ? <Td><span className="text-[var(--muted)]">—</span></Td> : null}
+                    {columns.cotizacionMonto ? <Td><span className="text-[var(--muted)]">—</span></Td> : null}
                     {columns.edoFisico ? <Td><span className="text-[var(--muted)]">—</span></Td> : null}
                     {columns.vendedor ? <Td>—</Td> : null}
                     {columns.tecnico ? <Td>—</Td> : null}
@@ -166,6 +174,12 @@ export function ServiciosSupervisorList({
                   {columns.cliente ? <Td><ClienteCell clientId={row.clientId} clientName={row.clientName} clientIsSystem={row.clientIsSystem} /></Td> : null}
                   {columns.edoTecnico ? <Td><StatusBadge status={row.technical} /></Td> : null}
                   {columns.edoAdministrativo ? <Td><StatusBadge status={row.administrative} /></Td> : null}
+                  {columns.cotizacion ? (
+                    <Td>
+                      <FolioCell folio={row.quoteFolio} href={row.quoteHref} />
+                    </Td>
+                  ) : null}
+                  {columns.cotizacionMonto ? <Td>{row.quoteMonto}</Td> : null}
                   {columns.edoFisico ? <Td><StatusBadge status={row.physical} /></Td> : null}
                   {columns.vendedor ? <Td>{row.sellerName ?? "Sin asignar"}</Td> : null}
                   {columns.tecnico ? <Td>{row.technicianName ?? "Sin asignar"}</Td> : null}
@@ -211,7 +225,7 @@ export function ServiciosSupervisorList({
               title={title}
               meta={
                 <>
-                  <StatusBadge status={row.technical} />
+                  {columns.edoTecnico ? <StatusBadge status={row.technical} /> : null}
                   {columns.edoAdministrativo ? <StatusBadge status={row.administrative} /> : null}
                 </>
               }
@@ -220,18 +234,31 @@ export function ServiciosSupervisorList({
               {columns.ordenServicio && row.osFolio ? <p>OS: {row.osFolio}</p> : null}
               <p>{row.equipmentLabel}</p>
               <p><ClienteCell clientId={row.clientId} clientName={row.clientName} clientIsSystem={row.clientIsSystem} /></p>
+              {columns.cotizacion ? (
+                <p>
+                  Cotización:{" "}
+                  {row.quoteFolio ? (
+                    row.quoteHref ? <RecordLink href={row.quoteHref}>{row.quoteFolio}</RecordLink> : row.quoteFolio
+                  ) : (
+                    "—"
+                  )}
+                  {columns.cotizacionMonto ? ` · ${row.quoteMonto}` : null}
+                </p>
+              ) : null}
               {columns.edoFisico ? <p>Físico: {row.physical.label}</p> : null}
               {columns.vendedor ? <p>Vendedor: {row.sellerName ?? "Sin asignar"}</p> : null}
               {columns.tecnico ? <p>Técnico: {row.technicianName ?? "Sin asignar"}</p> : null}
-              <p>
-                {historial ? (
-                  <>Cierre: {row.closedAt ? formatClosedAt(row.closedAt) : "—"}</>
-                ) : (
-                  <>
-                    SLA: <SlaCountdown dueAt={row.slaDueAt} />
-                  </>
-                )}
-              </p>
+              {columns.sla ? (
+                <p>
+                  {historial ? (
+                    <>Cierre: {row.closedAt ? formatClosedAt(row.closedAt) : "—"}</>
+                  ) : (
+                    <>
+                      SLA: <SlaCountdown dueAt={row.slaDueAt} />
+                    </>
+                  )}
+                </p>
+              ) : null}
             </MobileCard>
           </div>
         );

@@ -79,4 +79,13 @@ describe("serviciosBandejaColumns", () => {
   it("oculta vendedor a ventas", () => {
     assert.equal(serviciosBandejaColumns("VENTAS").vendedor, false);
   });
+
+  it("bandeja de ventas prioriza cotización y oculta taller", () => {
+    const cols = serviciosBandejaColumns("VENTAS");
+    assert.equal(cols.edoTecnico, false);
+    assert.equal(cols.tecnico, false);
+    assert.equal(cols.sla, false);
+    assert.equal(cols.cotizacion, true);
+    assert.equal(cols.cotizacionMonto, true);
+  });
 });

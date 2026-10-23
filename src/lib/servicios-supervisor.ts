@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { linesForTotal, money, quoteTotals } from "@/lib/money";
 import {
   administrativeStatus,
   equipmentDetailHref,
@@ -133,6 +134,9 @@ export type ServicioBandejaRow = {
   physical: StackedStatus;
   sellerName: string | null;
   technicianName: string | null;
+  quoteFolio: string | null;
+  quoteHref: string | null;
+  quoteMonto: string;
   slaDueAt: Date | null;
   slaStartedAt: Date | null;
   createdAt: Date;
@@ -174,11 +178,33 @@ export function servicioRowHighlight(row: SupervisorServicioRow, now = Date.now(
   return { wrapClass, markers };
 }
 
+type QuoteBandejaPick = {
+  id: string;
+  folio: string;
+  technicalCaseId: string | null;
+  equipmentId: string | null;
+  status: string;
+  quoteType: string;
+  discountPct: number;
+  updatedAt: Date;
+  lines: Array<{ quantity: number; unitPrice: number | null; authorized: boolean }>;
+};
+
+function quoteMontoBandejaLabel(quote: QuoteBandejaPick | null): string {
+  if (!quote) return "—";
+  if (quote.status === "PENDIENTE_COTIZAR") return "Sin precio";
+  const totals = quoteTotals(
+    linesForTotal(quote.lines, quote.quoteType, quote.status),
+    quote.discountPct,
+  );
+  return totals ? money(totals.total) : "—";
+}
+
 function pickQuoteForAttention(
   attentionId: string,
   caseIds: string[],
   equipmentId: string,
-  quotes: Array<{ technicalCaseId: string | null; equipmentId: string | null; status: string; updatedAt: Date }>,
+  quotes: QuoteBandejaPick[],
 ) {
   const linked = quotes.filter((q) => q.technicalCaseId && caseIds.includes(q.technicalCaseId));
   if (linked.length > 0) {
@@ -191,9 +217,10 @@ function pickQuoteForAttention(
 function buildServicioRow(
   attentionId: string,
   cases: CaseRecord[],
-  quoteStatus: string | null,
+  quote: QuoteBandejaPick | null,
   sellerName: string | null,
 ): ServicioBandejaRow {
+  const quoteStatus = quote?.status ?? null;
   const os =
     cases.find((c) => c.kind === "OS")
     ?? null;
@@ -240,6 +267,9 @@ function buildServicioRow(
     physical: physicalStatusFromCustody(equipment.custody),
     sellerName,
     technicianName,
+    quoteFolio: quote?.folio ?? null,
+    quoteHref: quote ? `/cotizaciones/${quote.id}` : null,
+    quoteMonto: quoteMontoBandejaLabel(quote),
     slaDueAt: primary.slaDueAt,
     slaStartedAt: primary.attention.slaStartedAt,
     createdAt: primary.createdAt,
@@ -307,7 +337,17 @@ async function mapCasesToBandejaRows(companyId: string, cases: CaseRecord[]): Pr
         companyId,
         OR: [{ technicalCaseId: { in: caseIds } }, { equipmentId: { in: equipmentIds } }],
       },
-      select: { technicalCaseId: true, equipmentId: true, status: true, updatedAt: true },
+      select: {
+        id: true,
+        folio: true,
+        technicalCaseId: true,
+        equipmentId: true,
+        status: true,
+        quoteType: true,
+        discountPct: true,
+        updatedAt: true,
+        lines: { select: { quantity: true, unitPrice: true, authorized: true } },
+      },
       orderBy: { updatedAt: "desc" },
       take: 500,
     }),
@@ -333,7 +373,7 @@ async function mapCasesToBandejaRows(companyId: string, cases: CaseRecord[]): Pr
       const sellerName = primary.attention.sellerUserId
         ? sellerMap.get(primary.attention.sellerUserId) ?? null
         : null;
-      rows.push(buildServicioRow(attentionId, attentionCases, quote?.status ?? null, sellerName));
+      rows.push(buildServicioRow(attentionId, attentionCases, quote, sellerName));
     }
   }
 

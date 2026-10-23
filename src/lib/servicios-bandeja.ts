@@ -9,12 +9,15 @@ export type ServicioBandejaColumns = {
   edoTecnico: boolean;
   edoAdministrativo: boolean;
   edoFisico: boolean;
+  cotizacion: boolean;
+  cotizacionMonto: boolean;
   vendedor: boolean;
   tecnico: boolean;
   sla: boolean;
 };
 
 export function serviciosBandejaColumns(role: Role): ServicioBandejaColumns {
+  const ventas = role === "VENTAS";
   const hideAdmin = (
     role === "TECNICO"
     || role === "GERENTE_OPERATIVO_SYSTRON"
@@ -27,12 +30,14 @@ export function serviciosBandejaColumns(role: Role): ServicioBandejaColumns {
     ordenServicio: true,
     equipo: true,
     cliente: true,
-    edoTecnico: true,
+    edoTecnico: !ventas,
     edoAdministrativo: !hideAdmin,
     edoFisico: !tecnicoView,
-    vendedor: role !== "VENTAS",
-    tecnico: !tecnicoView,
-    sla: true,
+    cotizacion: ventas,
+    cotizacionMonto: ventas,
+    vendedor: !ventas,
+    tecnico: !tecnicoView && !ventas,
+    sla: !ventas,
   };
 }
 
