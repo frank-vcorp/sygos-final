@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { ActiveFilters, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
+import { listHref } from "@/lib/list-url";
 import { requireCompany } from "@/lib/session";
 
 export default async function BuscarPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
@@ -63,7 +64,11 @@ export default async function BuscarPage({ searchParams }: { searchParams: Promi
     ...prospects.map((row) => ({ href: `/prospectos/${row.id}`, kind: "Prospecto", label: row.name })),
     ...suppliers.map((row) => ({ href: `/proveedores/${row.id}`, kind: "Proveedor", label: row.name })),
     ...equipment.map((row) => ({ href: row.kind === "MOT" ? `/motores/${row.id}` : `/equipos/${row.id}`, kind: row.kind, label: `${row.folio} · ${row.model}` })),
-    ...parts.map((row) => ({ href: "/inventario", kind: "Refacción", label: `${row.partNumber} · ${row.description}` })),
+    ...parts.map((row) => ({
+      href: listHref("/inventario", { q: row.partNumber || row.description || query }),
+      kind: "Refacción",
+      label: `${row.partNumber} · ${row.description}`,
+    })),
     ...operations.map((row) => ({ href: `/operacion/${row.id}`, kind: row.kind === "OS" ? "Orden de servicio" : "Diagnóstico", label: row.folio })),
   ];
   return (
