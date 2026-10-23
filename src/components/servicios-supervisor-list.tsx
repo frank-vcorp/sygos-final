@@ -78,13 +78,19 @@ function formatClosedAt(date: Date) {
   });
 }
 
+const SLA_BANDEJA_CLASS = "text-[11px] leading-4 whitespace-nowrap";
+
 function SlaCell({ dueAt, historial, closedAt }: { dueAt: Date | null; historial: boolean; closedAt: Date | null }) {
   if (historial) {
-    return <span className="text-sm text-[var(--muted)]">{closedAt ? formatClosedAt(closedAt) : "—"}</span>;
+    return (
+      <span className={`text-xs text-[var(--muted)] ${SLA_BANDEJA_CLASS}`}>
+        {closedAt ? formatClosedAt(closedAt) : "—"}
+      </span>
+    );
   }
   return (
-    <div className="rounded-md border border-[var(--line)] bg-[#f8fafc] px-2.5 py-1.5">
-      <SlaCountdown dueAt={dueAt} className="text-sm" />
+    <div className="inline-block w-max max-w-none rounded border border-[var(--line)] bg-[#f8fafc] px-1.5 py-0.5">
+      <SlaCountdown dueAt={dueAt} className={SLA_BANDEJA_CLASS} />
     </div>
   );
 }
