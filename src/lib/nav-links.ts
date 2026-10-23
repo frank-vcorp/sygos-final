@@ -2,6 +2,7 @@ import { ALMACEN_NAV_GROUPS } from "@/lib/nav-links-almacen";
 import { CEO_NAV_GROUPS } from "@/lib/nav-links-ceo";
 import { COORDINATION_NAV_GROUPS } from "@/lib/nav-links-coordination";
 import { SUPERVISOR_NAV_GROUPS } from "@/lib/nav-links-supervisor";
+import { TECNICO_NAV_GROUPS } from "@/lib/nav-links-tecnico";
 import { VENTAS_NAV_GROUPS } from "@/lib/nav-links-ventas";
 import { can } from "@/lib/permissions";
 import type { Role } from "@/lib/roles";
@@ -112,6 +113,7 @@ export function navGroupsForRole(role: Role): NavGroupDef[] {
   if (role === "ALMACEN") return ALMACEN_NAV_GROUPS;
   if (role === "VENTAS") return VENTAS_NAV_GROUPS;
   if (role === "SUPERVISOR_TECNICO") return SUPERVISOR_NAV_GROUPS;
+  if (role === "TECNICO") return TECNICO_NAV_GROUPS;
   return NAV_GROUPS;
 }
 

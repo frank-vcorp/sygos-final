@@ -123,6 +123,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
               session.role !== "VENTAS"
               && session.role !== "ALMACEN"
               && session.role !== "SUPERVISOR_TECNICO"
+              && session.role !== "TECNICO"
             }
             groups={[
               ...erpNavGroups(session.role).map((group) => ({
@@ -140,7 +141,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
                     };
                   }),
               })).filter((group) => group.links.length > 0),
-              ...(session.role === "VENTAS" || session.role === "SUPERVISOR_TECNICO"
+              ...(session.role === "VENTAS" || session.role === "SUPERVISOR_TECNICO" || session.role === "TECNICO"
                 ? []
                 : [{ title: null, links: [{ href: "/cuenta", label: "Cuenta" }] }]),
             ]}
