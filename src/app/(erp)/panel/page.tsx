@@ -389,12 +389,11 @@ async function Sales({
       where: {
         companyId,
         sellerUserId: userId,
-        technicalCase: { kind: "OS", status: "VALIDADO" },
+        technicalCaseId: { not: null },
         billingDocuments: { none: { kind: { in: ["FACTURA", "FACTURA_LIBRE"] }, status: "EMITIDA" } },
       },
-      include: { client: true, technicalCase: { select: { id: true, folio: true } } },
-      orderBy: { updatedAt: "desc" },
-      take: 12,
+      select: { technicalCaseId: true },
+      take: 100,
     }),
   ]);
 
@@ -403,8 +402,25 @@ async function Sales({
     .reduce((sum, row) => sum + row.balance, 0);
 
   const servicioRows = activeServicios.filter((row): row is ServicioBandejaRow => row.kind === "servicio");
+  const osSinFacturaCaseIds = [
+    ...new Set(
+      osSinFacturaQuotes.map((row) => row.technicalCaseId).filter((id): id is string => Boolean(id)),
+    ),
+  ];
   const osSinFacturaFolios = new Set(
-    osSinFacturaQuotes.map((row) => row.technicalCase?.folio).filter((folio): folio is string => Boolean(folio)),
+    osSinFacturaCaseIds.length
+      ? (
+          await prisma.technicalCase.findMany({
+            where: {
+              id: { in: osSinFacturaCaseIds },
+              kind: "OS",
+              status: "VALIDADO",
+              equipment: { client: { ownerUserId: userId, isSystem: false } },
+            },
+            select: { folio: true },
+          })
+        ).map((row) => row.folio)
+      : [],
   );
   const cotizadasSinAutorizacion = servicioRows.filter(servicioCotizadaSinAutorizacion);
   const pendientesAutorizacion = servicioRows.filter(servicioPendienteAutorizacion);
