@@ -3,7 +3,10 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ClientNameLink } from "@/components/client-entity-links";
 import { AuthorizeExitWithoutDocumentButton } from "@/components/exit-without-document-actions";
-import { SalesPanelServiciosGrouped, SalesPanelServiciosSection } from "@/components/sales-panel-bandeja";
+import {
+  SalesPanelServiciosGrouped,
+  SalesPanelServiciosSection,
+} from "@/components/sales-panel-bandeja";
 import { ActionLink, Card, KpiCard, PageHeader, RecordLink, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
@@ -226,24 +229,43 @@ function caseRowMap(list: Array<{
 }
 
 async function SupervisorShop({ companyId, userId }: { companyId: string; userId: string }) {
-  const rows = await prisma.technicalCase.findMany({
-    where: { serviceCompanyId: companyId, status: { notIn: CLOSED } },
-    include: { equipment: { include: { client: true } }, attention: true, assignee: true },
-    orderBy: { slaDueAt: "asc" },
-    take: 120,
-  });
-  const pending = rows.filter((row) => !row.assigneeUserId && !row.externalSupplierId);
-  const mine = rows.filter((row) => row.assigneeUserId === userId);
+  const role: Role = "SUPERVISOR_TECNICO";
+  const [activeRows, assignedAttentions] = await Promise.all([
+    listActiveServicios(companyId, ""),
+    prisma.technicalCase.findMany({
+      where: { serviceCompanyId: companyId, assigneeUserId: userId, status: { notIn: CLOSED } },
+      select: { attentionId: true },
+      distinct: ["attentionId"],
+    }),
+  ]);
+  const servicioRows = activeRows.filter((row): row is ServicioBandejaRow => row.kind === "servicio");
+  const pending = servicioRows.filter((row) => row.technicianName === null);
+  const assignedAttentionIds = new Set(assignedAttentions.map((row) => row.attentionId));
+  const mine = servicioRows.filter((row) => assignedAttentionIds.has(row.id));
+  const bandejaActivos = serviciosBandejaHref({ vista: "activos" });
+
   return (
     <>
       <PageHeader
         title="Inicio"
         subtitle="Pendientes de asignar en el taller y operaciones activas asignadas a ti. El resto está en Servicios."
       />
-      <div className="grid gap-3">
-        <Block title="Pendientes de asignación" empty="Todo lo activo tiene responsable o proveedor." bandejaHref="/operacion" rows={caseRowMap(pending)} />
-        <Block title="Asignadas a ti" empty="No tienes operaciones activas asignadas." bandejaHref="/operacion" rows={caseRowMap(mine)} />
-      </div>
+      <section className="flex w-full max-w-none flex-col gap-4">
+        <SalesPanelServiciosSection
+          title="Pendientes de asignación"
+          empty="Todo lo activo tiene responsable o proveedor."
+          bandejaHref={bandejaActivos}
+          rows={pending}
+          role={role}
+        />
+        <SalesPanelServiciosSection
+          title="Asignadas a ti"
+          empty="No tienes operaciones activas asignadas."
+          bandejaHref={bandejaActivos}
+          rows={mine}
+          role={role}
+        />
+      </section>
     </>
   );
 }

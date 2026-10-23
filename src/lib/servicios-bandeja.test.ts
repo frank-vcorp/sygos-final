@@ -73,7 +73,17 @@ describe("serviciosBandejaColumns", () => {
   it("oculta administrativo al técnico y gerente", () => {
     assert.equal(serviciosBandejaColumns("TECNICO").edoAdministrativo, false);
     assert.equal(serviciosBandejaColumns("GERENTE_OPERATIVO_SYSTRON").edoAdministrativo, false);
+    assert.equal(serviciosBandejaColumns("SUPERVISOR_TECNICO").edoAdministrativo, false);
     assert.equal(serviciosBandejaColumns("CEO").edoAdministrativo, true);
+  });
+
+  it("supervisor técnico ve columnas de taller sin cotización comercial", () => {
+    const cols = serviciosBandejaColumns("SUPERVISOR_TECNICO");
+    assert.equal(cols.edoTecnico, true);
+    assert.equal(cols.edoFisico, true);
+    assert.equal(cols.tecnico, true);
+    assert.equal(cols.sla, true);
+    assert.equal(cols.cotizacion, false);
   });
 
   it("oculta vendedor a ventas", () => {
