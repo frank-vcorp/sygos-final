@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { PrismaClient } from "@prisma/client";
 import { PrismaClient as PrismaClientCtor } from "@prisma/client";
+import { buildPartSearchKey } from "../src/lib/inventory-search";
 
 export const INVENTARIO_OCT26_LINES = 2277;
 
@@ -53,12 +54,22 @@ export async function importInventarioOct26(
     await prisma.$transaction(async (tx) => {
       for (const row of slice) {
         const qty = Number.isInteger(row.qty) && row.qty >= 0 ? row.qty : 0;
+        const description = row.description ?? "";
         const part = await tx.part.create({
           data: {
             companyId: company.id,
             catalogLine: row.catalogLine,
             partNumber: row.partNumber,
-            description: row.description ?? "",
+            description,
+            searchKey: buildPartSearchKey({
+              partNumber: row.partNumber,
+              description,
+              catalogNumero: row.catalogNumero ?? "",
+              family: row.family ?? "",
+              rack: row.rack ?? "",
+              nivel: row.nivel ?? "",
+              mountType: row.mountType ?? "",
+            }),
             catalogNumero: row.catalogNumero ?? "",
             family: row.family ?? "",
             rack: row.rack ?? "",

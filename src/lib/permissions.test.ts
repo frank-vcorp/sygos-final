@@ -41,7 +41,9 @@ describe("permisos de fase 1", () => {
     assert.equal(can("GERENTE_OPERATIVO_SERVOMOTORES", "equipment.catalog", "SERVOMOTORES"), true);
     assert.equal(can("GERENTE_OPERATIVO_SERVOMOTORES", "mot.view", "SERVOMOTORES"), true);
     assert.equal(can("TECNICO", "inventory.operate", "SYSTRON"), false);
+    assert.equal(can("TECNICO", "inventory.search", "SYSTRON"), true);
     assert.equal(can("ALMACEN", "inventory.operate", "SYSTRON"), true);
+    assert.equal(can("ALMACEN", "inventory.search", "SYSTRON"), true);
   });
 
   it("deja al ayudante y al kiosco fuera de los módulos de negocio", () => {

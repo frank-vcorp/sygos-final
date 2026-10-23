@@ -133,7 +133,7 @@ export default async function InventarioPage({
       {!showTable ? (
         <Empty
           title="Busca una refacción"
-          body={`El catálogo no se lista completo (${total.toLocaleString("es-MX")} líneas). Escribe al menos ${INVENTORY_SEARCH_MIN_LEN} caracteres en producto, descripción, familia o ubicación, o abre «Bajo mínimo» para revisar faltantes.`}
+          body={`El catálogo no se lista completo (${total.toLocaleString("es-MX")} líneas). Escribe al menos ${INVENTORY_SEARCH_MIN_LEN} caracteres (con o sin acentos) en producto, descripción, familia o ubicación, o abre «Bajo mínimo» para revisar faltantes.`}
         />
       ) : parts.length === 0 ? (
         <Empty

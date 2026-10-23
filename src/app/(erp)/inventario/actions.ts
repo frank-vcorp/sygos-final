@@ -7,6 +7,7 @@ import { setFlash } from "@/lib/flash";
 import { optionalInt, optionalText, parseVersion, requiredText } from "@/lib/form";
 import { recordHistory } from "@/lib/history";
 import { can } from "@/lib/permissions";
+import { buildPartSearchKey } from "@/lib/inventory-search";
 import { requireCompany } from "@/lib/session";
 
 async function guard() {
@@ -43,6 +44,7 @@ export async function createPartAction(formData: FormData) {
         companyId: session.activeCompanyId,
         partNumber,
         description,
+        searchKey: buildPartSearchKey({ partNumber, description, catalogNumero, family, rack, nivel, mountType }),
         catalogNumero,
         family,
         rack,

@@ -21,6 +21,7 @@ import {
 import { ClientNameLink } from "@/components/client-entity-links";
 import { DiagnosisValidationActions } from "@/components/diagnosis-validation-actions";
 import { RequestExitWithoutDocumentButton } from "@/components/exit-without-document-actions";
+import { PartInventoryFields } from "@/components/part-inventory-fields";
 import { RepairClosureActions } from "@/components/repair-closure-actions";
 import { SupervisorReassignControl } from "@/components/supervisor-reassign-control";
 import { HistoryTimeline, type HistoryTimelineItem } from "@/components/history-timeline";
@@ -229,6 +230,7 @@ export default async function OperacionDetallePage({ params }: { params: Promise
       (session.role === "TECNICO" && row.assigneeUserId === session.userId));
   const canRequestPartOnOs = canWork && !closed && !readOnly && row.kind === "OS";
   const canFulfillPartRequests = canWork && !closed && !readOnly && !presolicitudOnly;
+  const inventoryPickerEnabled = row.serviceCompany.inventoryEnabled;
   const canEditClient = can(session.role, "client.edit", session.activeCompanyCode);
   const slaOverdue = row.slaDueAt != null && row.slaDueAt.getTime() < Date.now() && !closed;
   const back = can(session.role, "attention.catalog", session.activeCompanyCode)
@@ -357,8 +359,11 @@ export default async function OperacionDetallePage({ params }: { params: Promise
                     <form action={updatePresolicitudAction} className="grid gap-2">
                       <input type="hidden" name="caseId" value={row.id} />
                       <input type="hidden" name="presolicitudId" value={item.id} />
-                      <Field label="Número de parte"><input name="partNumber" required defaultValue={item.partNumber} className={controlClass} /></Field>
-                      <Field label="Descripción"><input name="description" required defaultValue={item.description} className={controlClass} /></Field>
+                      <PartInventoryFields
+                        inventoryEnabled={inventoryPickerEnabled}
+                        initialPartNumber={item.partNumber}
+                        initialDescription={item.description}
+                      />
                       <Field label="Liga opcional"><input name="link" defaultValue={item.link ?? ""} className={controlClass} /></Field>
                       <Field label="Cantidad"><input name="quantity" type="number" min={1} required defaultValue={item.qtyRequested} className={controlClass} /></Field>
                       <Button type="submit" tone="ghost">Guardar cambios</Button>
@@ -380,8 +385,7 @@ export default async function OperacionDetallePage({ params }: { params: Promise
           <summary className="cursor-pointer text-sm font-semibold text-[var(--accent)]">Presolicitar refacción</summary>
           <form action={createPresolicitudAction} className="mt-3 grid gap-2">
             <input type="hidden" name="caseId" value={row.id} />
-            <Field label="Número de parte"><input name="partNumber" required className={controlClass} /></Field>
-            <Field label="Descripción"><input name="description" required className={controlClass} /></Field>
+            <PartInventoryFields inventoryEnabled={inventoryPickerEnabled} />
             <Field label="Liga opcional"><input name="link" className={controlClass} /></Field>
             <Field label="Cantidad"><input name="quantity" type="number" min={1} required className={controlClass} /></Field>
             <Button type="submit">Registrar presolicitud</Button>
@@ -434,8 +438,7 @@ export default async function OperacionDetallePage({ params }: { params: Promise
           <summary className="cursor-pointer text-sm font-semibold text-[var(--accent)]">Solicitar refacción</summary>
           <form action={requestPartAction} className="mt-3 grid gap-2">
             <input type="hidden" name="caseId" value={row.id} />
-            <Field label="Número de parte"><input name="partNumber" required className={controlClass} /></Field>
-            <Field label="Descripción"><input name="description" required className={controlClass} /></Field>
+            <PartInventoryFields inventoryEnabled={inventoryPickerEnabled} />
             <Field label="Liga opcional"><input name="link" className={controlClass} /></Field>
             <Field label="Cantidad"><input name="quantity" type="number" min={1} required className={controlClass} /></Field>
             <Button type="submit">Registrar solicitud</Button>

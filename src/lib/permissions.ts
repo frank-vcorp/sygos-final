@@ -23,6 +23,7 @@ export type Action =
   | "operation.queue"
   | "custody.confirm"
   | "inventory.operate"
+  | "inventory.search"
   | "quote.create"
   | "quote.price"
   | "quote.follow"
@@ -134,6 +135,10 @@ export function can(role: Role, action: Action, companyCode?: string | null): bo
     case "inventory.operate":
       if (companyCode === "SYSTRON") return admin || ceo || gerenteSy || role === "ALMACEN";
       if (companyCode === "SERVOMOTORES") return admin || ceo || gerenteSm;
+      return false;
+    case "inventory.search":
+      if (can(role, "inventory.operate", companyCode)) return true;
+      if (companyCode === "SYSTRON") return role === "TECNICO" || role === "SUPERVISOR_TECNICO";
       return false;
     case "quote.create":
       if (admin || ceo || coord) return true;

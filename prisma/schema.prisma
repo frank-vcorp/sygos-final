@@ -495,6 +495,7 @@ model Part {
   company       Company  @relation(fields: [companyId], references: [id])
   partNumber    String
   description   String   @default("")
+  searchKey     String   @default("")
   catalogNumero String   @default("")
   family        String   @default("")
   rack          String   @default("")
@@ -515,6 +516,9 @@ model Part {
   partRequests  PartRequest[]
 
   @@unique([companyId, partNumber, description, catalogNumero, family, rack, nivel, unit, mountType, catalogLine], name: "part_inventory_line")
+  @@index([companyId, active, partNumber])
+  @@index([companyId, active, family])
+  @@index([companyId, active, searchKey])
 }
 
 model StockMovement {

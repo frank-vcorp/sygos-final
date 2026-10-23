@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { INVENTORY_SEARCH_MIN_LEN, partInventoryAvailableQty, partInventorySearchWhere } from "./inventory-search";
+import {
+  buildPartSearchKey,
+  INVENTORY_SEARCH_MIN_LEN,
+  normalizeInventorySearch,
+  partInventoryAvailableQty,
+  partInventorySearchWhere,
+} from "./inventory-search";
 
 describe("búsqueda de inventario", () => {
   it("exige al menos dos caracteres", () => {
@@ -9,12 +15,16 @@ describe("búsqueda de inventario", () => {
     assert.equal(INVENTORY_SEARCH_MIN_LEN, 2);
   });
 
-  it("busca en producto, descripción y familia", () => {
-    const where = partInventorySearchWhere("co-1", "filtro");
-    assert.equal(where?.companyId, "co-1");
-    assert.ok(where?.OR?.some((clause) => "partNumber" in clause));
-    assert.ok(where?.OR?.some((clause) => "description" in clause));
-    assert.ok(where?.OR?.some((clause) => "family" in clause));
+  it("normaliza acentos para searchKey", () => {
+    assert.equal(normalizeInventorySearch("Filtro Hidráulico"), "filtro hidraulico");
+    const key = buildPartSearchKey({ partNumber: "ABC", description: "Módulo eléctrico" });
+    assert.ok(key.includes("modulo"));
+    assert.ok(!key.includes("é"));
+  });
+
+  it("filtra por searchKey normalizado", () => {
+    const where = partInventorySearchWhere("co-1", "hidraulico");
+    assert.ok(where?.OR?.some((clause) => "searchKey" in clause));
   });
 
   it("calcula existencia disponible descontando apartados", () => {

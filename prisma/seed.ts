@@ -73,10 +73,22 @@ async function ensureInventarioOct26() {
   const withCatalogLine = await prisma.part.count({
     where: { companyId: systron.id, catalogLine: { gt: 0 } },
   });
-  if (count === 2277 && withCatalogLine === 2277) return;
+  if (count === 2277 && withCatalogLine === 2277) {
+    await backfillInventorySearchKeys(systron.id);
+    return;
+  }
   const { importInventarioOct26 } = await import("../scripts/import-inventario-oct26.mts");
   const result = await importInventarioOct26(prisma, { replace: count > 0 });
   process.stdout.write(`Inventario Oct26: ${JSON.stringify(result)}\n`);
+  await backfillInventorySearchKeys(systron.id);
+}
+
+async function backfillInventorySearchKeys(companyId: string) {
+  const missing = await prisma.part.count({ where: { companyId, searchKey: "" } });
+  if (missing === 0) return;
+  const { backfillPartSearchKeys } = await import("../src/lib/inventory-search");
+  const keys = await backfillPartSearchKeys(prisma, companyId);
+  if (keys.updated > 0) process.stdout.write(`Inventario searchKey: ${keys.updated} líneas actualizadas.\n`);
 }
 
 async function seedPriorities(companyId: string, code: "SYSTRON" | "SERVOMOTORES") {

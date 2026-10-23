@@ -58,10 +58,25 @@ export async function findInventoryPartForRequest(
 
 export async function reserveInventoryForPartRequest(
   tx: Tx,
-  input: { companyId: string; inventoryEnabled: boolean; partNumber: string; description: string; qtyRequested: number },
+  input: {
+    companyId: string;
+    inventoryEnabled: boolean;
+    partNumber: string;
+    description: string;
+    qtyRequested: number;
+    inventoryPartId?: string | null;
+  },
 ): Promise<{ partId: string | null; qtyReserved: number }> {
   if (!input.inventoryEnabled) return { partId: null, qtyReserved: 0 };
-  const part = await findInventoryPartForRequest(tx, input.companyId, input.partNumber, input.description);
+  let part: Part | null = null;
+  if (input.inventoryPartId) {
+    part = await tx.part.findFirst({
+      where: { id: input.inventoryPartId, companyId: input.companyId, active: true },
+    });
+  }
+  if (!part) {
+    part = await findInventoryPartForRequest(tx, input.companyId, input.partNumber, input.description);
+  }
   if (!part) return { partId: null, qtyReserved: 0 };
   const avail = partAvailableQty(part);
   const toReserve = Math.min(input.qtyRequested, avail);
@@ -84,6 +99,7 @@ export async function createPartRequestWithReservation(
     description: string;
     link: string | null;
     qtyRequested: number;
+    inventoryPartId?: string | null;
   },
 ) {
   const reserve = await reserveInventoryForPartRequest(tx, {
@@ -92,6 +108,7 @@ export async function createPartRequestWithReservation(
     partNumber: input.partNumber,
     description: input.description,
     qtyRequested: input.qtyRequested,
+    inventoryPartId: input.inventoryPartId,
   });
   const status = reserve.qtyReserved > 0 ? "EN_ALMACEN" : "SOLICITADA";
   const request = await tx.partRequest.create({

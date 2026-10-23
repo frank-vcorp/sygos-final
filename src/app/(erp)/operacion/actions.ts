@@ -135,6 +135,7 @@ export async function requestPartAction(formData: FormData) {
     description: requiredText(formData.get("description"), "Descripción"),
     link: optionalText(formData.get("link")),
     quantity: Number(formData.get("quantity")),
+    inventoryPartId: optionalText(formData.get("inventoryPartId")),
   }), "Refacción solicitada.");
 }
 

@@ -12,6 +12,7 @@ type Actor = {
 };
 
 import { CASE_STATUS_LABEL } from "./case-labels";
+import { buildPartSearchKey } from "./inventory-search";
 import {
   createPartRequestWithReservation,
   findInventoryPartForRequest,
@@ -509,7 +510,11 @@ export async function overrideWarranty(actor: Actor, caseId: string, version: nu
   });
 }
 
-export async function requestPart(actor: Actor, caseId: string, input: { partNumber: string; description: string; link: string | null; quantity: number }) {
+export async function requestPart(
+  actor: Actor,
+  caseId: string,
+  input: { partNumber: string; description: string; link: string | null; quantity: number; inventoryPartId?: string | null },
+) {
   const row = await loadCase(caseId);
   assertServiceCompany(actor, row.serviceCompanyId);
   if (row.kind !== "OS") throw new Error("Las refacciones se solicitan desde la orden de servicio.");
@@ -527,6 +532,7 @@ export async function requestPart(actor: Actor, caseId: string, input: { partNum
       description: input.description,
       link: input.link,
       qtyRequested: input.quantity,
+      inventoryPartId: input.inventoryPartId,
     });
   });
 }
@@ -557,7 +563,13 @@ export async function receivePartRequest(actor: Actor, requestId: string, versio
           : await findInventoryPartForRequest(tx, company.id, request.partNumber, request.description);
       if (!part) {
         part = await tx.part.create({
-          data: { companyId: company.id, partNumber: request.partNumber, description: request.description, qty: 0 },
+          data: {
+            companyId: company.id,
+            partNumber: request.partNumber,
+            description: request.description,
+            searchKey: buildPartSearchKey({ partNumber: request.partNumber, description: request.description }),
+            qty: 0,
+          },
         });
         await tx.partRequest.update({ where: { id: request.id }, data: { partId: part.id } });
       }

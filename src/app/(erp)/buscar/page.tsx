@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { ActiveFilters, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
+import { partInventorySearchWhere } from "@/lib/inventory-search";
 import { listHref } from "@/lib/list-url";
 import { requireCompany } from "@/lib/session";
 
@@ -18,42 +19,34 @@ export default async function BuscarPage({ searchParams }: { searchParams: Promi
       </>
     );
   }
-  const contains = { contains: query };
+  const partWhere = partInventorySearchWhere(session.activeCompanyId, query);
   const systron = session.activeCompanyCode === "SERVOMOTORES"
     ? await prisma.company.findUnique({ where: { code: "SYSTRON" } })
     : null;
   const [clients, prospects, suppliers, equipment, parts, operations] = await Promise.all([
-    prisma.client.findMany({ where: { companyId: session.activeCompanyId, name: contains }, take: 20 }),
-    prisma.prospect.findMany({ where: { companyId: session.activeCompanyId, name: contains }, take: 20 }),
-    prisma.supplier.findMany({ where: { companyId: session.activeCompanyId, isSystem: false, name: contains }, take: 20 }),
+    prisma.client.findMany({ where: { companyId: session.activeCompanyId, name: { contains: query } }, take: 20 }),
+    prisma.prospect.findMany({ where: { companyId: session.activeCompanyId, name: { contains: query } }, take: 20 }),
+    prisma.supplier.findMany({ where: { companyId: session.activeCompanyId, isSystem: false, name: { contains: query } }, take: 20 }),
     prisma.equipment.findMany({
       where: {
         AND: [
           session.activeCompanyCode === "SYSTRON"
             ? { originCompanyId: session.activeCompanyId }
             : { kind: "MOT", OR: [{ originCompanyId: session.activeCompanyId }, ...(systron ? [{ originCompanyId: systron.id }] : [])] },
-          { OR: [{ folio: contains }, { model: contains }, { serial: contains }] },
+          { OR: [{ folio: { contains: query } }, { model: { contains: query } }, { serial: { contains: query } }] },
         ],
       },
       take: 20,
     }),
-    prisma.part.findMany({
-      where: {
-        companyId: session.activeCompanyId,
-        OR: [
-          { partNumber: contains },
-          { description: contains },
-          { rack: contains },
-          { nivel: contains },
-          { family: contains },
-          { catalogNumero: contains },
-        ],
-      },
-      take: 20,
-    }),
+    partWhere
+      ? prisma.part.findMany({
+          where: partWhere,
+          take: 20,
+        })
+      : Promise.resolve([]),
     prisma.technicalCase.findMany({
       where: {
-        folio: contains,
+        folio: { contains: query },
         OR: [{ serviceCompanyId: session.activeCompanyId }, { equipment: { originCompanyId: session.activeCompanyId } }],
       },
       take: 20,
