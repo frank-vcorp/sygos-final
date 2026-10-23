@@ -7,7 +7,7 @@ import {
   SalesPanelServiciosGrouped,
   SalesPanelServiciosSection,
 } from "@/components/sales-panel-bandeja";
-import { ActionLink, Card, KpiCard, PageHeader, RecordLink, TextLink } from "@/components/ui";
+import { Card, KpiCard, PageHeader, RecordLink, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
 import { can } from "@/lib/permissions";
@@ -482,11 +482,7 @@ async function Sales({
 
   return (
     <>
-      <PageHeader
-        title="Inicio"
-        subtitle="Pendientes comerciales de tu cartera."
-        action={<ActionLink href="/cotizaciones/nuevo">Nueva cotización</ActionLink>}
-      />
+      <PageHeader title="Inicio" subtitle="Pendientes comerciales de tu cartera." />
       <Card className="mb-4 p-5">
         <div>
           <h2 className="text-base font-bold tracking-tight text-[var(--ink)]">Mi desempeño</h2>
