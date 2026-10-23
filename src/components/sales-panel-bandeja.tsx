@@ -1,6 +1,5 @@
 import { ServiciosSupervisorList } from "@/components/servicios-supervisor-list";
 import { Card, TextLink } from "@/components/ui";
-import type { ServicioBandejaColumnPreset } from "@/lib/servicios-bandeja";
 import type { Role } from "@/lib/roles";
 import type { SupervisorServicioRow } from "@/lib/servicios-supervisor";
 
@@ -16,23 +15,15 @@ function ServiciosTableBlock({
   rows,
   role,
   highlightRow,
-  columnPreset,
 }: {
   rows: SupervisorServicioRow[];
   role: Role;
   highlightRow?: (row: SupervisorServicioRow) => boolean;
-  columnPreset?: ServicioBandejaColumnPreset;
 }) {
   const shown = rows.slice(0, LIST_CAP);
   return (
     <div className="w-full px-4 pb-5 pt-2 sm:px-5">
-      <ServiciosSupervisorList
-        rows={shown}
-        role={role}
-        variant="activos"
-        highlightRow={highlightRow}
-        columnPreset={columnPreset}
-      />
+      <ServiciosSupervisorList rows={shown} role={role} variant="activos" highlightRow={highlightRow} />
     </div>
   );
 }
@@ -75,12 +66,10 @@ export function SalesPanelServiciosGrouped({
   title,
   role,
   sections,
-  columnPreset,
 }: {
   title: string;
   role: Role;
   sections: Array<{ subtitle: string; empty: string; bandejaHref?: string; rows: SupervisorServicioRow[] }>;
-  columnPreset?: ServicioBandejaColumnPreset;
 }) {
   const total = sections.reduce((sum, section) => sum + Math.min(section.rows.length, LIST_CAP), 0);
   return (
@@ -100,7 +89,7 @@ export function SalesPanelServiciosGrouped({
             {shown.length === 0 ? (
               <p className="m-5 rounded-lg bg-[#f5f8fb] px-4 py-3 text-sm text-[var(--muted)]">{section.empty}</p>
             ) : (
-              <ServiciosTableBlock rows={section.rows} role={role} columnPreset={columnPreset} />
+              <ServiciosTableBlock rows={section.rows} role={role} />
             )}
           </section>
         );

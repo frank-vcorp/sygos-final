@@ -16,29 +16,7 @@ export type ServicioBandejaColumns = {
   sla: boolean;
 };
 
-/** Bandeja compacta del panel Ventas en «Cotizaciones / seguimientos» (sin equipo ni edo. físico). */
-export type ServicioBandejaColumnPreset = "cotizaciones-seguimiento";
-
-export function serviciosBandejaColumns(
-  role: Role,
-  preset?: ServicioBandejaColumnPreset,
-): ServicioBandejaColumns {
-  if (role === "VENTAS" && preset === "cotizaciones-seguimiento") {
-    return {
-      diagnostico: true,
-      ordenServicio: true,
-      equipo: false,
-      cliente: true,
-      edoTecnico: false,
-      edoAdministrativo: true,
-      edoFisico: false,
-      cotizacion: true,
-      cotizacionMonto: true,
-      vendedor: false,
-      tecnico: false,
-      sla: false,
-    };
-  }
+export function serviciosBandejaColumns(role: Role): ServicioBandejaColumns {
   const ventas = role === "VENTAS";
   const hideAdmin = (
     role === "TECNICO"

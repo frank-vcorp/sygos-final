@@ -493,7 +493,6 @@ async function Sales({
         <SalesPanelServiciosGrouped
           title="Cotizaciones / seguimientos"
           role={role}
-          columnPreset="cotizaciones-seguimiento"
           sections={[
             {
               subtitle: "Cotizadas / sin autorización",
