@@ -31,10 +31,12 @@ const LABELS: Record<string, string | ((code: string | null) => string)> = {
   "/cobranza": "Cobranza",
   "/pagos": "Pagos",
   "/compras": "Compras",
+  "/compras/requerimientos": "Requerimientos",
   "/finanzas": "Finanzas",
   "/personal": "Colaboradores",
   "/personal/asistencia": "Asistencia",
   "/personal/horas": "Horas extra",
+  "/personal/vacaciones": "Vacaciones",
   "/nomina": "Nómina",
   "/comisiones": "Comisiones",
   "/produccion": "Producción",
@@ -124,6 +126,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
               && session.role !== "ALMACEN"
               && session.role !== "SUPERVISOR_TECNICO"
               && session.role !== "TECNICO"
+              && session.role !== "GERENTE_OPERATIVO_SYSTRON"
             }
             groups={[
               ...erpNavGroups(session.role).map((group) => ({
