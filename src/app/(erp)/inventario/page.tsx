@@ -1,16 +1,13 @@
 import { redirect } from "next/navigation";
-import { InventoryPartCreateFields } from "@/components/inventory-part-create-fields";
+import { InventoryCreateLineOverlay } from "@/components/inventory-create-line-overlay";
 import { InventarioFilters } from "@/components/inventario-filters";
-import { createPartAction, stockAction } from "./actions";
+import { stockAction } from "./actions";
 import {
   ActiveFilters,
   Badge,
   Button,
   controlClass,
   Empty,
-  FormActions,
-  FormPanel,
-  FormSection,
   ListCap,
   MobileCard,
   PageHeader,
@@ -107,6 +104,7 @@ export default async function InventarioPage({
       <PageHeader
         title="Inventario"
         subtitle={`${total.toLocaleString("es-MX")} líneas en catálogo · busca o filtra por familia y ubicación.`}
+        action={<InventoryCreateLineOverlay catalog={createCatalog} />}
       />
       <InventarioFilters query={query} family={family} rack={rack} stock={stock} families={families} racks={racks} />
       <ActiveFilters
@@ -248,18 +246,6 @@ export default async function InventarioPage({
           />
         </>
       )}
-      <FormPanel action={createPartAction} className="mt-4">
-        <FormSection
-          title="Nueva línea de inventario"
-          description="Usa los listados del inventario importado; «Otro» solo si el valor no existe en catálogo."
-          columns={1}
-        >
-          <InventoryPartCreateFields catalog={createCatalog} />
-        </FormSection>
-        <FormActions note="La existencia inicial sigue en cero hasta un movimiento de entrada.">
-          <Button type="submit">Agregar al catálogo</Button>
-        </FormActions>
-      </FormPanel>
     </>
   );
 }
