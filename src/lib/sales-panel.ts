@@ -16,6 +16,11 @@ export function servicioCotizadaSinAutorizacion(row: ServicioBandejaRow) {
   return administrative.label === "Cotizado" && !administrative.tags?.includes("Autorizado");
 }
 
+/** Aún sin precio / cotización comercial (bandeja «Sin cotizar»). */
+export function servicioPendienteAutorizacion(row: ServicioBandejaRow) {
+  return row.administrative.label === "Sin cotizar";
+}
+
 export function servicioOsValidadaSinFacturar(row: ServicioBandejaRow) {
   if (!row.osFolio) return false;
   return row.technical.label === "Validado";

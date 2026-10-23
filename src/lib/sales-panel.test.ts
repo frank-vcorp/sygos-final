@@ -7,6 +7,7 @@ import {
   servicioCotizadaSinAutorizacion,
   servicioOsValidadaPendienteEntrega,
   servicioOsValidadaSinFacturar,
+  servicioPendienteAutorizacion,
 } from "./sales-panel";
 import type { ServicioBandejaRow } from "./servicios-supervisor";
 
@@ -42,6 +43,11 @@ describe("sales panel filters", () => {
     assert.equal(quoteCotizadaSinAutorizacion("NO_AUTORIZADA"), false);
     assert.equal(quotePendienteAutorizacion("PENDIENTE_COTIZAR"), true);
     assert.equal(quotePendienteAutorizacion("PENDIENTE_DECISION"), false);
+  });
+
+  it("detecta sin cotizar como pendiente de autorización comercial", () => {
+    assert.equal(servicioPendienteAutorizacion(row({ administrative: { label: "Sin cotizar", tone: "warn" } })), true);
+    assert.equal(servicioPendienteAutorizacion(row({ administrative: { label: "Cotizado", tone: "info" } })), false);
   });
 
   it("alinea seguimiento con edo. administrativo de servicios", () => {

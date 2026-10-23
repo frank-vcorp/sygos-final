@@ -3,21 +3,24 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ClientNameLink } from "@/components/client-entity-links";
 import { AuthorizeExitWithoutDocumentButton } from "@/components/exit-without-document-actions";
+import {
+  SalesPanelCobranzaSection,
+  SalesPanelServiciosGrouped,
+  SalesPanelServiciosSection,
+} from "@/components/sales-panel-bandeja";
 import { ActionLink, Card, KpiCard, PageHeader, RecordLink, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
 import { can } from "@/lib/permissions";
-import { QUOTE_STATUS_LABEL } from "@/lib/quotes";
 import { PART_REQUEST_STATUS_LABEL } from "@/lib/case-labels";
 import { homePath } from "@/lib/home";
 import {
-  formatAdministrativeDetail,
-  quoteCotizadaSinAutorizacion,
-  quotePendienteAutorizacion,
   receivableEsVigente,
   servicioCotizadaSinAutorizacion,
   servicioOsValidadaPendienteEntrega,
+  servicioPendienteAutorizacion,
 } from "@/lib/sales-panel";
+import type { Role } from "@/lib/roles";
 import { serviciosBandejaHref } from "@/lib/servicios-catalog";
 import { listActiveServicios, type ServicioBandejaRow } from "@/lib/servicios-supervisor";
 import { requireCompany } from "@/lib/session";
@@ -114,15 +117,6 @@ function GroupedBlock({
   );
 }
 
-function servicioPanelRows(rows: ServicioBandejaRow[], mapDetail: (row: ServicioBandejaRow) => ReactNode): PanelRow[] {
-  return rows.slice(0, 12).map((row) => ({
-    key: row.id,
-    href: row.osHref ?? row.diagnosisHref ?? `/operacion/${row.id}`,
-    label: row.osFolio ?? row.diagnosisFolio ?? row.equipmentLabel,
-    detail: mapDetail(row),
-  }));
-}
-
 function panelClientLink(client: { id: string; name: string; isSystem: boolean }) {
   return <ClientNameLink clientId={client.id} name={client.name} isSystem={client.isSystem} canEdit />;
 }
@@ -144,7 +138,16 @@ export default async function PanelPage({ searchParams }: { searchParams: Promis
   const { vista } = await searchParams;
   const companyId = session.activeCompanyId;
   if (session.role === "TECNICO") return <Technician companyId={companyId} userId={session.userId} history={vista === "historial"} />;
-  if (session.role === "VENTAS") return <Sales companyId={companyId} userId={session.userId} />;
+  if (session.role === "VENTAS") {
+    return (
+      <Sales
+        companyId={companyId}
+        userId={session.userId}
+        role={session.role}
+        companyCode={session.activeCompanyCode}
+      />
+    );
+  }
   if (session.role === "COORDINACION_ADMINISTRACION") return <Coordination companyId={companyId} code={session.activeCompanyCode} vista={vista} />;
   if (session.role === "GERENTE_OPERATIVO_SERVOMOTORES") return <Servomotores companyId={companyId} />;
   if (session.role === "SUPERVISOR_TECNICO") {
@@ -325,7 +328,17 @@ async function Servomotores({ companyId }: { companyId: string }) {
   );
 }
 
-async function Sales({ companyId, userId }: { companyId: string; userId: string }) {
+async function Sales({
+  companyId,
+  userId,
+  role,
+  companyCode,
+}: {
+  companyId: string;
+  userId: string;
+  role: Role;
+  companyCode: string | null;
+}) {
   const monthStart = new Date();
   monthStart.setDate(1);
   monthStart.setHours(0, 0, 0, 0);
@@ -336,7 +349,6 @@ async function Sales({ companyId, userId }: { companyId: string; userId: string 
     invoicedMonth,
     collectedMonth,
     newClientsMonth,
-    portfolioQuotes,
     activeServicios,
     osSinFacturaQuotes,
   ] = await Promise.all([
@@ -371,16 +383,6 @@ async function Sales({ companyId, userId }: { companyId: string; userId: string 
     prisma.client.count({
       where: { companyId, ownerUserId: userId, isSystem: false, createdAt: { gte: monthStart } },
     }),
-    prisma.quote.findMany({
-      where: {
-        companyId,
-        sellerUserId: userId,
-        status: { in: ["PENDIENTE_COTIZAR", "PENDIENTE_DECISION", "NO_AUTORIZADA"] },
-      },
-      include: { client: true },
-      orderBy: { updatedAt: "desc" },
-      take: 80,
-    }),
     listActiveServicios(companyId, "", { clientOwnerUserId: userId }),
     prisma.quote.findMany({
       where: {
@@ -400,23 +402,14 @@ async function Sales({ companyId, userId }: { companyId: string; userId: string 
     .reduce((sum, row) => sum + row.balance, 0);
 
   const servicioRows = activeServicios.filter((row): row is ServicioBandejaRow => row.kind === "servicio");
-  const cotizadasSinAutorizacionQuotes = portfolioQuotes.filter((row) => quoteCotizadaSinAutorizacion(row.status));
-  const pendienteAutorizacionQuotes = portfolioQuotes.filter((row) => quotePendienteAutorizacion(row.status));
-  const cotizadasSinAutorizacionServicios = servicioRows.filter(servicioCotizadaSinAutorizacion);
-  const entregasOsValidadas = servicioRows.filter(servicioOsValidadaPendienteEntrega);
-
-  const quoteRow = (row: (typeof portfolioQuotes)[number]): PanelRow => ({
-    key: row.id,
-    href: `/cotizaciones/${row.id}`,
-    label: row.folio,
-    detail: <>{QUOTE_STATUS_LABEL[row.status] ?? row.status} · {panelClientLink(row.client)}</>,
-  });
-
-  const servicioRowDetail = (row: ServicioBandejaRow) => (
-    <>
-      {row.clientName} · {formatAdministrativeDetail(row.administrative)} · {row.physical.label}
-    </>
+  const osSinFacturaFolios = new Set(
+    osSinFacturaQuotes.map((row) => row.technicalCase?.folio).filter((folio): folio is string => Boolean(folio)),
   );
+  const cotizadasSinAutorizacion = servicioRows.filter(servicioCotizadaSinAutorizacion);
+  const pendienteAutorizacion = servicioRows.filter(servicioPendienteAutorizacion);
+  const facturacionPendiente = servicioRows.filter((row) => row.osFolio != null && osSinFacturaFolios.has(row.osFolio));
+  const entregasOsValidadas = servicioRows.filter(servicioOsValidadaPendienteEntrega);
+  const canEditClient = can(role, "client.edit", companyCode);
 
   return (
     <>
@@ -450,71 +443,45 @@ async function Sales({ companyId, userId }: { companyId: string; userId: string 
         ) : null}
       </Card>
       <section className="grid items-stretch gap-4 xl:grid-cols-2">
-        <GroupedBlock
+        <SalesPanelServiciosGrouped
           title="Cotizaciones / seguimientos"
+          role={role}
           sections={[
             {
               subtitle: "Cotizadas / sin autorización",
-              empty: "No hay cotizaciones cotizadas esperando autorización del cliente.",
-              bandejaHref: "/cotizaciones?vista=decision",
-              rows: [
-                ...cotizadasSinAutorizacionQuotes.map(quoteRow),
-                ...servicioPanelRows(
-                  cotizadasSinAutorizacionServicios.filter(
-                    (row) => !cotizadasSinAutorizacionQuotes.some((quote) => quote.folio === (row.osFolio ?? row.diagnosisFolio)),
-                  ),
-                  servicioRowDetail,
-                ),
-              ].slice(0, 12),
+              empty: "No hay servicios cotizados esperando autorización del cliente.",
+              bandejaHref: serviciosBandejaHref({ vista: "activos" }),
+              rows: cotizadasSinAutorizacion,
             },
             {
               subtitle: "Pendientes de autorización",
-              empty: "No hay cotizaciones sin precio comercial.",
+              empty: "No hay servicios sin cotizar en tu cartera.",
               bandejaHref: "/cotizaciones?vista=pendientes",
-              rows: pendienteAutorizacionQuotes.map(quoteRow).slice(0, 12),
+              rows: pendienteAutorizacion,
             },
           ]}
         />
-        <Block
+        <SalesPanelServiciosSection
           title="Facturación"
-          empty="No hay OS validadas sin factura emitida."
+          empty="No hay OS validadas sin factura emitida en servicios activos."
           bandejaHref="/facturacion?vista=solicitudes"
-          rows={osSinFacturaQuotes.map((row) => ({
-            key: row.id,
-            href: row.technicalCase ? `/operacion/${row.technicalCase.id}` : `/cotizaciones/${row.id}`,
-            label: row.technicalCase?.folio ?? row.folio,
-            detail: panelClientLink(row.client),
-          }))}
+          rows={facturacionPendiente}
+          role={role}
         />
-        <Block
+        <SalesPanelCobranzaSection
           title="Cobranza"
           empty="No hay facturas con saldo pendiente."
           bandejaHref="/cobranza?vista=cxc"
-          rows={receivables.slice(0, 12).map((row) => {
-            const vigente = receivableEsVigente(row.dueAt, row.balance);
-            return {
-              key: row.id,
-              href: `/cobranza/${row.id}`,
-              label: row.document.folio,
-              highlight: vigente,
-              detail: (
-                <>
-                  {panelClientLink(row.client)} · {money(row.balance)}
-                  {vigente ? " · vigente" : " · vencida"}
-                </>
-              ),
-            };
-          })}
+          rows={receivables}
+          canEditClient={canEditClient}
+          highlightVigente={receivableEsVigente}
         />
-        <Block
+        <SalesPanelServiciosSection
           title="Entregas pendientes"
           empty="No hay OS validadas pendientes de entrega."
           bandejaHref={serviciosBandejaHref({ vista: "activos" })}
-          rows={servicioPanelRows(entregasOsValidadas, (row) => (
-            <>
-              {row.clientName} · {row.physical.label}
-            </>
-          ))}
+          rows={entregasOsValidadas}
+          role={role}
         />
       </section>
     </>
