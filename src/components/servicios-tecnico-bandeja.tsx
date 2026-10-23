@@ -19,7 +19,17 @@ import {
   SERVICIOS_BANDEJA_HISTORIAL,
   type ServiciosVista,
 } from "@/lib/servicios-catalog";
-import { listActiveServicios, listHistorialServicios } from "@/lib/servicios-supervisor";
+import {
+  filterServicioBandejaForGerentePanel,
+  GERENTE_SERVICIO_PANEL_FILTROS,
+  loadGerenteServicioPanelContext,
+  parseGerenteServicioPanelFiltro,
+} from "@/lib/gerente-servicios-panel-filters";
+import {
+  listActiveServicios,
+  listHistorialServicios,
+  type ServicioBandejaRow,
+} from "@/lib/servicios-supervisor";
 
 const HISTORIAL_ESTADO_OPTIONS = [
   { value: "todos", label: "Todos los estados" },
@@ -108,6 +118,7 @@ export async function ServiciosTecnicoBandeja({
   query,
   desde,
   hasta,
+  panelFiltro,
 }: {
   companyId: string;
   userId: string;
@@ -119,7 +130,9 @@ export async function ServiciosTecnicoBandeja({
   query: string;
   desde?: string;
   hasta?: string;
+  panelFiltro?: string;
 }) {
+  const gerentePanelFiltro = vista === "activos" ? parseGerenteServicioPanelFiltro(panelFiltro) : null;
   const estadoLabel =
     vista === "historial" && estado && estado !== "todos"
       ? HISTORIAL_ESTADO_OPTIONS.find((opt) => opt.value === estado)?.label
@@ -130,6 +143,7 @@ export async function ServiciosTecnicoBandeja({
     desde,
     hasta,
     estado: estado && estado !== "todos" ? estado : undefined,
+    filtro: gerentePanelFiltro ?? undefined,
   };
   const portfolioUserId = salesPortfolioUserId(role, userId);
   const listScope = {
@@ -138,7 +152,7 @@ export async function ServiciosTecnicoBandeja({
   };
   const dateRange = { desde, hasta };
 
-  const rows =
+  let rows =
     vista === "historial"
       ? await listHistorialServicios(companyId, query, {
           ...listScope,
@@ -147,7 +161,14 @@ export async function ServiciosTecnicoBandeja({
         })
       : await listActiveServicios(companyId, query, { ...listScope, ...dateRange });
 
+  if (gerentePanelFiltro) {
+    const servicioRows = rows.filter((row): row is ServicioBandejaRow => row.kind === "servicio");
+    const panelCtx = await loadGerenteServicioPanelContext(companyId);
+    rows = filterServicioBandejaForGerentePanel(servicioRows, gerentePanelFiltro, panelCtx);
+  }
+
   const formAction = vista === "historial" ? SERVICIOS_BANDEJA_HISTORIAL : SERVICIOS_BANDEJA_ACTIVOS;
+  const panelFiltroLabel = gerentePanelFiltro ? GERENTE_SERVICIO_PANEL_FILTROS[gerentePanelFiltro] : null;
 
   return (
     <>
@@ -200,7 +221,13 @@ export async function ServiciosTecnicoBandeja({
       </FilterBar>
       <ActiveFilters
         items={[
-          ...(estadoLabel ? [{ label: estadoLabel, clearHref: serviciosBandejaHref({ vista, q: query, desde, hasta }) }] : []),
+          ...(panelFiltroLabel
+            ? [{
+                label: panelFiltroLabel,
+                clearHref: serviciosBandejaHref({ vista, q: query, desde, hasta, estado }),
+              }]
+            : []),
+          ...(estadoLabel ? [{ label: estadoLabel, clearHref: serviciosBandejaHref({ vista, q: query, desde, hasta, filtro: gerentePanelFiltro ?? undefined }) }] : []),
           ...(query ? [{ label: `Búsqueda: ${query}`, clearHref: serviciosBandejaHref({ vista, desde, hasta, estado }) }] : []),
           ...(desde || hasta
             ? [{

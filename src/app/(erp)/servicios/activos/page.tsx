@@ -7,13 +7,13 @@ import { requireCompany } from "@/lib/session";
 export default async function ServiciosActivosPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; desde?: string; hasta?: string }>;
+  searchParams: Promise<{ q?: string; desde?: string; hasta?: string; filtro?: string }>;
 }) {
   const session = await requireCompany();
   if (!can(session.role, "attention.catalog", session.activeCompanyCode)) {
     redirect(homePath(session.role, session.activeCompanyCode));
   }
-  const { q, desde, hasta } = await searchParams;
+  const { q, desde, hasta, filtro } = await searchParams;
 
   return (
     <ServiciosTecnicoBandeja
@@ -26,6 +26,7 @@ export default async function ServiciosActivosPage({
       query={(q ?? "").trim()}
       desde={desde}
       hasta={hasta}
+      panelFiltro={filtro}
     />
   );
 }

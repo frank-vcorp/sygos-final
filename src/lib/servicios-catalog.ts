@@ -37,6 +37,8 @@ export type ServiciosListParams = {
   tipo?: string;
   /** Filtro comercial (catálogo gerente/ventas) o estado de operación en historial técnico */
   estado?: string;
+  /** Panel gerente SYSTRON sobre activos (validacion, vencidos, refacciones, compras, asignacion). */
+  filtro?: string;
   q?: string;
   desde?: string;
   hasta?: string;
@@ -64,6 +66,7 @@ function serviciosSearchParams(params: ServiciosListParams) {
   const search = new URLSearchParams();
   if (params.tipo && params.tipo !== "todos") search.set("tipo", params.tipo);
   if (params.estado && params.estado !== "todos") search.set("estado", params.estado);
+  if (params.filtro?.trim()) search.set("filtro", params.filtro.trim());
   if (params.q?.trim()) search.set("q", params.q.trim());
   if (params.desde?.trim()) search.set("desde", params.desde.trim());
   if (params.hasta?.trim()) search.set("hasta", params.hasta.trim());

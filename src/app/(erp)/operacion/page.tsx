@@ -1,10 +1,12 @@
 import { redirect } from "next/navigation";
 import { SlaCountdown } from "@/components/sla-countdown";
+import { parseGerenteServicioPanelFiltro } from "@/lib/gerente-servicios-panel-filters";
 import { ActiveFilters, Badge, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, SegmentedNav, Table, Td, Th } from "@/components/ui";
 import { homePath } from "@/lib/home";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { compareBySla } from "@/lib/sla";
+import { serviciosBandejaHref } from "@/lib/servicios-catalog";
 import { openOperationCaseWhere } from "@/lib/servicios-supervisor";
 import { CASE_STATUS_LABEL } from "@/lib/technical";
 import { salesPortfolioEquipmentWhere } from "@/lib/sales-assignment";
@@ -16,6 +18,13 @@ export default async function OperacionPage({ searchParams }: { searchParams: Pr
     redirect(homePath(session.role, session.activeCompanyCode));
   }
   const { vista } = await searchParams;
+  if (session.role === "GERENTE_OPERATIVO_SYSTRON" && session.activeCompanyCode === "SYSTRON") {
+    const filtro = vista === "validacion" ? "validacion" : undefined;
+    if (filtro && parseGerenteServicioPanelFiltro(filtro)) {
+      redirect(serviciosBandejaHref({ vista: "activos", filtro }));
+    }
+    redirect(serviciosBandejaHref({ vista: "activos" }));
+  }
   const view = vista === "validacion" || vista === "cotizar" ? vista : "activas";
   const servomotores = await prisma.company.findUnique({ where: { code: "SERVOMOTORES" } });
   const rows = await prisma.technicalCase.findMany({

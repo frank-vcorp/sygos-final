@@ -1,0 +1,13 @@
+# Servicios y atenciones: bandeja unificada
+
+Cualquier vista que liste **servicios**, **atenciones** u operaciones agrupadas por atención debe usar el mismo formato de columnas que **Servicios activos**:
+
+- Datos: `listActiveServicios` / `listHistorialServicios` → filas `ServicioBandejaRow`.
+- Tabla: `ServiciosSupervisorList` con `variant="activos"` o `"historial"`.
+- Paneles por sección: `SalesPanelServiciosSection` (como en `/panel` del gerente SYSTRON).
+
+No usar tablas legacy de `/operacion` (folio + equipo + estado sueltos) para roles que operan por bandeja de servicios.
+
+**Gerente Operativo SYSTRON:** enlaces de “Ver bandeja” → `/servicios/activos?filtro=…` (`validacion`, `vencidos`, `refacciones`, `compras`, `asignacion`). `/operacion` redirige a Servicios activos.
+
+Columnas por rol: `serviciosBandejaColumns(role)` en `@/lib/servicios-bandeja`.

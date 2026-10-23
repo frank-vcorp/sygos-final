@@ -20,6 +20,11 @@ import {
   servicioPendienteAutorizacion,
 } from "@/lib/sales-panel";
 import type { Role } from "@/lib/roles";
+import {
+  GERENTE_SERVICIO_PANEL_FILTROS,
+  gerentePanelSections,
+  loadGerenteServicioPanelContext,
+} from "@/lib/gerente-servicios-panel-filters";
 import { serviciosBandejaHref } from "@/lib/servicios-catalog";
 import {
   listActiveServicios,
@@ -209,22 +214,8 @@ async function Technician({ companyId, userId, history }: { companyId: string; u
   );
 }
 
-function servicioMatchesPendingPurchase(
-  row: ServicioBandejaRow,
-  purchaseRefs: ReadonlySet<string>,
-): boolean {
-  if (purchaseRefs.size === 0) return false;
-  if (row.osFolio && purchaseRefs.has(row.osFolio)) return true;
-  if (row.diagnosisFolio && purchaseRefs.has(row.diagnosisFolio)) return true;
-  for (const ref of purchaseRefs) {
-    if (row.equipmentLabel.includes(ref)) return true;
-  }
-  return false;
-}
-
 async function GerenteSystronPanel({ companyId, history }: { companyId: string; history: boolean }) {
   const role: Role = "GERENTE_OPERATIVO_SYSTRON";
-  const bandejaActivos = serviciosBandejaHref({ vista: "activos" });
   const bandejaHistorial = serviciosBandejaHref({ vista: "historial" });
 
   if (history) {
@@ -248,37 +239,20 @@ async function GerenteSystronPanel({ companyId, history }: { companyId: string; 
     );
   }
 
-  const now = Date.now();
-  const [activeRows, partRequests, pendingPurchases] = await Promise.all([
+  const [activeRows, panelCtx] = await Promise.all([
     listActiveServicios(companyId, ""),
-    prisma.partRequest.findMany({
-      where: { companyId, case: { status: { notIn: CLOSED } } },
-      include: { case: { select: { attentionId: true } } },
-    }),
-    prisma.purchase.findMany({
-      where: {
-        companyId,
-        status: { in: ["PENDIENTE_VALIDAR", "PENDIENTE_AUTORIZACION"] },
-      },
-      select: { destinationRef: true },
-    }),
+    loadGerenteServicioPanelContext(companyId),
   ]);
 
   const servicioRows = activeRows.filter((row): row is ServicioBandejaRow => row.kind === "servicio");
-  const refaccionAttentionIds = new Set(
-    partRequests.filter((row) => row.qtyIssued < row.qtyRequested).map((row) => row.case.attentionId),
-  );
-  const purchaseRefs = new Set(
-    pendingPurchases
-      .map((row) => row.destinationRef?.trim())
-      .filter((ref): ref is string => Boolean(ref)),
-  );
-
-  const pendientesValidacion = servicioRows.filter((row) => row.primaryStatus === "PENDIENTE_VALIDACION");
-  const vencidos = servicioRows.filter((row) => row.slaDueAt != null && row.slaDueAt.getTime() < now);
-  const refacciones = servicioRows.filter((row) => refaccionAttentionIds.has(row.id));
-  const comprasSolicitadas = servicioRows.filter((row) => servicioMatchesPendingPurchase(row, purchaseRefs));
-  const pendientesAsignacion = servicioRows.filter((row) => row.technicianName === null);
+  const sections = gerentePanelSections(servicioRows, panelCtx);
+  const emptyByFiltro: Record<keyof typeof GERENTE_SERVICIO_PANEL_FILTROS, string> = {
+    validacion: "No hay diagnósticos por validar.",
+    vencidos: "Nada vencido.",
+    refacciones: "No hay solicitudes de refacción abiertas.",
+    compras: "No hay compras pendientes ligadas a un servicio activo.",
+    asignacion: "Todo lo activo tiene responsable o proveedor.",
+  };
 
   return (
     <>
@@ -288,42 +262,21 @@ async function GerenteSystronPanel({ companyId, history }: { companyId: string; 
         action={<TextLink href="/panel?vista=historial">Ver historial</TextLink>}
       />
       <section className="flex w-full max-w-none flex-col gap-4">
-        <SalesPanelServiciosSection
-          title="Pendientes de validación"
-          empty="No hay diagnósticos por validar."
-          bandejaHref="/operacion?vista=validacion"
-          rows={pendientesValidacion}
-          role={role}
-        />
-        <SalesPanelServiciosSection
-          title="Vencidos (SLA)"
-          empty="Nada vencido."
-          bandejaHref={bandejaActivos}
-          rows={vencidos}
-          role={role}
-          highlightRow={(row) => servicioRowHighlight(row, now).markers.includes("Vencido")}
-        />
-        <SalesPanelServiciosSection
-          title="Refacciones solicitadas"
-          empty="No hay solicitudes de refacción abiertas."
-          bandejaHref={bandejaActivos}
-          rows={refacciones}
-          role={role}
-        />
-        <SalesPanelServiciosSection
-          title="Compras solicitadas"
-          empty="No hay compras pendientes ligadas a un servicio activo."
-          bandejaHref="/compras?vista=oc"
-          rows={comprasSolicitadas}
-          role={role}
-        />
-        <SalesPanelServiciosSection
-          title="Pendientes de asignación"
-          empty="Todo lo activo tiene responsable o proveedor."
-          bandejaHref={bandejaActivos}
-          rows={pendientesAsignacion}
-          role={role}
-        />
+        {sections.map(({ filtro, rows }) => (
+          <SalesPanelServiciosSection
+            key={filtro}
+            title={GERENTE_SERVICIO_PANEL_FILTROS[filtro]}
+            empty={emptyByFiltro[filtro]}
+            bandejaHref={serviciosBandejaHref({ vista: "activos", filtro })}
+            rows={rows}
+            role={role}
+            highlightRow={
+              filtro === "vencidos"
+                ? (row) => servicioRowHighlight(row, panelCtx.now).markers.includes("Vencido")
+                : undefined
+            }
+          />
+        ))}
       </section>
     </>
   );
