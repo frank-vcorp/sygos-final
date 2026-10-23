@@ -11,7 +11,6 @@ import { Card, KpiCard, PageHeader, RecordLink, TextLink } from "@/components/ui
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
 import { can } from "@/lib/permissions";
-import { PART_REQUEST_STATUS_LABEL } from "@/lib/case-labels";
 import { homePath } from "@/lib/home";
 import {
   receivableEsVigente,
@@ -24,7 +23,9 @@ import type { Role } from "@/lib/roles";
 import { serviciosBandejaHref } from "@/lib/servicios-catalog";
 import {
   listActiveServicios,
+  listHistorialServicios,
   listServiciosForBillingLinks,
+  servicioRowHighlight,
   type ServicioBandejaRow,
 } from "@/lib/servicios-supervisor";
 import { requireCompany } from "@/lib/session";
@@ -163,7 +164,7 @@ export default async function PanelPage({ searchParams }: { searchParams: Promis
     return <SupervisorShop companyId={companyId} userId={session.userId} />;
   }
   if (session.role === "GERENTE_OPERATIVO_SYSTRON") {
-    return <Shop companyId={companyId} manager history={vista === "historial"} />;
+    return <GerenteSystronPanel companyId={companyId} history={vista === "historial"} />;
   }
   if (session.role === "CEO") return <CeoExecutive companyId={companyId} name={session.activeCompanyName ?? "Empresa"} vista={vista} />;
   return <Executive companyId={companyId} name={session.activeCompanyName} />;
@@ -208,24 +209,124 @@ async function Technician({ companyId, userId, history }: { companyId: string; u
   );
 }
 
-function caseRowMap(list: Array<{
-  id: string;
-  folio: string;
-  equipment: { folio: string; client: { id: string; name: string; isSystem: boolean } | null };
-  attention: { priorityName: string };
-  externalSupplierId: string | null;
-  assignee: { name: string } | null;
-}>) {
-  return list.map((row) => ({
-    href: `/operacion/${row.id}`,
-    label: row.folio,
-    detail: (
+function servicioMatchesPendingPurchase(
+  row: ServicioBandejaRow,
+  purchaseRefs: ReadonlySet<string>,
+): boolean {
+  if (purchaseRefs.size === 0) return false;
+  if (row.osFolio && purchaseRefs.has(row.osFolio)) return true;
+  if (row.diagnosisFolio && purchaseRefs.has(row.diagnosisFolio)) return true;
+  for (const ref of purchaseRefs) {
+    if (row.equipmentLabel.includes(ref)) return true;
+  }
+  return false;
+}
+
+async function GerenteSystronPanel({ companyId, history }: { companyId: string; history: boolean }) {
+  const role: Role = "GERENTE_OPERATIVO_SYSTRON";
+  const bandejaActivos = serviciosBandejaHref({ vista: "activos" });
+  const bandejaHistorial = serviciosBandejaHref({ vista: "historial" });
+
+  if (history) {
+    const rows = await listHistorialServicios(companyId, "");
+    const servicioRows = rows.filter((row): row is ServicioBandejaRow => row.kind === "servicio");
+    return (
       <>
-        {panelClientRef(row.equipment.client)} · {row.equipment.folio} · {row.attention.priorityName} ·{" "}
-        {row.externalSupplierId ? "Proveedor externo" : row.assignee?.name ?? "Sin asignar"}
+        <PageHeader
+          title="Inicio"
+          subtitle="Servicios cerrados o concluidos. El detalle completo está en Servicios."
+          action={<TextLink href="/panel">Ver activos</TextLink>}
+        />
+        <SalesPanelServiciosSection
+          title="Historial"
+          empty="No hay servicios en historial."
+          bandejaHref={bandejaHistorial}
+          rows={servicioRows}
+          role={role}
+        />
       </>
-    ),
-  }));
+    );
+  }
+
+  const now = Date.now();
+  const [activeRows, partRequests, pendingPurchases] = await Promise.all([
+    listActiveServicios(companyId, ""),
+    prisma.partRequest.findMany({
+      where: { companyId, case: { status: { notIn: CLOSED } } },
+      include: { case: { select: { attentionId: true } } },
+    }),
+    prisma.purchase.findMany({
+      where: {
+        companyId,
+        status: { in: ["PENDIENTE_VALIDAR", "PENDIENTE_AUTORIZACION"] },
+      },
+      select: { destinationRef: true },
+    }),
+  ]);
+
+  const servicioRows = activeRows.filter((row): row is ServicioBandejaRow => row.kind === "servicio");
+  const refaccionAttentionIds = new Set(
+    partRequests.filter((row) => row.qtyIssued < row.qtyRequested).map((row) => row.case.attentionId),
+  );
+  const purchaseRefs = new Set(
+    pendingPurchases
+      .map((row) => row.destinationRef?.trim())
+      .filter((ref): ref is string => Boolean(ref)),
+  );
+
+  const pendientesValidacion = servicioRows.filter((row) => row.primaryStatus === "PENDIENTE_VALIDACION");
+  const vencidos = servicioRows.filter((row) => row.slaDueAt != null && row.slaDueAt.getTime() < now);
+  const refacciones = servicioRows.filter((row) => refaccionAttentionIds.has(row.id));
+  const comprasSolicitadas = servicioRows.filter((row) => servicioMatchesPendingPurchase(row, purchaseRefs));
+  const pendientesAsignacion = servicioRows.filter((row) => row.technicianName === null);
+
+  return (
+    <>
+      <PageHeader
+        title="Inicio"
+        subtitle="Pendientes del taller con el mismo detalle que Servicios activos."
+        action={<TextLink href="/panel?vista=historial">Ver historial</TextLink>}
+      />
+      <section className="flex w-full max-w-none flex-col gap-4">
+        <SalesPanelServiciosSection
+          title="Pendientes de validación"
+          empty="No hay diagnósticos por validar."
+          bandejaHref="/operacion?vista=validacion"
+          rows={pendientesValidacion}
+          role={role}
+        />
+        <SalesPanelServiciosSection
+          title="Vencidos (SLA)"
+          empty="Nada vencido."
+          bandejaHref={bandejaActivos}
+          rows={vencidos}
+          role={role}
+          highlightRow={(row) => servicioRowHighlight(row, now).markers.includes("Vencido")}
+        />
+        <SalesPanelServiciosSection
+          title="Refacciones solicitadas"
+          empty="No hay solicitudes de refacción abiertas."
+          bandejaHref={bandejaActivos}
+          rows={refacciones}
+          role={role}
+        />
+        <SalesPanelServiciosSection
+          title="Compras solicitadas"
+          empty="No hay compras pendientes ligadas a un servicio activo."
+          bandejaHref="/compras?vista=oc"
+          rows={comprasSolicitadas}
+          role={role}
+        />
+        <SalesPanelServiciosSection
+          title="Pendientes de asignación"
+          empty="Todo lo activo tiene responsable o proveedor."
+          bandejaHref={bandejaActivos}
+          rows={pendientesAsignacion}
+          role={role}
+        />
+      </section>
+    </>
+  );
 }
 
 async function SupervisorShop({ companyId, userId }: { companyId: string; userId: string }) {
@@ -266,71 +367,6 @@ async function SupervisorShop({ companyId, userId }: { companyId: string; userId
           role={role}
         />
       </section>
-    </>
-  );
-}
-
-function partRequestRowMap(
-  list: Array<{
-    id: string;
-    partNumber: string;
-    description: string;
-    qtyRequested: number;
-    qtyReserved: number;
-    qtyReceived: number;
-    qtyIssued: number;
-    status: string;
-    case: { id: string; folio: string };
-  }>,
-) {
-  return list.map((row) => {
-    const readyToIssue = Math.max(0, row.qtyReserved + row.qtyReceived - row.qtyIssued);
-    const pendingTotal = Math.max(0, row.qtyRequested - row.qtyIssued);
-    const pending = readyToIssue > 0 ? `pend. surtir ${readyToIssue}` : `pend. ${pendingTotal}`;
-    const status = PART_REQUEST_STATUS_LABEL[row.status] ?? row.status;
-    return {
-      key: row.id,
-      href: `/operacion/${row.case.id}`,
-      label: row.case.folio,
-      detail: `${row.partNumber} · ${row.description} · sol. ${row.qtyRequested} · ap. ${row.qtyReserved} · rec. ${row.qtyReceived} · surt. ${row.qtyIssued} · ${pending} · ${status}`,
-    };
-  });
-}
-
-async function Shop({ companyId, manager, history }: { companyId: string; manager: boolean; history: boolean }) {
-  const [rows, partRequests] = await Promise.all([
-    prisma.technicalCase.findMany({
-      where: { serviceCompanyId: companyId, ...(history ? { status: { in: CLOSED } } : { status: { notIn: CLOSED } }) },
-      include: { equipment: { include: { client: true } }, attention: true, assignee: true },
-      orderBy: { slaDueAt: "asc" },
-      take: 100,
-    }),
-    manager && !history
-      ? prisma.partRequest.findMany({
-          where: { companyId, case: { status: { notIn: CLOSED } } },
-          include: { case: { select: { id: true, folio: true } } },
-          orderBy: { updatedAt: "desc" },
-          take: 120,
-        })
-      : Promise.resolve([]),
-  ]);
-  const openPartRequests = partRequests.filter((row) => row.qtyIssued < row.qtyRequested);
-  const now = Date.now();
-  return (
-    <>
-      <PageHeader title={manager ? "Panel del gerente" : "Panel de supervisión"} subtitle="Activos de esta empresa. Validar o devolver se hace en el detalle." action={<TextLink href={history ? "/panel" : "/panel?vista=historial"}>{history ? "Ver activos" : "Ver historial"}</TextLink>} />
-      <div className="grid gap-3">
-        <Block title="Pendientes de asignación" empty="Todo lo activo tiene responsable o proveedor." bandejaHref="/operacion" rows={caseRowMap(rows.filter((row) => !row.assigneeUserId && !row.externalSupplierId))} />
-        <Block title="Diagnósticos activos" empty="Sin diagnósticos activos." bandejaHref="/operacion" rows={caseRowMap(rows.filter((row) => row.kind === "DIAGNOSTICO"))} />
-        <Block title="Reparaciones activas" empty="Sin reparaciones activas." bandejaHref="/operacion" rows={caseRowMap(rows.filter((row) => row.kind === "OS"))} />
-        <Block title="Vencidos" empty="Nada vencido." bandejaHref="/operacion" rows={caseRowMap(rows.filter((row) => row.slaDueAt != null && row.slaDueAt.getTime() < now))} />
-        <Block title="En espera de refacciones" empty="Ninguna orden espera refacción." bandejaHref="/operacion" rows={caseRowMap(rows.filter((row) => row.status === "EN_ESPERA_REFACCIONES"))} />
-        {manager && !history ? (
-          <Block title="Refacciones solicitadas" empty="No hay solicitudes de refacción abiertas." bandejaHref="/produccion" rows={partRequestRowMap(openPartRequests)} />
-        ) : null}
-        <Block title="Proveedor externo" empty="Nada está en proveedor externo." bandejaHref="/operacion" rows={caseRowMap(rows.filter((row) => row.externalSupplierId))} />
-        {manager ? <Block title="Diagnósticos pendientes de validación" empty="No hay diagnósticos por validar." bandejaHref="/operacion?vista=validacion" rows={caseRowMap(rows.filter((row) => row.status === "PENDIENTE_VALIDACION"))} /> : null}
-      </div>
     </>
   );
 }
