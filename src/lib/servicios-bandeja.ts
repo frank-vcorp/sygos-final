@@ -23,6 +23,8 @@ export type ServicioBandejaColumnOptions = {
   quoteMonto?: boolean;
   /** Muestra Cotización (y Monto si aplica) como primera(s) columna(s). */
   cotizacionFirst?: boolean;
+  /** En Ventas, incluye edo. técnico, Técnico y SLA (p. ej. panel Cotizaciones / seguimientos). */
+  tallerColumns?: boolean;
 };
 
 const BANDEJA_COLUMN_SEQUENCE: ServicioBandejaColumnKey[] = [
@@ -56,6 +58,7 @@ export function serviciosBandejaColumns(
   options?: ServicioBandejaColumnOptions,
 ): ServicioBandejaColumns {
   const ventas = role === "VENTAS";
+  const ventasTaller = ventas && options?.tallerColumns;
   const showQuoteMonto = ventas && options?.quoteMonto !== false;
   const hideAdmin = (
     role === "TECNICO"
@@ -69,14 +72,14 @@ export function serviciosBandejaColumns(
     ordenServicio: true,
     equipo: true,
     cliente: true,
-    edoTecnico: !ventas,
+    edoTecnico: !ventas || ventasTaller,
     edoAdministrativo: !hideAdmin,
     edoFisico: !tecnicoView,
     cotizacion: ventas,
     cotizacionMonto: showQuoteMonto,
     vendedor: !ventas,
-    tecnico: !tecnicoView && !ventas,
-    sla: !ventas,
+    tecnico: !tecnicoView && (!ventas || ventasTaller),
+    sla: !ventas || ventasTaller,
   };
 }
 

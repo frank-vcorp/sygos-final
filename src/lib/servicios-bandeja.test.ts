@@ -107,10 +107,12 @@ describe("serviciosBandejaColumns", () => {
   });
 
   it("cotización puede ir primero en el orden de columnas", () => {
-    const cols = serviciosBandejaColumns("VENTAS", { quoteMonto: false });
+    const cols = serviciosBandejaColumns("VENTAS", { quoteMonto: false, tallerColumns: true });
     const order = orderedBandejaColumns(cols, { cotizacionFirst: true });
     assert.equal(order[0], "cotizacion");
     assert.equal(order.includes("diagnostico"), true);
-    assert.equal(order.at(-1), "edoFisico");
+    assert.equal(order.includes("tecnico"), true);
+    assert.equal(order.includes("sla"), true);
+    assert.equal(order.at(-1), "sla");
   });
 });
