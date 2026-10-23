@@ -119,7 +119,12 @@ function GroupedBlock({
 }
 
 function panelClientLink(client: { id: string; name: string; isSystem: boolean }) {
-  return <ClientNameLink clientId={client.id} name={client.name} isSystem={client.isSystem} canEdit />;
+  return <ClientNameLink clientId={client.id} name={client.name} isSystem={client.isSystem} />;
+}
+
+function panelClientRef(client: { id: string; name: string; isSystem: boolean } | null) {
+  if (!client) return "Equipo";
+  return panelClientLink(client);
 }
 
 function SalesMetric({ label, value, href }: { label: string; value: ReactNode; href: string }) {
@@ -189,7 +194,11 @@ async function Technician({ companyId, userId, history }: { companyId: string; u
         rows={rows.map((row) => ({
           href: `/operacion/${row.id}`,
           label: row.folio,
-          detail: `${row.equipment.client?.name ?? "Equipo"} · ${row.equipment.folio} · ${row.attention.priorityName} · ${row.status}`,
+          detail: (
+            <>
+              {panelClientRef(row.equipment.client)} · {row.equipment.folio} · {row.attention.priorityName} · {row.status}
+            </>
+          ),
         }))}
       />
     </>
@@ -199,7 +208,7 @@ async function Technician({ companyId, userId, history }: { companyId: string; u
 function caseRowMap(list: Array<{
   id: string;
   folio: string;
-  equipment: { folio: string; client: { name: string } | null };
+  equipment: { folio: string; client: { id: string; name: string; isSystem: boolean } | null };
   attention: { priorityName: string };
   externalSupplierId: string | null;
   assignee: { name: string } | null;
@@ -207,7 +216,12 @@ function caseRowMap(list: Array<{
   return list.map((row) => ({
     href: `/operacion/${row.id}`,
     label: row.folio,
-    detail: `${row.equipment.client?.name ?? "Equipo"} · ${row.equipment.folio} · ${row.attention.priorityName} · ${row.externalSupplierId ? "Proveedor externo" : row.assignee?.name ?? "Sin asignar"}`,
+    detail: (
+      <>
+        {panelClientRef(row.equipment.client)} · {row.equipment.folio} · {row.attention.priorityName} ·{" "}
+        {row.externalSupplierId ? "Proveedor externo" : row.assignee?.name ?? "Sin asignar"}
+      </>
+    ),
   }));
 }
 
@@ -676,7 +690,7 @@ async function CeoExecutive({ companyId, name, vista }: { companyId: string; nam
                 label: row.folio,
                 detail: (
                   <>
-                    {row.equipment.client.name} · {row.equipment.folio}
+                    {panelClientLink(row.equipment.client)} · {row.equipment.folio}
                     <span className="ml-2 inline-flex">
                       <AuthorizeExitWithoutDocumentButton caseId={row.id} version={row.version} />
                     </span>

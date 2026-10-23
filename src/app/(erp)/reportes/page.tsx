@@ -65,7 +65,17 @@ export async function ReportView({ params, searchParams }: { params: Promise<{ t
             <tbody>
               {table.rows.map((row, index) => (
                 <tr key={index}>
-                  {row.cells.map((cell, cellIndex) => <Td key={cellIndex}>{cellIndex === 0 && "href" in row && row.href ? <RecordLink href={row.href}>{cell}</RecordLink> : cell}</Td>)}
+                  {row.cells.map((cell, cellIndex) => (
+                    <Td key={cellIndex}>
+                      {cellIndex === 0 && "href" in row && row.href ? (
+                        <RecordLink href={row.href}>{cell}</RecordLink>
+                      ) : cellIndex === 1 && "clientHref" in row && row.clientHref ? (
+                        <TextLink href={row.clientHref}>{cell}</TextLink>
+                      ) : (
+                        cell
+                      )}
+                    </Td>
+                  ))}
                 </tr>
               ))}
             </tbody>

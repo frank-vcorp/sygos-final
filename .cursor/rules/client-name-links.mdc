@@ -1,0 +1,9 @@
+# Cliente: siempre enlace al detalle
+
+Cuando muestres el **nombre de un cliente** en la UI del ERP (tablas, paneles, documentos, resúmenes de movimiento, etc.):
+
+- Usa `ClientNameLink` de `@/components/client-entity-links` con `clientId`, `name` e `isSystem` cuando aplique (p. ej. intercompañía → etiqueta «SYSTRON · intercompañía», mismo enlace a `/clientes/{id}`).
+- No renderices el nombre como texto plano ni condiciones del tipo «solo si puede editar».
+- Para **contactos** en fichas o formularios, usa `ContactNameLink` → `/clientes/{id}#contactos`.
+
+Excepciones razonables: campos de formulario (`<input>`, `<select>`), títulos de la propia ficha `/clientes/[id]`, y listados donde el nombre ya es el `RecordLink` principal a esa ficha.

@@ -1,4 +1,5 @@
 import { cancelMovementAction, createAttentionAction, movementAction } from "@/app/(erp)/equipos/actions";
+import { ClientNameLink } from "@/components/client-entity-links";
 import { MovementReasonFields } from "@/components/movement-reason-fields";
 import { SupplierPicker } from "@/components/supplier-picker";
 import { Button, controlClass, Field, FormActions, FormPanel, FormSection } from "@/components/ui";
@@ -119,7 +120,9 @@ export function MovementForm({
     reason: string;
     serviceLabel: string;
     reportedFault: string;
+    clientId: string;
     clientName: string;
+    clientIsSystem?: boolean;
   };
 }) {
   const movements = restrictMovements ?? allowedMovements(kind, custody);
@@ -137,7 +140,16 @@ export function MovementForm({
         </p>
         <dl className="grid gap-2 rounded-md border border-[var(--line)] bg-[#f7f8f9] p-3 text-sm">
           <div><dt className="text-[var(--muted)]">Equipo</dt><dd className="font-medium">{equipmentFolio}</dd></div>
-          <div><dt className="text-[var(--muted)]">Cliente</dt><dd>{receiptPreset.clientName}</dd></div>
+          <div>
+            <dt className="text-[var(--muted)]">Cliente</dt>
+            <dd>
+              <ClientNameLink
+                clientId={receiptPreset.clientId}
+                name={receiptPreset.clientName}
+                isSystem={receiptPreset.clientIsSystem}
+              />
+            </dd>
+          </div>
           <div><dt className="text-[var(--muted)]">Servicio</dt><dd>{receiptPreset.serviceLabel}</dd></div>
           <div><dt className="text-[var(--muted)]">Falla reportada</dt><dd>{receiptPreset.reportedFault}</dd></div>
           <div><dt className="text-[var(--muted)]">Movimiento</dt><dd>{MOVEMENT_LABEL[receiptPreset.movement]}</dd></div>

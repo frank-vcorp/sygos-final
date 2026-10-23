@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createAttentionAction } from "@/app/(erp)/equipos/actions";
 import { FormOverlayDialog } from "@/components/overlay-dialog";
+import { ClientNameLink } from "@/components/client-entity-links";
 import { Button, controlClass, Field } from "@/components/ui";
 import { ATTENTION_LABEL, ATTENTION_TYPES, type AttentionType } from "@/lib/priorities";
 
@@ -14,14 +15,18 @@ const primaryButtonClass =
 export function EquipmentAttentionLauncher({
   equipmentId,
   equipmentFolio,
+  clientId,
   clientName,
+  clientIsSystem = false,
   kind,
   version,
   priorities,
 }: {
   equipmentId: string;
   equipmentFolio: string;
+  clientId: string;
   clientName: string;
+  clientIsSystem?: boolean;
   kind: "EQUI" | "MOT";
   version: number;
   priorities: PriorityRow[];
@@ -50,7 +55,10 @@ export function EquipmentAttentionLauncher({
           <input type="hidden" name="version" value={version} />
           <dl className="grid gap-2 rounded-md border border-[var(--line)] bg-[#f7f8f9] p-3 text-sm">
             <div><dt className="text-[var(--muted)]">Equipo</dt><dd className="font-medium">{equipmentFolio}</dd></div>
-            <div><dt className="text-[var(--muted)]">Cliente</dt><dd>{clientName}</dd></div>
+            <div>
+              <dt className="text-[var(--muted)]">Cliente</dt>
+              <dd><ClientNameLink clientId={clientId} name={clientName} isSystem={clientIsSystem} /></dd>
+            </div>
           </dl>
           <Field label="Falla reportada" hint="Describe el síntoma que reporta el cliente.">
             <textarea name="reportedFault" required rows={3} className={controlClass} value={reportedFault} onChange={(event) => setReportedFault(event.target.value)} />

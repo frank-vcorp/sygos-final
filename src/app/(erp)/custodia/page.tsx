@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { AlmacenBandejaList } from "@/components/almacen-bandeja-list";
+import { ClientNameLink } from "@/components/client-entity-links";
 import { ActiveFilters, Badge, Card, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, SegmentedNav, Table, Td, Th } from "@/components/ui";
 import { mapEquipmentToAlmacenRow } from "@/lib/almacen-bandeja";
 import { CUSTODY_LABEL, type Custody } from "@/lib/custody";
@@ -39,7 +40,7 @@ export default async function CustodiaPage({ searchParams }: { searchParams: Pro
       };
 
   const bandejaInclude = {
-    client: { select: { name: true } },
+    client: { select: { id: true, name: true, isSystem: true } },
     originCompany: { select: { code: true } },
     attentions: {
       orderBy: { createdAt: "desc" as const },
@@ -183,7 +184,6 @@ export default async function CustodiaPage({ searchParams }: { searchParams: Pro
               <tbody>
                 {rows.map((row) => {
                   const hideClient = !systron && row.originCompany.code === "SYSTRON";
-                  const ref = hideClient ? "SYSTRON · intercompañía" : row.client.name;
                   return (
                     <tr key={row.id}>
                       <Td>
@@ -198,7 +198,13 @@ export default async function CustodiaPage({ searchParams }: { searchParams: Pro
                         </RecordLink>
                       </Td>
                       {view === "pendientes" && almacenBandeja ? <Td><EntradaServicioCell attentionType={entradaAttentionType(row)} /></Td> : null}
-                      <Td>{ref}</Td>
+                      <Td>
+                        <ClientNameLink
+                          clientId={row.client.id}
+                          name={row.client.name}
+                          isSystem={hideClient}
+                        />
+                      </Td>
                       <Td><Badge>{CUSTODY_LABEL[row.custody as Custody]}</Badge></Td>
                     </tr>
                   );
@@ -224,7 +230,9 @@ export default async function CustodiaPage({ searchParams }: { searchParams: Pro
                 }
               >
                 {series ? <p className="font-medium">{row.folio}</p> : null}
-                <p>{hideClient ? "SYSTRON · intercompañía" : row.client.name}</p>
+                <p>
+                  <ClientNameLink clientId={row.client.id} name={row.client.name} isSystem={hideClient} />
+                </p>
                 {series ? (
                   <p className="text-xs text-[var(--muted)]">
                     Folio {series}: se genera al confirmar la entrada física
@@ -259,7 +267,8 @@ async function SaleQueue({ companyId }: { companyId: string }) {
           return (
             <li key={sale.id}>
               <RecordLink href={`/ventas/${sale.id}`}>{sale.folio}</RecordLink>
-              {" · "}{sale.client.name}
+              {" · "}
+              <ClientNameLink clientId={sale.client.id} name={sale.client.name} isSystem={sale.client.isSystem} />
               {pendingReceive > 0 ? ` · por recibir ${pendingReceive}` : ""}
               {pendingDeliver > 0 ? ` · por entregar ${pendingDeliver}` : ""}
             </li>

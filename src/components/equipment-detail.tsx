@@ -138,7 +138,9 @@ export async function EquipmentDetail({
           reason: receiptReason,
           serviceLabel: ATTENTION_LABEL[openAttention.attentionType as AttentionType] ?? openAttention.attentionType,
           reportedFault: openAttention.reportedFault,
-          clientName: intercompany ? "SYSTRON · intercompañía" : equipment.client.name,
+          clientId: equipment.client.id,
+          clientName: equipment.client.name,
+          clientIsSystem: intercompany,
         }
       : undefined;
   const backLabel = listHref === "/custodia" ? "Almacén" : expectedKind === "EQUI" ? "Equipos" : "Motores";
@@ -189,13 +191,14 @@ export async function EquipmentDetail({
     })
     : null;
   let primaryAction: React.ReactNode = null;
-  const clientDisplayName = intercompany ? "SYSTRON · intercompañía" : equipment.client.name;
   if (awaitingAttentionForReceipt && canAttend) {
     primaryAction = (
       <EquipmentAttentionLauncher
         equipmentId={equipment.id}
         equipmentFolio={equipment.folio}
-        clientName={clientDisplayName}
+        clientId={equipment.client.id}
+        clientName={equipment.client.name}
+        clientIsSystem={intercompany}
         kind={expectedKind}
         version={equipment.version}
         priorities={priorities.map((row) => ({ id: row.id, attentionType: row.attentionType, name: row.name }))}
@@ -243,7 +246,9 @@ export async function EquipmentDetail({
           reason={almacenEntradaPreset.reason}
           serviceLabel={almacenEntradaPreset.serviceLabel}
           reportedFault={almacenEntradaPreset.reportedFault}
-          clientName={almacenEntradaPreset.clientName}
+          clientId={equipment.client.id}
+          clientName={equipment.client.name}
+          clientIsSystem={intercompany}
         />
       )
       : null;
@@ -287,9 +292,11 @@ export async function EquipmentDetail({
           <>
             <EntityMetaItem label="Origen">{equipment.originCompany.name}</EntityMetaItem>
             <EntityMetaItem label="Cliente">
-              {intercompany ? "SYSTRON · intercompañía" : (
-                <ClientNameLink clientId={equipment.client.id} name={equipment.client.name} isSystem={equipment.client.isSystem} canEdit={can(session.role, "client.edit", session.activeCompanyCode)} />
-              )}
+              <ClientNameLink
+                clientId={equipment.client.id}
+                name={equipment.client.name}
+                isSystem={intercompany || equipment.client.isSystem}
+              />
             </EntityMetaItem>
             <EntityMetaItem label="Identificación">{[equipment.typeName, equipment.brandName, equipment.model].filter(Boolean).join(" · ") || "—"}</EntityMetaItem>
             {equipment.serial ? <EntityMetaItem label="Serie">{equipment.serial}</EntityMetaItem> : null}

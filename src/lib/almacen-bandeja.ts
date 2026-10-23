@@ -29,7 +29,9 @@ export type AlmacenBandejaRow = {
   diagnosisHref: string | null;
   osFolio: string | null;
   osHref: string | null;
+  clientId: string;
   clientName: string;
+  clientIsSystem: boolean;
   physical: StackedStatus;
   sellerName: string | null;
 };
@@ -43,7 +45,7 @@ export function mapEquipmentToAlmacenRow(
     brandName: string | null;
     model: string;
     custody: string;
-    client: { name: string };
+    client: { id: string; name: string; isSystem: boolean };
     attentions: AttentionSlice[];
   },
   options: { vistaQuery?: string; hideClient?: boolean },
@@ -75,7 +77,9 @@ export function mapEquipmentToAlmacenRow(
     diagnosisHref,
     osFolio,
     osHref,
-    clientName: options.hideClient ? "SYSTRON · intercompañía" : equipment.client.name,
+    clientId: equipment.client.id,
+    clientName: equipment.client.name,
+    clientIsSystem: options.hideClient ? true : equipment.client.isSystem,
     physical: physicalStatusFromCustody(equipment.custody),
     sellerName: null,
   };

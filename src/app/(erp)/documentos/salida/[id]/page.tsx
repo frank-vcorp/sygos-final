@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { CompanyLogo } from "@/components/brand-logo";
 import { PrintButton } from "@/components/print-button";
+import { ClientNameLink } from "@/components/client-entity-links";
 import { TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
@@ -58,7 +59,13 @@ export default async function SalidaDocumentoPage({ params }: { params: Promise<
           <section className="grid gap-4 rounded-lg bg-[#f7f8f9] p-4 sm:grid-cols-2">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Cliente</p>
-              <p className="mt-1 text-base font-semibold">{movement.equipment.client.isSystem ? "SYSTRON · intercompañía" : movement.equipment.client.name}</p>
+              <p className="mt-1 text-base font-semibold">
+                <ClientNameLink
+                  clientId={movement.equipment.client.id}
+                  name={movement.equipment.client.name}
+                  isSystem={movement.equipment.client.isSystem}
+                />
+              </p>
             </div>
             <div className="sm:text-right">
               <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Equipo</p>

@@ -4,30 +4,29 @@ export function ClientNameLink({
   clientId,
   name,
   isSystem = false,
-  canEdit,
+  canEdit: _canEdit = true,
 }: {
   clientId: string;
   name: string;
   isSystem?: boolean;
-  canEdit: boolean;
+  /** Conservado por compatibilidad; el enlace al detalle no depende de editar. */
+  canEdit?: boolean;
   className?: string;
 }) {
   const label = isSystem ? "SYSTRON · intercompañía" : name;
-  if (!canEdit || isSystem) return <>{label}</>;
-  return <TextLink href={`/clientes/${clientId}`}>{name}</TextLink>;
+  return <TextLink href={`/clientes/${clientId}`}>{label}</TextLink>;
 }
 
 /** Abre la ficha del cliente en la sección de contactos. */
 export function ContactNameLink({
   clientId,
   name,
-  canEdit,
+  canEdit: _canEdit = true,
 }: {
   clientId: string;
   name: string;
-  canEdit: boolean;
+  canEdit?: boolean;
   className?: string;
 }) {
-  if (!canEdit) return <>{name}</>;
   return <TextLink href={`/clientes/${clientId}#contactos`}>{name}</TextLink>;
 }

@@ -1,3 +1,4 @@
+import { ClientNameLink } from "@/components/client-entity-links";
 import { SlaCountdown } from "@/components/sla-countdown";
 import { MobileCard, RecordLink, ResponsiveData, Table, Td, Th } from "@/components/ui";
 import { serviciosBandejaColumns, type StatusTone, type StackedStatus } from "@/lib/servicios-bandeja";
@@ -45,6 +46,16 @@ function StatusBadge({ status }: { status: StackedStatus }) {
         </span>
       ))}
     </div>
+  );
+}
+
+function ClienteCell(row: { clientId: string; clientName: string; clientIsSystem: boolean }) {
+  return (
+    <ClientNameLink
+      clientId={row.clientId}
+      name={row.clientName}
+      isSystem={row.clientIsSystem}
+    />
   );
 }
 
@@ -128,7 +139,7 @@ export function ServiciosSupervisorList({
                         <RecordLink href={row.equipmentHref}>{row.equipmentLabel}</RecordLink>
                       </Td>
                     ) : null}
-                    {columns.cliente ? <Td>{row.clientName}</Td> : null}
+                    {columns.cliente ? <Td><ClienteCell clientId={row.clientId} clientName={row.clientName} clientIsSystem={row.clientIsSystem} /></Td> : null}
                     {columns.edoTecnico ? (
                       <Td>
                         <StatusBadge status={{ label: "Cancelada", tone: "danger" }} />
@@ -152,7 +163,7 @@ export function ServiciosSupervisorList({
                       <RecordLink href={row.equipmentHref}>{row.equipmentLabel}</RecordLink>
                     </Td>
                   ) : null}
-                  {columns.cliente ? <Td>{row.clientName}</Td> : null}
+                  {columns.cliente ? <Td><ClienteCell clientId={row.clientId} clientName={row.clientName} clientIsSystem={row.clientIsSystem} /></Td> : null}
                   {columns.edoTecnico ? <Td><StatusBadge status={row.technical} /></Td> : null}
                   {columns.edoAdministrativo ? <Td><StatusBadge status={row.administrative} /></Td> : null}
                   {columns.edoFisico ? <Td><StatusBadge status={row.physical} /></Td> : null}
@@ -177,7 +188,7 @@ export function ServiciosSupervisorList({
             <div key={`att-${row.id}`}>
               <MobileCard href={row.equipmentHref} title="Atención cancelada" meta={<StatusBadge status={{ label: "Cancelada", tone: "danger" }} />}>
                 <p>{row.equipmentLabel}</p>
-                <p>{row.clientName}</p>
+                <p><ClienteCell clientId={row.clientId} clientName={row.clientName} clientIsSystem={row.clientIsSystem} /></p>
                 <p>Cierre: {formatClosedAt(row.closedAt)}</p>
               </MobileCard>
             </div>
@@ -208,7 +219,7 @@ export function ServiciosSupervisorList({
               {columns.diagnostico && row.diagnosisFolio ? <p>DX: {row.diagnosisFolio}</p> : null}
               {columns.ordenServicio && row.osFolio ? <p>OS: {row.osFolio}</p> : null}
               <p>{row.equipmentLabel}</p>
-              <p>{row.clientName}</p>
+              <p><ClienteCell clientId={row.clientId} clientName={row.clientName} clientIsSystem={row.clientIsSystem} /></p>
               {columns.edoFisico ? <p>Físico: {row.physical.label}</p> : null}
               {columns.vendedor ? <p>Vendedor: {row.sellerName ?? "Sin asignar"}</p> : null}
               {columns.tecnico ? <p>Técnico: {row.technicianName ?? "Sin asignar"}</p> : null}

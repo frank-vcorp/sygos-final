@@ -185,7 +185,7 @@ function ContactChoices({ clientId, contacts, canEditClient }: { clientId: strin
               className="mt-1"
             />
             <span className="text-sm leading-snug">
-              {canEditClient ? <ContactNameLink clientId={clientId} name={contact.name} canEdit /> : contact.name}
+              <ContactNameLink clientId={clientId} name={contact.name} />
               {contact.isPrimary ? <span className="mt-0.5 block text-xs text-[var(--muted)]">Contacto principal</span> : null}
             </span>
           </label>

@@ -56,7 +56,11 @@ export async function reportTable(companyId: string, inventoryEnabled: boolean, 
     return {
       title: "Cotizaciones",
       headers: ["Folio", "Cliente", "Estado", "Total"],
-      rows: rows.map((row) => ({ href: `/cotizaciones/${row.id}`, cells: [row.folio, row.client.name, row.status, money(quoteTotals(linesForTotal(row.lines, row.quoteType, row.status), row.discountPct)?.total)] })),
+      rows: rows.map((row) => ({
+        href: `/cotizaciones/${row.id}`,
+        clientHref: `/clientes/${row.client.id}`,
+        cells: [row.folio, row.client.name, row.status, money(quoteTotals(linesForTotal(row.lines, row.quoteType, row.status), row.discountPct)?.total)],
+      })),
     };
   }
   if (type === "conversion") {
@@ -71,7 +75,15 @@ export async function reportTable(companyId: string, inventoryEnabled: boolean, 
   }
   if (type === "cxc") {
     const rows = await prisma.receivable.findMany({ where: { companyId, ...(hasRange ? { createdAt: created } : {}) }, include: { client: true, document: true }, orderBy: { dueAt: "asc" }, take: 200 });
-    return { title: "Cuentas por cobrar", headers: ["Documento", "Cliente", "Saldo", "Estado"], rows: rows.map((row) => ({ href: `/cobranza/${row.id}`, cells: [row.document.folio, row.client.name, money(row.balance), row.status] })) };
+    return {
+      title: "Cuentas por cobrar",
+      headers: ["Documento", "Cliente", "Saldo", "Estado"],
+      rows: rows.map((row) => ({
+        href: `/cobranza/${row.id}`,
+        clientHref: `/clientes/${row.client.id}`,
+        cells: [row.document.folio, row.client.name, money(row.balance), row.status],
+      })),
+    };
   }
   if (type === "cxp") {
     const rows = await prisma.payable.findMany({ where: { companyId, ...(hasRange ? { createdAt: created } : {}) }, include: { supplier: true, document: true }, orderBy: { dueAt: "asc" }, take: 200 });

@@ -58,7 +58,13 @@ export default async function MotoresPage({ searchParams }: { searchParams: Prom
                 <tr key={row.id}>
                   <Td><RecordLink href={`/motores/${row.id}`}>{row.folio}</RecordLink></Td>
                   <Td>{row.originCompany.name}</Td>
-                  <Td>{intercompany ? "SYSTRON · intercompañía" : <ClientNameLink clientId={row.client.id} name={row.client.name} isSystem={row.client.isSystem} canEdit={canEditClient} />}</Td>
+                  <Td>
+                    <ClientNameLink
+                      clientId={row.client.id}
+                      name={row.client.name}
+                      isSystem={intercompany || row.client.isSystem}
+                    />
+                  </Td>
                   <Td>{[row.brandName, row.model, row.serial].filter(Boolean).join(" · ")}</Td>
                   <Td><Badge>{CUSTODY_LABEL[row.custody as Custody] ?? row.custody}</Badge></Td>
                 </tr>
@@ -73,7 +79,13 @@ export default async function MotoresPage({ searchParams }: { searchParams: Prom
               href={`/motores/${row.id}`}
               title={row.folio}
               meta={<Badge>{CUSTODY_LABEL[row.custody as Custody] ?? row.custody}</Badge>}
-              footer={intercompany ? "SYSTRON · intercompañía" : <ClientNameLink clientId={row.client.id} name={row.client.name} isSystem={row.client.isSystem} canEdit={canEditClient} />}
+              footer={
+                <ClientNameLink
+                  clientId={row.client.id}
+                  name={row.client.name}
+                  isSystem={intercompany || row.client.isSystem}
+                />
+              }
             >
               <p>{row.originCompany.name} · {[row.brandName, row.model, row.serial].filter(Boolean).join(" · ") || "Sin identificación adicional"}</p>
             </MobileCard>

@@ -1,3 +1,4 @@
+import { ClientNameLink } from "@/components/client-entity-links";
 import { MobileCard, RecordLink, ResponsiveData, Table, Td, Th } from "@/components/ui";
 import type { AlmacenBandejaRow } from "@/lib/almacen-bandeja";
 import type { StatusTone, StackedStatus } from "@/lib/servicios-bandeja";
@@ -49,7 +50,9 @@ export function AlmacenBandejaList({ rows }: { rows: AlmacenBandejaRow[] }) {
                 <Td>
                   <RecordLink href={row.equipmentHref}>{row.equipmentLabel}</RecordLink>
                 </Td>
-                <Td>{row.clientName}</Td>
+                <Td>
+                  <ClientNameLink clientId={row.clientId} name={row.clientName} isSystem={row.clientIsSystem} />
+                </Td>
                 <Td><StatusBadge status={row.physical} /></Td>
                 <Td>{row.sellerName ?? "Sin asignar"}</Td>
               </tr>
@@ -67,7 +70,9 @@ export function AlmacenBandejaList({ rows }: { rows: AlmacenBandejaRow[] }) {
           {row.diagnosisFolio ? <p>DX: {row.diagnosisFolio}</p> : null}
           {row.osFolio ? <p>OS: {row.osFolio}</p> : null}
           <p>{row.equipmentLabel}</p>
-          <p>{row.clientName}</p>
+          <p>
+            <ClientNameLink clientId={row.clientId} name={row.clientName} isSystem={row.clientIsSystem} />
+          </p>
           <p>Vendedor: {row.sellerName ?? "Sin asignar"}</p>
         </MobileCard>
       ))}

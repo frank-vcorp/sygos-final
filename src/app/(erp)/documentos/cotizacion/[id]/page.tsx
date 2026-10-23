@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { CompanyLogo } from "@/components/brand-logo";
 import { PrintButton } from "@/components/print-button";
 import { QuoteConcept } from "@/components/quote-concept";
+import { ClientNameLink } from "@/components/client-entity-links";
 import { TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { linesForTotal, money, quoteTotals } from "@/lib/money";
@@ -45,7 +46,13 @@ export default async function CotizacionDocumentoPage({ params }: { params: Prom
         <section className="grid gap-4 rounded-lg bg-[#f7f8f9] p-4 sm:grid-cols-2">
           <div>
             <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Cliente</p>
-            <p className="mt-1 text-base font-semibold">{quote.client.name}</p>
+            <p className="mt-1 text-base font-semibold">
+              <ClientNameLink
+                clientId={quote.client.id}
+                name={quote.client.name}
+                isSystem={quote.client.isSystem}
+              />
+            </p>
             {quote.client.rfc ? <p className="text-sm text-[var(--muted)]">RFC: {quote.client.rfc}</p> : null}
           </div>
           <div className="sm:text-right">

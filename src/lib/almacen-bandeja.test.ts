@@ -13,7 +13,7 @@ describe("almacen bandeja", () => {
         brandName: "FANUC",
         model: "M1",
         custody: "EN_RESGUARDO",
-        client: { name: "Cliente A" },
+        client: { id: "c1", name: "Cliente A", isSystem: false },
         attentions: [
           {
             id: "att1",

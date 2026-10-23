@@ -1,6 +1,7 @@
 "use client";
 
 import { movementAction } from "@/app/(erp)/equipos/actions";
+import { ClientNameLink } from "@/components/client-entity-links";
 import { Button } from "@/components/ui";
 import { MOVEMENT_LABEL, type MovementKind } from "@/lib/custody";
 
@@ -13,7 +14,9 @@ export function PassToResguardoForm({
   reason,
   serviceLabel,
   reportedFault,
+  clientId,
   clientName,
+  clientIsSystem = false,
   direct = false,
 }: {
   equipmentId: string;
@@ -24,7 +27,9 @@ export function PassToResguardoForm({
   reason: string;
   serviceLabel: string;
   reportedFault: string;
+  clientId: string;
   clientName: string;
+  clientIsSystem?: boolean;
   /** Un solo clic desde la cabecera del equipo (sin overlay ni resumen). */
   direct?: boolean;
 }) {
@@ -55,7 +60,10 @@ export function PassToResguardoForm({
       </p>
       <dl className="grid gap-2 rounded-md border border-[var(--line)] bg-[#f7f8f9] p-3 text-sm">
         <div><dt className="text-[var(--muted)]">Equipo</dt><dd className="font-medium">{equipmentFolio}</dd></div>
-        <div><dt className="text-[var(--muted)]">Cliente</dt><dd>{clientName}</dd></div>
+        <div>
+          <dt className="text-[var(--muted)]">Cliente</dt>
+          <dd><ClientNameLink clientId={clientId} name={clientName} isSystem={clientIsSystem} /></dd>
+        </div>
         <div><dt className="text-[var(--muted)]">Servicio</dt><dd>{serviceLabel}</dd></div>
         <div><dt className="text-[var(--muted)]">Falla reportada</dt><dd>{reportedFault}</dd></div>
         <div><dt className="text-[var(--muted)]">Movimiento</dt><dd>{MOVEMENT_LABEL[movement]}</dd></div>

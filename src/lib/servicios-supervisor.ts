@@ -105,7 +105,7 @@ type CaseRecord = {
     brandName: string | null;
     model: string;
     custody: string;
-    client: { name: string };
+    client: { id: string; name: string; isSystem: boolean };
   };
   attention: {
     attentionType: string;
@@ -125,7 +125,9 @@ export type ServicioBandejaRow = {
   diagnosisHref: string | null;
   osFolio: string | null;
   osHref: string | null;
+  clientId: string;
   clientName: string;
+  clientIsSystem: boolean;
   technical: StackedStatus;
   administrative: StackedStatus;
   physical: StackedStatus;
@@ -145,7 +147,9 @@ export type CancelledServicioBandejaRow = {
   equipmentId: string;
   equipmentHref: string;
   equipmentLabel: string;
+  clientId: string;
   clientName: string;
+  clientIsSystem: boolean;
   closedAt: Date;
   createdAt: Date;
 };
@@ -223,7 +227,9 @@ function buildServicioRow(
     diagnosisHref,
     osFolio,
     osHref,
+    clientId: equipment.client.id,
     clientName: equipment.client.name,
+    clientIsSystem: equipment.client.isSystem,
     technical: technicalStatusFromCase(technicalSource.status),
     administrative: administrativeStatus({
       attentionType: primary.attention.attentionType,
@@ -464,7 +470,9 @@ export async function listHistorialServicios(
     equipmentId: row.equipment.id,
     equipmentHref: equipmentDetailHref(row.equipment.kind, row.equipment.id),
     equipmentLabel: formatEquipmentBandejaLabel(row.equipment),
+    clientId: row.equipment.client.id,
     clientName: row.equipment.client.name,
+    clientIsSystem: row.equipment.client.isSystem,
     closedAt: row.updatedAt,
     createdAt: row.createdAt,
   }));
