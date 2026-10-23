@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   administrativeStatus,
   physicalStatusFromCustody,
+  orderedBandejaColumns,
   serviciosBandejaColumns,
   technicalStatusFromCase,
 } from "./servicios-bandeja";
@@ -103,5 +104,13 @@ describe("serviciosBandejaColumns", () => {
     const cols = serviciosBandejaColumns("VENTAS", { quoteMonto: false });
     assert.equal(cols.cotizacion, true);
     assert.equal(cols.cotizacionMonto, false);
+  });
+
+  it("cotización puede ir primero en el orden de columnas", () => {
+    const cols = serviciosBandejaColumns("VENTAS", { quoteMonto: false });
+    const order = orderedBandejaColumns(cols, { cotizacionFirst: true });
+    assert.equal(order[0], "cotizacion");
+    assert.equal(order.includes("diagnostico"), true);
+    assert.equal(order.at(-1), "edoFisico");
   });
 });

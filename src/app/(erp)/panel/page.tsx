@@ -515,7 +515,7 @@ async function Sales({
         <SalesPanelServiciosGrouped
           title="Cotizaciones / seguimientos"
           role={role}
-          columnOptions={{ quoteMonto: false }}
+          columnOptions={{ quoteMonto: false, cotizacionFirst: true }}
           sections={[
             {
               subtitle: "Cotizadas / sin autorización",

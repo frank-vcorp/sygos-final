@@ -16,10 +16,40 @@ export type ServicioBandejaColumns = {
   sla: boolean;
 };
 
+export type ServicioBandejaColumnKey = keyof ServicioBandejaColumns;
+
 export type ServicioBandejaColumnOptions = {
   /** En Ventas, oculta la columna Monto (p. ej. panel «Cotizaciones / seguimientos»). */
   quoteMonto?: boolean;
+  /** Muestra Cotización (y Monto si aplica) como primera(s) columna(s). */
+  cotizacionFirst?: boolean;
 };
+
+const BANDEJA_COLUMN_SEQUENCE: ServicioBandejaColumnKey[] = [
+  "diagnostico",
+  "ordenServicio",
+  "equipo",
+  "cliente",
+  "edoTecnico",
+  "edoAdministrativo",
+  "edoFisico",
+  "vendedor",
+  "tecnico",
+  "sla",
+  "cotizacion",
+  "cotizacionMonto",
+];
+
+export function orderedBandejaColumns(
+  columns: ServicioBandejaColumns,
+  options?: ServicioBandejaColumnOptions,
+): ServicioBandejaColumnKey[] {
+  const active = BANDEJA_COLUMN_SEQUENCE.filter((key) => columns[key]);
+  if (!options?.cotizacionFirst) return active;
+  const quote = active.filter((key) => key === "cotizacion" || key === "cotizacionMonto");
+  const rest = active.filter((key) => key !== "cotizacion" && key !== "cotizacionMonto");
+  return [...quote, ...rest];
+}
 
 export function serviciosBandejaColumns(
   role: Role,
