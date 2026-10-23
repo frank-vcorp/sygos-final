@@ -1,8 +1,8 @@
 import { redirect } from "next/navigation";
 import { InventoryPartCreateFields } from "@/components/inventory-part-create-fields";
+import { InventorySearchCombobox } from "@/components/inventory-search-combobox";
 import { createPartAction, stockAction } from "./actions";
 import {
-  ActionLink,
   ActiveFilters,
   Badge,
   Button,
@@ -38,12 +38,6 @@ import {
 import { formatUbicacion } from "@/lib/inventory-location";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
-
-function chipClass(active: boolean) {
-  return active
-    ? "rounded-full border border-[var(--accent)] bg-[var(--accent-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--accent)] no-underline"
-    : "rounded-full border border-[var(--line)] bg-white px-3 py-1.5 text-xs font-medium text-[#38506c] no-underline hover:border-[#91b7cf] hover:text-[var(--accent)]";
-}
 
 export default async function InventarioPage({
   searchParams,
@@ -114,16 +108,16 @@ export default async function InventarioPage({
       <PageHeader
         title="Inventario"
         subtitle={`${total.toLocaleString("es-MX")} líneas en catálogo · busca o filtra por familia y ubicación.`}
-        action={<ActionLink href="/inventario/conteo" tone="ghost">Conteo físico</ActionLink>}
       />
       <FilterBar action="/inventario">
-        <input
-          name="q"
-          defaultValue={query}
-          placeholder="Producto, descripción, núm. catálogo…"
-          className={`${controlClass} sm:min-w-[10rem] sm:flex-1`}
-          autoFocus={!hasCriteria}
-        />
+        <div className="sm:min-w-[10rem] sm:flex-1">
+          <InventorySearchCombobox
+            name="q"
+            defaultValue={query}
+            placeholder="Buscar producto, descripción, familia…"
+            inputClassName={`${controlClass} w-full`}
+          />
+        </div>
         <select name="familia" defaultValue={family} className={`${controlClass} sm:max-w-[11rem]`} aria-label="Familia">
           <option value="">Todas las familias</option>
           {families.map((row) => (
@@ -148,22 +142,6 @@ export default async function InventarioPage({
         </select>
         <Button type="submit" tone="ghost">Aplicar</Button>
       </FilterBar>
-      {families.length > 0 ? (
-        <section className="mb-4" aria-label="Familias">
-          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-[var(--muted)]">Familias</p>
-          <div className="flex flex-wrap gap-2">
-            {families.map((row) => (
-              <TextLink
-                key={row.family}
-                href={inventoryListHref({ ...baseFilters, family: row.family })}
-                className={chipClass(family === row.family)}
-              >
-                {row.family} · {row.count}
-              </TextLink>
-            ))}
-          </div>
-        </section>
-      ) : null}
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <TextLink href="/inventario/export" className="rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm font-medium no-underline hover:bg-[#f7f8f9]">
           Exportar CSV

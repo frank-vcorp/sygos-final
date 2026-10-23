@@ -138,7 +138,15 @@ export function can(role: Role, action: Action, companyCode?: string | null): bo
       return false;
     case "inventory.search":
       if (can(role, "inventory.operate", companyCode)) return true;
-      if (companyCode === "SYSTRON") return role === "TECNICO" || role === "SUPERVISOR_TECNICO";
+      if (companyCode === "SYSTRON") {
+        return (
+          role === "TECNICO" ||
+          role === "SUPERVISOR_TECNICO" ||
+          role === "GERENTE_OPERATIVO_SYSTRON" ||
+          role === "ADMINISTRADOR" ||
+          role === "CEO"
+        );
+      }
       return false;
     case "quote.create":
       if (admin || ceo || coord) return true;
