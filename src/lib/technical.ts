@@ -12,6 +12,13 @@ type Actor = {
 };
 
 import { CASE_STATUS_LABEL } from "./case-labels";
+import {
+  createPartRequestWithReservation,
+  findInventoryPartForRequest,
+  partRequestIssueable,
+  partRequestStatusAfterMove,
+  syncTechnicalCaseRefaccionesWait,
+} from "./part-inventory";
 
 export { CASE_STATUS_LABEL };
 
@@ -509,20 +516,18 @@ export async function requestPart(actor: Actor, caseId: string, input: { partNum
   if (!canExecute(actor, row.assigneeUserId) && !canAssign(actor)) throw new Error("No puedes solicitar refacciones.");
   if (["TERMINADA", "SIN_REPARACION"].includes(row.status)) throw new Error("La orden ya está cerrada.");
   if (!Number.isInteger(input.quantity) || input.quantity < 1) throw new Error("La cantidad debe ser un entero mayor a cero.");
+  const company = await prisma.company.findUnique({ where: { id: row.serviceCompanyId } });
+  if (!company) throw new Error("Empresa de servicio no encontrada.");
   await prisma.$transaction(async (tx) => {
-    await tx.partRequest.create({
-      data: {
-        caseId: row.id,
-        companyId: row.serviceCompanyId,
-        partNumber: input.partNumber,
-        description: input.description,
-        link: input.link,
-        qtyRequested: input.quantity,
-      },
+    await createPartRequestWithReservation(tx, {
+      caseId: row.id,
+      companyId: row.serviceCompanyId,
+      inventoryEnabled: company.inventoryEnabled,
+      partNumber: input.partNumber,
+      description: input.description,
+      link: input.link,
+      qtyRequested: input.quantity,
     });
-    if (row.status === "EN_REPARACION") {
-      await tx.technicalCase.update({ where: { id: row.id }, data: { status: "EN_ESPERA_REFACCIONES", version: { increment: 1 } } });
-    }
   });
 }
 
@@ -534,19 +539,27 @@ export async function receivePartRequest(actor: Actor, requestId: string, versio
   if (!Number.isInteger(quantity) || quantity < 1) throw new Error("La cantidad recibida no es válida.");
   const qtyReceived = request.qtyReceived + quantity;
   if (qtyReceived > request.qtyRequested) throw new Error("La recepción supera lo solicitado.");
-  const status = request.qtyIssued >= request.qtyRequested ? "SURTIDA" : qtyReceived > 0 ? "EN_ALMACEN" : request.status;
   const company = request.case.serviceCompany;
   await prisma.$transaction(async (tx) => {
-    const updated = await tx.partRequest.updateMany({ where: { id: request.id, version }, data: { qtyReceived, status, version: { increment: 1 } } });
+    const nextStatus = partRequestStatusAfterMove({
+      ...request,
+      qtyReceived,
+    });
+    const updated = await tx.partRequest.updateMany({
+      where: { id: request.id, version },
+      data: { qtyReceived, status: nextStatus, version: { increment: 1 } },
+    });
     if (updated.count === 0) throw new ConcurrencyError();
     if (company.inventoryEnabled) {
-      let part = await tx.part.findFirst({
-        where: { companyId: company.id, partNumber: request.partNumber, description: request.description },
-      });
+      let part =
+        request.partId != null
+          ? await tx.part.findFirst({ where: { id: request.partId, companyId: company.id, active: true } })
+          : await findInventoryPartForRequest(tx, company.id, request.partNumber, request.description);
       if (!part) {
         part = await tx.part.create({
           data: { companyId: company.id, partNumber: request.partNumber, description: request.description, qty: 0 },
         });
+        await tx.partRequest.update({ where: { id: request.id }, data: { partId: part.id } });
       }
       const qtyAfter = part.qty + quantity;
       await tx.part.update({ where: { id: part.id }, data: { qty: qtyAfter, version: { increment: 1 } } });
@@ -554,6 +567,7 @@ export async function receivePartRequest(actor: Actor, requestId: string, versio
         data: { companyId: company.id, partId: part.id, kind: "ENTRADA", quantity, qtyAfter, note: `Recepción para ${request.case.folio}`, authorUserId: actor.userId },
       });
     }
+    await syncTechnicalCaseRefaccionesWait(tx, request.caseId);
   });
 }
 
@@ -563,28 +577,34 @@ export async function issuePartRequest(actor: Actor, requestId: string, version:
   const request = await prisma.partRequest.findUnique({ where: { id: requestId }, include: { case: { include: { serviceCompany: true, requests: true } } } });
   if (!request || request.companyId !== actor.activeCompanyId) throw new Error("La solicitud no es de esta empresa.");
   if (!Number.isInteger(quantity) || quantity < 1) throw new Error("La cantidad surtida no es válida.");
-  const available = request.qtyReceived - request.qtyIssued;
-  if (quantity > available) throw new Error("No se puede surtir más de lo recibido.");
+  const issueable = partRequestIssueable(request);
+  if (quantity > issueable) throw new Error("No hay suficiente material apartado o recibido para surtir.");
   const qtyIssued = request.qtyIssued + quantity;
-  const status = qtyIssued >= request.qtyRequested ? "SURTIDA" : "EN_ALMACEN";
+  const fromReserve = Math.min(quantity, request.qtyReserved);
+  const qtyReserved = request.qtyReserved - fromReserve;
+  const status = partRequestStatusAfterMove({ ...request, qtyIssued, qtyReserved });
   await prisma.$transaction(async (tx) => {
-    const updated = await tx.partRequest.updateMany({ where: { id: request.id, version }, data: { qtyIssued, status, version: { increment: 1 } } });
+    const updated = await tx.partRequest.updateMany({
+      where: { id: request.id, version },
+      data: { qtyIssued, qtyReserved, status, version: { increment: 1 } },
+    });
     if (updated.count === 0) throw new ConcurrencyError();
     if (request.case.serviceCompany.inventoryEnabled) {
-      const part = await tx.part.findFirst({
-        where: { companyId: request.companyId, partNumber: request.partNumber, description: request.description },
-      });
+      const part =
+        request.partId != null
+          ? await tx.part.findFirst({ where: { id: request.partId, companyId: request.companyId, active: true } })
+          : await findInventoryPartForRequest(tx, request.companyId, request.partNumber, request.description);
       if (!part || part.qty < quantity) throw new Error("La existencia no alcanza para surtir.");
+      if (part.qtyReserved < fromReserve) throw new Error("El apartado en inventario no coincide. Revisa la solicitud.");
       const qtyAfter = part.qty - quantity;
-      await tx.part.update({ where: { id: part.id }, data: { qty: qtyAfter, version: { increment: 1 } } });
+      await tx.part.update({
+        where: { id: part.id },
+        data: { qty: qtyAfter, qtyReserved: { decrement: fromReserve }, version: { increment: 1 } },
+      });
       await tx.stockMovement.create({
         data: { companyId: request.companyId, partId: part.id, kind: "SALIDA", quantity, qtyAfter, note: `Surtido a ${request.case.folio}`, authorUserId: actor.userId },
       });
     }
-    const othersOpen = request.case.requests.some((item) => item.id !== request.id && item.qtyIssued < item.qtyRequested);
-    const thisOpen = qtyIssued < request.qtyRequested;
-    if (!othersOpen && !thisOpen && request.case.status === "EN_ESPERA_REFACCIONES") {
-      await tx.technicalCase.update({ where: { id: request.caseId }, data: { status: "EN_REPARACION", version: { increment: 1 } } });
-    }
+    await syncTechnicalCaseRefaccionesWait(tx, request.caseId);
   });
 }

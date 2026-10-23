@@ -276,6 +276,7 @@ function partRequestRowMap(
     partNumber: string;
     description: string;
     qtyRequested: number;
+    qtyReserved: number;
     qtyReceived: number;
     qtyIssued: number;
     status: string;
@@ -283,15 +284,15 @@ function partRequestRowMap(
   }>,
 ) {
   return list.map((row) => {
-    const pendingIssue = Math.max(0, row.qtyReceived - row.qtyIssued);
+    const readyToIssue = Math.max(0, row.qtyReserved + row.qtyReceived - row.qtyIssued);
     const pendingTotal = Math.max(0, row.qtyRequested - row.qtyIssued);
-    const pending = pendingIssue > 0 ? `pend. surtir ${pendingIssue}` : `pend. ${pendingTotal}`;
+    const pending = readyToIssue > 0 ? `pend. surtir ${readyToIssue}` : `pend. ${pendingTotal}`;
     const status = PART_REQUEST_STATUS_LABEL[row.status] ?? row.status;
     return {
       key: row.id,
       href: `/operacion/${row.case.id}`,
       label: row.case.folio,
-      detail: `${row.partNumber} · ${row.description} · sol. ${row.qtyRequested} · rec. ${row.qtyReceived} · surt. ${row.qtyIssued} · ${pending} · ${status}`,
+      detail: `${row.partNumber} · ${row.description} · sol. ${row.qtyRequested} · ap. ${row.qtyReserved} · rec. ${row.qtyReceived} · surt. ${row.qtyIssued} · ${pending} · ${status}`,
     };
   });
 }

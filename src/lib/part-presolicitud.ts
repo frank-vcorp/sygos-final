@@ -1,5 +1,6 @@
 import { prisma } from "./db";
 import { recordHistory } from "./history";
+import { createPartRequestWithReservation } from "./part-inventory";
 
 type Actor = {
   userId: string;
@@ -114,29 +115,23 @@ export async function promotePartPresolicitudesToRepairOrder(
   });
   if (pending.length === 0) return 0;
 
+  const company = await prisma.company.findUnique({ where: { id: pending[0]!.companyId } });
+  if (!company) throw new Error("Empresa no encontrada.");
+
   await prisma.$transaction(async (tx) => {
     for (const need of pending) {
-      const request = await tx.partRequest.create({
-        data: {
-          caseId: repairCaseId,
-          companyId: need.companyId,
-          partNumber: need.partNumber,
-          description: need.description,
-          link: need.link,
-          qtyRequested: need.qtyRequested,
-          status: "SOLICITADA",
-        },
+      const request = await createPartRequestWithReservation(tx, {
+        caseId: repairCaseId,
+        companyId: need.companyId,
+        inventoryEnabled: company.inventoryEnabled,
+        partNumber: need.partNumber,
+        description: need.description,
+        link: need.link,
+        qtyRequested: need.qtyRequested,
       });
       await tx.partPresolicitud.update({
         where: { id: need.id },
         data: { status: "PROMOVIDA", partRequestId: request.id },
-      });
-    }
-    const repair = await tx.technicalCase.findUnique({ where: { id: repairCaseId } });
-    if (repair && ["EN_ESPERA", "EN_REPARACION"].includes(repair.status)) {
-      await tx.technicalCase.update({
-        where: { id: repairCaseId },
-        data: { status: "EN_ESPERA_REFACCIONES", version: { increment: 1 } },
       });
     }
   });

@@ -606,7 +606,11 @@ export async function changeStock(
   if (!part) throw new Error("La refacción no está en el inventario de esta empresa.");
   const delta = input.kind === "ENTRADA" ? input.quantity : -input.quantity;
   const qtyAfter = part.qty + delta;
-  if (qtyAfter < 0) throw new Error("La salida supera la existencia. No hay reservas ni existencias negativas.");
+  const available = part.qty - part.qtyReserved;
+  if (input.kind === "SALIDA" && input.quantity > available) {
+    throw new Error("La salida supera la existencia disponible. Hay material apartado para órdenes de servicio.");
+  }
+  if (qtyAfter < 0) throw new Error("La salida supera la existencia. No hay existencias negativas.");
   await prisma.$transaction(async (tx) => {
     const updated = await tx.part.updateMany({
       where: { id: part.id, version: input.version },

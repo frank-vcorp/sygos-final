@@ -406,7 +406,7 @@ export default async function OperacionDetallePage({ params }: { params: Promise
                 <p className="font-medium">{request.partNumber} · {request.description}</p>
                 <Badge tone={request.status === "SURTIDA" ? "ok" : "warn"}>{request.status}</Badge>
               </div>
-              <p className="mt-1 text-[var(--muted)]">Solicitada {request.qtyRequested} · recibida {request.qtyReceived} · surtida {request.qtyIssued}</p>
+              <p className="mt-1 text-[var(--muted)]">Solicitada {request.qtyRequested} · apartada {request.qtyReserved} · recibida {request.qtyReceived} · surtida {request.qtyIssued}</p>
               {canFulfillPartRequests ? (
                 <div className="mt-3 flex flex-wrap gap-2">
                   <form action={receivePartAction} className="flex gap-1">
@@ -656,7 +656,7 @@ export default async function OperacionDetallePage({ params }: { params: Promise
                   {row.requests.map((request) => (
                     <li key={request.id}>
                       <p>{request.partNumber} · {request.description} · {request.status}</p>
-                      <p className="text-[var(--muted)]">Solicitada {request.qtyRequested} · recibida {request.qtyReceived} · surtida {request.qtyIssued}</p>
+                      <p className="text-[var(--muted)]">Solicitada {request.qtyRequested} · apartada {request.qtyReserved} · recibida {request.qtyReceived} · surtida {request.qtyIssued}</p>
                       {canFulfillPartRequests ? (
                         <div className="mt-1 flex flex-wrap gap-2">
                           <form action={receivePartAction} className="flex gap-1">
