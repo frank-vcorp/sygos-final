@@ -44,6 +44,34 @@ export type StackedStatus = {
   tags?: string[];
 };
 
+/** Etiqueta principal del edo. administrativo en bandejas. */
+export const ADMIN_ESTADO = {
+  SIN_COTIZAR: "Sin cotizar",
+  COTIZADO: "Cotizado",
+} as const;
+
+/** Subestados (segunda línea) bajo el edo. administrativo. */
+export const ADMIN_SUBESTADO = {
+  AUTORIZADO: "Autorizado",
+  NO_AUTORIZADO: "No autorizado",
+} as const;
+
+export const TECHNICAL_ESTADO = {
+  VALIDADO: "Validado",
+} as const;
+
+export const PHYSICAL_ESTADO = {
+  ENTREGADO: "Entregado",
+} as const;
+
+export function stackedHasTag(status: StackedStatus, tag: string) {
+  return status.tags?.includes(tag) ?? false;
+}
+
+export function stackedWithoutSubestados(status: StackedStatus) {
+  return !status.tags?.length;
+}
+
 const TECHNICAL_LABEL = {
   PENDIENTE: "Pendiente",
   EN_PROCESO: "En proceso",
@@ -98,29 +126,29 @@ export function administrativeStatus(input: AdminInput): StackedStatus {
   const tags: string[] = [];
 
   if (input.attentionType === "REPARACION") {
-    if (input.quoteStatus === "NO_AUTORIZADA") tags.push("No autorizado");
-    else tags.push("Autorizado");
-    return { label: "Sin cotizar", tone: "warn", tags };
+    if (input.quoteStatus === "NO_AUTORIZADA") tags.push(ADMIN_SUBESTADO.NO_AUTORIZADO);
+    else tags.push(ADMIN_SUBESTADO.AUTORIZADO);
+    return { label: ADMIN_ESTADO.SIN_COTIZAR, tone: "warn", tags };
   }
 
   if (input.quoteStatus === "NO_AUTORIZADA") {
-    tags.push("No autorizado");
-    return { label: "Cotizado", tone: "info", tags };
+    tags.push(ADMIN_SUBESTADO.NO_AUTORIZADO);
+    return { label: ADMIN_ESTADO.COTIZADO, tone: "info", tags };
   }
   if (input.quoteStatus === "PENDIENTE_DECISION") {
-    return { label: "Cotizado", tone: "info" };
+    return { label: ADMIN_ESTADO.COTIZADO, tone: "info" };
   }
   if (input.quoteStatus?.startsWith("AUTORIZADA")) {
-    tags.push("Autorizado");
-    return { label: "Cotizado", tone: "info", tags };
+    tags.push(ADMIN_SUBESTADO.AUTORIZADO);
+    return { label: ADMIN_ESTADO.COTIZADO, tone: "info", tags };
   }
   if (input.quoteStatus === "PENDIENTE_COTIZAR" || input.quotePending) {
-    return { label: "Sin cotizar", tone: "warn" };
+    return { label: ADMIN_ESTADO.SIN_COTIZAR, tone: "warn" };
   }
   if (input.warrantyDecision === "NO_PROCEDENTE") {
-    return { label: "Sin cotizar", tone: "warn" };
+    return { label: ADMIN_ESTADO.SIN_COTIZAR, tone: "warn" };
   }
-  return { label: "Sin cotizar", tone: "warn" };
+  return { label: ADMIN_ESTADO.SIN_COTIZAR, tone: "warn" };
 }
 
 export function formatEquipmentBandejaLabel(equipment: {

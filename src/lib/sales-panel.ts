@@ -1,42 +1,41 @@
-import type { StackedStatus } from "@/lib/servicios-bandeja";
+import {
+  ADMIN_ESTADO,
+  ADMIN_SUBESTADO,
+  PHYSICAL_ESTADO,
+  stackedHasTag,
+  stackedWithoutSubestados,
+  TECHNICAL_ESTADO,
+} from "@/lib/servicios-bandeja";
 import type { ServicioBandejaRow } from "@/lib/servicios-supervisor";
 
-/** Cotizada con precio; el cliente aún no autoriza (edo. administrativo «Cotizado» sin «Autorizado»). */
-export function quoteCotizadaSinAutorizacion(status: string) {
-  return status === "PENDIENTE_DECISION";
-}
-
-/** Sin precio comercial: aún no puede enviarse a autorización del cliente. */
-export function quotePendienteAutorizacion(status: string) {
-  return status === "PENDIENTE_COTIZAR";
-}
-
+/** Cotizado sin subestado: precio definido, sin autorización del cliente aún. */
 export function servicioCotizadaSinAutorizacion(row: ServicioBandejaRow) {
-  const { administrative } = row;
-  return administrative.label === "Cotizado" && !administrative.tags?.includes("Autorizado");
+  return row.administrative.label === ADMIN_ESTADO.COTIZADO && stackedWithoutSubestados(row.administrative);
 }
 
-/** Aún sin precio / cotización comercial (bandeja «Sin cotizar»). */
+/** Cotizado con subestado «No autorizado» (decisión registrada). */
 export function servicioPendienteAutorizacion(row: ServicioBandejaRow) {
-  return row.administrative.label === "Sin cotizar";
+  return (
+    row.administrative.label === ADMIN_ESTADO.COTIZADO
+    && stackedHasTag(row.administrative, ADMIN_SUBESTADO.NO_AUTORIZADO)
+  );
 }
 
-export function servicioOsValidadaSinFacturar(row: ServicioBandejaRow) {
+/** OS con cierre técnico validado y autorización comercial. */
+export function servicioOsValidadaAutorizada(row: ServicioBandejaRow) {
   if (!row.osFolio) return false;
-  return row.technical.label === "Validado";
+  return (
+    row.technical.label === TECHNICAL_ESTADO.VALIDADO
+    && stackedHasTag(row.administrative, ADMIN_SUBESTADO.AUTORIZADO)
+  );
 }
 
 export function servicioOsValidadaPendienteEntrega(row: ServicioBandejaRow) {
   if (!row.osFolio) return false;
-  if (row.technical.label !== "Validado") return false;
-  return row.physical.label !== "Entregado";
+  if (row.technical.label !== TECHNICAL_ESTADO.VALIDADO) return false;
+  return row.physical.label !== PHYSICAL_ESTADO.ENTREGADO;
 }
 
 export function receivableEsVigente(dueAt: Date, balance: number, now = Date.now()) {
   return balance > 0 && dueAt.getTime() >= now;
-}
-
-export function formatAdministrativeDetail(administrative: StackedStatus) {
-  const tags = administrative.tags?.length ? ` · ${administrative.tags.join(", ")}` : "";
-  return `${administrative.label}${tags}`;
 }

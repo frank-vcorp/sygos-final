@@ -17,6 +17,7 @@ import { homePath } from "@/lib/home";
 import {
   receivableEsVigente,
   servicioCotizadaSinAutorizacion,
+  servicioOsValidadaAutorizada,
   servicioOsValidadaPendienteEntrega,
   servicioPendienteAutorizacion,
 } from "@/lib/sales-panel";
@@ -406,8 +407,10 @@ async function Sales({
     osSinFacturaQuotes.map((row) => row.technicalCase?.folio).filter((folio): folio is string => Boolean(folio)),
   );
   const cotizadasSinAutorizacion = servicioRows.filter(servicioCotizadaSinAutorizacion);
-  const pendienteAutorizacion = servicioRows.filter(servicioPendienteAutorizacion);
-  const facturacionPendiente = servicioRows.filter((row) => row.osFolio != null && osSinFacturaFolios.has(row.osFolio));
+  const pendientesAutorizacion = servicioRows.filter(servicioPendienteAutorizacion);
+  const facturacionPendiente = servicioRows.filter(
+    (row) => servicioOsValidadaAutorizada(row) && row.osFolio != null && osSinFacturaFolios.has(row.osFolio),
+  );
   const entregasOsValidadas = servicioRows.filter(servicioOsValidadaPendienteEntrega);
   const canEditClient = can(role, "client.edit", companyCode);
 
@@ -449,15 +452,15 @@ async function Sales({
           sections={[
             {
               subtitle: "Cotizadas / sin autorización",
-              empty: "No hay servicios cotizados esperando autorización del cliente.",
+              empty: "No hay servicios «Cotizado» sin subestado (aún sin autorización del cliente).",
               bandejaHref: serviciosBandejaHref({ vista: "activos" }),
               rows: cotizadasSinAutorizacion,
             },
             {
               subtitle: "Pendientes de autorización",
-              empty: "No hay servicios sin cotizar en tu cartera.",
-              bandejaHref: "/cotizaciones?vista=pendientes",
-              rows: pendienteAutorizacion,
+              empty: "No hay servicios «Cotizado» con subestado «No autorizado».",
+              bandejaHref: serviciosBandejaHref({ vista: "activos" }),
+              rows: pendientesAutorizacion,
             },
           ]}
         />

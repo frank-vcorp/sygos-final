@@ -1,12 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { administrativeStatus } from "./servicios-bandeja";
 import {
-  quoteCotizadaSinAutorizacion,
-  quotePendienteAutorizacion,
   receivableEsVigente,
   servicioCotizadaSinAutorizacion,
+  servicioOsValidadaAutorizada,
   servicioOsValidadaPendienteEntrega,
-  servicioOsValidadaSinFacturar,
   servicioPendienteAutorizacion,
 } from "./sales-panel";
 import type { ServicioBandejaRow } from "./servicios-supervisor";
@@ -38,32 +37,30 @@ function row(partial: Partial<ServicioBandejaRow>): ServicioBandejaRow {
 }
 
 describe("sales panel filters", () => {
-  it("separa cotizada sin autorizar de pendiente de autorización en cotizaciones", () => {
-    assert.equal(quoteCotizadaSinAutorizacion("PENDIENTE_DECISION"), true);
-    assert.equal(quoteCotizadaSinAutorizacion("NO_AUTORIZADA"), false);
-    assert.equal(quotePendienteAutorizacion("PENDIENTE_COTIZAR"), true);
-    assert.equal(quotePendienteAutorizacion("PENDIENTE_DECISION"), false);
+  it("usa los mismos subestados que administrativeStatus", () => {
+    const pendiente = administrativeStatus({
+      attentionType: "DIAGNOSTICO",
+      quoteStatus: "PENDIENTE_DECISION",
+      quotePending: false,
+      warrantyDecision: null,
+    });
+    const rechazada = administrativeStatus({
+      attentionType: "DIAGNOSTICO",
+      quoteStatus: "NO_AUTORIZADA",
+      quotePending: false,
+      warrantyDecision: null,
+    });
+    assert.equal(servicioCotizadaSinAutorizacion(row({ administrative: pendiente })), true);
+    assert.equal(servicioPendienteAutorizacion(row({ administrative: rechazada })), true);
+    assert.equal(servicioPendienteAutorizacion(row({ administrative: pendiente })), false);
   });
 
-  it("detecta sin cotizar como pendiente de autorización comercial", () => {
-    assert.equal(servicioPendienteAutorizacion(row({ administrative: { label: "Sin cotizar", tone: "warn" } })), true);
-    assert.equal(servicioPendienteAutorizacion(row({ administrative: { label: "Cotizado", tone: "info" } })), false);
-  });
-
-  it("alinea seguimiento con edo. administrativo de servicios", () => {
+  it("detecta OS validada autorizada y pendiente de entrega", () => {
+    assert.equal(servicioOsValidadaAutorizada(row({})), true);
     assert.equal(
-      servicioCotizadaSinAutorizacion(row({ administrative: { label: "Cotizado", tone: "info" } })),
-      true,
-    );
-    assert.equal(
-      servicioCotizadaSinAutorizacion(row({ administrative: { label: "Cotizado", tone: "info", tags: ["Autorizado"] } })),
+      servicioOsValidadaAutorizada(row({ administrative: { label: "Cotizado", tone: "info" } })),
       false,
     );
-  });
-
-  it("detecta OS validada sin facturar y pendiente de entrega", () => {
-    assert.equal(servicioOsValidadaSinFacturar(row({})), true);
-    assert.equal(servicioOsValidadaSinFacturar(row({ osFolio: null })), false);
     assert.equal(servicioOsValidadaPendienteEntrega(row({})), true);
     assert.equal(servicioOsValidadaPendienteEntrega(row({ physical: { label: "Entregado", tone: "neutral" } })), false);
   });

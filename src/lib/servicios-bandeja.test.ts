@@ -31,6 +31,27 @@ describe("administrativeStatus", () => {
     assert.deepEqual(row.tags, ["Autorizado"]);
   });
 
+  it("cotizado pendiente de decisión sin subestado", () => {
+    const row = administrativeStatus({
+      attentionType: "DIAGNOSTICO",
+      quoteStatus: "PENDIENTE_DECISION",
+      quotePending: false,
+      warrantyDecision: null,
+    });
+    assert.equal(row.label, "Cotizado");
+    assert.equal(row.tags, undefined);
+  });
+
+  it("cotizado no autorizado lleva subestado", () => {
+    const row = administrativeStatus({
+      attentionType: "DIAGNOSTICO",
+      quoteStatus: "NO_AUTORIZADA",
+      quotePending: false,
+      warrantyDecision: null,
+    });
+    assert.deepEqual(row.tags, ["No autorizado"]);
+  });
+
   it("garantía no procedente sin cotización", () => {
     const row = administrativeStatus({
       attentionType: "DIAGNOSTICO_GARANTIA",
