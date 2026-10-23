@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { InventoryPartCreateFields } from "@/components/inventory-part-create-fields";
-import { InventorySearchCombobox } from "@/components/inventory-search-combobox";
+import { InventarioFilters } from "@/components/inventario-filters";
 import { createPartAction, stockAction } from "./actions";
 import {
   ActiveFilters,
@@ -8,7 +8,6 @@ import {
   Button,
   controlClass,
   Empty,
-  FilterBar,
   FormActions,
   FormPanel,
   FormSection,
@@ -109,39 +108,7 @@ export default async function InventarioPage({
         title="Inventario"
         subtitle={`${total.toLocaleString("es-MX")} líneas en catálogo · busca o filtra por familia y ubicación.`}
       />
-      <FilterBar action="/inventario">
-        <div className="sm:min-w-[10rem] sm:flex-1">
-          <InventorySearchCombobox
-            name="q"
-            defaultValue={query}
-            placeholder="Buscar producto, descripción, familia…"
-            inputClassName={`${controlClass} w-full`}
-          />
-        </div>
-        <select name="familia" defaultValue={family} className={`${controlClass} sm:max-w-[11rem]`} aria-label="Familia">
-          <option value="">Todas las familias</option>
-          {families.map((row) => (
-            <option key={row.family} value={row.family}>
-              {row.family} ({row.count})
-            </option>
-          ))}
-        </select>
-        <select name="rack" defaultValue={rack} className={`${controlClass} sm:max-w-[10rem]`} aria-label="Rack">
-          <option value="">Todos los racks</option>
-          {racks.map((row) => (
-            <option key={row.rack} value={row.rack}>
-              {row.rack} ({row.count})
-            </option>
-          ))}
-        </select>
-        <select name="existencia" defaultValue={stock} className={`${controlClass} sm:max-w-[11rem]`} aria-label="Existencia">
-          <option value="">Cualquier existencia</option>
-          <option value="disponible">Con disponible</option>
-          <option value="cero">Sin existencia</option>
-          <option value="bajo_minimo">Bajo mínimo</option>
-        </select>
-        <Button type="submit" tone="ghost">Aplicar</Button>
-      </FilterBar>
+      <InventarioFilters query={query} family={family} rack={rack} stock={stock} families={families} racks={racks} />
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <TextLink href="/inventario/export" className="rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm font-medium no-underline hover:bg-[#f7f8f9]">
           Exportar CSV

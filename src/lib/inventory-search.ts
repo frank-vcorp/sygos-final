@@ -18,6 +18,47 @@ export function normalizeInventorySearch(text: string) {
     .trim();
 }
 
+type InventorySearchRow = {
+  partNumber: string;
+  description: string;
+  family: string;
+  catalogNumero: string;
+  rack: string;
+  nivel: string;
+};
+
+/** Mayor puntaje = más parecido a lo que escribió el usuario (prefijo en producto primero). */
+export function inventorySearchRelevance(part: InventorySearchRow, query: string): number {
+  const q = normalizeInventorySearch(query);
+  if (q.length < INVENTORY_SEARCH_MIN_LEN) return 0;
+  const pn = normalizeInventorySearch(part.partNumber);
+  const desc = normalizeInventorySearch(part.description);
+  const fam = normalizeInventorySearch(part.family);
+  const cat = normalizeInventorySearch(part.catalogNumero);
+  const rack = normalizeInventorySearch(part.rack);
+  const nivel = normalizeInventorySearch(part.nivel);
+
+  if (pn.startsWith(q)) return 10_000 - Math.min(pn.length - q.length, 500);
+  if (pn.includes(q)) return 8_000 - pn.indexOf(q);
+  if (cat.startsWith(q)) return 7_000;
+  if (cat.includes(q)) return 6_500;
+  if (fam.startsWith(q)) return 6_000;
+  if (fam.includes(q)) return 5_500;
+  if (desc.startsWith(q)) return 5_000;
+  if (desc.includes(q)) return 4_000 - Math.min(desc.indexOf(q), 200);
+  if (rack.includes(q) || nivel.includes(q)) return 2_000;
+  return 0;
+}
+
+export function sortInventorySearchResults<T extends InventorySearchRow>(rows: T[], query: string): T[] {
+  const q = query.trim();
+  return [...rows]
+    .map((row) => ({ row, score: inventorySearchRelevance(row, q) }))
+    .filter((entry) => entry.score > 0)
+    .sort((a, b) => b.score - a.score || a.row.partNumber.localeCompare(b.row.partNumber, "es-MX"))
+    .map((entry) => entry.row);
+}
+
 export function buildPartSearchKey(fields: {
   partNumber: string;
   description?: string | null;
@@ -245,13 +286,20 @@ export async function fetchInventoryPartsForList(
 
   const where = partInventoryListWhere(companyId, filters);
   if (!where) return [];
-  const oversample = stock === "disponible" || stock === "cero" ? limit + 120 : limit;
+  const textQuery = filters.query?.trim() ?? "";
+  const oversample =
+    textQuery.length >= INVENTORY_SEARCH_MIN_LEN
+      ? Math.max(limit * 6, 120)
+      : stock === "disponible" || stock === "cero"
+        ? limit + 120
+        : limit;
   const parts = await prisma.part.findMany({
     where,
-    orderBy: [{ partNumber: "asc" }, { rack: "asc" }, { nivel: "asc" }],
     take: oversample,
   });
-  return applyStockFilter(parts, stock).slice(0, limit);
+  const ranked =
+    textQuery.length >= INVENTORY_SEARCH_MIN_LEN ? sortInventorySearchResults(parts, textQuery) : parts;
+  return applyStockFilter(ranked, stock).slice(0, limit);
 }
 
 function applyStockFilter<T extends { qty: number; qtyReserved: number }>(parts: T[], stock: InventoryStockFilter) {
@@ -283,8 +331,7 @@ export async function searchInventoryParts(
   if (!where) return [];
   const rows = await prisma.part.findMany({
     where,
-    orderBy: [{ partNumber: "asc" }, { rack: "asc" }, { nivel: "asc" }],
-    take: limit,
+    take: Math.max(limit * 6, 120),
     select: {
       id: true,
       partNumber: true,
@@ -297,10 +344,12 @@ export async function searchInventoryParts(
       qtyReserved: true,
     },
   });
-  return rows.map((row) => ({
-    ...row,
-    available: partInventoryAvailableQty(row),
-  }));
+  return sortInventorySearchResults(rows, query)
+    .slice(0, limit)
+    .map((row) => ({
+      ...row,
+      available: partInventoryAvailableQty(row),
+    }));
 }
 
 export async function backfillPartSearchKeys(prisma: PrismaClient, companyId?: string) {

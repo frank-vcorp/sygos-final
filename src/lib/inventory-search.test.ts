@@ -5,11 +5,13 @@ import {
   INVENTORY_SEARCH_MIN_LEN,
   inventoryListHasCriteria,
   inventoryListHref,
+  inventorySearchRelevance,
   normalizeInventorySearch,
   partInventoryAvailableQty,
   partInventoryListWhere,
   partInventorySearchWhere,
   parseInventoryStockFilter,
+  sortInventorySearchResults,
 } from "./inventory-search";
 
 describe("búsqueda de inventario", () => {
@@ -47,5 +49,31 @@ describe("búsqueda de inventario", () => {
 
   it("calcula existencia disponible descontando apartados", () => {
     assert.equal(partInventoryAvailableQty({ qty: 10, qtyReserved: 3 }), 7);
+  });
+
+  it("prioriza producto que empieza con lo escrito", () => {
+    const rows = sortInventorySearchResults(
+      [
+        {
+          partNumber: "APT30GP60BDQ1G",
+          description: "IGBT",
+          family: "IGBT",
+          catalogNumero: "44",
+          rack: "2",
+          nivel: "3",
+        },
+        {
+          partNumber: "BTS409L1",
+          description: "switch",
+          family: "PWM",
+          catalogNumero: "5",
+          rack: "2",
+          nivel: "5",
+        },
+      ],
+      "BTS",
+    );
+    assert.equal(rows[0]?.partNumber, "BTS409L1");
+    assert.equal(rows.length, 1);
   });
 });

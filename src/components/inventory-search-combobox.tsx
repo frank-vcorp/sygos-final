@@ -25,21 +25,36 @@ function hitLabel(row: InventorySearchHit) {
 export function InventorySearchCombobox({
   name,
   defaultValue = "",
+  value: controlledValue,
+  onValueChange,
   required,
   placeholder = "Producto, descripción, familia, ubicación…",
   onPick,
+  onEnter,
   inputClassName = controlClass,
 }: {
-  name: string;
+  name?: string;
   defaultValue?: string;
+  value?: string;
+  onValueChange?: (next: string) => void;
   required?: boolean;
   placeholder?: string;
   onPick?: (hit: InventorySearchHit) => void;
+  onEnter?: (value: string) => void;
   inputClassName?: string;
 }) {
   const listId = useId();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [value, setValue] = useState(defaultValue);
+  const [internalValue, setInternalValue] = useState(defaultValue);
+  const value = controlledValue ?? internalValue;
+  const setValue = (next: string) => {
+    onValueChange?.(next);
+    if (controlledValue === undefined) setInternalValue(next);
+  };
+
+  useEffect(() => {
+    if (controlledValue === undefined) setInternalValue(defaultValue);
+  }, [defaultValue, controlledValue]);
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [items, setItems] = useState<InventorySearchHit[]>([]);
@@ -106,10 +121,14 @@ export function InventorySearchCombobox({
           } else if (event.key === "ArrowUp" && items.length > 0) {
             event.preventDefault();
             setHighlight((current) => Math.max(current - 1, 0));
-          } else if (event.key === "Enter" && open && items.length > 0) {
-            event.preventDefault();
-            const row = items[highlight];
-            if (row) choose(row);
+          } else if (event.key === "Enter") {
+            if (open && items.length > 0) {
+              event.preventDefault();
+              const row = items[highlight];
+              if (row) choose(row);
+            } else {
+              onEnter?.(value);
+            }
           } else if (event.key === "Escape") {
             setOpen(false);
           }
