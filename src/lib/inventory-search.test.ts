@@ -22,7 +22,9 @@ describe("búsqueda de inventario", () => {
   it("permite listar solo por familia sin texto", () => {
     assert.equal(inventoryListHasCriteria({ family: "FILTROS" }), true);
     const where = partInventoryListWhere("co-1", { family: "FILTROS" });
-    assert.ok(where?.AND?.some((clause) => "family" in clause));
+    const and = where?.AND;
+    const clauses = Array.isArray(and) ? and : and ? [and] : [];
+    assert.ok(clauses.some((clause: Record<string, unknown>) => "family" in clause));
   });
 
   it("arma URL de filtros", () => {

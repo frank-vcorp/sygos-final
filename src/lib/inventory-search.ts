@@ -71,7 +71,7 @@ export type InventoryListFilters = {
 export function inventoryListHasCriteria(filters: InventoryListFilters): boolean {
   if (filters.family?.trim()) return true;
   if (filters.rack?.trim()) return true;
-  if (filters.stock && filters.stock !== "") return true;
+  if (filters.stock) return true;
   return (filters.query?.trim().length ?? 0) >= INVENTORY_SEARCH_MIN_LEN;
 }
 
