@@ -311,7 +311,7 @@ export default async function InventarioPage({
       <FormPanel action={createPartAction} className="mt-4">
         <FormSection
           title="Nueva línea de inventario"
-          description="Producto y descripción son libres; familia, rack, unidad y montaje se eligen del catálogo ya cargado (o agregas uno nuevo)."
+          description="Usa los listados del inventario importado; «Otro» solo si el valor no existe en catálogo."
           columns={1}
         >
           <InventoryPartCreateFields catalog={createCatalog} />
