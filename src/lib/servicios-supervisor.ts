@@ -334,6 +334,33 @@ async function mapCasesToBandejaRows(companyId: string, cases: CaseRecord[]): Pr
   return rows;
 }
 
+/** Episodios de servicio ligados a documentos de cobranza (caso u equipo). */
+export async function listServiciosForBillingLinks(
+  companyId: string,
+  links: Array<{ technicalCaseId: string | null; equipmentId: string | null }>,
+): Promise<ServicioBandejaRow[]> {
+  const caseIds = [...new Set(links.map((link) => link.technicalCaseId).filter((id): id is string => Boolean(id)))];
+  const equipmentIds = [...new Set(links.map((link) => link.equipmentId).filter((id): id is string => Boolean(id)))];
+  const orFilters = [
+    ...(caseIds.length ? [{ id: { in: caseIds } }] : []),
+    ...(equipmentIds.length ? [{ equipmentId: { in: equipmentIds } }] : []),
+  ];
+  if (orFilters.length === 0) return [];
+
+  const cases = await prisma.technicalCase.findMany({
+    where: { serviceCompanyId: companyId, OR: orFilters },
+    include: caseInclude,
+    take: 200,
+  });
+  const rows = await mapCasesToBandejaRows(companyId, cases as CaseRecord[]);
+  const seen = new Set<string>();
+  return rows.filter((row) => {
+    if (seen.has(row.id)) return false;
+    seen.add(row.id);
+    return true;
+  });
+}
+
 export async function listActiveServicios(
   companyId: string,
   query: string,

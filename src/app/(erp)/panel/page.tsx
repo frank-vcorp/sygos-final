@@ -3,11 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ClientNameLink } from "@/components/client-entity-links";
 import { AuthorizeExitWithoutDocumentButton } from "@/components/exit-without-document-actions";
-import {
-  SalesPanelCobranzaSection,
-  SalesPanelServiciosGrouped,
-  SalesPanelServiciosSection,
-} from "@/components/sales-panel-bandeja";
+import { SalesPanelServiciosGrouped, SalesPanelServiciosSection } from "@/components/sales-panel-bandeja";
 import { ActionLink, Card, KpiCard, PageHeader, RecordLink, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
@@ -23,7 +19,11 @@ import {
 } from "@/lib/sales-panel";
 import type { Role } from "@/lib/roles";
 import { serviciosBandejaHref } from "@/lib/servicios-catalog";
-import { listActiveServicios, type ServicioBandejaRow } from "@/lib/servicios-supervisor";
+import {
+  listActiveServicios,
+  listServiciosForBillingLinks,
+  type ServicioBandejaRow,
+} from "@/lib/servicios-supervisor";
 import { requireCompany } from "@/lib/session";
 
 const CLOSED = ["VALIDADO", "TERMINADA", "SIN_REPARACION"];
@@ -355,7 +355,10 @@ async function Sales({
   ] = await Promise.all([
     prisma.receivable.findMany({
       where: { companyId, sellerUserId: userId, balance: { gt: 0 } },
-      include: { document: true, client: true },
+      include: {
+        document: { select: { folio: true, technicalCaseId: true, equipmentId: true } },
+        client: true,
+      },
       take: 100,
       orderBy: { dueAt: "asc" },
     }),
@@ -428,7 +431,18 @@ async function Sales({
     (row) => servicioOsValidadaAutorizada(row) && row.osFolio != null && osSinFacturaFolios.has(row.osFolio),
   );
   const entregasOsValidadas = servicioRows.filter(servicioOsValidadaPendienteEntrega);
-  const canEditClient = can(role, "client.edit", companyCode);
+  const cobranzaServicios = await listServiciosForBillingLinks(
+    companyId,
+    receivables.map((row) => ({
+      technicalCaseId: row.document.technicalCaseId,
+      equipmentId: row.document.equipmentId,
+    })),
+  );
+  const vigenteEquipmentIds = new Set(
+    receivables
+      .filter((row) => receivableEsVigente(row.dueAt, row.balance) && row.document.equipmentId)
+      .map((row) => row.document.equipmentId as string),
+  );
 
   return (
     <>
@@ -461,7 +475,7 @@ async function Sales({
           </div>
         ) : null}
       </Card>
-      <section className="grid items-stretch gap-4 xl:grid-cols-2">
+      <section className="flex w-full max-w-none flex-col gap-4">
         <SalesPanelServiciosGrouped
           title="Cotizaciones / seguimientos"
           role={role}
@@ -487,13 +501,13 @@ async function Sales({
           rows={facturacionPendiente}
           role={role}
         />
-        <SalesPanelCobranzaSection
+        <SalesPanelServiciosSection
           title="Cobranza"
-          empty="No hay facturas con saldo pendiente."
+          empty="No hay servicios ligados a facturas con saldo pendiente."
           bandejaHref="/cobranza?vista=cxc"
-          rows={receivables}
-          canEditClient={canEditClient}
-          highlightVigente={receivableEsVigente}
+          rows={cobranzaServicios}
+          role={role}
+          highlightRow={(row) => row.kind === "servicio" && vigenteEquipmentIds.has(row.equipmentId)}
         />
         <SalesPanelServiciosSection
           title="Entregas pendientes"

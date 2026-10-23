@@ -73,14 +73,24 @@ function SlaCell({ dueAt, historial, closedAt }: { dueAt: Date | null; historial
   );
 }
 
+const VIGENTE_ROW_CLASS = "bg-gradient-to-r from-[#f0fdf4] to-white ring-1 ring-inset ring-[#86efac]/70";
+
+function rowSurfaceClass(wrapClass: string, extra?: string, historial?: boolean) {
+  const parts = [historial ? "" : wrapClass, extra].filter(Boolean);
+  return parts.length ? parts.join(" ") : undefined;
+}
+
 export function ServiciosSupervisorList({
   rows,
   role,
   variant = "activos",
+  highlightRow,
 }: {
   rows: SupervisorServicioRow[];
   role: Role;
   variant?: "activos" | "historial";
+  /** Resalta filas (p. ej. CxC vigente en panel de ventas). */
+  highlightRow?: (row: SupervisorServicioRow) => boolean;
 }) {
   const historial = variant === "historial";
   const columns = serviciosBandejaColumns(role);
@@ -107,9 +117,10 @@ export function ServiciosSupervisorList({
           <tbody>
             {rows.map((row) => {
               const { wrapClass } = servicioRowHighlight(row);
+              const extraClass = highlightRow?.(row) ? VIGENTE_ROW_CLASS : undefined;
               if (row.kind === "cancelado") {
                 return (
-                  <tr key={`att-${row.id}`} className={wrapClass}>
+                  <tr key={`att-${row.id}`} className={rowSurfaceClass(wrapClass, extraClass, historial)}>
                     {columns.diagnostico ? <Td><span className="text-[var(--muted)]">—</span></Td> : null}
                     {columns.ordenServicio ? <Td><span className="text-[var(--muted)]">—</span></Td> : null}
                     {columns.equipo ? (
@@ -133,7 +144,7 @@ export function ServiciosSupervisorList({
               }
 
               return (
-                <tr key={row.id} className={historial ? undefined : wrapClass}>
+                <tr key={row.id} className={rowSurfaceClass(wrapClass, extraClass, historial)}>
                   {columns.diagnostico ? <Td><FolioCell folio={row.diagnosisFolio} href={row.diagnosisHref} /></Td> : null}
                   {columns.ordenServicio ? <Td><FolioCell folio={row.osFolio} href={row.osHref} /></Td> : null}
                   {columns.equipo ? (
@@ -160,6 +171,7 @@ export function ServiciosSupervisorList({
       }
       cards={rows.map((row) => {
         const { wrapClass } = servicioRowHighlight(row);
+        const extraClass = highlightRow?.(row) ? VIGENTE_ROW_CLASS : undefined;
         if (row.kind === "cancelado") {
           return (
             <div key={`att-${row.id}`}>
@@ -175,7 +187,14 @@ export function ServiciosSupervisorList({
         const title = row.osFolio ?? row.diagnosisFolio ?? row.equipmentLabel;
         const href = row.osHref ?? row.diagnosisHref ?? row.equipmentHref;
         return (
-          <div key={row.id} className={historial ? undefined : wrapClass ? `rounded-xl p-0.5 ${wrapClass}` : undefined}>
+          <div
+            key={row.id}
+            className={
+              historial
+                ? extraClass ? `rounded-xl p-0.5 ${extraClass}` : undefined
+                : [wrapClass ? `rounded-xl p-0.5 ${wrapClass}` : "rounded-xl p-0.5", extraClass].filter(Boolean).join(" ") || undefined
+            }
+          >
             <MobileCard
               href={href}
               title={title}
