@@ -136,7 +136,9 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
                     };
                   }),
               })).filter((group) => group.links.length > 0),
-              { title: null, links: [{ href: "/cuenta", label: "Cuenta" }] },
+              ...(session.role === "VENTAS"
+                ? []
+                : [{ title: null, links: [{ href: "/cuenta", label: "Cuenta" }] }]),
             ]}
           />
         </Suspense>
