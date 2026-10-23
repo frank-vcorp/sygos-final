@@ -3,16 +3,33 @@ import { describe, it } from "node:test";
 import {
   buildPartSearchKey,
   INVENTORY_SEARCH_MIN_LEN,
+  inventoryListHasCriteria,
+  inventoryListHref,
   normalizeInventorySearch,
   partInventoryAvailableQty,
+  partInventoryListWhere,
   partInventorySearchWhere,
+  parseInventoryStockFilter,
 } from "./inventory-search";
 
 describe("búsqueda de inventario", () => {
-  it("exige al menos dos caracteres", () => {
+  it("exige al menos dos caracteres para texto libre", () => {
     assert.equal(partInventorySearchWhere("co-1", "a"), null);
     assert.notEqual(partInventorySearchWhere("co-1", "ab"), null);
     assert.equal(INVENTORY_SEARCH_MIN_LEN, 2);
+  });
+
+  it("permite listar solo por familia sin texto", () => {
+    assert.equal(inventoryListHasCriteria({ family: "FILTROS" }), true);
+    const where = partInventoryListWhere("co-1", { family: "FILTROS" });
+    assert.ok(where?.AND?.some((clause) => "family" in clause));
+  });
+
+  it("arma URL de filtros", () => {
+    assert.equal(
+      inventoryListHref({ family: "MOTORES", query: "bomba", stock: "disponible" }),
+      "/inventario?q=bomba&familia=MOTORES&existencia=disponible",
+    );
   });
 
   it("normaliza acentos para searchKey", () => {
@@ -22,9 +39,8 @@ describe("búsqueda de inventario", () => {
     assert.ok(!key.includes("é"));
   });
 
-  it("filtra por searchKey normalizado", () => {
-    const where = partInventorySearchWhere("co-1", "hidraulico");
-    assert.ok(where?.OR?.some((clause) => "searchKey" in clause));
+  it("interpreta vista legada bajo mínimo", () => {
+    assert.equal(parseInventoryStockFilter("", "bajo_minimo"), "bajo_minimo");
   });
 
   it("calcula existencia disponible descontando apartados", () => {

@@ -1,4 +1,5 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
+import { listHref } from "./list-url";
 
 export const INVENTORY_SEARCH_MIN_LEN = 2;
 export const INVENTORY_SEARCH_LIMIT = 80;
@@ -41,6 +42,39 @@ export function buildPartSearchKey(fields: {
   );
 }
 
+export type InventoryStockFilter = "" | "disponible" | "cero" | "bajo_minimo";
+
+const STOCK_FILTERS = new Set<InventoryStockFilter>(["", "disponible", "cero", "bajo_minimo"]);
+
+export function parseInventoryStockFilter(raw: string | undefined, legacyVista?: string): InventoryStockFilter {
+  if (legacyVista === "bajo_minimo") return "bajo_minimo";
+  const value = (raw ?? "").trim() as InventoryStockFilter;
+  return STOCK_FILTERS.has(value) ? value : "";
+}
+
+export function inventoryListHref(filters: InventoryListFilters) {
+  return listHref("/inventario", {
+    q: filters.query?.trim() || undefined,
+    familia: filters.family?.trim() || undefined,
+    rack: filters.rack?.trim() || undefined,
+    existencia: filters.stock || undefined,
+  });
+}
+
+export type InventoryListFilters = {
+  query?: string;
+  family?: string;
+  rack?: string;
+  stock?: InventoryStockFilter;
+};
+
+export function inventoryListHasCriteria(filters: InventoryListFilters): boolean {
+  if (filters.family?.trim()) return true;
+  if (filters.rack?.trim()) return true;
+  if (filters.stock && filters.stock !== "") return true;
+  return (filters.query?.trim().length ?? 0) >= INVENTORY_SEARCH_MIN_LEN;
+}
+
 /** Filtro Prisma para buscar refacciones (sin acentos vía searchKey). */
 export function partInventorySearchWhere(companyId: string, query: string): Prisma.PartWhereInput | null {
   const q = query.trim();
@@ -62,6 +96,109 @@ export function partInventorySearchWhere(companyId: string, query: string): Pris
       { mountType: contains },
     ],
   };
+}
+
+/** Combina texto libre con familia, rack y existencia (excepto bajo mínimo, que va aparte). */
+export function partInventoryListWhere(companyId: string, filters: InventoryListFilters): Prisma.PartWhereInput | null {
+  if (!inventoryListHasCriteria(filters) || filters.stock === "bajo_minimo") return null;
+  const AND: Prisma.PartWhereInput[] = [];
+  const q = filters.query?.trim() ?? "";
+  if (q.length >= INVENTORY_SEARCH_MIN_LEN) {
+    const text = partInventorySearchWhere(companyId, q);
+    if (text?.OR) AND.push({ OR: text.OR });
+  }
+  const family = filters.family?.trim();
+  if (family) AND.push({ family });
+  const rack = filters.rack?.trim();
+  if (rack) AND.push({ rack });
+  if (filters.stock === "cero") AND.push({ qty: 0 });
+  if (filters.stock === "disponible") AND.push({ qty: { gt: 0 } });
+  return { companyId, active: true, AND };
+}
+
+export type InventoryFamilyChip = { family: string; count: number };
+export type InventoryRackOption = { rack: string; count: number };
+
+export async function listTopInventoryFamilies(prisma: PrismaClient, companyId: string, limit = 20) {
+  const rows = await prisma.$queryRaw<InventoryFamilyChip[]>`
+    SELECT family, COUNT(*) AS count
+    FROM Part
+    WHERE companyId = ${companyId}
+      AND active = 1
+      AND TRIM(family) != ''
+    GROUP BY family
+    ORDER BY count DESC, family ASC
+    LIMIT ${limit}
+  `;
+  return rows.map((row) => ({ family: row.family, count: Number(row.count) }));
+}
+
+export async function listTopInventoryRacks(prisma: PrismaClient, companyId: string, limit = 16) {
+  const rows = await prisma.$queryRaw<InventoryRackOption[]>`
+    SELECT rack, COUNT(*) AS count
+    FROM Part
+    WHERE companyId = ${companyId}
+      AND active = 1
+      AND TRIM(rack) != ''
+    GROUP BY rack
+    ORDER BY count DESC, rack ASC
+    LIMIT ${limit}
+  `;
+  return rows.map((row) => ({ rack: row.rack, count: Number(row.count) }));
+}
+
+export async function fetchInventoryPartsForList(
+  prisma: PrismaClient,
+  companyId: string,
+  filters: InventoryListFilters,
+  limit = INVENTORY_SEARCH_LIMIT,
+) {
+  const stock = filters.stock ?? "";
+  if (stock === "bajo_minimo") {
+    const family = filters.family?.trim();
+    const ids = family
+      ? await prisma.$queryRaw<Array<{ id: string }>>`
+          SELECT id FROM Part
+          WHERE companyId = ${companyId}
+            AND active = 1
+            AND minQty IS NOT NULL
+            AND qty < minQty
+            AND family = ${family}
+          ORDER BY qty ASC
+          LIMIT ${limit}
+        `
+      : await prisma.$queryRaw<Array<{ id: string }>>`
+          SELECT id FROM Part
+          WHERE companyId = ${companyId}
+            AND active = 1
+            AND minQty IS NOT NULL
+            AND qty < minQty
+          ORDER BY qty ASC
+          LIMIT ${limit}
+        `;
+    if (ids.length === 0) return [];
+    const parts = await prisma.part.findMany({
+      where: { id: { in: ids.map((row) => row.id) } },
+      orderBy: [{ qty: "asc" }, { partNumber: "asc" }],
+    });
+    return applyStockFilter(parts, stock);
+  }
+
+  const where = partInventoryListWhere(companyId, filters);
+  if (!where) return [];
+  const oversample = stock === "disponible" || stock === "cero" ? limit + 120 : limit;
+  const parts = await prisma.part.findMany({
+    where,
+    orderBy: [{ partNumber: "asc" }, { rack: "asc" }, { nivel: "asc" }],
+    take: oversample,
+  });
+  return applyStockFilter(parts, stock).slice(0, limit);
+}
+
+function applyStockFilter<T extends { qty: number; qtyReserved: number }>(parts: T[], stock: InventoryStockFilter) {
+  if (stock === "disponible") return parts.filter((part) => partInventoryAvailableQty(part) > 0);
+  if (stock === "cero") return parts.filter((part) => partInventoryAvailableQty(part) === 0);
+  return parts;
 }
 
 export type InventorySearchHit = {

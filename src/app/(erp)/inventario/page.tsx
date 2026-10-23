@@ -23,20 +23,31 @@ import {
 } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import {
+  fetchInventoryPartsForList,
   INVENTORY_SEARCH_LIMIT,
   INVENTORY_SEARCH_MIN_LEN,
+  inventoryListHasCriteria,
+  inventoryListHref,
+  listTopInventoryFamilies,
+  listTopInventoryRacks,
+  parseInventoryStockFilter,
   partInventoryAvailableQty,
-  partInventorySearchWhere,
+  type InventoryListFilters,
 } from "@/lib/inventory-search";
 import { formatUbicacion } from "@/lib/inventory-location";
-import { listHref } from "@/lib/list-url";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
+
+function chipClass(active: boolean) {
+  return active
+    ? "rounded-full border border-[var(--accent)] bg-[var(--accent-soft)] px-3 py-1.5 text-xs font-semibold text-[var(--accent)] no-underline"
+    : "rounded-full border border-[var(--line)] bg-white px-3 py-1.5 text-xs font-medium text-[#38506c] no-underline hover:border-[#91b7cf] hover:text-[var(--accent)]";
+}
 
 export default async function InventarioPage({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; vista?: string }>;
+  searchParams: Promise<{ q?: string; vista?: string; familia?: string; rack?: string; existencia?: string }>;
 }) {
   const session = await requireCompany();
   if (!can(session.role, "inventory.operate", session.activeCompanyCode)) redirect("/inicio");
@@ -54,92 +65,126 @@ export default async function InventarioPage({
     );
   }
 
-  const { q, vista } = await searchParams;
-  const query = (q ?? "").trim();
-  const belowMinimum = vista === "bajo_minimo";
-  const searchWhere = partInventorySearchWhere(company.id, query);
+  const params = await searchParams;
+  const query = (params.q ?? "").trim();
+  const family = (params.familia ?? "").trim();
+  const rack = (params.rack ?? "").trim();
+  const stock = parseInventoryStockFilter(params.existencia, params.vista);
 
-  const total = await prisma.part.count({ where: { companyId: company.id, active: true } });
+  const filters: InventoryListFilters = { query, family, rack, stock };
+  const hasCriteria = inventoryListHasCriteria(filters);
 
-  let parts: Awaited<ReturnType<typeof prisma.part.findMany>> = [];
-  let listNote: string | null = null;
+  const [total, families, racks, parts] = await Promise.all([
+    prisma.part.count({ where: { companyId: company.id, active: true } }),
+    listTopInventoryFamilies(prisma, company.id),
+    listTopInventoryRacks(prisma, company.id),
+    hasCriteria ? fetchInventoryPartsForList(prisma, company.id, filters) : Promise.resolve([]),
+  ]);
 
-  if (belowMinimum) {
-    const ids = await prisma.$queryRaw<Array<{ id: string }>>`
-      SELECT id FROM Part
-      WHERE companyId = ${company.id}
-        AND active = 1
-        AND minQty IS NOT NULL
-        AND qty < minQty
-      ORDER BY qty ASC
-      LIMIT ${INVENTORY_SEARCH_LIMIT}
-    `;
-    if (ids.length > 0) {
-      parts = await prisma.part.findMany({
-        where: { id: { in: ids.map((row) => row.id) } },
-        orderBy: [{ qty: "asc" }, { partNumber: "asc" }],
-      });
-    }
-    listNote = parts.length >= INVENTORY_SEARCH_LIMIT
-      ? `Mostrando hasta ${INVENTORY_SEARCH_LIMIT} líneas bajo mínimo. Exporta el CSV para el catálogo completo.`
-      : `${parts.length} línea(s) bajo mínimo de ${total} en catálogo.`;
-  } else if (searchWhere) {
-    parts = await prisma.part.findMany({
-      where: searchWhere,
-      orderBy: [{ partNumber: "asc" }, { rack: "asc" }, { nivel: "asc" }],
-      take: INVENTORY_SEARCH_LIMIT,
-    });
-    listNote = parts.length >= INVENTORY_SEARCH_LIMIT
-      ? `Hasta ${INVENTORY_SEARCH_LIMIT} coincidencias. Afina la búsqueda o exporta el CSV.`
-      : `${parts.length} coincidencia(s) de ${total} líneas en catálogo.`;
-  }
+  const showTable = hasCriteria;
+  const listNote = !showTable
+    ? null
+    : parts.length >= INVENTORY_SEARCH_LIMIT
+      ? `Hasta ${INVENTORY_SEARCH_LIMIT} líneas. Afina filtros o exporta el CSV.`
+      : `${parts.length} línea(s) de ${total.toLocaleString("es-MX")} en catálogo.`;
 
-  const showTable = belowMinimum || Boolean(searchWhere);
+  const baseFilters = { query, family, rack, stock };
+  const clearOne = (omit: "query" | "family" | "rack" | "stock") => {
+    const next = { ...baseFilters };
+    if (omit === "query") next.query = "";
+    if (omit === "family") next.family = "";
+    if (omit === "rack") next.rack = "";
+    if (omit === "stock") next.stock = "";
+    return inventoryListHref(next);
+  };
+
+  const stockLabel =
+    stock === "bajo_minimo"
+      ? "Bajo mínimo"
+      : stock === "disponible"
+        ? "Con disponible"
+        : stock === "cero"
+          ? "Sin existencia"
+          : null;
 
   return (
     <>
       <PageHeader
         title="Inventario"
-        subtitle={`${total.toLocaleString("es-MX")} líneas en catálogo · busca por producto, descripción, familia o ubicación.`}
+        subtitle={`${total.toLocaleString("es-MX")} líneas en catálogo · busca o filtra por familia y ubicación.`}
         action={<ActionLink href="/inventario/conteo" tone="ghost">Conteo físico</ActionLink>}
       />
       <FilterBar action="/inventario">
         <input
           name="q"
           defaultValue={query}
-          placeholder="Producto, descripción, familia, núm. catálogo, rack…"
-          className={`${controlClass} sm:min-w-[14rem] sm:flex-1`}
-          autoFocus={!query && !belowMinimum}
+          placeholder="Producto, descripción, núm. catálogo…"
+          className={`${controlClass} sm:min-w-[10rem] sm:flex-1`}
+          autoFocus={!hasCriteria}
         />
-        <Button type="submit" tone="ghost">Buscar</Button>
+        <select name="familia" defaultValue={family} className={`${controlClass} sm:max-w-[11rem]`} aria-label="Familia">
+          <option value="">Todas las familias</option>
+          {families.map((row) => (
+            <option key={row.family} value={row.family}>
+              {row.family} ({row.count})
+            </option>
+          ))}
+        </select>
+        <select name="rack" defaultValue={rack} className={`${controlClass} sm:max-w-[10rem]`} aria-label="Rack">
+          <option value="">Todos los racks</option>
+          {racks.map((row) => (
+            <option key={row.rack} value={row.rack}>
+              {row.rack} ({row.count})
+            </option>
+          ))}
+        </select>
+        <select name="existencia" defaultValue={stock} className={`${controlClass} sm:max-w-[11rem]`} aria-label="Existencia">
+          <option value="">Cualquier existencia</option>
+          <option value="disponible">Con disponible</option>
+          <option value="cero">Sin existencia</option>
+          <option value="bajo_minimo">Bajo mínimo</option>
+        </select>
+        <Button type="submit" tone="ghost">Aplicar</Button>
       </FilterBar>
+      {families.length > 0 ? (
+        <section className="mb-4" aria-label="Familias">
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-[var(--muted)]">Familias</p>
+          <div className="flex flex-wrap gap-2">
+            {families.map((row) => (
+              <TextLink
+                key={row.family}
+                href={inventoryListHref({ ...baseFilters, family: row.family })}
+                className={chipClass(family === row.family)}
+              >
+                {row.family} · {row.count}
+              </TextLink>
+            ))}
+          </div>
+        </section>
+      ) : null}
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <TextLink href="/inventario/export" className="rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm font-medium no-underline hover:bg-[#f7f8f9]">
           Exportar CSV
         </TextLink>
-        <TextLink
-          href={listHref("/inventario", { vista: "bajo_minimo" })}
-          className="rounded-md border border-[var(--line)] bg-white px-3 py-2 text-sm font-medium no-underline hover:bg-[#f7f8f9]"
-        >
-          Bajo mínimo
-        </TextLink>
       </div>
       <ActiveFilters
         items={[
-          ...(belowMinimum ? [{ label: "Bajo mínimo", clearHref: listHref("/inventario", { q: query || undefined }) }] : []),
-          ...(query ? [{ label: `Búsqueda: ${query}`, clearHref: listHref("/inventario", { vista: belowMinimum ? "bajo_minimo" : undefined }) }] : []),
+          ...(family ? [{ label: `Familia: ${family}`, clearHref: clearOne("family") }] : []),
+          ...(rack ? [{ label: `Rack: ${rack}`, clearHref: clearOne("rack") }] : []),
+          ...(stockLabel ? [{ label: stockLabel, clearHref: clearOne("stock") }] : []),
+          ...(query ? [{ label: `Búsqueda: ${query}`, clearHref: clearOne("query") }] : []),
         ]}
       />
       {!showTable ? (
         <Empty
-          title="Busca una refacción"
-          body={`El catálogo no se lista completo (${total.toLocaleString("es-MX")} líneas). Escribe al menos ${INVENTORY_SEARCH_MIN_LEN} caracteres (con o sin acentos) en producto, descripción, familia o ubicación, o abre «Bajo mínimo» para revisar faltantes.`}
+          title="Busca o elige una familia"
+          body={`El catálogo no se lista completo (${total.toLocaleString("es-MX")} líneas). Escribe al menos ${INVENTORY_SEARCH_MIN_LEN} caracteres, elige una familia arriba o combina filtros en la barra.`}
         />
       ) : parts.length === 0 ? (
         <Empty
           title="Sin coincidencias"
-          body={belowMinimum ? "Ninguna línea está bajo su mínimo informativo." : `Nada coincide con «${query}».`}
-          action={<TextLink href="/inventario">Limpiar búsqueda</TextLink>}
+          body="Ninguna línea coincide con los filtros actuales."
+          action={<TextLink href="/inventario">Limpiar todo</TextLink>}
         />
       ) : (
         <>
@@ -170,8 +215,20 @@ export default async function InventarioPage({
                         <Td>{part.partNumber}</Td>
                         <Td>{part.description || "—"}</Td>
                         <Td>{part.catalogNumero || "—"}</Td>
-                        <Td>{part.family || "—"}</Td>
-                        <Td>{part.rack || "—"}</Td>
+                        <Td>
+                          {part.family ? (
+                            <TextLink href={inventoryListHref({ ...baseFilters, family: part.family })}>{part.family}</TextLink>
+                          ) : (
+                            "—"
+                          )}
+                        </Td>
+                        <Td>
+                          {part.rack ? (
+                            <TextLink href={inventoryListHref({ ...baseFilters, rack: part.rack })}>{part.rack}</TextLink>
+                          ) : (
+                            "—"
+                          )}
+                        </Td>
                         <Td>{part.nivel || "—"}</Td>
                         <Td>{part.mountType || "—"}</Td>
                         <Td>
@@ -226,7 +283,13 @@ export default async function InventarioPage({
                 >
                   <p>{part.description || "Sin descripción"}</p>
                   <p>
-                    {[part.catalogNumero && `Núm. ${part.catalogNumero}`, part.family, formatUbicacion(part.rack, part.nivel), part.mountType].filter(Boolean).join(" · ")}
+                    {part.family ? (
+                      <>
+                        <TextLink href={inventoryListHref({ family: part.family })}>{part.family}</TextLink>
+                        {" · "}
+                      </>
+                    ) : null}
+                    {[part.catalogNumero && `Núm. ${part.catalogNumero}`, formatUbicacion(part.rack, part.nivel), part.mountType].filter(Boolean).join(" · ")}
                   </p>
                   <div className="flex flex-wrap gap-2">
                     {part.minQty != null && available < part.minQty ? <Badge tone="warn">bajo mínimo</Badge> : null}
