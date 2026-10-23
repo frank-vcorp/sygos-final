@@ -1,7 +1,12 @@
 import { ClientNameLink } from "@/components/client-entity-links";
 import { SlaCountdown } from "@/components/sla-countdown";
 import { MobileCard, RecordLink, ResponsiveData, Table, Td, Th } from "@/components/ui";
-import { serviciosBandejaColumns, type StatusTone, type StackedStatus } from "@/lib/servicios-bandeja";
+import {
+  serviciosBandejaColumns,
+  type ServicioBandejaColumnPreset,
+  type StatusTone,
+  type StackedStatus,
+} from "@/lib/servicios-bandeja";
 import type { Role } from "@/lib/roles";
 import { servicioRowHighlight, type SupervisorServicioRow } from "@/lib/servicios-supervisor";
 
@@ -96,15 +101,17 @@ export function ServiciosSupervisorList({
   role,
   variant = "activos",
   highlightRow,
+  columnPreset,
 }: {
   rows: SupervisorServicioRow[];
   role: Role;
   variant?: "activos" | "historial";
   /** Resalta filas (p. ej. CxC vigente en panel de ventas). */
   highlightRow?: (row: SupervisorServicioRow) => boolean;
+  columnPreset?: ServicioBandejaColumnPreset;
 }) {
   const historial = variant === "historial";
-  const columns = serviciosBandejaColumns(role);
+  const columns = serviciosBandejaColumns(role, columnPreset);
   const trailHeader = historial ? "Cierre" : "SLA";
 
   return (

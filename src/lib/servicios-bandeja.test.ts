@@ -88,4 +88,12 @@ describe("serviciosBandejaColumns", () => {
     assert.equal(cols.cotizacion, true);
     assert.equal(cols.cotizacionMonto, true);
   });
+
+  it("panel cotizaciones ventas: compacta con folio COT al final", () => {
+    const cols = serviciosBandejaColumns("VENTAS", "cotizaciones-seguimiento");
+    assert.equal(cols.equipo, false);
+    assert.equal(cols.edoFisico, false);
+    assert.equal(cols.cotizacion, true);
+    assert.equal(cols.cotizacionMonto, true);
+  });
 });
