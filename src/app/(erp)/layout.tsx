@@ -119,7 +119,11 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
         </div>
         <Suspense fallback={<nav className="px-3 pb-5 text-sm text-[var(--muted)]">Menú…</nav>}>
           <SideNav
-            accordionGroups={session.role !== "VENTAS" && session.role !== "ALMACEN"}
+            accordionGroups={
+              session.role !== "VENTAS"
+              && session.role !== "ALMACEN"
+              && session.role !== "SUPERVISOR_TECNICO"
+            }
             groups={[
               ...erpNavGroups(session.role).map((group) => ({
                 title: group.title,
@@ -136,7 +140,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
                     };
                   }),
               })).filter((group) => group.links.length > 0),
-              ...(session.role === "VENTAS"
+              ...(session.role === "VENTAS" || session.role === "SUPERVISOR_TECNICO"
                 ? []
                 : [{ title: null, links: [{ href: "/cuenta", label: "Cuenta" }] }]),
             ]}
