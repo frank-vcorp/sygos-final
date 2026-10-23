@@ -89,4 +89,9 @@ describe("serviciosBandejaColumns", () => {
     assert.equal(cols.cotizacionMonto, true);
   });
 
+  it("panel cotizaciones ventas puede ocultar monto", () => {
+    const cols = serviciosBandejaColumns("VENTAS", { quoteMonto: false });
+    assert.equal(cols.cotizacion, true);
+    assert.equal(cols.cotizacionMonto, false);
+  });
 });

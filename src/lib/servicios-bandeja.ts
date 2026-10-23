@@ -16,8 +16,17 @@ export type ServicioBandejaColumns = {
   sla: boolean;
 };
 
-export function serviciosBandejaColumns(role: Role): ServicioBandejaColumns {
+export type ServicioBandejaColumnOptions = {
+  /** En Ventas, oculta la columna Monto (p. ej. panel «Cotizaciones / seguimientos»). */
+  quoteMonto?: boolean;
+};
+
+export function serviciosBandejaColumns(
+  role: Role,
+  options?: ServicioBandejaColumnOptions,
+): ServicioBandejaColumns {
   const ventas = role === "VENTAS";
+  const showQuoteMonto = ventas && options?.quoteMonto !== false;
   const hideAdmin = (
     role === "TECNICO"
     || role === "GERENTE_OPERATIVO_SYSTRON"
@@ -34,7 +43,7 @@ export function serviciosBandejaColumns(role: Role): ServicioBandejaColumns {
     edoAdministrativo: !hideAdmin,
     edoFisico: !tecnicoView,
     cotizacion: ventas,
-    cotizacionMonto: ventas,
+    cotizacionMonto: showQuoteMonto,
     vendedor: !ventas,
     tecnico: !tecnicoView && !ventas,
     sla: !ventas,
