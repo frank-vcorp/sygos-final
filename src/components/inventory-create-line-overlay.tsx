@@ -21,12 +21,12 @@ export function InventoryCreateLineOverlay({ catalog }: { catalog: InventoryCrea
   return (
     <>
       <Button type="button" tone="ghost" className="text-sm font-medium" onClick={() => setOpen(true)}>
-        Nueva línea
+        Subir inventario
       </Button>
       <FormOverlayDialog
         open={open}
         onClose={() => setOpen(false)}
-        title="Nueva línea de inventario"
+        title="Subir inventario"
         titleId="inventory-create-line-dialog"
         wide
       >
