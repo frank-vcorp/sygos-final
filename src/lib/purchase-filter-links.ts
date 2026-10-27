@@ -8,7 +8,7 @@ export type ShoppingListFilters = {
 
 export function shoppingListHref(filters: ShoppingListFilters) {
   return listHref("/compras/listas", {
-    estado: filters.estado === "TODAS" ? undefined : filters.estado,
+    estado: filters.estado || undefined,
     proveedor: filters.proveedor?.trim() || undefined,
     fecha: filters.fecha || undefined,
   });

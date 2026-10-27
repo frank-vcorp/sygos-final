@@ -23,7 +23,7 @@ test("conserva la vista compartible y los filtros de listas", () => {
     "/compras?vista=autorizar&q=OC-42",
   );
   assert.equal(
-    shoppingListHref({ estado: "TODAS", proveedor: " proveedor-1 ", fecha: "2026-10-27" }),
-    "/compras/listas?proveedor=proveedor-1&fecha=2026-10-27",
+    shoppingListHref({ estado: "CONVERTIDA", proveedor: " proveedor-1 ", fecha: "2026-10-27" }),
+    "/compras/listas?estado=CONVERTIDA&proveedor=proveedor-1&fecha=2026-10-27",
   );
 });

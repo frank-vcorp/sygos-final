@@ -429,7 +429,6 @@ export function shoppingListSupplierId(existingSupplierId: string | null, submit
 
 export function shoppingListStatusFilter(status?: string) {
   if (status === "CONVERTIDA") return "CONVERTIDA";
-  if (status === "TODAS") return undefined;
   return "ABIERTA";
 }
 

@@ -31,7 +31,6 @@ export function ShoppingListFilters({
       >
         <option value="ABIERTA">Listas abiertas</option>
         <option value="CONVERTIDA">Listas convertidas en compra</option>
-        <option value="TODAS">Todas las listas</option>
       </select>
       <select
         name="proveedor"

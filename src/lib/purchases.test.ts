@@ -32,7 +32,6 @@ describe("transiciones de requerimientos y listas", () => {
   it("muestra listas abiertas por defecto y acepta filtros de listas", () => {
     assert.equal(shoppingListStatusFilter(), "ABIERTA");
     assert.equal(shoppingListStatusFilter("CONVERTIDA"), "CONVERTIDA");
-    assert.equal(shoppingListStatusFilter("TODAS"), undefined);
     assert.equal(shoppingListStatusFilter("EN_LISTA"), "ABIERTA");
   });
 
