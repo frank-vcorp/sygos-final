@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { purchaseMovementDetails, requirementStatusAfter, requirementsNeedExpenseSelection, selectExpenseCatalog, shoppingListSupplierId, sourceRequirementIsDuplicate, withinDirectLimits } from "./purchases";
+import { purchaseMovementDetails, requirementStatusAfter, requirementsNeedExpenseSelection, selectExpenseCatalog, shoppingListStatusFilter, shoppingListSupplierId, sourceRequirementIsDuplicate, withinDirectLimits } from "./purchases";
 
 describe("compra directa", () => {
   it("exige límite individual y presupuesto del mes al mismo tiempo", () => {
@@ -27,6 +27,13 @@ describe("transiciones de requerimientos y listas", () => {
     assert.equal(shoppingListSupplierId("mouser", "otro-proveedor"), "mouser");
     assert.equal(shoppingListSupplierId(null, "mouser"), "mouser");
     assert.equal(shoppingListSupplierId(null), null);
+  });
+
+  it("muestra listas abiertas por defecto y acepta filtros de listas", () => {
+    assert.equal(shoppingListStatusFilter(), "ABIERTA");
+    assert.equal(shoppingListStatusFilter("CONVERTIDA"), "CONVERTIDA");
+    assert.equal(shoppingListStatusFilter("TODAS"), undefined);
+    assert.equal(shoppingListStatusFilter("EN_LISTA"), "ABIERTA");
   });
 
   it("solo pide clasificación financiera si la lista incluye generales", () => {

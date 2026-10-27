@@ -422,6 +422,12 @@ export function shoppingListSupplierId(existingSupplierId: string | null, submit
   return existingSupplierId ?? submittedSupplierId ?? null;
 }
 
+export function shoppingListStatusFilter(status?: string) {
+  if (status === "CONVERTIDA") return "CONVERTIDA";
+  if (status === "TODAS") return undefined;
+  return "ABIERTA";
+}
+
 export function requirementsNeedExpenseSelection(kinds: string[]) {
   return kinds.some((kind) => kind !== "REFACCION");
 }
