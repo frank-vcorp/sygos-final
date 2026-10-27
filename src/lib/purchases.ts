@@ -602,36 +602,43 @@ export async function addRequirementToShoppingList(
   }
   if (!Number.isInteger(input.quantity) || input.quantity < 1) throw new Error("La partida no es válida.");
   const requirementKind = normalizeShoppingListKind(requirement.kind);
-  let list = input.shoppingListId
+  const openList = input.shoppingListId
     ? await prisma.shoppingList.findFirst({
         where: { id: input.shoppingListId, companyId: actor.activeCompanyId, status: "ABIERTA" },
         include: { lines: { include: { requirement: { select: { kind: true } } } } },
       })
     : null;
-  if (input.shoppingListId && !list) throw new Error("La lista de compras ya no está abierta.");
-  if (list && shoppingListKindFromList(list) !== requirementKind) {
+  if (input.shoppingListId && !openList) throw new Error("La lista de compras ya no está abierta.");
+  if (openList && shoppingListKindFromList(openList) !== requirementKind) {
     throw new Error("El requerimiento no coincide con el tipo de la lista.");
   }
-  const supplierId = shoppingListSupplierId(list?.supplierId ?? null, input.supplierId);
+  const supplierId = shoppingListSupplierId(openList?.supplierId ?? null, input.supplierId);
   if (supplierId) await supplierForPurchase(actor, supplierId);
-  if (!list) {
+  let listId: string;
+  if (!openList) {
     const folio = await allocateFolio(actor.activeCompanyId, "LC");
-    list = await prisma.shoppingList.create({
+    const created = await prisma.shoppingList.create({
       data: { folio, companyId: actor.activeCompanyId, kind: requirementKind, status: "ABIERTA", supplierId, createdByUserId: actor.userId },
     });
-  } else if (!list.supplierId && supplierId) {
-    list = await prisma.shoppingList.update({ where: { id: list.id }, data: { supplierId } });
+    listId = created.id;
+  } else {
+    listId = openList.id;
+    if (!openList.supplierId && supplierId) {
+      await prisma.shoppingList.update({ where: { id: openList.id }, data: { supplierId } });
+    }
   }
   await prisma.$transaction(async (tx) => {
     const moved = await tx.requirement.updateMany({
       where: { id: requirement.id, status: "PENDIENTE", shoppingListId: null },
-      data: { status: requirementStatusAfter("ADD_TO_LIST"), shoppingListId: list!.id },
+      data: { status: requirementStatusAfter("ADD_TO_LIST"), shoppingListId: listId },
     });
     if (!moved.count) throw new ConcurrencyError();
     await tx.shoppingListLine.create({
-      data: { shoppingListId: list!.id, requirementId: requirement.id, partNumber: input.partNumber.trim(), description: input.description?.trim() ?? "", quantity: input.quantity, sourceType: requirement.sourceType, sourceId: requirement.sourceId },
+      data: { shoppingListId: listId, requirementId: requirement.id, partNumber: input.partNumber.trim(), description: input.description?.trim() ?? "", quantity: input.quantity, sourceType: requirement.sourceType, sourceId: requirement.sourceId },
     });
   });
+  const list = await prisma.shoppingList.findFirst({ where: { id: listId, companyId: actor.activeCompanyId } });
+  if (!list) throw new Error("No se pudo guardar la lista.");
   return list;
 }
 
