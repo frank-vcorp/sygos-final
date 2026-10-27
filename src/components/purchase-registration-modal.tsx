@@ -6,13 +6,9 @@ import { phaseOnePurchaseAction } from "@/app/(erp)/compras/actions";
 import { FormOverlayDialog } from "@/components/overlay-dialog";
 import { SupplierPicker } from "@/components/supplier-picker";
 import { Button, controlClass, Field, FormActions, FormPanel, FormSection, MoneyInput } from "@/components/ui";
+import { ExpenseCategorySubcategoryFields } from "@/components/expense-category-subcategory-fields";
+import type { ExpenseCategoryCatalogItem } from "@/lib/expense-catalog";
 import type { PickerOption } from "@/components/searchable-entity-picker";
-
-type ExpenseCategoryOption = {
-  id: string;
-  name: string;
-  subcategories: Array<{ id: string; name: string }>;
-};
 
 type AccountOption = { id: string; name: string };
 
@@ -25,7 +21,7 @@ export function PurchaseRegistrationModal({
   returnHref = "/compras",
 }: {
   suppliers: PickerOption[];
-  categories: ExpenseCategoryOption[];
+  categories: ExpenseCategoryCatalogItem[];
   accounts: AccountOption[];
   allowQuickSupplier: boolean;
   initiallyOpen?: boolean;
@@ -85,22 +81,7 @@ export function PurchaseRegistrationModal({
                 <strong className="ml-2">Producción y operación · Refacciones y componentes</strong>
               </div>
             ) : (
-              <>
-                <Field label="Categoría de egreso">
-                  <select name="expenseCategoryId" defaultValue="" required className={controlClass}>
-                    <option value="" disabled>Selecciona una categoría</option>
-                    {categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
-                  </select>
-                </Field>
-                <Field label="Subcategoría">
-                  <select name="expenseSubcategoryId" defaultValue="" className={controlClass}>
-                    <option value="">Sin subcategoría</option>
-                    {categories.flatMap((category) => category.subcategories.map((subcategory) => (
-                      <option key={subcategory.id} value={subcategory.id}>{category.name} · {subcategory.name}</option>
-                    )))}
-                  </select>
-                </Field>
-              </>
+              <ExpenseCategorySubcategoryFields categories={categories} />
             )}
             <Field label="Forma de pago">
               <select name="paymentType" required className={controlClass} defaultValue="CONTADO">

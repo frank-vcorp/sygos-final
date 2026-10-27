@@ -1,6 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { purchaseRequirementAction } from "../../../actions";
 import { Button, controlClass, Field, FormActions, FormPanel, FormSection, MoneyInput, PageHeader } from "@/components/ui";
+import { ExpenseCategorySubcategoryFields } from "@/components/expense-category-subcategory-fields";
 import { SupplierPicker } from "@/components/supplier-picker";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
@@ -24,8 +25,7 @@ export default async function ComprarRequerimientoPage({ params }: { params: Pro
         <div className="md:col-span-2"><SupplierPicker suppliers={suppliers} required allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)} /></div>
         <Field label="Fecha de compra"><input name="purchaseDate" type="date" defaultValue={new Date().toISOString().slice(0, 10)} required className={controlClass} /></Field>
         <Field label="Monto"><MoneyInput name="amount" min="0.01" required /></Field>
-        {refaccion ? <div className="md:col-span-2 rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm"><span className="text-[var(--muted)]">Clasificación de egreso</span><strong className="ml-2">Producción y operación · Refacciones y componentes</strong></div> : <><Field label="Categoría de egreso"><select name="expenseCategoryId" defaultValue="" required className={controlClass}><option value="" disabled>Selecciona una categoría</option>{categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field>
-        <Field label="Subcategoría"><select name="expenseSubcategoryId" defaultValue="" className={controlClass}><option value="">Sin subcategoría</option>{categories.flatMap((item) => item.subcategories.map((sub) => <option key={sub.id} value={sub.id}>{item.name} · {sub.name}</option>))}</select></Field></>}
+        {refaccion ? <div className="md:col-span-2 rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm"><span className="text-[var(--muted)]">Clasificación de egreso</span><strong className="ml-2">Producción y operación · Refacciones y componentes</strong></div> : <ExpenseCategorySubcategoryFields categories={categories} />}
         <Field label="Descripción general"><input name="concept" required defaultValue={refaccion ? "Compra de refacciones y componentes" : requirement.description || requirement.partNumber} className={controlClass} /></Field>
         <Field label="Forma de pago"><select name="paymentType" defaultValue="CONTADO" className={controlClass}><option value="CONTADO">Contado</option><option value="CREDITO">Crédito</option><option value="TARJETA">Tarjeta</option><option value="TRANSFERENCIA">Transferencia</option></select></Field>
         <Field label="Banco / cuenta, si aplica"><select name="accountId" defaultValue="" className={controlClass}><option value="">No aplica</option>{accounts.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></Field>

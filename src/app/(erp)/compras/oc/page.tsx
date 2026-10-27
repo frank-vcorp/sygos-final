@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { phaseOnePurchaseAction } from "../actions";
+import { ExpenseCategorySubcategoryFields } from "@/components/expense-category-subcategory-fields";
 import { SupplierPicker } from "@/components/supplier-picker";
 import { Button, controlClass, Field, FormActions, FormPanel, FormSection, MoneyInput, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
@@ -31,8 +32,7 @@ export default async function NuevaOrdenPage() {
           <Field label="Monto"><MoneyInput name="amount" required min="0.01" /></Field>
         </FormSection>
         <FormSection title="Datos para Finanzas">
-          <Field label="Categoría de egreso"><select name="expenseCategoryId" required className={controlClass} defaultValue=""><option value="" disabled>Selecciona una categoría</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></Field>
-          <Field label="Subcategoría"><select name="expenseSubcategoryId" defaultValue="" className={controlClass}><option value="">Sin subcategoría</option>{categories.flatMap((category) => category.subcategories.map((sub) => <option key={sub.id} value={sub.id}>{category.name} · {sub.name}</option>))}</select></Field>
+          <ExpenseCategorySubcategoryFields categories={categories} />
           <Field label="Tipo de pago"><select name="paymentType" required className={controlClass} defaultValue="CONTADO"><option value="CONTADO">Contado</option><option value="CREDITO">Crédito</option><option value="TARJETA">Tarjeta</option><option value="TRANSFERENCIA">Transferencia</option></select></Field>
           <Field label="Fecha"><input name="purchaseDate" type="date" required className={controlClass} /></Field>
         </FormSection>
