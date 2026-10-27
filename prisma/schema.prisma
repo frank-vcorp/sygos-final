@@ -900,6 +900,7 @@ model PurchaseLine {
   partNumber  String
   description String   @default("")
   quantity    Int      @default(1)
+  unitPrice   Float?
   sourceType  String?
   sourceId    String?
   createdAt   DateTime @default(now())

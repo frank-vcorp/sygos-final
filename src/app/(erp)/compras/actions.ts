@@ -242,25 +242,48 @@ export async function requirementStatusAction(formData: FormData) {
   redirect("/compras/requerimientos");
 }
 
+function phaseOneLinesFromForm(formData: FormData, order: boolean) {
+  const linePart = optionalText(formData.get("partNumber"));
+  if (linePart) {
+    return [{
+      partNumber: linePart,
+      description: optionalText(formData.get("description")) ?? "",
+      quantity: Number(formData.get("quantity")) || 1,
+      unitPrice: order ? moneyFromForm(formData.get("unitPrice")) : null,
+    }];
+  }
+  const raw = JSON.parse(String(formData.get("lines") || "[]")) as Array<{
+    partNumber: string;
+    description: string;
+    quantity: number;
+    unitPrice?: string;
+  }>;
+  return raw.map((line) => ({
+    partNumber: line.partNumber ?? "",
+    description: line.description ?? "",
+    quantity: Number(line.quantity) || 0,
+    unitPrice: order && line.unitPrice ? moneyFromForm(line.unitPrice) : null,
+  }));
+}
+
 export async function phaseOnePurchaseAction(formData: FormData) {
   "use server";
   try {
     const session = await guard("purchase.operate");
+    const order = formData.get("order") === "si";
     const purchaseKind = formData.get("purchaseKind") === "REFACCION" ? "REFACCION" : "GENERAL";
-    const linePart = optionalText(formData.get("partNumber"));
-    const lines: { partNumber: string; description: string; quantity: number }[] = linePart
-      ? [{ partNumber: linePart, description: optionalText(formData.get("description")) ?? "", quantity: Number(formData.get("quantity")) }]
-      : JSON.parse(String(formData.get("lines") || "[]"));
+    const lines = phaseOneLinesFromForm(formData, order);
+    const purchaseDateRaw = optionalText(formData.get("purchaseDate"));
     const purchase = await createPhaseOnePurchase(session, {
       supplierId: requiredText(formData.get("supplierId"), "Proveedor"),
       expenseCategoryId: optionalText(formData.get("expenseCategoryId")),
       expenseSubcategoryId: optionalText(formData.get("expenseSubcategoryId")),
       paymentType: requiredText(formData.get("paymentType"), "Tipo de pago"),
       accountId: optionalText(formData.get("accountId")),
-      purchaseDate: new Date(requiredText(formData.get("purchaseDate"), "Fecha de compra")),
+      purchaseDate: order ? null : new Date(requiredText(purchaseDateRaw, "Fecha de compra")),
       amount: moneyFromForm(formData.get("amount")),
       lines,
-      order: formData.get("order") === "si",
+      order,
       concept: optionalText(formData.get("concept")) ?? undefined,
       purchaseKind,
     });

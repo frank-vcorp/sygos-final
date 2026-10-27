@@ -25,14 +25,14 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
   if (registrar === "1") redirect("/compras/nueva");
   const query = (q ?? "").trim();
   const view = vista === "autorizar" ? "autorizar" : vista === "procesar" ? "procesar" : vista === "oc" ? "oc" : vista === "legacy" ? "legacy" : "compras";
-  const estadoCompras = view === "compras" ? (estado ?? "PENDIENTE_VALIDAR") : estado;
+  const estadoCompras = view === "compras" ? (estado ?? "PENDIENTE_VALIDAR") : view === "oc" ? (estado ?? "PENDIENTE_AUTORIZACION") : estado;
   const dateFilter = fecha ? { gte: new Date(`${fecha}T00:00:00`), lt: new Date(`${fecha}T23:59:59`) } : undefined;
   const where = view === "autorizar"
     ? { kind: "OC", status: "PENDIENTE_AUTORIZACION" }
     : view === "procesar"
       ? { OR: [{ kind: "DIRECTA", status: "PENDIENTE_VALIDAR" }, { kind: "OC", status: "AUTORIZADA" }] }
       : view === "oc"
-        ? { kind: "OC", status: { not: "ELIMINADA" } }
+        ? { kind: "OC", status: estadoCompras ?? { not: "ELIMINADA" } }
         : view === "legacy"
           ? { kind: "DIRECTA", status: { not: "ELIMINADA" } }
           : { kind: "COMPRA", status: estadoCompras ?? { not: "ELIMINADA" } };
@@ -45,7 +45,7 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
             OR: [{ folio: { contains: query } }, { concept: { contains: query } }],
           }
         : {}),
-      ...(categoria && view === "compras" ? { expenseCategoryId: categoria } : {}),
+      ...(categoria && (view === "compras" || view === "oc") ? { expenseCategoryId: categoria } : {}),
       ...(proveedor ? { supplierId: proveedor } : {}),
       ...(solicitante ? { requesterUserId: solicitante } : {}),
       ...(dateFilter ? { createdAt: dateFilter } : {}),
@@ -80,11 +80,13 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
   return (
     <>
       <PageHeader
-        title="Compras"
-        subtitle="Consulta compras realizadas y registra compras urgentes sin requerimiento."
+        title={view === "oc" ? "Órdenes de compra" : "Compras"}
+        subtitle={view === "oc" ? "Autorización y seguimiento de órdenes de compra." : "Consulta compras realizadas y registra compras urgentes sin requerimiento."}
         action={
           <div className="flex flex-wrap gap-2">
-            <ActionLink href="/compras/listas" tone="ghost">Listas de compras</ActionLink>
+            {view === "oc" ? <ActionLink href="/compras/oc" tone="primary">Nueva O.C.</ActionLink> : null}
+            {view === "compras" ? <ActionLink href="/compras/listas" tone="ghost">Listas de compras</ActionLink> : null}
+            {view === "compras" ? (
             <PurchaseRegistrationModal
               suppliers={suppliers.map((supplier) => ({ id: supplier.id, name: `${supplier.name} · ${supplier.currency}` }))}
               categories={categories}
@@ -92,6 +94,7 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
               allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)}
               returnHref={filters()}
             />
+            ) : null}
           </div>
         }
       />
@@ -104,6 +107,7 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
         proveedor={proveedor ?? ""}
         solicitante={solicitante ?? ""}
         showPurchaseFilters={view === "compras"}
+        showOrderFilters={view === "oc"}
         suppliers={suppliers}
         categories={categories}
         requesters={requesters}
@@ -111,7 +115,7 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
       <ActiveFilters
         items={[
           ...(view !== "compras" ? [{ label: viewLabel, clearHref: filters("vista") }] : []),
-          ...(view === "compras" && estadoCompras ? [{ label: STATUS[estadoCompras] ?? estadoCompras, clearHref: filters("estado") }] : []),
+          ...((view === "compras" || view === "oc") && estadoCompras ? [{ label: STATUS[estadoCompras] ?? estadoCompras, clearHref: filters("estado") }] : []),
           ...(fecha ? [{ label: `Fecha: ${fecha}`, clearHref: filters("fecha") }] : []),
           ...(proveedor ? [{ label: `Proveedor: ${suppliers.find((supplier) => supplier.id === proveedor)?.name ?? "Seleccionado"}`, clearHref: filters("proveedor") }] : []),
           ...(categoria ? [{ label: `Categoría: ${categories.find((category) => category.id === categoria)?.name ?? "Seleccionada"}`, clearHref: filters("categoria") }] : []),
@@ -123,7 +127,7 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
         <ResponsiveData
           table={
             <Table>
-              <thead><tr><Th>Folio</Th><Th>Proveedor</Th><Th>Categoría</Th><Th>Solicitante</Th><Th>Importe</Th><Th>Estado</Th></tr></thead>
+              <thead><tr><Th>Folio</Th><Th>Proveedor</Th><Th>Categoría</Th><Th>Solicitante</Th><Th>{view === "oc" ? "Precio" : "Importe"}</Th><Th>Estado</Th></tr></thead>
               <tbody>
                 {rows.map((row) => (
                   <tr key={row.id}>

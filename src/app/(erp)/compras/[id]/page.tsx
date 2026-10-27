@@ -78,7 +78,7 @@ export default async function CompraPage({ params }: { params: Promise<{ id: str
   return (
     <>
       <EntityDetailHeader
-        back={{ href: "/compras", label: "Compras" }}
+        back={{ href: row.kind === "OC" ? "/compras?vista=oc" : "/compras", label: row.kind === "OC" ? "Órdenes de compra" : "Compras" }}
         title={row.folio}
         subtitle={row.kind === "OC" ? "Orden de compra" : row.kind === "COMPRA" ? "Compra Fase 1" : "Compra directa"}
         status={<Badge tone={row.status === "PENDIENTE_AUTORIZACION" || row.status === "PENDIENTE_VALIDAR" ? "warn" : "neutral"}>{STATUS_LABEL[row.status] ?? row.status}</Badge>}
@@ -109,10 +109,21 @@ export default async function CompraPage({ params }: { params: Promise<{ id: str
         {row.settlement ? <p className={row.authorizedAmount != null ? "mt-1" : ""}>Procesada como {row.settlement === "CREDITO" ? "cuenta por pagar" : "egreso"}.</p> : null}
         {row.cancelReason ? <p className="mt-1">Cancelación: {row.cancelReason}</p> : null}
       </Card>
-      {row.kind === "COMPRA" ? (
+      {row.lines.length > 0 && (row.kind === "COMPRA" || row.kind === "OC") ? (
         <Card className="mb-4 p-4">
-          <h2 className="font-semibold">Partidas relacionadas</h2>
-          <div className="mt-3 space-y-2">{row.lines.map((line) => <div key={line.id} className="rounded border border-[var(--line)] p-3"><strong>{line.partNumber}</strong><span className="ml-2 text-sm text-[var(--muted)]">{line.description} · {line.quantity}</span></div>)}</div>
+          <h2 className="font-semibold">Partidas</h2>
+          <div className="mt-3 space-y-2">
+            {row.lines.map((line) => (
+              <div key={line.id} className="rounded border border-[var(--line)] p-3">
+                <strong>{line.partNumber || line.description}</strong>
+                <span className="ml-2 text-sm text-[var(--muted)]">
+                  {line.partNumber && line.description ? `${line.description} · ` : ""}
+                  Cant. {line.quantity}
+                  {line.unitPrice != null ? ` · Precio ${money(line.unitPrice)} · Subtotal ${money(line.quantity * line.unitPrice)}` : ""}
+                </span>
+              </div>
+            ))}
+          </div>
         </Card>
       ) : null}
       {canManage && row.kind === "DIRECTA" && row.status === "PENDIENTE_VALIDAR" ? (

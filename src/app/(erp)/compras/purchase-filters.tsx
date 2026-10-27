@@ -18,6 +18,7 @@ export function PurchaseFilters({
   categories,
   requesters,
   showPurchaseFilters,
+  showOrderFilters,
 }: {
   vista: string;
   q: string;
@@ -30,6 +31,7 @@ export function PurchaseFilters({
   categories: Option[];
   requesters: Option[];
   showPurchaseFilters: boolean;
+  showOrderFilters: boolean;
 }) {
   const { filters, update, apply } = useAutoFilters({
     initialFilters: { vista, q, estado, fecha, categoria, proveedor, solicitante },
@@ -39,10 +41,20 @@ export function PurchaseFilters({
 
   return (
     <CompactFilterBar onSubmit={apply} className="lg:[&>select]:max-w-[13rem]">
-      {showPurchaseFilters ? (
+      {showPurchaseFilters || showOrderFilters ? (
         <>
           <select name="estado" value={filters.estado} className={`${controlClass} sm:w-auto sm:min-w-[12rem]`} aria-label="Estado" onChange={(event) => update("estado", event.target.value)}>
-            <option value="PENDIENTE_VALIDAR">Pendiente de validación</option>
+            {showOrderFilters ? (
+              <>
+                <option value="PENDIENTE_AUTORIZACION">Pendiente de autorización</option>
+                <option value="AUTORIZADA">Autorizada</option>
+                <option value="RECHAZADA">Rechazada</option>
+                <option value="PROCESADA">Procesada</option>
+                <option value="CANCELADA">Cancelada</option>
+              </>
+            ) : (
+              <option value="PENDIENTE_VALIDAR">Pendiente de validación</option>
+            )}
           </select>
           <input name="fecha" type="date" value={filters.fecha} className={`${controlClass} sm:w-auto`} aria-label="Fecha" onChange={(event) => update("fecha", event.target.value)} />
           <select name="proveedor" value={filters.proveedor} className={`${controlClass} sm:min-w-[12rem] sm:flex-1`} aria-label="Proveedor" onChange={(event) => update("proveedor", event.target.value)}>
