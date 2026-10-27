@@ -18,6 +18,7 @@ export function PurchaseRegistrationModal({
   accounts,
   allowQuickSupplier,
   initiallyOpen = false,
+  showTrigger = true,
   returnHref = "/compras",
 }: {
   suppliers: PickerOption[];
@@ -25,6 +26,7 @@ export function PurchaseRegistrationModal({
   accounts: AccountOption[];
   allowQuickSupplier: boolean;
   initiallyOpen?: boolean;
+  showTrigger?: boolean;
   returnHref?: string;
 }) {
   const router = useRouter();
@@ -38,7 +40,7 @@ export function PurchaseRegistrationModal({
 
   return (
     <>
-      <Button type="button" onClick={() => setOpen(true)}>Registrar compra</Button>
+      {showTrigger ? <Button type="button" onClick={() => setOpen(true)}>Registrar compra</Button> : null}
       <FormOverlayDialog open={open} onClose={close} title="Registrar compra" titleId="registrar-compra-title" wide>
         <p className="mb-4 text-sm leading-6 text-[var(--muted)]">
           Registra una compra urgente ya realizada, sin requerimiento ni lista. La moneda se hereda del proveedor.

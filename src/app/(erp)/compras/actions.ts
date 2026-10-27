@@ -268,7 +268,7 @@ export async function phaseOnePurchaseAction(formData: FormData) {
     redirect(`/compras/${purchase.id}`);
   } catch (error) {
     await setFlash({ tone: "error", message: bubble(error) });
-    redirect(formData.get("order") === "si" ? "/compras/oc" : "/compras?registrar=1");
+    redirect(formData.get("order") === "si" ? "/compras/oc" : "/compras/nueva");
   }
 }
 

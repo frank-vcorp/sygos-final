@@ -22,8 +22,10 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
   const session = await requireCompany();
   if (!can(session.role, "purchase.operate", session.activeCompanyCode)) redirect("/inicio");
   const { vista, q, estado, fecha, categoria, proveedor, solicitante, registrar } = await searchParams;
+  if (registrar === "1") redirect("/compras/nueva");
   const query = (q ?? "").trim();
   const view = vista === "autorizar" ? "autorizar" : vista === "procesar" ? "procesar" : vista === "oc" ? "oc" : vista === "legacy" ? "legacy" : "compras";
+  const estadoCompras = view === "compras" ? (estado ?? "PENDIENTE_VALIDAR") : estado;
   const dateFilter = fecha ? { gte: new Date(`${fecha}T00:00:00`), lt: new Date(`${fecha}T23:59:59`) } : undefined;
   const where = view === "autorizar"
     ? { kind: "OC", status: "PENDIENTE_AUTORIZACION" }
@@ -33,7 +35,7 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
         ? { kind: "OC", status: { not: "ELIMINADA" } }
         : view === "legacy"
           ? { kind: "DIRECTA", status: { not: "ELIMINADA" } }
-          : { kind: "COMPRA", ...(estado ? { status: estado } : { status: { not: "ELIMINADA" } }) };
+          : { kind: "COMPRA", status: estadoCompras ?? { not: "ELIMINADA" } };
   const rows = await prisma.purchase.findMany({
     where: {
       companyId: session.activeCompanyId,
@@ -69,7 +71,7 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
   const filters = (omit?: "vista" | "q" | "estado" | "fecha" | "categoria" | "proveedor" | "solicitante") => purchaseListHref({
     vista: omit === "vista" ? undefined : view,
     q: omit === "q" ? undefined : query,
-    estado: omit === "estado" ? undefined : estado,
+    estado: omit === "estado" ? undefined : estadoCompras,
     fecha: omit === "fecha" ? undefined : fecha,
     categoria: omit === "categoria" ? undefined : categoria,
     proveedor: omit === "proveedor" ? undefined : proveedor,
@@ -88,7 +90,6 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
               categories={categories}
               accounts={accounts}
               allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)}
-              initiallyOpen={registrar === "1"}
               returnHref={filters()}
             />
           </div>
@@ -97,12 +98,12 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
       <PurchaseFilters
         vista={view}
         q={query}
-        estado={estado ?? ""}
+        estado={estadoCompras ?? ""}
         fecha={fecha ?? ""}
         categoria={categoria ?? ""}
         proveedor={proveedor ?? ""}
         solicitante={solicitante ?? ""}
-        tabs={tabs}
+        showPurchaseFilters={view === "compras"}
         suppliers={suppliers}
         categories={categories}
         requesters={requesters}
@@ -110,7 +111,7 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
       <ActiveFilters
         items={[
           ...(view !== "compras" ? [{ label: viewLabel, clearHref: filters("vista") }] : []),
-          ...(estado ? [{ label: STATUS[estado] ?? estado, clearHref: filters("estado") }] : []),
+          ...(view === "compras" && estadoCompras ? [{ label: STATUS[estadoCompras] ?? estadoCompras, clearHref: filters("estado") }] : []),
           ...(fecha ? [{ label: `Fecha: ${fecha}`, clearHref: filters("fecha") }] : []),
           ...(proveedor ? [{ label: `Proveedor: ${suppliers.find((supplier) => supplier.id === proveedor)?.name ?? "Seleccionado"}`, clearHref: filters("proveedor") }] : []),
           ...(categoria ? [{ label: `Categoría: ${categories.find((category) => category.id === categoria)?.name ?? "Seleccionada"}`, clearHref: filters("categoria") }] : []),
@@ -118,7 +119,6 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
           ...(query ? [{ label: `Búsqueda: ${query}`, clearHref: filters("q") }] : []),
         ]}
       />
-      <p className="mb-4 flex flex-wrap gap-2 text-sm"><ActionLink href="/compras/requerimientos" tone="ghost" className="min-h-9 px-2.5">Requerimientos</ActionLink><ActionLink href="/compras/listas" tone="ghost" className="min-h-9 px-2.5">Listas de compras</ActionLink><ActionLink href="/compras/oc" tone="ghost" className="min-h-9 px-2.5">Nueva O.C.</ActionLink></p>
       {rows.length === 0 ? <Empty title="Sin compras en esta vista" body="La compra directa consume el presupuesto del mes desde que se registra." /> : (
         <ResponsiveData
           table={

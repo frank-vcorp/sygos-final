@@ -13,6 +13,7 @@ export default async function ListasComprasPage({ searchParams }: { searchParams
   const session = await requireCompany();
   if (!can(session.role, "purchase.operate", session.activeCompanyCode)) redirect("/compras");
   const params = await searchParams;
+  if (params.nueva === "1") redirect("/compras/listas/nueva");
   const status = shoppingListStatusFilter(params.estado);
   const dateFilter = params.fecha ? { gte: new Date(`${params.fecha}T00:00:00`), lt: new Date(`${params.fecha}T23:59:59`) } : undefined;
   const [lists, suppliers] = await Promise.all([
@@ -25,8 +26,6 @@ export default async function ListasComprasPage({ searchParams }: { searchParams
     proveedor: omit === "proveedor" ? undefined : params.proveedor,
     fecha: omit === "fecha" ? undefined : params.fecha,
   });
-  const openCreate = params.nueva === "1";
-
   return (
     <>
       <PageHeader
@@ -37,7 +36,6 @@ export default async function ListasComprasPage({ searchParams }: { searchParams
           <ShoppingListCreateModal
             suppliers={suppliers}
             allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)}
-            initiallyOpen={openCreate}
           />
         }
       />

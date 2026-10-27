@@ -15,11 +15,13 @@ export function ShoppingListCreateModal({
   allowQuickSupplier,
   initiallyOpen = false,
   showTrigger = true,
+  returnHref = "/compras/listas",
 }: {
   suppliers: PickerOption[];
   allowQuickSupplier: boolean;
   initiallyOpen?: boolean;
   showTrigger?: boolean;
+  returnHref?: string;
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(initiallyOpen);
@@ -27,7 +29,7 @@ export function ShoppingListCreateModal({
 
   function close() {
     setOpen(false);
-    if (initiallyOpen) router.replace("/compras/listas");
+    if (initiallyOpen) router.replace(returnHref);
     requestAnimationFrame(() => triggerRef.current?.querySelector("button")?.focus());
   }
 

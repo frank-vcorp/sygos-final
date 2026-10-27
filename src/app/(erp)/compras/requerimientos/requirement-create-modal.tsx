@@ -14,34 +14,44 @@ export function RequirementCreateModal({
   shoppingListId,
   triggerLabel = "Nuevo requerimiento",
   triggerVariant = "button",
+  initiallyOpen = false,
+  showTrigger = true,
+  returnHref = "/compras/requerimientos",
 }: {
   defaultKind?: "GENERAL" | "REFACCION";
   lockKind?: boolean;
   shoppingListId?: string;
   triggerLabel?: string;
   triggerVariant?: "button" | "record";
+  initiallyOpen?: boolean;
+  showTrigger?: boolean;
+  returnHref?: string;
 }) {
-  const [open, setOpen] = useState(false);
+  const router = useRouter();
+  const [open, setOpen] = useState(initiallyOpen);
   const triggerRef = useRef<HTMLDivElement>(null);
 
   const close = () => {
     setOpen(false);
+    if (initiallyOpen) router.replace(returnHref);
     requestAnimationFrame(() => triggerRef.current?.querySelector("button")?.focus());
   };
 
   return (
     <>
-      <div ref={triggerRef}>
-        {triggerVariant === "record" ? (
-          <button type="button" className={recordLinkClass} onClick={() => setOpen(true)}>
-            {triggerLabel}
-          </button>
-        ) : (
-          <Button type="button" onClick={() => setOpen(true)}>
-            {triggerLabel}
-          </Button>
-        )}
-      </div>
+      {showTrigger ? (
+        <div ref={triggerRef}>
+          {triggerVariant === "record" ? (
+            <button type="button" className={recordLinkClass} onClick={() => setOpen(true)}>
+              {triggerLabel}
+            </button>
+          ) : (
+            <Button type="button" onClick={() => setOpen(true)}>
+              {triggerLabel}
+            </Button>
+          )}
+        </div>
+      ) : null}
       {open ? (
         <RequirementCreateDialog
           onClose={close}

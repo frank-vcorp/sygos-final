@@ -14,10 +14,10 @@ export function PurchaseFilters({
   categoria,
   proveedor,
   solicitante,
-  tabs,
   suppliers,
   categories,
   requesters,
+  showPurchaseFilters,
 }: {
   vista: string;
   q: string;
@@ -26,33 +26,22 @@ export function PurchaseFilters({
   categoria: string;
   proveedor: string;
   solicitante: string;
-  tabs: Array<readonly [string, string]>;
   suppliers: Option[];
   categories: Option[];
   requesters: Option[];
+  showPurchaseFilters: boolean;
 }) {
   const { filters, update, apply } = useAutoFilters({
     initialFilters: { vista, q, estado, fecha, categoria, proveedor, solicitante },
     toHref: purchaseListHref,
     debouncedKeys: ["q"],
   });
-  const isPurchaseView = filters.vista === "compras";
 
   return (
     <CompactFilterBar onSubmit={apply} className="lg:[&>select]:max-w-[13rem]">
-      <select
-        name="vista"
-        value={filters.vista}
-        aria-label="Vista de compras"
-        className={`${controlClass} sm:w-[13rem]`}
-        onChange={(event) => update("vista", event.target.value)}
-      >
-        {tabs.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-      </select>
-      {isPurchaseView ? (
+      {showPurchaseFilters ? (
         <>
           <select name="estado" value={filters.estado} className={`${controlClass} sm:w-auto sm:min-w-[12rem]`} aria-label="Estado" onChange={(event) => update("estado", event.target.value)}>
-            <option value="">Todos los estados</option>
             <option value="PENDIENTE_VALIDAR">Pendiente de validación</option>
           </select>
           <input name="fecha" type="date" value={filters.fecha} className={`${controlClass} sm:w-auto`} aria-label="Fecha" onChange={(event) => update("fecha", event.target.value)} />
@@ -70,6 +59,7 @@ export function PurchaseFilters({
           </select>
         </>
       ) : null}
+      <input type="hidden" name="vista" value={filters.vista} />
       <input
         name="q"
         value={filters.q}

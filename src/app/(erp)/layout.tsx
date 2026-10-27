@@ -73,7 +73,8 @@ const CREATE: Partial<Record<string, { href: string; show: NavLink["showCreate"]
   "/equipos": { href: "/equipos/nuevo", show: (role, code) => can(role, "equi.create", code) },
   "/motores": { href: "/motores/nuevo", show: (role, code) => can(role, "mot.create", code) },
   "/proveedores": { href: "/proveedores/nuevo", show: (role, code) => can(role, "supplier.operate", code) },
-  "/compras/listas": { href: "/compras/listas?nueva=1", show: (role, code) => can(role, "purchase.operate", code) },
+  "/compras/requerimientos": { href: "/compras/requerimientos/nuevo", show: (role, code) => can(role, "purchase.requirement.create", code) },
+  "/compras/listas": { href: "/compras/listas/nueva", show: (role, code) => can(role, "purchase.operate", code) },
 };
 
 function erpNavGroups(role: Parameters<typeof can>[0]): Array<{ title: string | null; direct?: boolean; links: NavLink[] }> {
