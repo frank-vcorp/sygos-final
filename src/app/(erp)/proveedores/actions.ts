@@ -1,3 +1,6 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { setFlash } from "@/lib/flash";
@@ -30,27 +33,53 @@ function supplierData(formData: FormData) {
   };
 }
 
+async function createSupplier(formData: FormData) {
+  const session = await guard();
+  const supplier = await prisma.supplier.create({
+    data: { ...supplierData(formData), companyId: session.activeCompanyId },
+  });
+  await recordHistory({
+    companyId: session.activeCompanyId,
+    entityType: "PROVEEDOR",
+    entityId: supplier.id,
+    action: "ALTA",
+    summary: "Proveedor creado.",
+    authorUserId: session.userId,
+  });
+  return supplier;
+}
+
 export async function createSupplierAction(formData: FormData) {
   "use server";
   try {
-    const session = await guard();
-    const supplier = await prisma.supplier.create({
-      data: { ...supplierData(formData), companyId: session.activeCompanyId },
-    });
-    await recordHistory({
-      companyId: session.activeCompanyId,
-      entityType: "PROVEEDOR",
-      entityId: supplier.id,
-      action: "ALTA",
-      summary: "Proveedor creado.",
-      authorUserId: session.userId,
-    });
+    const supplier = await createSupplier(formData);
     await setFlash({ tone: "ok", message: "Proveedor creado." });
     redirect(`/proveedores/${supplier.id}`);
   } catch (error) {
     if (isRedirect(error)) throw error;
     await setFlash({ tone: "error", message: messageOf(error) });
     redirect("/proveedores/nuevo");
+  }
+}
+
+export type CreateSupplierState =
+  | { status: "idle" }
+  | { status: "success" }
+  | { status: "error"; message: string };
+
+export async function createSupplierModalAction(
+  _previousState: CreateSupplierState,
+  formData: FormData,
+): Promise<CreateSupplierState> {
+  "use server";
+  try {
+    await createSupplier(formData);
+    await setFlash({ tone: "ok", message: "Proveedor creado." });
+    revalidatePath("/proveedores");
+    return { status: "success" };
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    return { status: "error", message: messageOf(error) };
   }
 }
 
