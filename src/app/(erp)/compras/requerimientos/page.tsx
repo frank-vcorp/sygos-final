@@ -1,9 +1,11 @@
 import { redirect } from "next/navigation";
-import { Button, controlClass, Empty, PageHeader, RecordLink, Table, Td, Th } from "@/components/ui";
+import { Empty, PageHeader, RecordLink, Table, Td, Th } from "@/components/ui";
 import { RequirementCreateModal } from "./requirement-create-modal";
+import { RequirementFilters } from "./requirement-filters";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
 import { can } from "@/lib/permissions";
+import { requirementStatusFilter } from "@/lib/requirement-filters";
 import { requireCompany } from "@/lib/session";
 
 export default async function ComprasRequerimientosPage({ searchParams }: { searchParams: Promise<{ estado?: string; solicitante?: string; fecha?: string }> }) {
@@ -12,9 +14,9 @@ export default async function ComprasRequerimientosPage({ searchParams }: { sear
   const canCreate = can(session.role, "purchase.requirement.create", session.activeCompanyCode);
   if (!canManage && !canCreate) redirect("/inicio");
   const params = await searchParams;
-  const status = params.estado && ["PENDIENTE", "EN_LISTA", "ATENDIDO", "CANCELADO"].includes(params.estado) ? params.estado : "PENDIENTE";
+  const status = requirementStatusFilter(params.estado);
   const rows = await prisma.requirement.findMany({
-    where: { companyId: session.activeCompanyId, status, ...(canManage || !canCreate ? {} : { requesterUserId: session.userId }), ...(params.solicitante ? { requesterUserId: params.solicitante } : {}), ...(params.fecha ? { createdAt: { gte: new Date(`${params.fecha}T00:00:00`), lt: new Date(`${params.fecha}T23:59:59`) } } : {}) },
+    where: { companyId: session.activeCompanyId, status, ...(canManage ? (params.solicitante ? { requesterUserId: params.solicitante } : {}) : { requesterUserId: session.userId }), ...(params.fecha ? { createdAt: { gte: new Date(`${params.fecha}T00:00:00`), lt: new Date(`${params.fecha}T23:59:59`) } } : {}) },
     orderBy: { createdAt: "desc" },
     take: 100,
   });
@@ -29,12 +31,7 @@ export default async function ComprasRequerimientosPage({ searchParams }: { sear
         subtitle="Solicitudes de compra y refacciones que el gerente convierte en pedido."
         action={canCreate ? <RequirementCreateModal /> : null}
       />
-      <form action="/compras/requerimientos" className="mb-6 grid gap-3 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-4 sm:grid-cols-4">
-        <select name="estado" defaultValue={status} className={controlClass}><option value="PENDIENTE">Pendientes</option><option value="EN_LISTA">En lista</option><option value="ATENDIDO">Atendidos</option><option value="CANCELADO">Cancelados</option></select>
-        <input name="solicitante" placeholder="Solicitante" defaultValue={params.solicitante ?? ""} className={controlClass} />
-        <input name="fecha" type="date" defaultValue={params.fecha ?? ""} className={controlClass} />
-        <Button type="submit" tone="ghost">Filtrar</Button>
-      </form>
+      <RequirementFilters estado={status} solicitante={params.solicitante ?? ""} fecha={params.fecha ?? ""} />
       {rows.length === 0 ? <Empty title={`Sin requerimientos ${status.toLowerCase()}`} body="Crea una solicitud sencilla con número de parte y cantidad." /> : groups.map((group) => (
         <section key={group.title} className="mb-6 overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--surface)]">
           <h2 className="border-b border-[var(--line)] px-4 py-3 text-sm font-semibold">{group.title}</h2>
