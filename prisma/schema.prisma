@@ -56,6 +56,7 @@ model Company {
   financeMovements FinanceMovement[]
   purchases        Purchase[]
   requirements     Requirement[]
+  shoppingLists    ShoppingList[]
   expenseCategories ExpenseCategory[]
   collaborators    Collaborator[]
   payrollPeriods   PayrollPeriod[]
@@ -203,6 +204,7 @@ model Supplier {
 
   payables Payable[]
   purchases Purchase[]
+  shoppingLists ShoppingList[]
 
   @@index([companyId, name])
 }
@@ -872,6 +874,9 @@ model Purchase {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
   lines            PurchaseLine[]
+  requirements     Requirement[]
+  shoppingListId   String?   @unique
+  shoppingList     ShoppingList? @relation("PurchaseFromList", fields: [shoppingListId], references: [id])
 
   @@unique([companyId, folio])
   @@index([companyId, status])
@@ -881,6 +886,10 @@ model PurchaseLine {
   id          String   @id @default(cuid())
   purchaseId  String
   purchase    Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  requirementId String?
+  requirement Requirement? @relation(fields: [requirementId], references: [id])
+  shoppingListLineId String? @unique
+  shoppingListLine ShoppingListLine? @relation(fields: [shoppingListLineId], references: [id])
   partNumber  String
   description String   @default("")
   quantity    Int      @default(1)
@@ -890,6 +899,7 @@ model PurchaseLine {
   updatedAt   DateTime @updatedAt
 
   @@index([purchaseId])
+  @@index([requirementId])
   @@index([sourceType, sourceId])
 }
 
@@ -900,15 +910,63 @@ model Requirement {
   partNumber      String
   description     String   @default("")
   quantity        Int
+  kind            String   @default("GENERAL")
   status          String   @default("PENDIENTE")
   requesterUserId String
   sourceType      String?
   sourceId        String?
+  shoppingListId  String?
+  shoppingList    ShoppingList? @relation(fields: [shoppingListId], references: [id])
+  purchaseId      String?
+  purchase        Purchase? @relation(fields: [purchaseId], references: [id])
+  shoppingListLine ShoppingListLine?
+  purchaseLines   PurchaseLine[]
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
   @@index([companyId, status])
   @@index([companyId, requesterUserId])
+  @@index([shoppingListId])
+  @@index([purchaseId])
+  @@unique([companyId, sourceType, sourceId])
+}
+
+model ShoppingList {
+  id              String   @id @default(cuid())
+  folio           String
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id])
+  status          String   @default("ABIERTA")
+  supplierId      String?
+  supplier        Supplier? @relation(fields: [supplierId], references: [id])
+  purchase        Purchase? @relation("PurchaseFromList")
+  requirements    Requirement[]
+  lines           ShoppingListLine[]
+  createdByUserId String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([companyId, folio])
+  @@index([companyId, status])
+}
+
+model ShoppingListLine {
+  id             String   @id @default(cuid())
+  shoppingListId String
+  shoppingList   ShoppingList @relation(fields: [shoppingListId], references: [id], onDelete: Cascade)
+  requirementId  String   @unique
+  requirement    Requirement @relation(fields: [requirementId], references: [id])
+  partNumber     String
+  description    String   @default("")
+  quantity       Int      @default(1)
+  sourceType     String?
+  sourceId       String?
+  purchaseLine   PurchaseLine?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([shoppingListId])
+  @@index([sourceType, sourceId])
 }
 
 model ExpenseCategory {

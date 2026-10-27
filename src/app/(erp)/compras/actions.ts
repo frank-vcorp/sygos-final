@@ -7,7 +7,7 @@ import { supplierIdFromForm } from "@/lib/form-quick-entities";
 import { optionalText, parseVersion, requiredText } from "@/lib/form";
 import { moneyFromForm } from "@/lib/money";
 import { can, type Action } from "@/lib/permissions";
-import { cancelOrder, changeAuthorizedOrder, confirmPhaseOnePurchase, createPhaseOnePurchase, createRequirement, decideOrder, discardDirectPurchase, editDirectPurchase, editRequirement, processPurchase, registerDirectPurchase, registerOrder, setRequirementStatus, addPurchaseLine, updatePurchaseLine } from "@/lib/purchases";
+import { addRequirementToShoppingList, cancelOrder, changeAuthorizedOrder, convertShoppingListToPurchase, createPhaseOnePurchase, createRequirement, decideOrder, discardDirectPurchase, editDirectPurchase, editRequirement, processPurchase, purchaseRequirement, registerDirectPurchase, registerOrder, removeShoppingListLine, setRequirementStatus, setShoppingListSupplier, updateShoppingListLine } from "@/lib/purchases";
 import { requireCompany } from "@/lib/session";
 
 async function guard(action: Action) {
@@ -159,6 +159,7 @@ export async function createRequirementAction(formData: FormData) {
       partNumber: requiredText(formData.get("partNumber"), "Número de parte"),
       description: optionalText(formData.get("description")) ?? "",
       quantity: Number(formData.get("quantity")),
+      kind: formData.get("kind") === "REFACCION" ? "REFACCION" : "GENERAL",
     });
     await setFlash({ tone: "ok", message: "Requerimiento creado." });
     redirect(`/compras/requerimientos?created=${requirement.id}`);
@@ -227,37 +228,99 @@ export async function phaseOnePurchaseAction(formData: FormData) {
       expenseCategory: requiredText(formData.get("expenseCategory"), "Categoría"),
       expenseSubcategory: optionalText(formData.get("expenseSubcategory")),
       paymentType: requiredText(formData.get("paymentType"), "Tipo de pago"),
+      accountId: optionalText(formData.get("accountId")),
       purchaseDate: new Date(requiredText(formData.get("purchaseDate"), "Fecha de compra")),
       amount: moneyFromForm(formData.get("amount")),
       lines,
-      planned: formData.get("planned") === "si",
       order: formData.get("order") === "si",
+      concept: optionalText(formData.get("concept")) ?? undefined,
     });
     await setFlash({ tone: "ok", message: `${purchase.folio} creada.` });
     redirect(`/compras/${purchase.id}`);
-  } catch (error) { await setFlash({ tone: "error", message: bubble(error) }); redirect("/compras/nueva"); }
+  } catch (error) {
+    await setFlash({ tone: "error", message: bubble(error) });
+    redirect(formData.get("order") === "si" ? "/compras/oc" : "/compras/registrar");
+  }
 }
 
-export async function confirmPhaseOnePurchaseAction(formData: FormData) {
-  "use server";
-  const id = requiredText(formData.get("purchaseId"), "Compra");
-  try { await confirmPhaseOnePurchase(await guard("purchase.operate"), id); await setFlash({ tone: "ok", message: "Compra confirmada y pendiente de validación." }); }
-  catch (error) { await setFlash({ tone: "error", message: bubble(error) }); }
-  redirect(`/compras/${id}`);
+function purchaseFinanceFromForm(formData: FormData) {
+  return {
+    supplierId: requiredText(formData.get("supplierId"), "Proveedor"),
+    expenseCategory: optionalText(formData.get("expenseCategory")),
+    expenseSubcategory: optionalText(formData.get("expenseSubcategory")),
+    paymentType: requiredText(formData.get("paymentType"), "Forma de pago"),
+    accountId: optionalText(formData.get("accountId")),
+    purchaseDate: new Date(requiredText(formData.get("purchaseDate"), "Fecha de compra")),
+    amount: moneyFromForm(formData.get("amount")),
+    concept: optionalText(formData.get("concept")) ?? "",
+  };
 }
 
-export async function addPurchaseLineAction(formData: FormData) {
-  "use server";
-  const id = requiredText(formData.get("purchaseId"), "Compra");
-  try { await addPurchaseLine(await guard("purchase.operate"), id, { partNumber: requiredText(formData.get("partNumber"), "Número de parte"), description: optionalText(formData.get("description")) ?? "", quantity: Number(formData.get("quantity")) }); await setFlash({ tone: "ok", message: "Partida agregada." }); }
-  catch (error) { await setFlash({ tone: "error", message: bubble(error) }); }
-  redirect(`/compras/${id}`);
+export async function purchaseRequirementAction(formData: FormData) {
+  const requirementId = requiredText(formData.get("requirementId"), "Requerimiento");
+  try {
+    const purchase = await purchaseRequirement(await guard("purchase.operate"), requirementId, purchaseFinanceFromForm(formData));
+    await setFlash({ tone: "ok", message: `${purchase.folio} creada desde el requerimiento.` });
+    redirect(`/compras/${purchase.id}`);
+  } catch (error) {
+    await setFlash({ tone: "error", message: bubble(error) });
+    redirect(`/compras/requerimientos/${requirementId}/comprar`);
+  }
 }
 
-export async function updatePurchaseLineAction(formData: FormData) {
-  "use server";
-  const id = requiredText(formData.get("purchaseId"), "Compra");
-  try { await updatePurchaseLine(await guard("purchase.operate"), requiredText(formData.get("lineId"), "Partida"), { partNumber: requiredText(formData.get("partNumber"), "Número de parte"), description: optionalText(formData.get("description")) ?? "", quantity: Number(formData.get("quantity")) }); await setFlash({ tone: "ok", message: "Partida actualizada." }); }
+export async function addToShoppingListAction(formData: FormData) {
+  const requirementId = requiredText(formData.get("requirementId"), "Requerimiento");
+  try {
+    const list = await addRequirementToShoppingList(await guard("purchase.operate"), requirementId, {
+      shoppingListId: optionalText(formData.get("shoppingListId")),
+      supplierId: optionalText(formData.get("supplierId")),
+      partNumber: requiredText(formData.get("partNumber"), "Número de parte"),
+      description: optionalText(formData.get("description")) ?? "",
+      quantity: Number(formData.get("quantity")),
+    });
+    await setFlash({ tone: "ok", message: `${requirementId} se agregó a ${list.folio}.` });
+    redirect(`/compras/listas/${list.id}`);
+  } catch (error) {
+    await setFlash({ tone: "error", message: bubble(error) });
+    redirect(`/compras/requerimientos/${requirementId}/agregar-a-lista`);
+  }
+}
+
+export async function updateShoppingListLineAction(formData: FormData) {
+  const listId = requiredText(formData.get("listId"), "Lista");
+  try {
+    await updateShoppingListLine(await guard("purchase.operate"), requiredText(formData.get("lineId"), "Partida"), {
+      partNumber: requiredText(formData.get("partNumber"), "Número de parte"),
+      description: optionalText(formData.get("description")) ?? "",
+      quantity: Number(formData.get("quantity")),
+    });
+    await setFlash({ tone: "ok", message: "Partida actualizada." });
+  } catch (error) { await setFlash({ tone: "error", message: bubble(error) }); }
+  redirect(`/compras/listas/${listId}`);
+}
+
+export async function removeShoppingListLineAction(formData: FormData) {
+  const listId = requiredText(formData.get("listId"), "Lista");
+  try { await removeShoppingListLine(await guard("purchase.operate"), requiredText(formData.get("lineId"), "Partida")); await setFlash({ tone: "ok", message: "Partida retirada; el requerimiento volvió a pendiente." }); }
   catch (error) { await setFlash({ tone: "error", message: bubble(error) }); }
-  redirect(`/compras/${id}`);
+  redirect(`/compras/listas/${listId}`);
+}
+
+export async function setShoppingListSupplierAction(formData: FormData) {
+  const listId = requiredText(formData.get("listId"), "Lista");
+  try { await setShoppingListSupplier(await guard("purchase.operate"), listId, optionalText(formData.get("supplierId"))); await setFlash({ tone: "ok", message: "Proveedor actualizado." }); }
+  catch (error) { await setFlash({ tone: "error", message: bubble(error) }); }
+  redirect(`/compras/listas/${listId}`);
+}
+
+export async function convertShoppingListAction(formData: FormData) {
+  const listId = requiredText(formData.get("listId"), "Lista");
+  try {
+    const purchase = await convertShoppingListToPurchase(await guard("purchase.operate"), listId, purchaseFinanceFromForm(formData));
+    await setFlash({ tone: "ok", message: `${purchase.folio} creada desde la lista.` });
+    redirect(`/compras/${purchase.id}`);
+  } catch (error) {
+    await setFlash({ tone: "error", message: bubble(error) });
+    redirect(`/compras/listas/${listId}`);
+  }
 }

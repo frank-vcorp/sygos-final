@@ -100,6 +100,7 @@ export async function createPartRequestWithReservation(
     link: string | null;
     qtyRequested: number;
     inventoryPartId?: string | null;
+    requesterUserId: string;
   },
 ) {
   const reserve = await reserveInventoryForPartRequest(tx, {
@@ -122,6 +123,25 @@ export async function createPartRequestWithReservation(
       qtyRequested: input.qtyRequested,
       qtyReserved: reserve.qtyReserved,
       status,
+    },
+  });
+  await tx.requirement.upsert({
+    where: { companyId_sourceType_sourceId: { companyId: input.companyId, sourceType: "OS", sourceId: request.id } },
+    update: {
+      partNumber: request.partNumber,
+      description: request.description,
+      quantity: request.qtyRequested,
+      kind: "REFACCION",
+    },
+    create: {
+      companyId: input.companyId,
+      partNumber: request.partNumber,
+      description: request.description,
+      quantity: request.qtyRequested,
+      kind: "REFACCION",
+      requesterUserId: input.requesterUserId,
+      sourceType: "OS",
+      sourceId: request.id,
     },
   });
   await syncTechnicalCaseRefaccionesWait(tx, input.caseId);

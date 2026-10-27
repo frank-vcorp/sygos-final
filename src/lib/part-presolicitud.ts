@@ -128,6 +128,7 @@ export async function promotePartPresolicitudesToRepairOrder(
         description: need.description,
         link: need.link,
         qtyRequested: need.qtyRequested,
+        requesterUserId: authorUserId,
       });
       await tx.partPresolicitud.update({
         where: { id: need.id },

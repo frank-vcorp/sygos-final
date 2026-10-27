@@ -533,6 +533,7 @@ export async function requestPart(
       link: input.link,
       qtyRequested: input.quantity,
       inventoryPartId: input.inventoryPartId,
+      requesterUserId: actor.userId,
     });
   });
 }
