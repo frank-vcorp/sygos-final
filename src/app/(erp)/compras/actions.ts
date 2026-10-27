@@ -165,7 +165,7 @@ export async function createRequirementAction(
     const session = await requireCompany();
     if (!can(session.role, "purchase.requirement.create", session.activeCompanyCode)) throw new Error("Los Técnicos deben solicitar refacciones desde OS o DX.");
     const kind = formData.get("kind") === "REFACCION" ? "REFACCION" : "GENERAL";
-    await createRequirement(session, {
+    const requirement = await createRequirement(session, {
       partNumber: requirementPartNumberRequired(kind)
         ? requiredText(formData.get("partNumber"), "Número de parte")
         : optionalText(formData.get("partNumber")) ?? "",
@@ -173,7 +173,22 @@ export async function createRequirementAction(
       quantity: Number(formData.get("quantity")),
       kind,
     });
-    await setFlash({ tone: "ok", message: "Requerimiento creado." });
+    const shoppingListId = optionalText(formData.get("shoppingListId"));
+    if (shoppingListId) {
+      if (!can(session.role, "purchase.operate", session.activeCompanyCode)) {
+        throw new Error("No puedes agregar partidas a una lista de compras.");
+      }
+      await addRequirementToShoppingList(session, requirement.id, {
+        shoppingListId,
+        partNumber: requirement.partNumber,
+        description: requirement.description,
+        quantity: requirement.quantity,
+      });
+      await setFlash({ tone: "ok", message: "Requerimiento agregado a la lista." });
+      revalidatePath(`/compras/listas/${shoppingListId}`);
+    } else {
+      await setFlash({ tone: "ok", message: "Requerimiento creado." });
+    }
     revalidatePath("/compras/requerimientos");
     return { status: "success" };
   } catch (error) {
@@ -365,6 +380,39 @@ function partNumberFromRequirementForm(formData: FormData) {
   return requirementPartNumberRequired(kind)
     ? requiredText(formData.get("partNumber"), "Número de parte")
     : optionalText(formData.get("partNumber")) ?? "";
+}
+
+export async function updateShoppingListLineSilentAction(input: {
+  listId: string;
+  lineId: string;
+  partNumber: string;
+  description: string;
+  quantity: number;
+}): Promise<{ ok: true } | { ok: false; message: string }> {
+  try {
+    await updateShoppingListLine(await guard("purchase.operate"), input.lineId, {
+      partNumber: input.partNumber,
+      description: input.description,
+      quantity: input.quantity,
+    });
+    revalidatePath(`/compras/listas/${input.listId}`);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, message: bubble(error) };
+  }
+}
+
+export async function setShoppingListSupplierSilentAction(
+  listId: string,
+  supplierId: string | null,
+): Promise<{ ok: true } | { ok: false; message: string }> {
+  try {
+    await setShoppingListSupplier(await guard("purchase.operate"), listId, supplierId);
+    revalidatePath(`/compras/listas/${listId}`);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, message: bubble(error) };
+  }
 }
 
 export async function updateShoppingListLineAction(formData: FormData) {
