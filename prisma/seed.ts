@@ -5,6 +5,7 @@ import { catalogKey } from "../src/lib/catalog-key";
 import { hashPassword, verifyPassword } from "../src/lib/crypto";
 import { initialPriorities } from "../src/lib/priorities";
 import { DEFAULT_MONTHLY_PURCHASE, DEFAULT_PURCHASE_LIMIT, isPurchaseManager, type Role } from "../src/lib/roles";
+import { seedSystronExpenseCatalog } from "./seed-systron-finance-catalog";
 
 const prisma = new PrismaClient();
 
@@ -43,14 +44,9 @@ async function main() {
     },
   });
 
+  await seedSystronExpenseCatalog(prisma, systron.id);
+
   for (const companyId of [systron.id, servomotores.id]) {
-    for (const name of ["Refacciones", "Mantenimiento", "Operación", "Servicios"]) {
-      await prisma.expenseCategory.upsert({
-        where: { companyId_name: { companyId, name } },
-        update: { active: true },
-        create: { companyId, name },
-      });
-    }
     for (const account of [
       { suffix: "caja", name: "Caja", kind: "EFECTIVO" },
       { suffix: "banco", name: "Banco", kind: "BANCO" },
