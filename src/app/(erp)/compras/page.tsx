@@ -95,7 +95,6 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
                 returnHref={filters()}
               />
             ) : null}
-            {view === "compras" ? <ActionLink href="/compras/listas" tone="ghost">Listas de compras</ActionLink> : null}
             {view === "compras" ? (
             <PurchaseRegistrationModal
               suppliers={suppliers.map((supplier) => ({ id: supplier.id, name: `${supplier.name} · ${supplier.currency}` }))}
