@@ -27,6 +27,7 @@ import {
 import type { ExpenseCategoryCatalogItem } from "@/lib/expense-catalog";
 import type { RequirementListContext } from "@/lib/requirement-list-enrichment";
 import { requirementPartidaLabel, requirementPartNumberRequired } from "@/lib/requirement-display";
+import { normalizeShoppingListKind } from "@/lib/shopping-list-display";
 import type { PickerOption } from "@/components/searchable-entity-picker";
 
 export type RequirementListRow = {
@@ -45,6 +46,7 @@ export type RequirementListRow = {
 type ShoppingListOption = {
   id: string;
   folio: string;
+  kind: string;
   supplierId: string | null;
   supplierName: string | null;
 };
@@ -251,7 +253,12 @@ function RequirementAddToListDialog({
         <input type="hidden" name="requirementId" value={row.id} />
         <input type="hidden" name="requirementKind" value={row.kind} />
         <FormSection title="Lista y partida">
-          <ShoppingListSelection lists={shoppingLists} suppliers={suppliers} allowQuickSupplier={allowQuickSupplier} />
+          <ShoppingListSelection
+            lists={shoppingLists}
+            suppliers={suppliers}
+            allowQuickSupplier={allowQuickSupplier}
+            listKind={normalizeShoppingListKind(row.kind)}
+          />
           <Field label="Número de parte">
             <input name="partNumber" defaultValue={row.partNumber} required={partRequired} className={controlClass} />
           </Field>

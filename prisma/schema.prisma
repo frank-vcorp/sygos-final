@@ -943,6 +943,7 @@ model ShoppingList {
   folio           String
   companyId       String
   company         Company  @relation(fields: [companyId], references: [id])
+  kind            String   @default("GENERAL")
   status          String   @default("ABIERTA")
   supplierId      String?
   supplier        Supplier? @relation(fields: [supplierId], references: [id])

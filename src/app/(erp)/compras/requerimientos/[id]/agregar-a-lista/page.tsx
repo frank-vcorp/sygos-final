@@ -4,6 +4,7 @@ import { Button, controlClass, Field, FormActions, FormPanel, FormSection, PageH
 import { ShoppingListSelection } from "@/components/shopping-list-selection";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
+import { normalizeShoppingListKind } from "@/lib/shopping-list-display";
 import { requireCompany } from "@/lib/session";
 
 export default async function AgregarAListaPage({ params }: { params: Promise<{ id: string }> }) {
@@ -21,9 +22,10 @@ export default async function AgregarAListaPage({ params }: { params: Promise<{ 
       <input type="hidden" name="requirementKind" value={requirement.kind} />
       <FormSection title="Lista y partida">
         <ShoppingListSelection
-          lists={lists.map((list) => ({ id: list.id, folio: list.folio, supplierId: list.supplierId, supplierName: list.supplier?.name ?? null }))}
+          lists={lists.map((list) => ({ id: list.id, folio: list.folio, kind: list.kind, supplierId: list.supplierId, supplierName: list.supplier?.name ?? null }))}
           suppliers={suppliers}
           allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)}
+          listKind={normalizeShoppingListKind(requirement.kind)}
         />
         <Field label="Número de parte"><input name="partNumber" defaultValue={requirement.partNumber} required={requirement.kind === "REFACCION"} className={controlClass} /></Field>
         <Field label="Descripción"><input name="description" defaultValue={requirement.description} className={controlClass} /></Field>

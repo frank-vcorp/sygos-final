@@ -5,6 +5,7 @@ import { recordHistory } from "./history";
 import { DEFAULT_MONTHLY_PURCHASE, DEFAULT_PURCHASE_LIMIT } from "./roles";
 import type { Role } from "./roles";
 import { requirementPartNumberRequired } from "./requirement-display";
+import { normalizeShoppingListKind } from "./shopping-list-display";
 
 export { requirementPartNumberRequired } from "./requirement-display";
 
@@ -570,6 +571,24 @@ export async function purchaseRequirement(actor: Actor, requirementId: string, i
   return purchase;
 }
 
+export async function createShoppingList(
+  actor: Actor,
+  input: { kind: "GENERAL" | "REFACCION"; supplierId?: string | null },
+) {
+  if (input.supplierId) await supplierForPurchase(actor, input.supplierId);
+  const folio = await allocateFolio(actor.activeCompanyId, "LC");
+  return prisma.shoppingList.create({
+    data: {
+      folio,
+      companyId: actor.activeCompanyId,
+      kind: input.kind,
+      status: "ABIERTA",
+      supplierId: input.supplierId ?? null,
+      createdByUserId: actor.userId,
+    },
+  });
+}
+
 export async function addRequirementToShoppingList(
   actor: Actor,
   requirementId: string,
@@ -582,16 +601,20 @@ export async function addRequirementToShoppingList(
     throw new Error("Indica número de parte o descripción.");
   }
   if (!Number.isInteger(input.quantity) || input.quantity < 1) throw new Error("La partida no es válida.");
+  const requirementKind = normalizeShoppingListKind(requirement.kind);
   let list = input.shoppingListId
     ? await prisma.shoppingList.findFirst({ where: { id: input.shoppingListId, companyId: actor.activeCompanyId, status: "ABIERTA" } })
     : null;
   if (input.shoppingListId && !list) throw new Error("La lista de compras ya no está abierta.");
+  if (list && normalizeShoppingListKind(list.kind) !== requirementKind) {
+    throw new Error("El requerimiento no coincide con el tipo de la lista.");
+  }
   const supplierId = shoppingListSupplierId(list?.supplierId ?? null, input.supplierId);
   if (supplierId) await supplierForPurchase(actor, supplierId);
   if (!list) {
     const folio = await allocateFolio(actor.activeCompanyId, "LC");
     list = await prisma.shoppingList.create({
-      data: { folio, companyId: actor.activeCompanyId, status: "ABIERTA", supplierId, createdByUserId: actor.userId },
+      data: { folio, companyId: actor.activeCompanyId, kind: requirementKind, status: "ABIERTA", supplierId, createdByUserId: actor.userId },
     });
   } else if (!list.supplierId && supplierId) {
     list = await prisma.shoppingList.update({ where: { id: list.id }, data: { supplierId } });
@@ -638,7 +661,8 @@ export async function convertShoppingListToPurchase(actor: Actor, listId: string
     include: { lines: { include: { requirement: { select: { kind: true, description: true, partNumber: true } } } } },
   });
   if (!list || !list.lines.length) throw new Error("La lista debe tener al menos una partida antes de convertirla.");
-  const onlyRefacciones = !requirementsNeedExpenseSelection(list.lines.map((line) => line.requirement.kind));
+  const onlyRefacciones = normalizeShoppingListKind(list.kind) === "REFACCION"
+    || !requirementsNeedExpenseSelection(list.lines.map((line) => line.requirement.kind));
   const finance = await validFinanceInput(
     actor,
     { ...input, supplierId: input.supplierId || list.supplierId || "" },

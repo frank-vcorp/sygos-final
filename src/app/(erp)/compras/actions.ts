@@ -8,7 +8,7 @@ import { supplierIdFromForm } from "@/lib/form-quick-entities";
 import { optionalText, parseVersion, requiredText } from "@/lib/form";
 import { moneyFromForm } from "@/lib/money";
 import { can, type Action } from "@/lib/permissions";
-import { addRequirementToShoppingList, cancelOrder, changeAuthorizedOrder, convertShoppingListToPurchase, createPhaseOnePurchase, createRequirement, decideOrder, discardDirectPurchase, editDirectPurchase, editRequirement, processPurchase, purchaseRequirement, registerDirectPurchase, registerOrder, removeShoppingListLine, requirementPartNumberRequired, setRequirementStatus, setShoppingListSupplier, updateShoppingListLine } from "@/lib/purchases";
+import { addRequirementToShoppingList, cancelOrder, changeAuthorizedOrder, convertShoppingListToPurchase, createPhaseOnePurchase, createRequirement, createShoppingList, decideOrder, discardDirectPurchase, editDirectPurchase, editRequirement, processPurchase, purchaseRequirement, registerDirectPurchase, registerOrder, removeShoppingListLine, requirementPartNumberRequired, setRequirementStatus, setShoppingListSupplier, updateShoppingListLine } from "@/lib/purchases";
 import { requireCompany } from "@/lib/session";
 
 async function guard(action: Action) {
@@ -283,6 +283,10 @@ function purchaseRequirementFinanceFromForm(formData: FormData) {
   };
 }
 
+function convertShoppingListFinanceFromForm(formData: FormData) {
+  return purchaseRequirementFinanceFromForm(formData);
+}
+
 export type RequirementOverlayState =
   | { status: "idle" }
   | { status: "success"; message: string }
@@ -393,11 +397,52 @@ export async function setShoppingListSupplierAction(formData: FormData) {
 export async function convertShoppingListAction(formData: FormData) {
   const listId = requiredText(formData.get("listId"), "Lista");
   try {
-    const purchase = await convertShoppingListToPurchase(await guard("purchase.operate"), listId, purchaseFinanceFromForm(formData));
+    const purchase = await convertShoppingListToPurchase(await guard("purchase.operate"), listId, convertShoppingListFinanceFromForm(formData));
     await setFlash({ tone: "ok", message: `${purchase.folio} creada desde la lista.` });
     redirect(`/compras/${purchase.id}`);
   } catch (error) {
     await setFlash({ tone: "error", message: bubble(error) });
     redirect(`/compras/listas/${listId}`);
+  }
+}
+
+export type CreateShoppingListState =
+  | { status: "idle" }
+  | { status: "success"; listId: string }
+  | { status: "error"; message: string };
+
+export async function createShoppingListAction(
+  _previousState: CreateShoppingListState,
+  formData: FormData,
+): Promise<CreateShoppingListState> {
+  "use server";
+  try {
+    const session = await guard("purchase.operate");
+    const list = await createShoppingList(session, {
+      kind: formData.get("kind") === "REFACCION" ? "REFACCION" : "GENERAL",
+      supplierId: optionalText(formData.get("supplierId")),
+    });
+    await setFlash({ tone: "ok", message: `${list.folio} creada.` });
+    revalidatePath("/compras/listas");
+    return { status: "success", listId: list.id };
+  } catch (error) {
+    return { status: "error", message: bubble(error) };
+  }
+}
+
+export async function convertShoppingListOverlayAction(
+  _previousState: RequirementOverlayState,
+  formData: FormData,
+): Promise<RequirementOverlayState> {
+  "use server";
+  const listId = requiredText(formData.get("listId"), "Lista");
+  try {
+    const purchase = await convertShoppingListToPurchase(await guard("purchase.operate"), listId, convertShoppingListFinanceFromForm(formData));
+    await setFlash({ tone: "ok", message: `${purchase.folio} creada desde la lista.` });
+    revalidatePath("/compras/listas");
+    revalidatePath(`/compras/listas/${listId}`);
+    return { status: "success", message: `${purchase.folio} registrada.` };
+  } catch (error) {
+    return { status: "error", message: bubble(error) };
   }
 }

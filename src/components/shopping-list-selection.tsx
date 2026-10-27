@@ -8,6 +8,7 @@ import type { PickerOption } from "@/components/searchable-entity-picker";
 type ShoppingListOption = {
   id: string;
   folio: string;
+  kind: string;
   supplierId: string | null;
   supplierName: string | null;
 };
@@ -16,21 +17,25 @@ export function ShoppingListSelection({
   lists,
   suppliers,
   allowQuickSupplier,
+  listKind,
 }: {
   lists: ShoppingListOption[];
   suppliers: PickerOption[];
   allowQuickSupplier: boolean;
+  listKind: "GENERAL" | "REFACCION";
 }) {
   const [listId, setListId] = useState("");
-  const selectedList = lists.find((list) => list.id === listId);
+  const compatibleLists = lists.filter((list) => list.kind === listKind);
+  const selectedList = compatibleLists.find((list) => list.id === listId);
   const inheritedSupplier = selectedList?.supplierId ? { id: selectedList.supplierId, name: selectedList.supplierName } : null;
 
   return (
     <>
+      <input type="hidden" name="listKind" value={listKind} />
       <Field label="Lista de compras">
         <select name="shoppingListId" value={listId} onChange={(event) => setListId(event.target.value)} className={controlClass}>
           <option value="">Crear nueva lista</option>
-          {lists.map((list) => <option key={list.id} value={list.id}>{list.folio}{list.supplierName ? ` — ${list.supplierName}` : ""}</option>)}
+          {compatibleLists.map((list) => <option key={list.id} value={list.id}>{list.folio}{list.supplierName ? ` — ${list.supplierName}` : ""}</option>)}
         </select>
       </Field>
       {inheritedSupplier ? (

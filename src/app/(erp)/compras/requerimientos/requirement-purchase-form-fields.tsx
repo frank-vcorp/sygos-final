@@ -15,29 +15,43 @@ export function RequirementPurchaseFormFields({
   accounts,
   allowQuickSupplier,
   refaccion,
+  fixedSupplierId = null,
+  fixedSupplierName = null,
+  supplierRequired = true,
 }: {
   suppliers: SupplierWithCurrency[];
   categories: ExpenseCategoryCatalogItem[];
   accounts: Array<{ id: string; name: string }>;
   allowQuickSupplier: boolean;
   refaccion: boolean;
+  fixedSupplierId?: string | null;
+  fixedSupplierName?: string | null;
+  supplierRequired?: boolean;
 }) {
-  const [supplierId, setSupplierId] = useState("");
+  const [supplierId, setSupplierId] = useState(fixedSupplierId ?? "");
   const currency = useMemo(
-    () => suppliers.find((row) => row.id === supplierId)?.currency ?? "MXN",
-    [supplierId, suppliers],
+    () => suppliers.find((row) => row.id === (fixedSupplierId || supplierId))?.currency ?? "MXN",
+    [fixedSupplierId, supplierId, suppliers],
   );
 
   return (
     <FormSection title="Datos de compra" description="La moneda se hereda del proveedor. La fecha de compra se registra al guardar.">
-      <div className="md:col-span-2">
-        <SupplierPicker
-          suppliers={suppliers}
-          required
-          allowQuickSupplier={allowQuickSupplier}
-          onSupplierChange={setSupplierId}
-        />
-      </div>
+      {fixedSupplierId ? (
+        <div className="md:col-span-2 rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm">
+          <input type="hidden" name="supplierId" value={fixedSupplierId} />
+          <span className="text-[var(--muted)]">Proveedor</span>
+          <strong className="ml-2">{fixedSupplierName ?? "—"}</strong>
+        </div>
+      ) : (
+        <div className="md:col-span-2">
+          <SupplierPicker
+            suppliers={suppliers}
+            required={supplierRequired}
+            allowQuickSupplier={allowQuickSupplier}
+            onSupplierChange={setSupplierId}
+          />
+        </div>
+      )}
       <Field label="Monto" hint={`Importe en ${currency}.`}>
         <MoneyInput key={currency} name="amount" currency={currency} min="0.01" required />
       </Field>

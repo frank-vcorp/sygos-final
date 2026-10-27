@@ -81,6 +81,7 @@ export default async function ComprasRequerimientosPage({ searchParams }: { sear
             shoppingLists={shoppingLists.map((list) => ({
               id: list.id,
               folio: list.folio,
+              kind: list.kind,
               supplierId: list.supplierId,
               supplierName: list.supplier?.name ?? null,
             }))}
