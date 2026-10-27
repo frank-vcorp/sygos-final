@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import { addToShoppingListAction } from "../../../actions";
 import { Button, controlClass, Field, FormActions, FormPanel, FormSection, PageHeader } from "@/components/ui";
-import { SupplierPicker } from "@/components/supplier-picker";
+import { ShoppingListSelection } from "@/components/shopping-list-selection";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
@@ -19,8 +19,11 @@ export default async function AgregarAListaPage({ params }: { params: Promise<{ 
   return <><PageHeader back={{ href: "/compras/requerimientos", label: "Requerimientos" }} title="Agregar a lista" subtitle="Ajusta la partida y elige una lista abierta o crea una nueva." />
     <FormPanel action={addToShoppingListAction}><input type="hidden" name="requirementId" value={requirement.id} />
       <FormSection title="Lista y partida">
-        <Field label="Lista de compras"><select name="shoppingListId" defaultValue="" className={controlClass}><option value="">Crear nueva lista</option>{lists.map((list) => <option key={list.id} value={list.id}>{list.folio}{list.supplier ? ` — ${list.supplier.name}` : ""}</option>)}</select></Field>
-        <div className="md:col-span-2"><SupplierPicker suppliers={suppliers} allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)} allowEmpty emptyLabel="Sin proveedor por ahora" /></div>
+        <ShoppingListSelection
+          lists={lists.map((list) => ({ id: list.id, folio: list.folio, supplierId: list.supplierId, supplierName: list.supplier?.name ?? null }))}
+          suppliers={suppliers}
+          allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)}
+        />
         <Field label="Número de parte"><input name="partNumber" defaultValue={requirement.partNumber} required className={controlClass} /></Field>
         <Field label="Descripción"><input name="description" defaultValue={requirement.description} className={controlClass} /></Field>
         <Field label="Cantidad"><input name="quantity" type="number" min="1" defaultValue={requirement.quantity} required className={controlClass} /></Field>

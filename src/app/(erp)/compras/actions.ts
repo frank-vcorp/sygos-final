@@ -245,7 +245,7 @@ export async function phaseOnePurchaseAction(formData: FormData) {
 
 function purchaseFinanceFromForm(formData: FormData) {
   return {
-    supplierId: requiredText(formData.get("supplierId"), "Proveedor"),
+    supplierId: optionalText(formData.get("supplierId")) ?? "",
     expenseCategoryId: optionalText(formData.get("expenseCategoryId")),
     expenseSubcategoryId: optionalText(formData.get("expenseSubcategoryId")),
     paymentType: requiredText(formData.get("paymentType"), "Forma de pago"),

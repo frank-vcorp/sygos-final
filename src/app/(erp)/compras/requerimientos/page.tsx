@@ -18,6 +18,10 @@ export default async function ComprasRequerimientosPage({ searchParams }: { sear
     orderBy: { createdAt: "desc" },
     take: 100,
   });
+  const groups = [
+    { title: "Refacciones", rows: rows.filter((row) => row.kind === "REFACCION") },
+    { title: "Generales", rows: rows.filter((row) => row.kind !== "REFACCION") },
+  ].filter((group) => group.rows.length);
   return (
     <>
       <PageHeader
@@ -31,11 +35,14 @@ export default async function ComprasRequerimientosPage({ searchParams }: { sear
         <input name="fecha" type="date" defaultValue={params.fecha ?? ""} className={controlClass} />
         <Button type="submit" tone="ghost">Filtrar</Button>
       </form>
-      {rows.length === 0 ? <Empty title={`Sin requerimientos ${status.toLowerCase()}`} body="Crea una solicitud sencilla con número de parte y cantidad." /> : (
-        <Table><thead><tr><Th>Fecha</Th><Th>Grupo y partida</Th><Th>Cantidad</Th><Th>Estado</Th>{canManage ? <Th>Acciones</Th> : null}</tr></thead><tbody>
-          {rows.map((row) => <tr key={row.id}><Td>{formatWhen(row.createdAt)}</Td><Td><span className="text-xs font-semibold text-[var(--muted)]">{row.kind === "REFACCION" ? "Refacciones" : "Generales"}</span><strong className="block">{row.partNumber}</strong>{row.description ? <span className="block text-sm text-[var(--muted)]">{row.description}</span> : null}</Td><Td>{row.quantity}</Td><Td>{row.status === "EN_LISTA" ? "En lista" : row.status}</Td>{canManage ? <Td className="flex gap-2">{row.status === "PENDIENTE" ? <><RecordLink href={`/compras/requerimientos/${row.id}/comprar`}>Comprar</RecordLink><RecordLink href={`/compras/requerimientos/${row.id}/agregar-a-lista`}>Agregar a lista</RecordLink></> : row.shoppingListId ? <RecordLink href={`/compras/listas/${row.shoppingListId}`}>Ver lista</RecordLink> : row.purchaseId ? <RecordLink href={`/compras/${row.purchaseId}`}>Ver compra</RecordLink> : null}</Td> : null}</tr>)}
-        </tbody></Table>
-      )}
+      {rows.length === 0 ? <Empty title={`Sin requerimientos ${status.toLowerCase()}`} body="Crea una solicitud sencilla con número de parte y cantidad." /> : groups.map((group) => (
+        <section key={group.title} className="mb-6 overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--surface)]">
+          <h2 className="border-b border-[var(--line)] px-4 py-3 text-sm font-semibold">{group.title}</h2>
+          <Table><thead><tr><Th>Fecha</Th><Th>Partida</Th><Th>Cantidad</Th><Th>Estado</Th>{canManage ? <Th>Acciones</Th> : null}</tr></thead><tbody>
+            {group.rows.map((row) => <tr key={row.id}><Td>{formatWhen(row.createdAt)}</Td><Td><strong>{row.partNumber}</strong>{row.description ? <span className="block text-sm text-[var(--muted)]">{row.description}</span> : null}</Td><Td>{row.quantity}</Td><Td>{row.status === "EN_LISTA" ? "En lista" : row.status}</Td>{canManage ? <Td className="flex gap-2">{row.status === "PENDIENTE" ? <><RecordLink href={`/compras/requerimientos/${row.id}/comprar`}>Comprar</RecordLink><RecordLink href={`/compras/requerimientos/${row.id}/agregar-a-lista`}>Agregar a lista</RecordLink></> : row.shoppingListId ? <RecordLink href={`/compras/listas/${row.shoppingListId}`}>Ver lista</RecordLink> : row.purchaseId ? <RecordLink href={`/compras/${row.purchaseId}`}>Ver compra</RecordLink> : null}</Td> : null}</tr>)}
+          </tbody></Table>
+        </section>
+      ))}
       {canCreate ? <FormPanel id="nuevo-requerimiento" action={createRequirementAction} className="mt-8 scroll-mt-24"><FormSection title="Nuevo requerimiento" description="La clasificación financiera ocurre al registrar la compra."><Field label="Tipo"><select name="kind" defaultValue="GENERAL" className={controlClass}><option value="GENERAL">General</option><option value="REFACCION">Refacción</option></select></Field><Field label="Número de parte"><input name="partNumber" required className={controlClass} /></Field><Field label="Descripción"><input name="description" className={controlClass} /></Field><Field label="Cantidad"><input name="quantity" type="number" min="1" defaultValue="1" required className={controlClass} /></Field></FormSection><FormActions><Button type="submit">Guardar requerimiento</Button></FormActions></FormPanel> : null}
     </>
   );

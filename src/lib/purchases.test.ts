@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { purchaseMovementDetails, requirementStatusAfter, selectExpenseCatalog, sourceRequirementIsDuplicate, withinDirectLimits } from "./purchases";
+import { purchaseMovementDetails, requirementStatusAfter, requirementsNeedExpenseSelection, selectExpenseCatalog, shoppingListSupplierId, sourceRequirementIsDuplicate, withinDirectLimits } from "./purchases";
 
 describe("compra directa", () => {
   it("exige límite individual y presupuesto del mes al mismo tiempo", () => {
@@ -21,6 +21,17 @@ describe("transiciones de requerimientos y listas", () => {
   it("evita volver a importar el mismo origen técnico", () => {
     assert.equal(sourceRequirementIsDuplicate(null), false);
     assert.equal(sourceRequirementIsDuplicate({ id: "req-1" }), true);
+  });
+
+  it("conserva el proveedor de una lista existente", () => {
+    assert.equal(shoppingListSupplierId("mouser", "otro-proveedor"), "mouser");
+    assert.equal(shoppingListSupplierId(null, "mouser"), "mouser");
+    assert.equal(shoppingListSupplierId(null), null);
+  });
+
+  it("solo pide clasificación financiera si la lista incluye generales", () => {
+    assert.equal(requirementsNeedExpenseSelection(["REFACCION", "REFACCION"]), false);
+    assert.equal(requirementsNeedExpenseSelection(["REFACCION", "GENERAL"]), true);
   });
 });
 

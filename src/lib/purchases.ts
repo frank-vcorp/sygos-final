@@ -418,6 +418,14 @@ export function sourceRequirementIsDuplicate(existing: { id: string } | null) {
   return Boolean(existing);
 }
 
+export function shoppingListSupplierId(existingSupplierId: string | null, submittedSupplierId?: string | null) {
+  return existingSupplierId ?? submittedSupplierId ?? null;
+}
+
+export function requirementsNeedExpenseSelection(kinds: string[]) {
+  return kinds.some((kind) => kind !== "REFACCION");
+}
+
 function accountRequired(paymentType: string) {
   return ["TARJETA", "TRANSFERENCIA"].includes(paymentType);
 }
@@ -429,10 +437,15 @@ async function validFinanceInput(actor: Actor, input: PurchaseFinanceInput, defa
   if (accountRequired(input.paymentType) && !input.accountId) throw new Error("Selecciona el banco o cuenta para esta forma de pago.");
   const supplier = await supplierForPurchase(actor, input.supplierId);
   const category = await prisma.expenseCategory.findFirst({
-    where: { id: input.expenseCategoryId ?? "", companyId: actor.activeCompanyId, active: true },
+    where: defaultsToRefacciones && !input.expenseCategoryId
+      ? { companyId: actor.activeCompanyId, active: true, name: "Producción y operación" }
+      : { id: input.expenseCategoryId ?? "", companyId: actor.activeCompanyId, active: true },
     include: { subcategories: { where: { active: true } } },
   });
-  const selection = selectExpenseCatalog(category, input.expenseSubcategoryId, defaultsToRefacciones || Boolean(category?.subcategories.length));
+  const refaccionesSubcategoryId = defaultsToRefacciones && !input.expenseSubcategoryId
+    ? category?.subcategories.find((subcategory) => subcategory.name === "Refacciones y componentes")?.id
+    : input.expenseSubcategoryId;
+  const selection = selectExpenseCatalog(category, refaccionesSubcategoryId, defaultsToRefacciones || Boolean(category?.subcategories.length));
   return { supplier, ...selection };
 }
 
@@ -551,14 +564,15 @@ export async function addRequirementToShoppingList(
     ? await prisma.shoppingList.findFirst({ where: { id: input.shoppingListId, companyId: actor.activeCompanyId, status: "ABIERTA" } })
     : null;
   if (input.shoppingListId && !list) throw new Error("La lista de compras ya no está abierta.");
-  if (input.supplierId) await supplierForPurchase(actor, input.supplierId);
+  const supplierId = shoppingListSupplierId(list?.supplierId ?? null, input.supplierId);
+  if (supplierId) await supplierForPurchase(actor, supplierId);
   if (!list) {
     const folio = await allocateFolio(actor.activeCompanyId, "LC");
     list = await prisma.shoppingList.create({
-      data: { folio, companyId: actor.activeCompanyId, status: "ABIERTA", supplierId: input.supplierId ?? null, createdByUserId: actor.userId },
+      data: { folio, companyId: actor.activeCompanyId, status: "ABIERTA", supplierId, createdByUserId: actor.userId },
     });
-  } else if (!list.supplierId && input.supplierId) {
-    list = await prisma.shoppingList.update({ where: { id: list.id }, data: { supplierId: input.supplierId } });
+  } else if (!list.supplierId && supplierId) {
+    list = await prisma.shoppingList.update({ where: { id: list.id }, data: { supplierId } });
   }
   await prisma.$transaction(async (tx) => {
     const moved = await tx.requirement.updateMany({
@@ -599,10 +613,14 @@ export async function setShoppingListSupplier(actor: Actor, listId: string, supp
 export async function convertShoppingListToPurchase(actor: Actor, listId: string, input: PurchaseFinanceInput) {
   const list = await prisma.shoppingList.findFirst({
     where: { id: listId, companyId: actor.activeCompanyId, status: "ABIERTA" },
-    include: { lines: true },
+    include: { lines: { include: { requirement: { select: { kind: true } } } } },
   });
   if (!list || !list.lines.length) throw new Error("La lista debe tener al menos una partida antes de convertirla.");
-  const finance = await validFinanceInput(actor, { ...input, supplierId: input.supplierId || list.supplierId || "" });
+  const finance = await validFinanceInput(
+    actor,
+    { ...input, supplierId: input.supplierId || list.supplierId || "" },
+    !requirementsNeedExpenseSelection(list.lines.map((line) => line.requirement.kind)),
+  );
   const folio = await allocateFolio(actor.activeCompanyId, "COM");
   const purchase = await prisma.$transaction(async (tx) => {
     const created = await tx.purchase.create({

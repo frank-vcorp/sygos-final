@@ -44,6 +44,7 @@ export const GERENTE_SYSTRON_NAV_GROUPS: NavGroupDef[] = [
       },
       {
         href: "/proveedores",
+        label: "Proveedores",
         show: (role, code) => gerenteSystron(role) && can(role, "supplier.operate", code),
       },
     ],
