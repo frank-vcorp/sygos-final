@@ -51,28 +51,34 @@ export default async function ProveedorDetallePage({ params }: { params: Promise
         <FormPanel id="datos-proveedor" action={updateSupplierAction} className="scroll-mt-24">
           <input type="hidden" name="id" value={supplier.id} />
           <input type="hidden" name="version" value={supplier.version} />
-          <FormSection title="Datos generales" description="Nombre, contacto y categoría comercial.">
-            <Field label="Nombre o razón social"><input name="name" defaultValue={supplier.name} className={controlClass} /></Field>
+          <FormSection title="Datos generales" description="Nombre y moneda son necesarios para usar al proveedor en una compra.">
+            <Field label="Nombre o razón social"><input name="name" required defaultValue={supplier.name} className={controlClass} /></Field>
+            <Field label="Moneda"><select name="currency" required defaultValue={supplier.currency} className={controlClass}><option value="MXN">MXN</option><option value="USD">USD</option></select></Field>
             <Field label="Categoría"><input name="category" defaultValue={supplier.category ?? ""} className={controlClass} /></Field>
-            <Field label="Moneda"><select name="currency" defaultValue={supplier.currency} className={controlClass}><option value="MXN">MXN</option><option value="USD">USD</option></select></Field>
             <Field label="Contacto"><input name="contactName" defaultValue={supplier.contactName ?? ""} className={controlClass} /></Field>
             <Field label="Teléfono"><input name="phone" defaultValue={supplier.phone ?? ""} className={controlClass} /></Field>
             <Field label="Correo"><input name="email" defaultValue={supplier.email ?? ""} className={controlClass} /></Field>
           </FormSection>
-          <FormSection title="Fiscal y condiciones" description="Se validan al procesar compras y pagos.">
-            <Field label="RFC"><input name="rfc" defaultValue={supplier.rfc ?? ""} className={controlClass} /></Field>
-            <Field label="Días de crédito"><input name="creditDays" defaultValue={supplier.creditDays ?? ""} className={controlClass} /></Field>
-            <Field label="Emite factura fiscal">
-              <select name="issuesInvoice" defaultValue={supplier.issuesInvoice == null ? "" : supplier.issuesInvoice ? "si" : "no"} className={controlClass}>
-                <option value="">Sin definir</option>
-                <option value="si">Sí</option>
-                <option value="no">No</option>
-              </select>
-            </Field>
-            <div className="md:col-span-2">
-              <Field label="Domicilio fiscal"><textarea name="fiscalAddress" defaultValue={supplier.fiscalAddress ?? ""} rows={2} className={controlClass} /></Field>
-            </div>
-          </FormSection>
+          <details className="group border-b border-[var(--line)]" open={Boolean(supplier.rfc || supplier.fiscalAddress || supplier.creditDays != null || supplier.issuesInvoice != null)}>
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 p-5 text-sm font-semibold text-[var(--ink)] md:px-8 [&::-webkit-details-marker]:hidden">
+              <span>Datos fiscales y condiciones <span className="font-normal text-[var(--muted)]">(opcional)</span></span>
+              <span className="text-xs text-[var(--muted)] transition-transform group-open:rotate-180">▼</span>
+            </summary>
+            <FormSection title="Fiscal y condiciones" description="Se validan al procesar compras y pagos.">
+              <Field label="RFC"><input name="rfc" defaultValue={supplier.rfc ?? ""} className={controlClass} /></Field>
+              <Field label="Días de crédito"><input name="creditDays" defaultValue={supplier.creditDays ?? ""} className={controlClass} /></Field>
+              <Field label="Emite factura fiscal">
+                <select name="issuesInvoice" defaultValue={supplier.issuesInvoice == null ? "" : supplier.issuesInvoice ? "si" : "no"} className={controlClass}>
+                  <option value="">Sin definir</option>
+                  <option value="si">Sí</option>
+                  <option value="no">No</option>
+                </select>
+              </Field>
+              <div className="md:col-span-2">
+                <Field label="Domicilio fiscal"><textarea name="fiscalAddress" defaultValue={supplier.fiscalAddress ?? ""} rows={2} className={controlClass} /></Field>
+              </div>
+            </FormSection>
+          </details>
           <FormActions><Button type="submit">Guardar cambios</Button></FormActions>
         </FormPanel>
       )}

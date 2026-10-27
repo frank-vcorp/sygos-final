@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { purchaseMovementDetails, requirementStatusAfter, requirementsNeedExpenseSelection, selectExpenseCatalog, shoppingListStatusFilter, shoppingListSupplierId, sourceRequirementIsDuplicate, withinDirectLimits } from "./purchases";
+import { purchaseConceptDefault, purchaseMovementDetails, requirementStatusAfter, requirementsNeedExpenseSelection, selectExpenseCatalog, shoppingListStatusFilter, shoppingListSupplierId, sourceRequirementIsDuplicate, withinDirectLimits } from "./purchases";
 
 describe("compra directa", () => {
   it("exige límite individual y presupuesto del mes al mismo tiempo", () => {
@@ -39,6 +39,12 @@ describe("transiciones de requerimientos y listas", () => {
   it("solo pide clasificación financiera si la lista incluye generales", () => {
     assert.equal(requirementsNeedExpenseSelection(["REFACCION", "REFACCION"]), false);
     assert.equal(requirementsNeedExpenseSelection(["REFACCION", "GENERAL"]), true);
+  });
+
+  it("predetermina la descripción de refacciones sin reemplazar una descripción editada", () => {
+    assert.equal(purchaseConceptDefault("REFACCION"), "Compra de refacciones y componentes");
+    assert.equal(purchaseConceptDefault("REFACCION", " Refacciones para torno "), "Refacciones para torno");
+    assert.equal(purchaseConceptDefault("GENERAL", "", "Mantenimiento correctivo"), "Mantenimiento correctivo");
   });
 });
 

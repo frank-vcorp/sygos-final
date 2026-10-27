@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { Empty, PageHeader, RecordLink, Table, Td, Th } from "@/components/ui";
+import { Empty, PageHeader, Table, TableActionLink, Td, Th } from "@/components/ui";
 import { RequirementCreateModal } from "./requirement-create-modal";
 import { RequirementFilters } from "./requirement-filters";
 import { prisma } from "@/lib/db";
@@ -24,6 +24,13 @@ export default async function ComprasRequerimientosPage({ searchParams }: { sear
     { title: "Refacciones", rows: rows.filter((row) => row.kind === "REFACCION") },
     { title: "Generales", rows: rows.filter((row) => row.kind !== "REFACCION") },
   ].filter((group) => group.rows.length);
+  const [requesters, rowRequesters] = await Promise.all([
+    canManage
+      ? prisma.user.findMany({ where: { companyId: session.activeCompanyId, active: true }, select: { id: true, name: true }, orderBy: { name: "asc" } })
+      : Promise.resolve([]),
+    prisma.user.findMany({ where: { id: { in: rows.map((row) => row.requesterUserId) } }, select: { id: true, name: true } }),
+  ]);
+  const requesterName = new Map(rowRequesters.map((user) => [user.id, user.name]));
   return (
     <>
       <PageHeader
@@ -31,12 +38,12 @@ export default async function ComprasRequerimientosPage({ searchParams }: { sear
         subtitle="Solicitudes de compra y refacciones que el gerente convierte en pedido."
         action={canCreate ? <RequirementCreateModal /> : null}
       />
-      <RequirementFilters estado={status} solicitante={params.solicitante ?? ""} fecha={params.fecha ?? ""} />
+      <RequirementFilters estado={status} solicitante={params.solicitante ?? ""} fecha={params.fecha ?? ""} requesters={requesters} canFilterRequester={canManage} />
       {rows.length === 0 ? <Empty title={`Sin requerimientos ${status.toLowerCase()}`} body="Crea una solicitud sencilla con número de parte y cantidad." /> : groups.map((group) => (
         <section key={group.title} className="mb-6 overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--surface)]">
           <h2 className="border-b border-[var(--line)] px-4 py-3 text-sm font-semibold">{group.title}</h2>
-          <Table><thead><tr><Th>Fecha</Th><Th>Partida</Th><Th>Cantidad</Th><Th>Estado</Th>{canManage ? <Th>Acciones</Th> : null}</tr></thead><tbody>
-            {group.rows.map((row) => <tr key={row.id}><Td>{formatWhen(row.createdAt)}</Td><Td><strong>{row.partNumber}</strong>{row.description ? <span className="block text-sm text-[var(--muted)]">{row.description}</span> : null}</Td><Td>{row.quantity}</Td><Td>{row.status === "EN_LISTA" ? "En lista" : row.status}</Td>{canManage ? <Td className="flex gap-2">{row.status === "PENDIENTE" ? <><RecordLink href={`/compras/requerimientos/${row.id}/comprar`}>Comprar</RecordLink><RecordLink href={`/compras/requerimientos/${row.id}/agregar-a-lista`}>Agregar a lista</RecordLink></> : row.shoppingListId ? <RecordLink href={`/compras/listas/${row.shoppingListId}`}>Ver lista</RecordLink> : row.purchaseId ? <RecordLink href={`/compras/${row.purchaseId}`}>Ver compra</RecordLink> : null}</Td> : null}</tr>)}
+          <Table><thead><tr><Th>Fecha</Th><Th>Solicitante</Th><Th>Partida</Th><Th>Cantidad</Th><Th>Estado</Th>{canManage ? <Th>Acciones</Th> : null}</tr></thead><tbody>
+            {group.rows.map((row) => <tr key={row.id}><Td>{formatWhen(row.createdAt)}</Td><Td>{requesterName.get(row.requesterUserId) ?? "—"}</Td><Td><strong>{row.partNumber}</strong>{row.description ? <span className="block text-sm text-[var(--muted)]">{row.description}</span> : null}</Td><Td>{row.quantity}</Td><Td>{row.status === "EN_LISTA" ? "En lista" : row.status}</Td>{canManage ? <Td className="flex flex-wrap gap-2">{row.status === "PENDIENTE" ? <><TableActionLink href={`/compras/requerimientos/${row.id}/comprar`} tone="primary">Comprar</TableActionLink><TableActionLink href={`/compras/requerimientos/${row.id}/agregar-a-lista`}>Agregar a lista</TableActionLink></> : row.shoppingListId ? <TableActionLink href={`/compras/listas/${row.shoppingListId}`}>Ver lista</TableActionLink> : row.purchaseId ? <TableActionLink href={`/compras/${row.purchaseId}`}>Ver compra</TableActionLink> : null}</Td> : null}</tr>)}
           </tbody></Table>
         </section>
       ))}

@@ -432,6 +432,10 @@ export function requirementsNeedExpenseSelection(kinds: string[]) {
   return kinds.some((kind) => kind !== "REFACCION");
 }
 
+export function purchaseConceptDefault(kind: "GENERAL" | "REFACCION", concept?: string | null, fallback?: string | null) {
+  return concept?.trim() || (kind === "REFACCION" ? "Compra de refacciones y componentes" : fallback?.trim() || "Compra urgente");
+}
+
 function accountRequired(paymentType: string) {
   return ["TARJETA", "TRANSFERENCIA"].includes(paymentType);
 }
@@ -619,13 +623,20 @@ export async function setShoppingListSupplier(actor: Actor, listId: string, supp
 export async function convertShoppingListToPurchase(actor: Actor, listId: string, input: PurchaseFinanceInput) {
   const list = await prisma.shoppingList.findFirst({
     where: { id: listId, companyId: actor.activeCompanyId, status: "ABIERTA" },
-    include: { lines: { include: { requirement: { select: { kind: true } } } } },
+    include: { lines: { include: { requirement: { select: { kind: true, description: true, partNumber: true } } } } },
   });
   if (!list || !list.lines.length) throw new Error("La lista debe tener al menos una partida antes de convertirla.");
+  const onlyRefacciones = !requirementsNeedExpenseSelection(list.lines.map((line) => line.requirement.kind));
   const finance = await validFinanceInput(
     actor,
     { ...input, supplierId: input.supplierId || list.supplierId || "" },
-    !requirementsNeedExpenseSelection(list.lines.map((line) => line.requirement.kind)),
+    onlyRefacciones,
+  );
+  const generalLine = list.lines.find((line) => line.requirement.kind !== "REFACCION");
+  const concept = purchaseConceptDefault(
+    onlyRefacciones ? "REFACCION" : "GENERAL",
+    input.concept,
+    generalLine?.requirement.description || generalLine?.description || generalLine?.partNumber || "Compra de lista",
   );
   const folio = await allocateFolio(actor.activeCompanyId, "COM");
   const purchase = await prisma.$transaction(async (tx) => {
@@ -636,7 +647,7 @@ export async function convertShoppingListToPurchase(actor: Actor, listId: string
         expenseCategory: finance.expenseCategory, expenseSubcategory: finance.expenseSubcategory,
         expenseCategoryId: finance.expenseCategoryId, expenseSubcategoryId: finance.expenseSubcategoryId,
         paymentType: input.paymentType.trim(), accountId: input.accountId ?? null, purchaseDate: input.purchaseDate,
-        concept: input.concept.trim() || "Compra de refacciones y componentes", quantity: list.lines.length,
+        concept, quantity: list.lines.length,
         amount: input.amount, destination: "LISTA_COMPRAS", destinationRef: list.id, requesterUserId: actor.userId,
         lines: { create: list.lines.map((line) => ({ requirementId: line.requirementId, shoppingListLineId: line.id, partNumber: line.partNumber, description: line.description, quantity: line.quantity, sourceType: line.sourceType, sourceId: line.sourceId })) },
       },
@@ -667,7 +678,7 @@ export async function createPhaseOnePurchase(
   actor: Actor,
   input: {
     supplierId: string;
-    expenseCategoryId: string;
+    expenseCategoryId?: string | null;
     expenseSubcategoryId?: string | null;
     paymentType: string;
     accountId?: string | null;
@@ -676,10 +687,13 @@ export async function createPhaseOnePurchase(
     lines: PurchaseLineInput[];
     order?: boolean;
     concept?: string;
+    purchaseKind?: "GENERAL" | "REFACCION";
   },
 ) {
   const lines = input.lines.length ? normalizedLines(input.lines) : [];
-  if (!lines.length && !input.concept?.trim()) throw new Error("Indica una descripción general o una partida.");
+  if (!lines.length && !input.concept?.trim() && input.purchaseKind !== "REFACCION") throw new Error("Indica una descripción general o una partida.");
+  const refacciones = input.purchaseKind === "REFACCION";
+  const concept = purchaseConceptDefault(refacciones ? "REFACCION" : "GENERAL", input.concept, lines[0]?.description || lines[0]?.partNumber);
   const finance = await validFinanceInput(actor, {
     supplierId: input.supplierId,
     expenseCategoryId: input.expenseCategoryId,
@@ -688,8 +702,8 @@ export async function createPhaseOnePurchase(
     accountId: input.accountId,
     purchaseDate: input.purchaseDate ?? new Date(),
     amount: input.amount,
-    concept: input.concept?.trim() || lines[0]?.description || lines[0]?.partNumber || "Compra urgente",
-  });
+    concept,
+  }, refacciones);
   const folio = await allocateFolio(actor.activeCompanyId, input.order ? "OC" : "COM");
   return prisma.purchase.create({
     data: {
@@ -706,7 +720,7 @@ export async function createPhaseOnePurchase(
       paymentType: input.paymentType.trim(),
       accountId: input.accountId ?? null,
       purchaseDate: input.purchaseDate ?? null,
-      concept: input.concept?.trim() || lines[0]?.description || lines[0]?.partNumber || "Compra urgente",
+      concept,
       quantity: lines[0]?.quantity ?? 1,
       amount: input.amount,
       destination: "INVENTARIO",

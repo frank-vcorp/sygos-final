@@ -228,13 +228,14 @@ export async function phaseOnePurchaseAction(formData: FormData) {
   "use server";
   try {
     const session = await guard("purchase.operate");
+    const purchaseKind = formData.get("purchaseKind") === "REFACCION" ? "REFACCION" : "GENERAL";
     const linePart = optionalText(formData.get("partNumber"));
     const lines: { partNumber: string; description: string; quantity: number }[] = linePart
       ? [{ partNumber: linePart, description: optionalText(formData.get("description")) ?? "", quantity: Number(formData.get("quantity")) }]
       : JSON.parse(String(formData.get("lines") || "[]"));
     const purchase = await createPhaseOnePurchase(session, {
       supplierId: requiredText(formData.get("supplierId"), "Proveedor"),
-      expenseCategoryId: requiredText(formData.get("expenseCategoryId"), "Categoría"),
+      expenseCategoryId: optionalText(formData.get("expenseCategoryId")),
       expenseSubcategoryId: optionalText(formData.get("expenseSubcategoryId")),
       paymentType: requiredText(formData.get("paymentType"), "Tipo de pago"),
       accountId: optionalText(formData.get("accountId")),
@@ -243,12 +244,13 @@ export async function phaseOnePurchaseAction(formData: FormData) {
       lines,
       order: formData.get("order") === "si",
       concept: optionalText(formData.get("concept")) ?? undefined,
+      purchaseKind,
     });
     await setFlash({ tone: "ok", message: `${purchase.folio} creada.` });
     redirect(`/compras/${purchase.id}`);
   } catch (error) {
     await setFlash({ tone: "error", message: bubble(error) });
-    redirect(formData.get("order") === "si" ? "/compras/oc" : "/compras/registrar");
+    redirect(formData.get("order") === "si" ? "/compras/oc" : "/compras?registrar=1");
   }
 }
 

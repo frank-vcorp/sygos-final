@@ -11,7 +11,16 @@ type RequirementFilterValues = {
   fecha: string;
 };
 
-export function RequirementFilters({ estado, solicitante, fecha }: RequirementFilterValues) {
+export function RequirementFilters({
+  estado,
+  solicitante,
+  fecha,
+  requesters,
+  canFilterRequester,
+}: RequirementFilterValues & {
+  requesters: Array<{ id: string; name: string }>;
+  canFilterRequester: boolean;
+}) {
   const router = useRouter();
   const [filters, setFilters] = useState<RequirementFilterValues>({ estado, solicitante, fecha });
   const skipDebounce = useRef(false);
@@ -64,14 +73,18 @@ export function RequirementFilters({ estado, solicitante, fecha }: RequirementFi
         <option value="ATENDIDO">Atendidos</option>
         <option value="CANCELADO">Cancelados</option>
       </select>
-      <input
-        aria-label="Solicitante"
-        className={`${controlClass} sm:min-w-[12rem] sm:flex-1`}
-        name="solicitante"
-        placeholder="Solicitante"
-        value={filters.solicitante}
-        onChange={(event) => update("solicitante", event.target.value)}
-      />
+      {canFilterRequester ? (
+        <select
+          aria-label="Solicitante"
+          className={`${controlClass} sm:min-w-[12rem] sm:flex-1`}
+          name="solicitante"
+          value={filters.solicitante}
+          onChange={(event) => update("solicitante", event.target.value)}
+        >
+          <option value="">Todos los solicitantes</option>
+          {requesters.map((requester) => <option key={requester.id} value={requester.id}>{requester.name}</option>)}
+        </select>
+      ) : null}
       <input
         aria-label="Fecha"
         className={`${controlClass} sm:w-auto`}

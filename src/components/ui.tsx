@@ -189,6 +189,29 @@ export function RecordLink({
   );
 }
 
+/** Acción compacta para tablas; conserva el enlace semántico y un área táctil clara. */
+export function TableActionLink({
+  href,
+  children,
+  tone = "ghost",
+}: {
+  href: string;
+  children: React.ReactNode;
+  tone?: "primary" | "ghost";
+}) {
+  const styles = tone === "primary"
+    ? "bg-[var(--accent)] text-white hover:opacity-90"
+    : "border border-[var(--line)] bg-white text-[var(--accent)] hover:border-[#91b7cf] hover:bg-[#f4f9fc]";
+  return (
+    <Link
+      href={href}
+      className={`inline-flex min-h-9 items-center justify-center rounded-md px-2.5 py-1.5 text-xs font-semibold outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1 ${styles}`}
+    >
+      {children}
+    </Link>
+  );
+}
+
 export function TextLink({
   href,
   children,
