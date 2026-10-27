@@ -22,6 +22,17 @@ function isLinkActive(pathname: string, search: URLSearchParams, href: string, l
   return true;
 }
 
+function activeLinkHref(
+  pathname: string,
+  search: URLSearchParams,
+  links: Array<{ href: string }>,
+  locationHash: string,
+): string | undefined {
+  return links
+    .filter((link) => isLinkActive(pathname, search, link.href, locationHash))
+    .sort((a, b) => b.href.length - a.href.length)[0]?.href;
+}
+
 export function SideNav({
   groups,
   /** Si es false, las secciones del menú no usan acordeón (p. ej. rol Ventas). */
@@ -74,9 +85,10 @@ export function SideNav({
             </div>
           );
         }
-        const groupActive = group.links.some((link) => isLinkActive(path, search, link.href, locationHash));
+        const activeHref = activeLinkHref(path, search, group.links, locationHash);
+        const groupActive = activeHref !== undefined;
         const links = group.links.map((link) => {
-            const active = isLinkActive(path, search, link.href, locationHash);
+            const active = link.href === activeHref;
             return (
               <div key={link.href} className={`flex min-h-10 items-center rounded-xl transition-colors ${active ? "bg-[var(--accent)] text-white shadow-[0_5px_14px_rgba(10,71,126,0.18)]" : "text-[#263b55] hover:bg-[var(--accent-soft)]"}`}>
                 <Link href={link.href} className="block min-w-0 flex-1 px-3 py-2.5 text-[14px] font-medium" aria-current={active ? "page" : undefined}>
