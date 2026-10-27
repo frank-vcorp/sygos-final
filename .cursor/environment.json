@@ -1,0 +1,4 @@
+{
+  "name": "Sygos",
+  "install": "command -v jq >/dev/null || (sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq && sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -qq jq)"
+}
