@@ -41,14 +41,7 @@ export function RequirementPurchaseFormFields({
       <Field label="Monto" hint={`Importe en ${currency}.`}>
         <MoneyInput key={currency} name="amount" currency={currency} min="0.01" required />
       </Field>
-      {refaccion ? (
-        <div className="md:col-span-2 rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm">
-          <span className="text-[var(--muted)]">Clasificación de egreso</span>
-          <strong className="ml-2">Producción y operación · Refacciones y componentes</strong>
-        </div>
-      ) : (
-        <ExpenseCategorySubcategoryFields categories={categories} />
-      )}
+      {!refaccion ? <ExpenseCategorySubcategoryFields categories={categories} /> : null}
       <Field label="Forma de pago">
         <select name="paymentType" defaultValue="CONTADO" className={controlClass}>
           <option value="CONTADO">Contado</option>
