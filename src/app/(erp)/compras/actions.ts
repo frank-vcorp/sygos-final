@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { setFlash } from "@/lib/flash";
@@ -150,22 +151,30 @@ export async function processPurchaseAction(formData: FormData) {
   redirect(`/compras/${id}`);
 }
 
-export async function createRequirementAction(formData: FormData) {
+export type CreateRequirementState =
+  | { status: "idle" }
+  | { status: "success" }
+  | { status: "error"; message: string };
+
+export async function createRequirementAction(
+  _previousState: CreateRequirementState,
+  formData: FormData,
+): Promise<CreateRequirementState> {
   "use server";
   try {
     const session = await requireCompany();
     if (!can(session.role, "purchase.requirement.create", session.activeCompanyCode)) throw new Error("Los Técnicos deben solicitar refacciones desde OS o DX.");
-    const requirement = await createRequirement(session, {
+    await createRequirement(session, {
       partNumber: requiredText(formData.get("partNumber"), "Número de parte"),
       description: optionalText(formData.get("description")) ?? "",
       quantity: Number(formData.get("quantity")),
       kind: formData.get("kind") === "REFACCION" ? "REFACCION" : "GENERAL",
     });
     await setFlash({ tone: "ok", message: "Requerimiento creado." });
-    redirect(`/compras/requerimientos?created=${requirement.id}`);
+    revalidatePath("/compras/requerimientos");
+    return { status: "success" };
   } catch (error) {
-    await setFlash({ tone: "error", message: bubble(error) });
-    redirect("/compras/requerimientos");
+    return { status: "error", message: bubble(error) };
   }
 }
 

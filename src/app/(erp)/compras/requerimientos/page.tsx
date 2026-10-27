@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
-import { Button, controlClass, Empty, Field, FormActions, FormPanel, FormSection, PageHeader, RecordLink, Table, Td, Th } from "@/components/ui";
-import { createRequirementAction } from "../actions";
+import { Button, controlClass, Empty, PageHeader, RecordLink, Table, Td, Th } from "@/components/ui";
+import { RequirementCreateModal } from "./requirement-create-modal";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
 import { can } from "@/lib/permissions";
@@ -27,7 +27,7 @@ export default async function ComprasRequerimientosPage({ searchParams }: { sear
       <PageHeader
         title="Requerimientos"
         subtitle="Solicitudes de compra y refacciones que el gerente convierte en pedido."
-        action={canCreate ? <a href="#nuevo-requerimiento" className="rounded-md bg-[var(--accent)] px-3 py-2 text-sm font-semibold text-white">Nuevo requerimiento</a> : null}
+        action={canCreate ? <RequirementCreateModal /> : null}
       />
       <form action="/compras/requerimientos" className="mb-6 grid gap-3 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-4 sm:grid-cols-4">
         <select name="estado" defaultValue={status} className={controlClass}><option value="PENDIENTE">Pendientes</option><option value="EN_LISTA">En lista</option><option value="ATENDIDO">Atendidos</option><option value="CANCELADO">Cancelados</option></select>
@@ -43,7 +43,6 @@ export default async function ComprasRequerimientosPage({ searchParams }: { sear
           </tbody></Table>
         </section>
       ))}
-      {canCreate ? <FormPanel id="nuevo-requerimiento" action={createRequirementAction} className="mt-8 scroll-mt-24"><FormSection title="Nuevo requerimiento" description="La clasificación financiera ocurre al registrar la compra."><Field label="Tipo"><select name="kind" defaultValue="GENERAL" className={controlClass}><option value="GENERAL">General</option><option value="REFACCION">Refacción</option></select></Field><Field label="Número de parte"><input name="partNumber" required className={controlClass} /></Field><Field label="Descripción"><input name="description" className={controlClass} /></Field><Field label="Cantidad"><input name="quantity" type="number" min="1" defaultValue="1" required className={controlClass} /></Field></FormSection><FormActions><Button type="submit">Guardar requerimiento</Button></FormActions></FormPanel> : null}
     </>
   );
 }
