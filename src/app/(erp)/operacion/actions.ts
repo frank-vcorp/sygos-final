@@ -29,7 +29,9 @@ import { authorizeExitWithoutDocument, requestExitWithoutDocument } from "@/lib/
 
 function back(formData: FormData) {
   const id = String(formData.get("caseId") ?? "");
-  return id ? `/operacion/${id}` : "/operacion";
+  const base = id ? `/operacion/${id}` : "/operacion";
+  const anchor = optionalText(formData.get("scrollAnchor"));
+  return anchor ? `${base}#${anchor.replace(/^#/, "")}` : base;
 }
 
 async function run(formData: FormData, work: (session: Awaited<ReturnType<typeof requireCompany>>) => Promise<void>, ok: string) {

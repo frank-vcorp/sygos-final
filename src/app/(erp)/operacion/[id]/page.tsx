@@ -22,6 +22,7 @@ import { ClientNameLink } from "@/components/client-entity-links";
 import { DiagnosisValidationActions } from "@/components/diagnosis-validation-actions";
 import { RequestExitWithoutDocumentButton } from "@/components/exit-without-document-actions";
 import { PartInventoryFields } from "@/components/part-inventory-fields";
+import { PartRequestModal } from "@/components/part-request-modal";
 import { RepairClosureActions } from "@/components/repair-closure-actions";
 import { SupervisorReassignControl } from "@/components/supervisor-reassign-control";
 import { HistoryTimeline, type HistoryTimelineItem } from "@/components/history-timeline";
@@ -434,16 +435,11 @@ export default async function OperacionDetallePage({ params }: { params: Promise
         </ul>
       )}
       {canRequestPartOnOs ? (
-        <details className="mt-3 rounded-lg border border-[var(--line)] bg-[#f7fafc] p-3" open={row.requests.length === 0}>
-          <summary className="cursor-pointer text-sm font-semibold text-[var(--accent)]">Solicitar refacción</summary>
-          <form action={requestPartAction} className="mt-3 grid gap-2">
-            <input type="hidden" name="caseId" value={row.id} />
-            <PartInventoryFields inventoryEnabled={inventoryPickerEnabled} />
-            <Field label="Liga opcional"><input name="link" className={controlClass} /></Field>
-            <Field label="Cantidad"><input name="quantity" type="number" min={1} required className={controlClass} /></Field>
-            <Button type="submit">Registrar solicitud</Button>
-          </form>
-        </details>
+        <PartRequestModal
+          caseId={row.id}
+          inventoryEnabled={inventoryPickerEnabled}
+          requestPartAction={requestPartAction}
+        />
       ) : null}
       {presolicitudOnly && canRequestPartOnOs ? (
         <p className="mt-3 text-xs text-[var(--muted)]">Recibir y surtir refacciones lo registra almacén o gerencia.</p>
