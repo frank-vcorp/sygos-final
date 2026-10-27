@@ -28,17 +28,17 @@ export function PurchaseOrderForm({
       <input type="hidden" name="order" value="si" />
       <input type="hidden" name="purchaseKind" value={purchaseKind} />
       <FormSection title="Orden de compra" description="Se enviará a autorización del CEO con el total de las partidas.">
-        <Field label="Tipo">
-          <select
-            value={purchaseKind}
-            onChange={(event) => setPurchaseKind(event.target.value === "REFACCION" ? "REFACCION" : "GENERAL")}
-            className={controlClass}
-          >
-            <option value="GENERAL">General</option>
-            <option value="REFACCION">Refacción</option>
-          </select>
-        </Field>
-        <div className="md:col-span-2">
+        <div className="md:col-span-2 grid gap-3 sm:grid-cols-[minmax(7.5rem,9.5rem)_1fr] sm:items-end">
+          <Field label="Tipo">
+            <select
+              value={purchaseKind}
+              onChange={(event) => setPurchaseKind(event.target.value === "REFACCION" ? "REFACCION" : "GENERAL")}
+              className={controlClass}
+            >
+              <option value="GENERAL">General</option>
+              <option value="REFACCION">Refacción</option>
+            </select>
+          </Field>
           <SupplierPicker suppliers={suppliers} allowQuickSupplier={allowQuickSupplier} required />
         </div>
         <PurchaseLinesField requirePartNumber={refaccion} showUnitPrice />
