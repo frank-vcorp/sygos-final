@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { CompactFilterBar, useAutoFilters } from "@/components/auto-filter-bar";
 import { controlClass } from "@/components/ui";
 import { requirementListHref, type RequirementStatus } from "@/lib/requirement-filters";
 
@@ -21,46 +20,15 @@ export function RequirementFilters({
   requesters: Array<{ id: string; name: string }>;
   canFilterRequester: boolean;
 }) {
-  const router = useRouter();
-  const [filters, setFilters] = useState<RequirementFilterValues>({ estado, solicitante, fecha });
-  const skipDebounce = useRef(false);
-
-  useEffect(() => {
-    setFilters({ estado, solicitante, fecha });
-  }, [estado, solicitante, fecha]);
-
-  function navigate(next: RequirementFilterValues) {
-    router.replace(requirementListHref(next));
-  }
-
-  function update<K extends keyof RequirementFilterValues>(key: K, value: RequirementFilterValues[K]) {
-    const next = { ...filters, [key]: value };
-    setFilters(next);
-    if (key !== "solicitante") {
-      navigate(next);
-    }
-  }
-
-  useEffect(() => {
-    if (skipDebounce.current) {
-      skipDebounce.current = false;
-      return;
-    }
-    if (filters.solicitante.trim() === solicitante.trim()) return;
-    const timer = window.setTimeout(() => navigate(filters), 350);
-    return () => window.clearTimeout(timer);
-  }, [filters, solicitante]);
+  const initialFilters = { estado, solicitante, fecha };
+  const { filters, update, apply } = useAutoFilters({
+    initialFilters,
+    toHref: requirementListHref,
+    debouncedKeys: ["solicitante"],
+  });
 
   return (
-    <form
-      className="mb-4 flex flex-col gap-2 rounded-xl border border-[var(--line)] bg-white p-3 shadow-[0_4px_14px_rgba(20,45,75,0.04)] sm:flex-row sm:flex-wrap sm:items-center"
-      role="search"
-      onSubmit={(event) => {
-        event.preventDefault();
-        skipDebounce.current = true;
-        navigate(filters);
-      }}
-    >
+    <CompactFilterBar onSubmit={apply}>
       <select
         aria-label="Estado"
         className={`${controlClass} sm:w-auto`}
@@ -93,6 +61,6 @@ export function RequirementFilters({
         value={filters.fecha}
         onChange={(event) => update("fecha", event.target.value)}
       />
-    </form>
+    </CompactFilterBar>
   );
 }

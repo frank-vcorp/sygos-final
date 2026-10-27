@@ -1,8 +1,9 @@
 import { redirect } from "next/navigation";
-import { ActiveFilters, Badge, Button, controlClass, Empty, FilterBar, MobileCard, PageHeader, RecordLink, ResponsiveData, Table, Td, Th } from "@/components/ui";
+import { ActiveFilters, Badge, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, Table, Td, Th } from "@/components/ui";
+import { ShoppingListFilters } from "./shopping-list-filters";
 import { prisma } from "@/lib/db";
-import { listHref } from "@/lib/list-url";
 import { can } from "@/lib/permissions";
+import { shoppingListHref } from "@/lib/purchase-filter-links";
 import { shoppingListStatusFilter } from "@/lib/purchases";
 import { requireCompany } from "@/lib/session";
 
@@ -17,18 +18,13 @@ export default async function ListasComprasPage({ searchParams }: { searchParams
     prisma.supplier.findMany({ where: { companyId: session.activeCompanyId, active: true }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);
   const emptyTitle = status === "ABIERTA" ? "Sin listas abiertas" : status === "CONVERTIDA" ? "Sin listas convertidas" : "Sin listas de compras";
-  const filters = (omit?: "estado" | "proveedor" | "fecha") => listHref("/compras/listas", {
-    estado: omit === "estado" || params.estado === "TODAS" ? undefined : params.estado,
+  const filters = (omit?: "estado" | "proveedor" | "fecha") => shoppingListHref({
+    estado: omit === "estado" ? undefined : params.estado ?? "ABIERTA",
     proveedor: omit === "proveedor" ? undefined : params.proveedor,
     fecha: omit === "fecha" ? undefined : params.fecha,
   });
   return <><PageHeader back={{ href: "/compras", label: "Compras" }} title="Listas de compras" subtitle="Concentra requerimientos antes de realizar una compra." />
-    <FilterBar action="/compras/listas">
-      <select name="estado" defaultValue={status ?? "TODAS"} className={`${controlClass} sm:w-auto sm:min-w-[13rem]`} aria-label="Estado de lista de compras"><option value="ABIERTA">Listas abiertas</option><option value="CONVERTIDA">Listas convertidas en compra</option><option value="TODAS">Todas las listas</option></select>
-      <select name="proveedor" defaultValue={params.proveedor ?? ""} className={`${controlClass} sm:min-w-[12rem] sm:flex-1`} aria-label="Proveedor"><option value="">Todos los proveedores</option>{suppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}</select>
-      <input name="fecha" type="date" defaultValue={params.fecha ?? ""} className={`${controlClass} sm:w-auto`} aria-label="Fecha de creación" />
-      <Button type="submit" tone="ghost" className="shrink-0">Filtrar</Button>
-    </FilterBar>
+    <ShoppingListFilters estado={params.estado ?? "ABIERTA"} proveedor={params.proveedor ?? ""} fecha={params.fecha ?? ""} suppliers={suppliers} />
     <ActiveFilters items={[
       ...(params.estado === "CONVERTIDA" ? [{ label: "Convertidas", clearHref: filters("estado") }] : []),
       ...(params.proveedor ? [{ label: `Proveedor: ${suppliers.find((supplier) => supplier.id === params.proveedor)?.name ?? "Seleccionado"}`, clearHref: filters("proveedor") }] : []),

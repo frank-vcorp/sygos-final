@@ -1,10 +1,11 @@
 import { redirect } from "next/navigation";
-import { ActionLink, ActiveFilters, Badge, Button, controlClass, Empty, FilterBar, MobileCard, PageHeader, RecordLink, ResponsiveData, Table, Td, Th } from "@/components/ui";
+import { ActionLink, ActiveFilters, Badge, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, Table, Td, Th } from "@/components/ui";
+import { PurchaseFilters } from "./purchase-filters";
 import { PurchaseRegistrationModal } from "@/components/purchase-registration-modal";
-import { listHref } from "@/lib/list-url";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
 import { can } from "@/lib/permissions";
+import { purchaseListHref } from "@/lib/purchase-filter-links";
 import { requireCompany } from "@/lib/session";
 
 const STATUS: Record<string, string> = {
@@ -51,7 +52,7 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
     orderBy: { createdAt: "desc" },
     take: 100,
   });
-  const tabs = [
+  const tabs: Array<readonly [string, string]> = [
     ["compras", "Compras"],
     ["oc", "Órdenes de compra"],
     ["procesar", "Por procesar"],
@@ -65,9 +66,9 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
     prisma.user.findMany({ where: { companyId: session.activeCompanyId, active: true }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);
   const requesterName = new Map(requesters.map((user) => [user.id, user.name]));
-  const filters = (omit?: "vista" | "q" | "estado" | "fecha" | "categoria" | "proveedor" | "solicitante") => listHref("/compras", {
-    vista: omit === "vista" || view === "compras" ? undefined : view,
-    q: omit === "q" ? undefined : query || undefined,
+  const filters = (omit?: "vista" | "q" | "estado" | "fecha" | "categoria" | "proveedor" | "solicitante") => purchaseListHref({
+    vista: omit === "vista" ? undefined : view,
+    q: omit === "q" ? undefined : query,
     estado: omit === "estado" ? undefined : estado,
     fecha: omit === "fecha" ? undefined : fecha,
     categoria: omit === "categoria" ? undefined : categoria,
@@ -93,18 +94,19 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
           </div>
         }
       />
-      <FilterBar action="/compras">
-        <select name="vista" defaultValue={view} aria-label="Vista de compras" className={`${controlClass} sm:w-[210px]`}>
-          {tabs.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-        </select>
-        {view === "compras" ? <select name="estado" defaultValue={estado ?? ""} className={controlClass}><option value="">Todos los estados</option><option value="PENDIENTE_VALIDAR">Pendiente de validación</option></select> : null}
-        {view === "compras" ? <input name="fecha" type="date" defaultValue={fecha ?? ""} className={controlClass} /> : null}
-        {view === "compras" ? <select name="proveedor" defaultValue={proveedor ?? ""} className={controlClass} aria-label="Proveedor"><option value="">Todos los proveedores</option>{suppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}</select> : null}
-        {view === "compras" ? <select name="categoria" defaultValue={categoria ?? ""} className={controlClass} aria-label="Categoría de egreso"><option value="">Todas las categorías</option>{categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select> : null}
-        {view === "compras" ? <select name="solicitante" defaultValue={solicitante ?? ""} className={controlClass} aria-label="Solicitante"><option value="">Todos los solicitantes</option>{requesters.map((user) => <option key={user.id} value={user.id}>{user.name}</option>)}</select> : null}
-        <input name="q" defaultValue={query} placeholder="Folio o descripción" className={`${controlClass} sm:flex-1`} />
-        <Button type="submit" tone="ghost">Buscar</Button>
-      </FilterBar>
+      <PurchaseFilters
+        vista={view}
+        q={query}
+        estado={estado ?? ""}
+        fecha={fecha ?? ""}
+        categoria={categoria ?? ""}
+        proveedor={proveedor ?? ""}
+        solicitante={solicitante ?? ""}
+        tabs={tabs}
+        suppliers={suppliers}
+        categories={categories}
+        requesters={requesters}
+      />
       <ActiveFilters
         items={[
           ...(view !== "compras" ? [{ label: viewLabel, clearHref: filters("vista") }] : []),
