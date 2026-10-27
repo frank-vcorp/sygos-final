@@ -44,10 +44,7 @@ export function PurchaseOrderModal({
       {showTrigger ? (
         <Button type="button" onClick={() => setOpen(true)}>Nueva O.C.</Button>
       ) : null}
-      <FormOverlayDialog open={open} onClose={close} title="Nueva orden de compra" titleId="nueva-oc-title" wide>
-        <p className="mb-4 text-sm leading-6 text-[var(--muted)]">
-          Captura proveedor, partidas con precio y datos para finanzas. Se enviará a autorización.
-        </p>
+      <FormOverlayDialog open={open} onClose={close} title="Nueva orden de compra" titleId="nueva-oc-title" documentWide>
         <PurchaseOrderForm
           suppliers={suppliers}
           categories={categories}

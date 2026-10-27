@@ -72,17 +72,17 @@ export function FormOverlayDialog({
       <div
         ref={dialogRef}
         tabIndex={-1}
-        className={`w-full overflow-y-auto rounded-xl border border-[var(--line)] bg-white shadow-xl ${
-          documentWide ? "max-h-[min(94vh,56rem)] max-w-4xl" : wide ? "max-h-[min(92vh,44rem)] max-w-2xl" : "max-h-[min(92vh,44rem)] max-w-lg"
+        className={`flex w-full max-h-[min(94vh,56rem)] flex-col overflow-hidden rounded-xl border border-[var(--line)] bg-white shadow-xl ${
+          documentWide ? "max-w-4xl" : wide ? "max-w-3xl" : "max-w-lg"
         }`}
       >
-        <div className="sticky top-0 z-10 flex items-center justify-between gap-3 border-b border-[var(--line)] bg-white px-4 py-3">
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--line)] bg-white px-4 py-3">
           <h3 id={titleId} className="text-sm font-semibold text-[#0b1f3a]">{title}</h3>
           <Button type="button" tone="ghost" className="min-h-9 px-2 text-xs" onClick={onClose}>
             Cerrar
           </Button>
         </div>
-        <div className="p-4">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-4">{children}</div>
       </div>
     </div>
   );

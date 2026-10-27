@@ -5,7 +5,7 @@ import { phaseOnePurchaseAction } from "../actions";
 import { PurchaseLinesField } from "@/components/purchase-lines-field";
 import { ExpenseCategorySubcategoryFields } from "@/components/expense-category-subcategory-fields";
 import { SupplierPicker } from "@/components/supplier-picker";
-import { Button, controlClass, Field, FormActions, FormPanel, FormSection } from "@/components/ui";
+import { Button, controlClass, Field, FormPanel } from "@/components/ui";
 import type { ExpenseCategoryCatalogItem } from "@/lib/expense-catalog";
 import type { PickerOption } from "@/components/searchable-entity-picker";
 
@@ -24,11 +24,11 @@ export function PurchaseOrderForm({
   const refaccion = purchaseKind === "REFACCION";
 
   return (
-    <FormPanel action={phaseOnePurchaseAction}>
+    <FormPanel action={phaseOnePurchaseAction} className="max-w-none border-0 shadow-none">
       <input type="hidden" name="order" value="si" />
       <input type="hidden" name="purchaseKind" value={purchaseKind} />
-      <FormSection title="Orden de compra" description="Se enviará a autorización del CEO con el total de las partidas.">
-        <div className="md:col-span-2 grid gap-3 sm:grid-cols-[minmax(7.5rem,9.5rem)_1fr] sm:items-end">
+      <div className="space-y-4">
+        <div className="grid gap-3 sm:grid-cols-[8.5rem_minmax(0,1fr)] sm:items-start">
           <Field label="Tipo">
             <select
               value={purchaseKind}
@@ -39,35 +39,50 @@ export function PurchaseOrderForm({
               <option value="REFACCION">Refacción</option>
             </select>
           </Field>
-          <SupplierPicker suppliers={suppliers} allowQuickSupplier={allowQuickSupplier} required />
+          <SupplierPicker
+            suppliers={suppliers}
+            allowQuickSupplier={allowQuickSupplier}
+            required
+            hint=""
+          />
         </div>
-        <PurchaseLinesField requirePartNumber={refaccion} showUnitPrice />
+
+        <PurchaseLinesField requirePartNumber={refaccion} showUnitPrice compact />
+
         {refaccion ? (
-          <div className="md:col-span-2 rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm">
-            <span className="text-[var(--muted)]">Clasificación de egreso</span>
-            <strong className="ml-2">Producción y operación · Refacciones y componentes</strong>
-          </div>
+          <p className="rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm text-[var(--muted)]">
+            Clasificación: <strong className="text-[var(--ink)]">Producción y operación · Refacciones y componentes</strong>
+          </p>
         ) : (
-          <ExpenseCategorySubcategoryFields categories={categories} />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <ExpenseCategorySubcategoryFields categories={categories} />
+          </div>
         )}
-        <Field label="Forma de pago">
-          <select name="paymentType" required className={controlClass} defaultValue="CONTADO">
-            <option value="CONTADO">Contado</option>
-            <option value="CREDITO">Crédito</option>
-            <option value="TARJETA">Tarjeta</option>
-            <option value="TRANSFERENCIA">Transferencia</option>
-          </select>
-        </Field>
-        <Field label="Banco / cuenta, si aplica">
-          <select name="accountId" defaultValue="" className={controlClass}>
-            <option value="">No aplica</option>
-            {accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
-          </select>
-        </Field>
-      </FormSection>
-      <FormActions note="El importe total se calcula a partir de cantidad × precio unitario de cada partida.">
-        <Button type="submit">Enviar O.C. a autorización</Button>
-      </FormActions>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Forma de pago">
+            <select name="paymentType" required className={controlClass} defaultValue="CONTADO">
+              <option value="CONTADO">Contado</option>
+              <option value="CREDITO">Crédito</option>
+              <option value="TARJETA">Tarjeta</option>
+              <option value="TRANSFERENCIA">Transferencia</option>
+            </select>
+          </Field>
+          <Field label="Banco / cuenta">
+            <select name="accountId" defaultValue="" className={controlClass}>
+              <option value="">No aplica</option>
+              {accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
+            </select>
+          </Field>
+        </div>
+
+        <div className="flex flex-col-reverse gap-3 border-t border-[var(--line)] pt-4 sm:flex-row sm:items-center sm:justify-between">
+          <p className="text-xs leading-5 text-[var(--muted)]">
+            El total se calcula con cantidad × precio unitario de cada partida.
+          </p>
+          <Button type="submit" className="shrink-0">Enviar O.C. a autorización</Button>
+        </div>
+      </div>
     </FormPanel>
   );
 }
