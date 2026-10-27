@@ -1,3 +1,4 @@
+import type { ShoppingList } from "@prisma/client";
 import { prisma } from "./db";
 import { allocateFolio } from "./folios";
 import { ConcurrencyError } from "./form";
@@ -593,7 +594,7 @@ export async function addRequirementToShoppingList(
   actor: Actor,
   requirementId: string,
   input: { shoppingListId?: string | null; supplierId?: string | null; partNumber: string; description?: string; quantity: number },
-) {
+): Promise<ShoppingList> {
   const requirement = await prisma.requirement.findFirst({ where: { id: requirementId, companyId: actor.activeCompanyId, status: "PENDIENTE" } });
   if (!requirement) throw new Error("El requerimiento ya no está pendiente.");
   if (requirementPartNumberRequired(requirement.kind) && !input.partNumber.trim()) throw new Error("Indica el número de parte.");
