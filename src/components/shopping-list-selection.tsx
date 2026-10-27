@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { SupplierPicker } from "@/components/supplier-picker";
 import { controlClass, Field } from "@/components/ui";
+import { normalizeShoppingListKind, shoppingListKindLabel } from "@/lib/shopping-list-display";
 import type { PickerOption } from "@/components/searchable-entity-picker";
 
 type ShoppingListOption = {
@@ -25,16 +26,31 @@ export function ShoppingListSelection({
   listKind: "GENERAL" | "REFACCION";
 }) {
   const [listId, setListId] = useState("");
-  const compatibleLists = lists.filter((list) => list.kind === listKind);
-  const selectedList = compatibleLists.find((list) => list.id === listId);
+  const selectedList = lists.find((list) => list.id === listId);
+  const compatibleCount = lists.filter((list) => normalizeShoppingListKind(list.kind) === listKind).length;
   const inheritedSupplier = selectedList?.supplierId ? { id: selectedList.supplierId, name: selectedList.supplierName } : null;
 
   return (
     <>
-      <Field label="Lista de compras">
+      <Field
+        label="Lista de compras"
+        hint={
+          compatibleCount === 0 && lists.length > 0
+            ? `No hay listas abiertas de ${shoppingListKindLabel(listKind).toLowerCase()}; puedes crear una nueva.`
+            : `El requerimiento es de ${shoppingListKindLabel(listKind).toLowerCase()}; elige una lista del mismo tipo.`
+        }
+      >
         <select name="shoppingListId" value={listId} onChange={(event) => setListId(event.target.value)} className={controlClass}>
           <option value="">Crear nueva lista</option>
-          {compatibleLists.map((list) => <option key={list.id} value={list.id}>{list.folio}{list.supplierName ? ` — ${list.supplierName}` : ""}</option>)}
+          {lists.map((list) => {
+            const kind = normalizeShoppingListKind(list.kind);
+            const mismatch = kind !== listKind;
+            return (
+              <option key={list.id} value={list.id} disabled={mismatch}>
+                {list.folio} · {shoppingListKindLabel(kind)}{list.supplierName ? ` — ${list.supplierName}` : ""}{mismatch ? " (otro tipo)" : ""}
+              </option>
+            );
+          })}
         </select>
       </Field>
       {inheritedSupplier ? (

@@ -5,7 +5,7 @@ import { recordHistory } from "./history";
 import { DEFAULT_MONTHLY_PURCHASE, DEFAULT_PURCHASE_LIMIT } from "./roles";
 import type { Role } from "./roles";
 import { requirementPartNumberRequired } from "./requirement-display";
-import { normalizeShoppingListKind } from "./shopping-list-display";
+import { normalizeShoppingListKind, shoppingListKindFromList } from "./shopping-list-display";
 
 export { requirementPartNumberRequired } from "./requirement-display";
 
@@ -603,10 +603,13 @@ export async function addRequirementToShoppingList(
   if (!Number.isInteger(input.quantity) || input.quantity < 1) throw new Error("La partida no es válida.");
   const requirementKind = normalizeShoppingListKind(requirement.kind);
   let list = input.shoppingListId
-    ? await prisma.shoppingList.findFirst({ where: { id: input.shoppingListId, companyId: actor.activeCompanyId, status: "ABIERTA" } })
+    ? await prisma.shoppingList.findFirst({
+        where: { id: input.shoppingListId, companyId: actor.activeCompanyId, status: "ABIERTA" },
+        include: { lines: { include: { requirement: { select: { kind: true } } } } },
+      })
     : null;
   if (input.shoppingListId && !list) throw new Error("La lista de compras ya no está abierta.");
-  if (list && normalizeShoppingListKind(list.kind) !== requirementKind) {
+  if (list && shoppingListKindFromList(list) !== requirementKind) {
     throw new Error("El requerimiento no coincide con el tipo de la lista.");
   }
   const supplierId = shoppingListSupplierId(list?.supplierId ?? null, input.supplierId);

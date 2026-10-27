@@ -7,6 +7,7 @@ import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { loadRequirementListContexts } from "@/lib/requirement-list-enrichment";
 import { requirementStatusFilter } from "@/lib/requirement-filters";
+import { shoppingListKindFromList } from "@/lib/shopping-list-display";
 import { requireCompany } from "@/lib/session";
 
 export default async function ComprasRequerimientosPage({ searchParams }: { searchParams: Promise<{ estado?: string; solicitante?: string; fecha?: string }> }) {
@@ -37,7 +38,11 @@ export default async function ComprasRequerimientosPage({ searchParams }: { sear
       ? prisma.financeAccount.findMany({ where: { companyId: session.activeCompanyId, active: true }, orderBy: { name: "asc" }, select: { id: true, name: true } })
       : Promise.resolve([]),
     canManage
-      ? prisma.shoppingList.findMany({ where: { companyId: session.activeCompanyId, status: "ABIERTA" }, include: { supplier: true }, orderBy: { createdAt: "desc" } })
+      ? prisma.shoppingList.findMany({
+          where: { companyId: session.activeCompanyId, status: "ABIERTA" },
+          include: { supplier: true, lines: { include: { requirement: { select: { kind: true } } } } },
+          orderBy: { createdAt: "desc" },
+        })
       : Promise.resolve([]),
   ]);
   const requesterName = new Map(rowRequesters.map((user) => [user.id, user.name]));
@@ -81,7 +86,7 @@ export default async function ComprasRequerimientosPage({ searchParams }: { sear
             shoppingLists={shoppingLists.map((list) => ({
               id: list.id,
               folio: list.folio,
-              kind: list.kind,
+              kind: shoppingListKindFromList(list),
               supplierId: list.supplierId,
               supplierName: list.supplier?.name ?? null,
             }))}
