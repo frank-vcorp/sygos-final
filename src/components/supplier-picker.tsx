@@ -10,7 +10,7 @@ import { readNamedFormFields, validateQuickSupplierDraft, type QuickFormFieldMap
 
 export function SupplierPicker({
   suppliers, allowQuickSupplier = false, defaultSupplierId = "", label = "Proveedor",
-  hint, allowEmpty = false, emptyLabel = "Sin proveedor", required = false,
+  hint, allowEmpty = false, emptyLabel = "Sin proveedor", required = false, onSupplierChange,
 }: {
   suppliers: PickerOption[];
   allowQuickSupplier?: boolean;
@@ -20,6 +20,7 @@ export function SupplierPicker({
   allowEmpty?: boolean;
   emptyLabel?: string;
   required?: boolean;
+  onSupplierChange?: (supplierId: string) => void;
 }) {
   const router = useRouter();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -46,6 +47,7 @@ export function SupplierPicker({
       const created = await quickCreateSupplierAction(fields);
       setExtraSuppliers((current) => [...current, { id: created.supplierId, name: created.name }]);
       setSupplierId(created.supplierId);
+      onSupplierChange?.(created.supplierId);
       setShowNew(false);
       router.refresh();
     } catch (cause) {
@@ -62,7 +64,7 @@ export function SupplierPicker({
         name="supplierId"
         options={options}
         selectedId={supplierId}
-        onSelect={(id) => { setSupplierId(id); if (id) setShowNew(false); }}
+        onSelect={(id) => { setSupplierId(id); onSupplierChange?.(id); if (id) setShowNew(false); }}
         required={required}
         allowEmpty={allowEmpty}
         emptyLabel={allowEmpty ? emptyLabel : "Busca o selecciona un proveedor"}

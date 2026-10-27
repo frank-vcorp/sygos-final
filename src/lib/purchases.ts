@@ -539,7 +539,11 @@ export async function purchaseRequirement(actor: Actor, requirementId: string, i
         paymentType: input.paymentType.trim(),
         accountId: input.accountId ?? null,
         purchaseDate: input.purchaseDate,
-        concept: input.concept.trim() || (requirement.kind === "REFACCION" ? "Compra de refacciones y componentes" : requirement.description || requirement.partNumber),
+        concept: purchaseConceptDefault(
+          requirement.kind === "REFACCION" ? "REFACCION" : "GENERAL",
+          input.concept,
+          requirement.description || requirement.partNumber,
+        ),
         quantity: requirement.quantity,
         amount: input.amount,
         destination: "REQUERIMIENTO",

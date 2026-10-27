@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { finalFromBase, formatMoneyInput, linesForTotal, parseMoneyInput, quoteTotals } from "./money";
+import { finalFromBase, formatMoneyInput, linesForTotal, moneyCurrencyPrefix, parseMoneyInput, quoteTotals } from "./money";
 
 describe("captura de importes", () => {
   it("formatea y parsea miles con dos decimales", () => {
     assert.equal(formatMoneyInput(1234.5), "1,234.50");
     assert.equal(parseMoneyInput("1,234.50"), 1234.5);
     assert.equal(parseMoneyInput("$ 2,000.00"), 2000);
+    assert.equal(moneyCurrencyPrefix("MXN"), "$");
+    assert.equal(moneyCurrencyPrefix("USD"), "US$");
   });
 });
 

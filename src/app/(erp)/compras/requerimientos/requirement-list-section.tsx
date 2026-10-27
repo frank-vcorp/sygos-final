@@ -8,7 +8,7 @@ import {
   type RequirementOverlayState,
 } from "../actions";
 import { FormOverlayDialog } from "@/components/overlay-dialog";
-import { ExpenseCategorySubcategoryFields } from "@/components/expense-category-subcategory-fields";
+import { RequirementPurchaseFormFields, type SupplierWithCurrency } from "./requirement-purchase-form-fields";
 import { ShoppingListSelection } from "@/components/shopping-list-selection";
 import { SlaCountdown } from "@/components/sla-countdown";
 import { SupplierPicker } from "@/components/supplier-picker";
@@ -18,7 +18,6 @@ import {
   Field,
   FormActions,
   FormSection,
-  MoneyInput,
   RecordLink,
   Table,
   TableActionLink,
@@ -93,7 +92,7 @@ export function RequirementListSection({
   title: string;
   rows: RequirementListRow[];
   canManage: boolean;
-  suppliers: PickerOption[];
+  suppliers: SupplierWithCurrency[];
   categories: ExpenseCategoryCatalogItem[];
   accounts: Array<{ id: string; name: string }>;
   allowQuickSupplier: boolean;
@@ -178,7 +177,7 @@ function RequirementPurchaseDialog({
   onClose,
 }: {
   row: RequirementListRow;
-  suppliers: PickerOption[];
+  suppliers: SupplierWithCurrency[];
   categories: ExpenseCategoryCatalogItem[];
   accounts: Array<{ id: string; name: string }>;
   allowQuickSupplier: boolean;
@@ -203,49 +202,13 @@ function RequirementPurchaseDialog({
       </p>
       <form action={formAction}>
         <input type="hidden" name="requirementId" value={row.id} />
-        <FormSection title="Datos de compra" description="La moneda se hereda del proveedor.">
-          <div className="md:col-span-2">
-            <SupplierPicker suppliers={suppliers} required allowQuickSupplier={allowQuickSupplier} />
-          </div>
-          <Field label="Fecha de compra">
-            <input name="purchaseDate" type="date" defaultValue={new Date().toISOString().slice(0, 10)} required className={controlClass} />
-          </Field>
-          <Field label="Monto">
-            <MoneyInput name="amount" min="0.01" required />
-          </Field>
-          {refaccion ? (
-            <div className="md:col-span-2 rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm">
-              <span className="text-[var(--muted)]">Clasificación de egreso</span>
-              <strong className="ml-2">Producción y operación · Refacciones y componentes</strong>
-            </div>
-          ) : (
-            <ExpenseCategorySubcategoryFields categories={categories} />
-          )}
-          <Field label="Descripción general">
-            <input
-              name="concept"
-              required
-              defaultValue={refaccion ? "Compra de refacciones y componentes" : row.description || row.partNumber}
-              className={controlClass}
-            />
-          </Field>
-          <Field label="Forma de pago">
-            <select name="paymentType" defaultValue="CONTADO" className={controlClass}>
-              <option value="CONTADO">Contado</option>
-              <option value="CREDITO">Crédito</option>
-              <option value="TARJETA">Tarjeta</option>
-              <option value="TRANSFERENCIA">Transferencia</option>
-            </select>
-          </Field>
-          <Field label="Banco / cuenta, si aplica">
-            <select name="accountId" defaultValue="" className={controlClass}>
-              <option value="">No aplica</option>
-              {accounts.map((item) => (
-                <option key={item.id} value={item.id}>{item.name}</option>
-              ))}
-            </select>
-          </Field>
-        </FormSection>
+        <RequirementPurchaseFormFields
+          suppliers={suppliers}
+          categories={categories}
+          accounts={accounts}
+          allowQuickSupplier={allowQuickSupplier}
+          refaccion={refaccion}
+        />
         {state.status === "error" ? (
           <p className="px-5 pt-4 text-sm text-[var(--danger)]" role="alert">{state.message}</p>
         ) : null}
@@ -267,7 +230,7 @@ function RequirementAddToListDialog({
 }: {
   row: RequirementListRow;
   shoppingLists: ShoppingListOption[];
-  suppliers: PickerOption[];
+  suppliers: SupplierWithCurrency[];
   allowQuickSupplier: boolean;
   onClose: () => void;
 }) {

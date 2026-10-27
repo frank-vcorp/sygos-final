@@ -36,6 +36,11 @@ export function money(value: number | null | undefined): string {
   return value.toLocaleString("es-MX", { style: "currency", currency: "MXN" });
 }
 
+/** Prefijo visual del monto según moneda del proveedor (MXN / USD). */
+export function moneyCurrencyPrefix(currency: string | null | undefined) {
+  return currency === "USD" ? "US$" : "$";
+}
+
 /** Valor mostrado en captura de importes (sin símbolo $; el prefijo va en el control). */
 export function formatMoneyInput(value: number): string {
   return value.toLocaleString("es-MX", { minimumFractionDigits: 2, maximumFractionDigits: 2 });

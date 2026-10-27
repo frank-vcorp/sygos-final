@@ -270,6 +270,19 @@ function purchaseFinanceFromForm(formData: FormData) {
   };
 }
 
+function purchaseRequirementFinanceFromForm(formData: FormData) {
+  return {
+    supplierId: optionalText(formData.get("supplierId")) ?? "",
+    expenseCategoryId: optionalText(formData.get("expenseCategoryId")),
+    expenseSubcategoryId: optionalText(formData.get("expenseSubcategoryId")),
+    paymentType: requiredText(formData.get("paymentType"), "Forma de pago"),
+    accountId: optionalText(formData.get("accountId")),
+    purchaseDate: new Date(),
+    amount: moneyFromForm(formData.get("amount")),
+    concept: optionalText(formData.get("concept")) ?? "",
+  };
+}
+
 export type RequirementOverlayState =
   | { status: "idle" }
   | { status: "success"; message: string }
@@ -278,7 +291,7 @@ export type RequirementOverlayState =
 export async function purchaseRequirementAction(formData: FormData) {
   const requirementId = requiredText(formData.get("requirementId"), "Requerimiento");
   try {
-    const purchase = await purchaseRequirement(await guard("purchase.operate"), requirementId, purchaseFinanceFromForm(formData));
+    const purchase = await purchaseRequirement(await guard("purchase.operate"), requirementId, purchaseRequirementFinanceFromForm(formData));
     await setFlash({ tone: "ok", message: `${purchase.folio} creada desde el requerimiento.` });
     redirect(`/compras/${purchase.id}`);
   } catch (error) {
@@ -294,7 +307,7 @@ export async function purchaseRequirementOverlayAction(
   "use server";
   const requirementId = requiredText(formData.get("requirementId"), "Requerimiento");
   try {
-    const purchase = await purchaseRequirement(await guard("purchase.operate"), requirementId, purchaseFinanceFromForm(formData));
+    const purchase = await purchaseRequirement(await guard("purchase.operate"), requirementId, purchaseRequirementFinanceFromForm(formData));
     await setFlash({ tone: "ok", message: `${purchase.folio} creada desde el requerimiento.` });
     revalidatePath("/compras/requerimientos");
     return { status: "success", message: `${purchase.folio} registrada.` };

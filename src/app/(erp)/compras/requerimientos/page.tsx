@@ -28,7 +28,7 @@ export default async function ComprasRequerimientosPage({ searchParams }: { sear
       : Promise.resolve([]),
     prisma.user.findMany({ where: { id: { in: rows.map((row) => row.requesterUserId) } }, select: { id: true, name: true } }),
     canManage
-      ? prisma.supplier.findMany({ where: { companyId: session.activeCompanyId, active: true }, orderBy: { name: "asc" }, select: { id: true, name: true } })
+      ? prisma.supplier.findMany({ where: { companyId: session.activeCompanyId, active: true }, orderBy: { name: "asc" }, select: { id: true, name: true, currency: true } })
       : Promise.resolve([]),
     canManage
       ? prisma.expenseCategory.findMany({ where: { companyId: session.activeCompanyId, active: true }, include: { subcategories: { where: { active: true } } }, orderBy: { name: "asc" } })
