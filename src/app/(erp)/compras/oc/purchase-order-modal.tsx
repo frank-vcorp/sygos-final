@@ -1,7 +1,7 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState } from "react";
 import { PurchaseOrderForm } from "./purchase-order-form";
 import { FormOverlayDialog } from "@/components/overlay-dialog";
 import { Button } from "@/components/ui";
@@ -26,11 +26,17 @@ export function PurchaseOrderModal({
   returnHref?: string;
 }) {
   const router = useRouter();
-  const [open, setOpen] = useState(initiallyOpen);
+  const searchParams = useSearchParams();
+  const openFromQuery = searchParams.get("nueva") === "1";
+  const [open, setOpen] = useState(initiallyOpen || openFromQuery);
+
+  useEffect(() => {
+    setOpen(initiallyOpen || openFromQuery);
+  }, [initiallyOpen, openFromQuery]);
 
   function close() {
     setOpen(false);
-    if (initiallyOpen) router.replace(returnHref);
+    if (openFromQuery) router.replace(returnHref);
   }
 
   return (
