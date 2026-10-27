@@ -38,7 +38,19 @@ export async function movementAction(formData: FormData) {
   try {
     const session = await guard();
     const direction = formData.get("direction") === "INGRESO" ? "INGRESO" : "EGRESO";
-    await manualMovement(session, requiredText(formData.get("accountId"), "Cuenta"), direction, moneyFromForm(formData.get("amount")), requiredText(formData.get("category"), "Categoría"), requiredText(formData.get("note"), "Nota"), formData.get("pendingProof") === "si");
+    await manualMovement(
+      session,
+      requiredText(formData.get("accountId"), "Cuenta"),
+      direction,
+      moneyFromForm(formData.get("amount")),
+      {
+        incomeCategoryId: formData.get("incomeCategoryId")?.toString() || null,
+        expenseCategoryId: formData.get("expenseCategoryId")?.toString() || null,
+        expenseSubcategoryId: formData.get("expenseSubcategoryId")?.toString() || null,
+      },
+      requiredText(formData.get("note"), "Nota"),
+      formData.get("pendingProof") === "si",
+    );
     await setFlash({ tone: "ok", message: "Movimiento confirmado." });
   } catch (error) {
     await setFlash({ tone: "error", message: bubble(error) });

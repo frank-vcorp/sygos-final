@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { accountAction, movementAction, payCardAction, payPayableAction, proofAction, transferAction } from "./actions";
+import { accountAction, payCardAction, payPayableAction, proofAction, transferAction } from "./actions";
 import {
   ActiveFilters,
   Button,
@@ -22,6 +22,7 @@ import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
+import { ManualMovementForm } from "./manual-movement-form";
 
 type FinanceAccountRow = { id: string; name: string; kind: string; balance: number };
 
@@ -36,7 +37,7 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
   const [year, month] = key.split("-").map(Number);
   const start = new Date(Date.UTC(year, month - 1, 1, 6, 0, 0));
   const end = new Date(Date.UTC(year, month, 1, 6, 0, 0));
-  const [accounts, movements, invoiced, collected, payables, receivables, pending] = await Promise.all([
+  const [accounts, movements, invoiced, collected, payables, receivables, pending, expenseCategories, incomeCategories] = await Promise.all([
     prisma.financeAccount.findMany({ where: { companyId: session.activeCompanyId, active: true }, orderBy: { name: "asc" } }),
     prisma.financeMovement.findMany({ where: { companyId: session.activeCompanyId, createdAt: { gte: start, lt: end } } }),
     prisma.billingDocument.aggregate({ where: { companyId: session.activeCompanyId, status: "EMITIDA", kind: { not: "REMISION" }, issuedAt: { gte: start, lt: end } }, _sum: { total: true } }),
@@ -44,6 +45,8 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
     prisma.payable.aggregate({ where: { companyId: session.activeCompanyId, balance: { gt: 0 } }, _sum: { balance: true } }),
     prisma.receivable.aggregate({ where: { companyId: session.activeCompanyId, balance: { gt: 0 } }, _sum: { balance: true } }),
     prisma.financeMovement.findMany({ where: { companyId: session.activeCompanyId, pendingProof: true }, include: { account: true }, orderBy: { createdAt: "desc" } }),
+    prisma.expenseCategory.findMany({ where: { companyId: session.activeCompanyId, active: true }, include: { subcategories: { where: { active: true } } }, orderBy: { name: "asc" } }),
+    prisma.incomeCategory.findMany({ where: { companyId: session.activeCompanyId, active: true }, orderBy: { name: "asc" } }),
   ]);
   const openPayables = await prisma.payable.findMany({ where: { companyId: session.activeCompanyId, balance: { gt: 0 } }, include: { supplier: true, document: true }, take: 20 });
   const facturado = invoiced._sum.total ?? 0;
@@ -125,7 +128,7 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
           <div id="fin-cuentas" className="scroll-mt-28">
             <AccountsSummary accounts={accounts} cxc={cxc} cxp={cxp} cardDebt={cardDebt} />
           </div>
-          <MovementManualForm accounts={accounts} className="max-w-none" />
+          <ManualMovementForm accounts={accounts} expenseCategories={expenseCategories} incomeCategories={incomeCategories} className="max-w-none" />
         </section>
       ) : null}
       {showSection("cuentas") && !showSection("dashboard") ? (
@@ -134,7 +137,7 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
         </div>
       ) : null}
       {(showSection("movimientos") || showSection("ingresos") || showSection("egresos")) && !showSection("dashboard") ? (
-        <MovementManualForm accounts={accounts} className="mt-4 max-w-xl" />
+        <ManualMovementForm accounts={accounts} expenseCategories={expenseCategories} incomeCategories={incomeCategories} className="mt-4 max-w-xl" />
       ) : null}
       {showSection("dashboard") && pending.length > 0 ? (
         <Card className="mt-4 p-4">
@@ -233,7 +236,6 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
     </>
   );
 }
-
 function AccountsSummary({
   accounts,
   cxc,
@@ -257,32 +259,5 @@ function AccountsSummary({
       </ul>
       <p className="mt-2">CxC {money(cxc)} · CxP {money(cxp)} · Tarjetas {money(cardDebt)}</p>
     </Card>
-  );
-}
-
-function MovementManualForm({ accounts, className = "" }: { accounts: FinanceAccountRow[]; className?: string }) {
-  return (
-    <FormPanel action={movementAction} className={className}>
-      <FormSection title="Movimiento manual" description="Registra ingreso o egreso en una cuenta del mes en curso.">
-        <Field label="Cuenta">
-          <select name="accountId" className={controlClass}>{accounts.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select>
-        </Field>
-        <Field label="Dirección">
-          <select name="direction" className={controlClass}>
-            <option value="EGRESO">Egreso</option>
-            <option value="INGRESO">Ingreso</option>
-          </select>
-        </Field>
-        <Field label="Importe"><MoneyInput name="amount" min="0.01" required /></Field>
-        <Field label="Categoría"><input name="category" required className={controlClass} /></Field>
-        <Field label="Nota"><input name="note" required className={controlClass} /></Field>
-        <div className="md:col-span-2">
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" name="pendingProof" value="si" /> Pendiente de comprobación
-          </label>
-        </div>
-      </FormSection>
-      <FormActions><Button type="submit">Registrar</Button></FormActions>
-    </FormPanel>
   );
 }

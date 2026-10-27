@@ -22,7 +22,7 @@ export const SYSTRON_EXPENSE_CATALOG: Readonly<Record<string, readonly string[]>
   "Otros gastos": ["Otros gastos"],
 };
 
-/** Catálogo de ingresos SYSTRON — Finanzas usa `FinanceMovement.category` (texto); sin modelo IncomeCategory aún. */
+/** Catálogo de ingresos SYSTRON. */
 export const SYSTRON_INCOME_CATALOG: readonly string[] = [
   "Servicios",
   "Venta de refacciones y materiales",
@@ -44,6 +44,45 @@ export async function seedSystronExpenseCatalog(prisma: PrismaClient, companyId:
         where: { categoryId_name: { categoryId: category.id, name: subName } },
         update: { active: true },
         create: { categoryId: category.id, name: subName },
+      });
+    }
+  }
+}
+
+export async function seedSystronIncomeCatalog(prisma: PrismaClient, companyId: string) {
+  for (const name of SYSTRON_INCOME_CATALOG) {
+    await prisma.incomeCategory.upsert({
+      where: { companyId_name: { companyId, name } },
+      update: { active: true },
+      create: { companyId, name },
+    });
+  }
+}
+
+/**
+ * Backfills nullable catalog references only when an existing display name exactly
+ * matches the SYSTRON catalog. Legacy strings are deliberately retained so old
+ * purchases remain readable even if their category was historical or custom.
+ */
+export async function backfillPurchaseExpenseCatalogReferences(prisma: PrismaClient, companyId: string) {
+  const categories = await prisma.expenseCategory.findMany({
+    where: { companyId },
+    include: { subcategories: true },
+  });
+  for (const category of categories) {
+    await prisma.purchase.updateMany({
+      where: { companyId, expenseCategory: category.name, expenseCategoryId: null },
+      data: { expenseCategoryId: category.id },
+    });
+    for (const subcategory of category.subcategories) {
+      await prisma.purchase.updateMany({
+        where: {
+          companyId,
+          expenseCategory: category.name,
+          expenseSubcategory: subcategory.name,
+          expenseSubcategoryId: null,
+        },
+        data: { expenseSubcategoryId: subcategory.id },
       });
     }
   }

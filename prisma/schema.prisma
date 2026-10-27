@@ -58,6 +58,7 @@ model Company {
   requirements     Requirement[]
   shoppingLists    ShoppingList[]
   expenseCategories ExpenseCategory[]
+  incomeCategories IncomeCategory[]
   collaborators    Collaborator[]
   payrollPeriods   PayrollPeriod[]
   commissionRuns   CommissionRun[]
@@ -863,6 +864,10 @@ model Purchase {
   currency         String   @default("MXN")
   expenseCategory  String?
   expenseSubcategory String?
+  expenseCategoryId String?
+  expenseCategoryRef ExpenseCategory? @relation("PurchaseExpenseCategory", fields: [expenseCategoryId], references: [id], onDelete: SetNull)
+  expenseSubcategoryId String?
+  expenseSubcategoryRef ExpenseSubcategory? @relation("PurchaseExpenseSubcategory", fields: [expenseSubcategoryId], references: [id], onDelete: SetNull)
   paymentType      String?
   purchaseDate     DateTime?
   requesterUserId  String
@@ -880,6 +885,8 @@ model Purchase {
 
   @@unique([companyId, folio])
   @@index([companyId, status])
+  @@index([expenseCategoryId])
+  @@index([expenseSubcategoryId])
 }
 
 model PurchaseLine {
@@ -979,6 +986,7 @@ model ExpenseCategory {
   updatedAt DateTime @updatedAt
 
   subcategories ExpenseSubcategory[]
+  purchases     Purchase[] @relation("PurchaseExpenseCategory")
 
   @@unique([companyId, name])
 }
@@ -990,8 +998,21 @@ model ExpenseSubcategory {
   name       String
   active     Boolean         @default(true)
   createdAt  DateTime        @default(now())
+  purchases  Purchase[]      @relation("PurchaseExpenseSubcategory")
 
   @@unique([categoryId, name])
+}
+
+model IncomeCategory {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id])
+  name      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([companyId, name])
 }
 
 model Collaborator {

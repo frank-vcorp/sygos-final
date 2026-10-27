@@ -241,7 +241,8 @@ export async function processPurchase(actor: Actor, purchaseId: string, version:
   if (!row.supplierId) throw new Error("Indica el proveedor antes de procesar.");
   if (settlement === "CONTADO" && !accountId) throw new Error("El contado sale de una cuenta.");
   if (settlement === "CONTADO" && accountId) {
-    const movement = await postMovement(row.companyId, accountId, "EGRESO", row.amount, "Compra", "COMPRA", row.id, row.concept);
+    const movementDetails = purchaseMovementDetails(row);
+    const movement = await postMovement(row.companyId, accountId, "EGRESO", row.amount, movementDetails.category, "COMPRA", row.id, movementDetails.note);
     const updated = await prisma.purchase.updateMany({
       where: { id: row.id, version },
       data: { status: "PROCESADA", settlement: "CONTADO", accountId, movementId: movement.id, version: { increment: 1 } },
@@ -283,7 +284,9 @@ export async function payPayable(actor: Actor, payableId: string, accountId: str
   const payable = await prisma.payable.findFirst({ where: { id: payableId, companyId: actor.activeCompanyId }, include: { supplier: true } });
   if (!payable || payable.balance <= 0) throw new Error("Esa cuenta por pagar no tiene saldo.");
   if (!Number.isFinite(amount) || amount <= 0 || amount > payable.balance) throw new Error("El pago no cubre un abono válido.");
-  const movement = await postMovement(payable.companyId, accountId, "EGRESO", amount, "Pago a proveedor", "CXP", payable.id, payable.supplier.name);
+  const purchase = await prisma.purchase.findFirst({ where: { companyId: payable.companyId, payableId: payable.id } });
+  const movementDetails = purchase ? purchaseMovementDetails(purchase) : { category: "Pago a proveedor", note: payable.supplier.name };
+  const movement = await postMovement(payable.companyId, accountId, "EGRESO", amount, movementDetails.category, "CXP", payable.id, movementDetails.note);
   const balance = Math.round((payable.balance - amount) * 100) / 100;
   await prisma.payable.update({
     where: { id: payable.id },
@@ -315,9 +318,54 @@ export async function transferAccounts(actor: Actor, fromId: string, toId: strin
   });
 }
 
-export async function manualMovement(actor: Actor, accountId: string, direction: "INGRESO" | "EGRESO", amount: number, category: string, note: string, pendingProof: boolean) {
+export type ExpenseCatalogSelection = {
+  id: string;
+  name: string;
+  subcategories: Array<{ id: string; name: string }>;
+};
+
+export function selectExpenseCatalog(category: ExpenseCatalogSelection | null, subcategoryId?: string | null, requireSubcategory = false) {
+  if (!category) throw new Error("La categoría de egreso no existe en el catálogo.");
+  const subcategory = subcategoryId ? category.subcategories.find((item) => item.id === subcategoryId) : undefined;
+  if (subcategoryId && !subcategory) throw new Error("La subcategoría no pertenece a la categoría seleccionada.");
+  if (requireSubcategory && category.subcategories.length && !subcategory) throw new Error("Selecciona una subcategoría del catálogo.");
+  return {
+    expenseCategoryId: category.id,
+    expenseCategory: category.name,
+    expenseSubcategoryId: subcategory?.id ?? null,
+    expenseSubcategory: subcategory?.name ?? null,
+  };
+}
+
+export function purchaseMovementDetails(purchase: { expenseCategory: string | null; expenseSubcategory: string | null; concept: string }) {
+  const category = [purchase.expenseCategory, purchase.expenseSubcategory].filter(Boolean).join(" · ");
+  return { category: category || "Compra", note: purchase.concept };
+}
+
+export async function manualMovement(
+  actor: Actor,
+  accountId: string,
+  direction: "INGRESO" | "EGRESO",
+  amount: number,
+  categoryIds: { incomeCategoryId?: string | null; expenseCategoryId?: string | null; expenseSubcategoryId?: string | null },
+  note: string,
+  pendingProof: boolean,
+) {
   if (!Number.isFinite(amount) || amount <= 0) throw new Error("El importe no es válido.");
-  return postMovement(actor.activeCompanyId, accountId, direction, amount, category, "MANUAL", accountId, note, pendingProof);
+  if (direction === "INGRESO") {
+    const category = await prisma.incomeCategory.findFirst({
+      where: { id: categoryIds.incomeCategoryId ?? "", companyId: actor.activeCompanyId, active: true },
+    });
+    if (!category) throw new Error("Selecciona una categoría de ingreso del catálogo.");
+    return postMovement(actor.activeCompanyId, accountId, direction, amount, category.name, "MANUAL", accountId, note, pendingProof);
+  }
+  const category = await prisma.expenseCategory.findFirst({
+    where: { id: categoryIds.expenseCategoryId ?? "", companyId: actor.activeCompanyId, active: true },
+    include: { subcategories: { where: { active: true } } },
+  });
+  const selection = selectExpenseCatalog(category, categoryIds.expenseSubcategoryId);
+  const label = [selection.expenseCategory, selection.expenseSubcategory].filter(Boolean).join(" · ");
+  return postMovement(actor.activeCompanyId, accountId, direction, amount, label, "MANUAL", accountId, note, pendingProof);
 }
 
 export async function recordCompanyCash(companyId: string, direction: "INGRESO" | "EGRESO", amount: number, method: string, note: string, originId: string) {
@@ -353,8 +401,8 @@ export type PurchaseLineInput = {
 
 export type PurchaseFinanceInput = {
   supplierId: string;
-  expenseCategory?: string | null;
-  expenseSubcategory?: string | null;
+  expenseCategoryId?: string | null;
+  expenseSubcategoryId?: string | null;
   paymentType: string;
   accountId?: string | null;
   purchaseDate: Date;
@@ -380,21 +428,12 @@ async function validFinanceInput(actor: Actor, input: PurchaseFinanceInput, defa
   if (!input.paymentType.trim()) throw new Error("Indica la forma de pago.");
   if (accountRequired(input.paymentType) && !input.accountId) throw new Error("Selecciona el banco o cuenta para esta forma de pago.");
   const supplier = await supplierForPurchase(actor, input.supplierId);
-  const defaultCategory = defaultsToRefacciones ? "Producción y operación" : "";
-  const defaultSubcategory = defaultsToRefacciones ? "Refacciones y componentes" : "";
-  const categoryName = input.expenseCategory?.trim() || defaultCategory;
-  const subcategoryName = input.expenseSubcategory?.trim() || defaultSubcategory;
-  if (!categoryName) throw new Error("Selecciona una categoría de egreso.");
   const category = await prisma.expenseCategory.findFirst({
-    where: { companyId: actor.activeCompanyId, name: categoryName, active: true },
+    where: { id: input.expenseCategoryId ?? "", companyId: actor.activeCompanyId, active: true },
     include: { subcategories: { where: { active: true } } },
   });
-  if (!category) throw new Error("La categoría de egreso no existe en el catálogo.");
-  if (category.subcategories.length && !subcategoryName) throw new Error("Selecciona una subcategoría del catálogo.");
-  if (subcategoryName && !category.subcategories.some((item) => item.name === subcategoryName)) {
-    throw new Error("La subcategoría no pertenece a la categoría seleccionada.");
-  }
-  return { supplier, expenseCategory: category.name, expenseSubcategory: subcategoryName || null };
+  const selection = selectExpenseCatalog(category, input.expenseSubcategoryId, defaultsToRefacciones || Boolean(category?.subcategories.length));
+  return { supplier, ...selection };
 }
 
 export async function createRequirement(
@@ -468,6 +507,8 @@ export async function purchaseRequirement(actor: Actor, requirementId: string, i
         currency: finance.supplier.currency,
         expenseCategory: finance.expenseCategory,
         expenseSubcategory: finance.expenseSubcategory,
+        expenseCategoryId: finance.expenseCategoryId,
+        expenseSubcategoryId: finance.expenseSubcategoryId,
         paymentType: input.paymentType.trim(),
         accountId: input.accountId ?? null,
         purchaseDate: input.purchaseDate,
@@ -569,6 +610,7 @@ export async function convertShoppingListToPurchase(actor: Actor, listId: string
         folio, companyId: actor.activeCompanyId, kind: "COMPRA", status: "PENDIENTE_VALIDAR",
         shoppingListId: list.id, supplierId: finance.supplier.id, currency: finance.supplier.currency,
         expenseCategory: finance.expenseCategory, expenseSubcategory: finance.expenseSubcategory,
+        expenseCategoryId: finance.expenseCategoryId, expenseSubcategoryId: finance.expenseSubcategoryId,
         paymentType: input.paymentType.trim(), accountId: input.accountId ?? null, purchaseDate: input.purchaseDate,
         concept: input.concept.trim() || "Compra de refacciones y componentes", quantity: list.lines.length,
         amount: input.amount, destination: "LISTA_COMPRAS", destinationRef: list.id, requesterUserId: actor.userId,
@@ -601,8 +643,8 @@ export async function createPhaseOnePurchase(
   actor: Actor,
   input: {
     supplierId: string;
-    expenseCategory: string;
-    expenseSubcategory?: string | null;
+    expenseCategoryId: string;
+    expenseSubcategoryId?: string | null;
     paymentType: string;
     accountId?: string | null;
     purchaseDate?: Date | null;
@@ -616,8 +658,8 @@ export async function createPhaseOnePurchase(
   if (!lines.length && !input.concept?.trim()) throw new Error("Indica una descripción general o una partida.");
   const finance = await validFinanceInput(actor, {
     supplierId: input.supplierId,
-    expenseCategory: input.expenseCategory,
-    expenseSubcategory: input.expenseSubcategory,
+    expenseCategoryId: input.expenseCategoryId,
+    expenseSubcategoryId: input.expenseSubcategoryId,
     paymentType: input.paymentType,
     accountId: input.accountId,
     purchaseDate: input.purchaseDate ?? new Date(),
@@ -635,6 +677,8 @@ export async function createPhaseOnePurchase(
       currency: finance.supplier.currency,
       expenseCategory: finance.expenseCategory,
       expenseSubcategory: finance.expenseSubcategory,
+      expenseCategoryId: finance.expenseCategoryId,
+      expenseSubcategoryId: finance.expenseSubcategoryId,
       paymentType: input.paymentType.trim(),
       accountId: input.accountId ?? null,
       purchaseDate: input.purchaseDate ?? null,

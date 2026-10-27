@@ -225,8 +225,8 @@ export async function phaseOnePurchaseAction(formData: FormData) {
       : JSON.parse(String(formData.get("lines") || "[]"));
     const purchase = await createPhaseOnePurchase(session, {
       supplierId: requiredText(formData.get("supplierId"), "Proveedor"),
-      expenseCategory: requiredText(formData.get("expenseCategory"), "Categoría"),
-      expenseSubcategory: optionalText(formData.get("expenseSubcategory")),
+      expenseCategoryId: requiredText(formData.get("expenseCategoryId"), "Categoría"),
+      expenseSubcategoryId: optionalText(formData.get("expenseSubcategoryId")),
       paymentType: requiredText(formData.get("paymentType"), "Tipo de pago"),
       accountId: optionalText(formData.get("accountId")),
       purchaseDate: new Date(requiredText(formData.get("purchaseDate"), "Fecha de compra")),
@@ -246,8 +246,8 @@ export async function phaseOnePurchaseAction(formData: FormData) {
 function purchaseFinanceFromForm(formData: FormData) {
   return {
     supplierId: requiredText(formData.get("supplierId"), "Proveedor"),
-    expenseCategory: optionalText(formData.get("expenseCategory")),
-    expenseSubcategory: optionalText(formData.get("expenseSubcategory")),
+    expenseCategoryId: optionalText(formData.get("expenseCategoryId")),
+    expenseSubcategoryId: optionalText(formData.get("expenseSubcategoryId")),
     paymentType: requiredText(formData.get("paymentType"), "Forma de pago"),
     accountId: optionalText(formData.get("accountId")),
     purchaseDate: new Date(requiredText(formData.get("purchaseDate"), "Fecha de compra")),

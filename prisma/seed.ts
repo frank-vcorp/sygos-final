@@ -5,7 +5,7 @@ import { catalogKey } from "../src/lib/catalog-key";
 import { hashPassword, verifyPassword } from "../src/lib/crypto";
 import { initialPriorities } from "../src/lib/priorities";
 import { DEFAULT_MONTHLY_PURCHASE, DEFAULT_PURCHASE_LIMIT, isPurchaseManager, type Role } from "../src/lib/roles";
-import { seedSystronExpenseCatalog } from "./seed-systron-finance-catalog";
+import { backfillPurchaseExpenseCatalogReferences, seedSystronExpenseCatalog, seedSystronIncomeCatalog } from "./seed-systron-finance-catalog";
 
 const prisma = new PrismaClient();
 
@@ -45,6 +45,8 @@ async function main() {
   });
 
   await seedSystronExpenseCatalog(prisma, systron.id);
+  await seedSystronIncomeCatalog(prisma, systron.id);
+  await backfillPurchaseExpenseCatalogReferences(prisma, systron.id);
 
   for (const companyId of [systron.id, servomotores.id]) {
     for (const account of [
