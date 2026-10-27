@@ -59,6 +59,20 @@ describe("permisos de fase 1", () => {
     assert.equal(can("COORDINACION_ADMINISTRACION", "operation.queue", "SYSTRON"), false);
   });
 
+  it("limita requerimientos a SYSTRON y tipos por rol", () => {
+    assert.equal(can("VENTAS", "purchase.requirement.create", "SYSTRON"), true);
+    assert.equal(can("VENTAS", "purchase.requirement.create", "SERVOMOTORES"), false);
+    assert.equal(can("VENTAS", "purchase.requirement.refaccion", "SYSTRON"), false);
+    assert.equal(can("ALMACEN", "purchase.requirement.create", "SYSTRON"), true);
+    assert.equal(can("ALMACEN", "purchase.requirement.refaccion", "SYSTRON"), true);
+    assert.equal(can("SUPERVISOR_TECNICO", "purchase.requirement.refaccion", "SYSTRON"), true);
+    assert.equal(can("TECNICO", "purchase.requirement.create", "SYSTRON"), false);
+    assert.equal(can("KIOSCO_ASISTENCIA", "purchase.requirement.create", "SYSTRON"), false);
+    assert.equal(can("AYUDANTE_GENERAL", "purchase.requirement.create", "SYSTRON"), false);
+    assert.equal(can("GERENTE_OPERATIVO_SYSTRON", "purchase.requirement.create", "SYSTRON"), true);
+    assert.equal(can("CEO", "purchase.requirement.refaccion", "SYSTRON"), false);
+  });
+
   it("deja al técnico fuera del catálogo de equipos; servicios solo asignados en bandeja", () => {
     assert.equal(can("TECNICO", "attention.catalog", "SYSTRON"), true);
     assert.equal(can("TECNICO", "equipment.catalog", "SYSTRON"), false);

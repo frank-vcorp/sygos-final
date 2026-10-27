@@ -163,8 +163,13 @@ export async function createRequirementAction(
   "use server";
   try {
     const session = await requireCompany();
-    if (!can(session.role, "purchase.requirement.create", session.activeCompanyCode)) throw new Error("Los Técnicos deben solicitar refacciones desde OS o DX.");
+    if (!can(session.role, "purchase.requirement.create", session.activeCompanyCode)) {
+      throw new Error("No tienes permiso para crear requerimientos en esta empresa.");
+    }
     const kind = formData.get("kind") === "REFACCION" ? "REFACCION" : "GENERAL";
+    if (kind === "REFACCION" && !can(session.role, "purchase.requirement.refaccion", session.activeCompanyCode)) {
+      throw new Error("Solo puedes crear requerimientos generales.");
+    }
     const requirement = await createRequirement(session, {
       partNumber: requirementPartNumberRequired(kind)
         ? requiredText(formData.get("partNumber"), "Número de parte")

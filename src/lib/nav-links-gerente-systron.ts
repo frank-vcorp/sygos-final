@@ -1,4 +1,4 @@
-import type { NavGroupDef } from "@/lib/nav-links";
+import { requerimientosNavGroup, type NavGroupDef } from "@/lib/nav-links";
 import { can } from "@/lib/permissions";
 import type { Role } from "@/lib/roles";
 
@@ -6,6 +6,7 @@ const gerenteSystron = (role: Role) => role === "GERENTE_OPERATIVO_SYSTRON";
 
 /** Menú lateral del Gerente Operativo SYSTRON. */
 export const GERENTE_SYSTRON_NAV_GROUPS: NavGroupDef[] = [
+  requerimientosNavGroup(),
   {
     title: null,
     links: [
@@ -22,11 +23,6 @@ export const GERENTE_SYSTRON_NAV_GROUPS: NavGroupDef[] = [
   {
     title: "Compras",
     links: [
-      {
-        href: "/compras/requerimientos",
-        label: "Requerimientos",
-        show: (role, code) => gerenteSystron(role) && can(role, "purchase.operate", code),
-      },
       {
         href: "/compras/listas",
         label: "Listas de compras",

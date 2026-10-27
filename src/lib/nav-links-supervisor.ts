@@ -1,4 +1,5 @@
 import type { NavGroupDef } from "@/lib/nav-links";
+import { requerimientosNavGroup } from "@/lib/nav-links";
 import { can } from "@/lib/permissions";
 import type { Role } from "@/lib/roles";
 
@@ -6,6 +7,7 @@ const supervisor = (role: Role) => role === "SUPERVISOR_TECNICO";
 
 /** Menú lateral del Supervisor Técnico (SYSTRON). */
 export const SUPERVISOR_NAV_GROUPS: NavGroupDef[] = [
+  requerimientosNavGroup(),
   {
     title: null,
     links: [

@@ -22,6 +22,20 @@ export type NavGroupDef = {
   direct?: boolean;
 };
 
+/** Entrada lateral suelta para quien puede capturar requerimientos en SYSTRON. */
+export function requerimientosNavGroup(): NavGroupDef {
+  return {
+    title: "Requerimientos",
+    direct: true,
+    links: [
+      {
+        href: "/compras/requerimientos",
+        show: (role, code) => can(role, "purchase.requirement.create", code),
+      },
+    ],
+  };
+}
+
 const ventas = (role: Role) => role === "VENTAS";
 const notVentas = (role: Role) => role !== "VENTAS";
 /** Operación vía Servicios + detalle; técnico y supervisor no ven acordeón Taller. */
@@ -116,6 +130,7 @@ export function navGroupsForRole(role: Role): NavGroupDef[] {
   if (role === "SUPERVISOR_TECNICO") return SUPERVISOR_NAV_GROUPS;
   if (role === "TECNICO") return TECNICO_NAV_GROUPS;
   if (role === "GERENTE_OPERATIVO_SYSTRON") return GERENTE_SYSTRON_NAV_GROUPS;
+  if (role === "ADMINISTRADOR") return [requerimientosNavGroup(), ...NAV_GROUPS];
   return NAV_GROUPS;
 }
 

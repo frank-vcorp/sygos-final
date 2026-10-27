@@ -1,4 +1,5 @@
 import type { NavGroupDef } from "@/lib/nav-links";
+import { requerimientosNavGroup } from "@/lib/nav-links";
 import { can } from "@/lib/permissions";
 import type { Role } from "@/lib/roles";
 
@@ -6,6 +7,7 @@ const showAlmacen = (role: Role) => role === "ALMACEN";
 
 /** Menú lateral de Almacén SYSTRON: inicio = bandeja de entradas + inventario y horas extra. */
 export const ALMACEN_NAV_GROUPS: NavGroupDef[] = [
+  requerimientosNavGroup(),
   {
     title: "Inicio",
     direct: true,

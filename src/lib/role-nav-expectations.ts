@@ -3,6 +3,7 @@ import type { Role } from "@/lib/roles";
 /** Menú lateral esperado por rol (SYSTRON). Alineado al Discovery funcional. */
 export const SYSTRON_NAV: Partial<Record<Role, readonly string[]>> = {
   VENTAS: [
+    "/compras/requerimientos",
     "/panel",
     "/agenda",
     "/servicios/activos",
@@ -26,6 +27,7 @@ export const SYSTRON_NAV: Partial<Record<Role, readonly string[]>> = {
     "/cuenta",
   ],
   SUPERVISOR_TECNICO: [
+    "/compras/requerimientos",
     "/panel",
     "/servicios/activos",
     "/servicios/historial",
@@ -34,10 +36,10 @@ export const SYSTRON_NAV: Partial<Record<Role, readonly string[]>> = {
     "/cuenta",
   ],
   GERENTE_OPERATIVO_SYSTRON: [
+    "/compras/requerimientos",
     "/panel",
     "/servicios/activos",
     "/servicios/historial",
-    "/compras/requerimientos",
     "/compras/listas",
     "/compras",
     "/compras?vista=oc",
@@ -46,8 +48,9 @@ export const SYSTRON_NAV: Partial<Record<Role, readonly string[]>> = {
     "/personal/vacaciones",
     "/inventario",
   ],
-  ALMACEN: ["/custodia", "/inventario", "/personal/horas"],
+  ALMACEN: ["/compras/requerimientos", "/custodia", "/inventario", "/personal/horas"],
   CEO: [
+    "/compras/requerimientos",
     "/panel?vista=autorizacion",
     "/panel?vista=comercial",
     "/panel?vista=tecnico",
@@ -115,6 +118,7 @@ export const SYSTRON_NAV: Partial<Record<Role, readonly string[]>> = {
     "/usuarios",
   ],
   COORDINACION_ADMINISTRACION: [
+    "/compras/requerimientos",
     "/panel?vista=pendientes",
     "/cobranza?vista=vencidas",
     "/clientes",

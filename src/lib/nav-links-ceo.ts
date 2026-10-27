@@ -1,4 +1,5 @@
 import type { NavGroupDef } from "@/lib/nav-links";
+import { requerimientosNavGroup } from "@/lib/nav-links";
 import { can } from "@/lib/permissions";
 import type { Role } from "@/lib/roles";
 
@@ -6,6 +7,7 @@ const showCeo = (role: Role) => role === "CEO";
 
 /** Menú lateral del CEO (solo navegación). */
 export const CEO_NAV_GROUPS: NavGroupDef[] = [
+  requerimientosNavGroup(),
   {
     title: "Inicio",
     links: [

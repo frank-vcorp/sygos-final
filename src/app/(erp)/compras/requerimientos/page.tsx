@@ -14,6 +14,7 @@ export default async function ComprasRequerimientosPage({ searchParams }: { sear
   const session = await requireCompany();
   const canManage = can(session.role, "purchase.operate", session.activeCompanyCode);
   const canCreate = can(session.role, "purchase.requirement.create", session.activeCompanyCode);
+  const allowRefaccionKind = can(session.role, "purchase.requirement.refaccion", session.activeCompanyCode);
   if (!canManage && !canCreate) redirect("/inicio");
   const params = await searchParams;
   const status = requirementStatusFilter(params.estado);
@@ -66,8 +67,16 @@ export default async function ComprasRequerimientosPage({ searchParams }: { sear
     <>
       <PageHeader
         title="Requerimientos"
-        subtitle="Solicitudes de compra y refacciones que el gerente convierte en pedido."
-        action={canCreate ? <RequirementCreateModal /> : null}
+        subtitle={
+          canManage
+            ? "Solicitudes de compra y refacciones que el gerente convierte en pedido."
+            : "Tus solicitudes de compra; el gerente de compras las atiende."
+        }
+        action={
+          canCreate ? (
+            <RequirementCreateModal lockKind={!allowRefaccionKind} defaultKind="GENERAL" />
+          ) : null
+        }
       />
       <RequirementFilters estado={status} solicitante={params.solicitante ?? ""} fecha={params.fecha ?? ""} requesters={requesters} canFilterRequester={canManage} />
       {rows.length === 0 ? (
@@ -79,6 +88,7 @@ export default async function ComprasRequerimientosPage({ searchParams }: { sear
             title={group.title}
             rows={group.rows}
             canManage={canManage}
+            showRequester={canManage}
             suppliers={suppliers}
             categories={categories}
             accounts={accounts}

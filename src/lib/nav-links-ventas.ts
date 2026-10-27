@@ -1,4 +1,5 @@
 import type { NavGroupDef } from "@/lib/nav-links";
+import { requerimientosNavGroup } from "@/lib/nav-links";
 import { can } from "@/lib/permissions";
 import type { Role } from "@/lib/roles";
 
@@ -11,6 +12,7 @@ function showEquiCatalog(role: Role, companyCode: string | null) {
 
 /** Menú lateral del rol Ventas (SYSTRON). */
 export const VENTAS_NAV_GROUPS: NavGroupDef[] = [
+  requerimientosNavGroup(),
   {
     title: null,
     links: [

@@ -4,6 +4,7 @@ import { allocateFolio } from "./folios";
 import { ConcurrencyError } from "./form";
 import { recordHistory } from "./history";
 import { DEFAULT_MONTHLY_PURCHASE, DEFAULT_PURCHASE_LIMIT } from "./roles";
+import { can } from "./permissions";
 import type { Role } from "./roles";
 import { requirementPartNumberRequired } from "./requirement-display";
 import { normalizeShoppingListKind, shoppingListKindFromList } from "./shopping-list-display";
@@ -400,6 +401,7 @@ export type PurchaseLineInput = {
   partNumber: string;
   description?: string;
   quantity: number;
+  unitPrice?: number | null;
   sourceType?: string | null;
   sourceId?: string | null;
 };
@@ -467,8 +469,13 @@ export async function createRequirement(
   actor: Actor,
   input: { partNumber: string; description?: string; quantity: number; kind?: "REFACCION" | "GENERAL"; sourceType?: string | null; sourceId?: string | null },
 ) {
-  if (actor.role === "TECNICO") throw new Error("Los Técnicos solicitan refacciones desde OS o DX.");
+  if (!can(actor.role, "purchase.requirement.create", actor.activeCompanyCode)) {
+    throw new Error("No tienes permiso para crear requerimientos en esta empresa.");
+  }
   const kind = input.kind ?? (input.sourceType ? "REFACCION" : "GENERAL");
+  if (kind === "REFACCION" && !input.sourceType && !can(actor.role, "purchase.requirement.refaccion", actor.activeCompanyCode)) {
+    throw new Error("Solo puedes crear requerimientos generales.");
+  }
   if (requirementPartNumberRequired(kind) && !input.partNumber.trim()) throw new Error("Indica el número de parte.");
   if (!Number.isInteger(input.quantity) || input.quantity < 1) throw new Error("La cantidad debe ser mayor a cero.");
   if (input.sourceType && input.sourceId) {
@@ -706,12 +713,26 @@ export async function convertShoppingListToPurchase(actor: Actor, listId: string
   return purchase;
 }
 
-function normalizedLines(lines: PurchaseLineInput[]) {
+function normalizedLines(
+  lines: PurchaseLineInput[],
+  options?: { requirePartNumber?: boolean; requireUnitPrice?: boolean },
+) {
   if (!lines.length) throw new Error("Agrega al menos una partida.");
   return lines.map((line) => {
-    if (!line.partNumber.trim() || !Number.isInteger(line.quantity) || line.quantity < 1) throw new Error("Todas las partidas deben tener número y cantidad.");
-    return { ...line, partNumber: line.partNumber.trim(), description: line.description?.trim() ?? "" };
+    const partNumber = line.partNumber.trim();
+    const description = line.description?.trim() ?? "";
+    if (options?.requirePartNumber && !partNumber) throw new Error("Todas las partidas de refacción deben tener número de parte.");
+    if (!partNumber && !description) throw new Error("Cada partida necesita número de parte o descripción.");
+    if (!Number.isInteger(line.quantity) || line.quantity < 1) throw new Error("Todas las partidas deben tener cantidad válida.");
+    const unitPrice = line.unitPrice ?? null;
+    if (options?.requireUnitPrice && (!unitPrice || unitPrice <= 0)) throw new Error("Indica precio unitario en todas las partidas.");
+    return { ...line, partNumber, description, unitPrice };
   });
+}
+
+function purchaseAmountFromLines(lines: PurchaseLineInput[], fallback: number) {
+  const priced = lines.reduce((sum, line) => sum + line.quantity * (line.unitPrice ?? 0), 0);
+  return priced > 0 ? priced : fallback;
 }
 
 async function supplierForPurchase(actor: Actor, supplierId: string) {
@@ -736,27 +757,38 @@ export async function createPhaseOnePurchase(
     purchaseKind?: "GENERAL" | "REFACCION";
   },
 ) {
-  const lines = input.lines.length ? normalizedLines(input.lines) : [];
-  if (!lines.length && !input.concept?.trim() && input.purchaseKind !== "REFACCION") throw new Error("Indica una descripción general o una partida.");
   const refacciones = input.purchaseKind === "REFACCION";
+  const lines = input.lines.length
+    ? normalizedLines(input.lines, {
+        requirePartNumber: refacciones,
+        requireUnitPrice: Boolean(input.order),
+      })
+    : [];
+  if (!lines.length && !input.concept?.trim() && input.purchaseKind !== "REFACCION") throw new Error("Indica una descripción general o una partida.");
   const concept = purchaseConceptDefault(refacciones ? "REFACCION" : "GENERAL", input.concept, lines[0]?.description || lines[0]?.partNumber);
-  const finance = await validFinanceInput(actor, {
-    supplierId: input.supplierId,
-    expenseCategoryId: input.expenseCategoryId,
-    expenseSubcategoryId: input.expenseSubcategoryId,
-    paymentType: input.paymentType,
-    accountId: input.accountId,
-    purchaseDate: input.purchaseDate ?? new Date(),
-    amount: input.amount,
-    concept,
-  }, refacciones);
+  const amount = purchaseAmountFromLines(lines, input.amount);
+  const finance = await validFinanceInput(
+    actor,
+    {
+      supplierId: input.supplierId,
+      expenseCategoryId: input.expenseCategoryId,
+      expenseSubcategoryId: input.expenseSubcategoryId,
+      paymentType: input.paymentType,
+      accountId: input.accountId,
+      purchaseDate: input.purchaseDate ?? new Date(),
+      amount,
+      concept,
+    },
+    refacciones,
+  );
   const folio = await allocateFolio(actor.activeCompanyId, input.order ? "OC" : "COM");
+  const authorized = input.order && (actor.role === "CEO" || actor.role === "ADMINISTRADOR");
   return prisma.purchase.create({
     data: {
       folio,
       companyId: actor.activeCompanyId,
       kind: input.order ? "OC" : "COMPRA",
-      status: input.order ? "PENDIENTE_AUTORIZACION" : "PENDIENTE_VALIDAR",
+      status: input.order ? (authorized ? "AUTORIZADA" : "PENDIENTE_AUTORIZACION") : "PENDIENTE_VALIDAR",
       supplierId: finance.supplier.id,
       currency: finance.supplier.currency,
       expenseCategory: finance.expenseCategory,
@@ -768,10 +800,22 @@ export async function createPhaseOnePurchase(
       purchaseDate: input.purchaseDate ?? null,
       concept,
       quantity: lines[0]?.quantity ?? 1,
-      amount: input.amount,
+      amount,
+      authorizedAmount: authorized ? amount : null,
       destination: "INVENTARIO",
       requesterUserId: actor.userId,
-      lines: lines.length ? { create: lines } : undefined,
+      lines: lines.length
+        ? {
+            create: lines.map((line) => ({
+              partNumber: line.partNumber,
+              description: line.description ?? "",
+              quantity: line.quantity,
+              unitPrice: line.unitPrice ?? null,
+              sourceType: line.sourceType ?? null,
+              sourceId: line.sourceId ?? null,
+            })),
+          }
+        : undefined,
     },
     include: { lines: true, supplier: true },
   });

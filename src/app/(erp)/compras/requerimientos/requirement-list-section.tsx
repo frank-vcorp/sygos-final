@@ -85,6 +85,7 @@ export function RequirementListSection({
   title,
   rows,
   canManage,
+  showRequester = true,
   suppliers,
   categories,
   accounts,
@@ -94,6 +95,7 @@ export function RequirementListSection({
   title: string;
   rows: RequirementListRow[];
   canManage: boolean;
+  showRequester?: boolean;
   suppliers: SupplierWithCurrency[];
   categories: ExpenseCategoryCatalogItem[];
   accounts: Array<{ id: string; name: string }>;
@@ -114,7 +116,7 @@ export function RequirementListSection({
             <Th>Diag</Th>
             <Th>OS</Th>
             <Th>Equipo</Th>
-            <Th>Solicitante</Th>
+            {showRequester ? <Th>Solicitante</Th> : null}
             <Th>SLA</Th>
             {canManage ? <Th>Acciones</Th> : null}
           </tr>
@@ -127,7 +129,7 @@ export function RequirementListSection({
               <Td><ContextLink label={row.context.diagLabel} href={row.context.diagHref} /></Td>
               <Td><ContextLink label={row.context.osLabel} href={row.context.osHref} /></Td>
               <Td><ContextLink label={row.context.equipmentLabel} href={row.context.equipmentHref} /></Td>
-              <Td>{row.requesterName}</Td>
+              {showRequester ? <Td>{row.requesterName}</Td> : null}
               <Td><SlaCountdown dueAt={row.context.slaDueAt} /></Td>
               {canManage ? (
                 <Td className="flex flex-wrap gap-2">

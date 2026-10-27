@@ -1,10 +1,12 @@
 import type { NavGroupDef } from "@/lib/nav-links";
+import { requerimientosNavGroup } from "@/lib/nav-links";
 import type { Role } from "@/lib/roles";
 
 const showCoord = (role: Role) => role === "COORDINACION_ADMINISTRACION";
 
 /** Menú lateral de Coordinación de Administración (solo navegación; permisos sin cambio). */
 export const COORDINATION_NAV_GROUPS: NavGroupDef[] = [
+  requerimientosNavGroup(),
   {
     title: "Inicio",
     links: [
