@@ -57,12 +57,12 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
   const viewLabel = tabs.find(([key]) => key === view)?.[1] ?? view;
   return (
     <>
-      <PageHeader title="Compras" subtitle="Planea compras, registra las ya realizadas y consulta su validación." action={<div className="flex gap-2"><ActionLink href="/compras/nueva">Nueva compra</ActionLink><ActionLink href="/compras/registrar">Registrar compra</ActionLink></div>} />
+      <PageHeader title="Compras" subtitle="Consulta compras realizadas y registra compras urgentes sin requerimiento." action={<div className="flex gap-2"><ActionLink href="/compras/listas">Listas de compras</ActionLink><ActionLink href="/compras/registrar">Registrar compra</ActionLink></div>} />
       <FilterBar action="/compras">
         <select name="vista" defaultValue={view} aria-label="Vista de compras" className={`${controlClass} sm:w-[210px]`}>
           {tabs.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
         </select>
-        {view === "compras" ? <select name="estado" defaultValue={estado ?? ""} className={controlClass}><option value="">Todos los estados</option><option value="EN_PREPARACION">En preparación</option><option value="PENDIENTE_VALIDAR">Pendiente de validación</option></select> : null}
+        {view === "compras" ? <select name="estado" defaultValue={estado ?? ""} className={controlClass}><option value="">Todos los estados</option><option value="PENDIENTE_VALIDAR">Pendiente de validación</option></select> : null}
         {view === "compras" ? <input name="fecha" type="date" defaultValue={fecha ?? ""} className={controlClass} /> : null}
         {view === "compras" ? <input name="categoria" defaultValue={categoria ?? ""} placeholder="Categoría" className={controlClass} /> : null}
         <input name="q" defaultValue={query} placeholder="Folio o proveedor" className={`${controlClass} sm:flex-1`} />
@@ -74,7 +74,7 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
           ...(query ? [{ label: `Búsqueda: ${query}`, clearHref: listHref("/compras", { vista: view !== "compras" ? view : undefined }) }] : []),
         ]}
       />
-      <p className="mb-4 flex gap-4 text-sm"><TextLink href="/compras/oc">Nueva O.C.</TextLink><TextLink href="/compras/requerimientos">Requerimientos</TextLink></p>
+      <p className="mb-4 flex gap-4 text-sm"><TextLink href="/compras/requerimientos">Requerimientos</TextLink><TextLink href="/compras/listas">Listas de compras</TextLink><TextLink href="/compras/oc">Nueva O.C.</TextLink></p>
       {rows.length === 0 ? <Empty title="Sin compras en esta vista" body="La compra directa consume el presupuesto del mes desde que se registra." /> : (
         <ResponsiveData
           table={

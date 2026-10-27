@@ -28,7 +28,12 @@ export const GERENTE_SYSTRON_NAV_GROUPS: NavGroupDef[] = [
         show: (role, code) => gerenteSystron(role) && can(role, "purchase.operate", code),
       },
       {
-        href: "/compras?vista=directas",
+        href: "/compras/listas",
+        label: "Listas de compras",
+        show: (role, code) => gerenteSystron(role) && can(role, "purchase.operate", code),
+      },
+      {
+        href: "/compras",
         label: "Compras",
         show: (role, code) => gerenteSystron(role) && can(role, "purchase.operate", code),
       },
