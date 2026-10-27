@@ -24,10 +24,10 @@ export default async function ListasComprasPage({ searchParams }: { searchParams
   });
   return <><PageHeader back={{ href: "/compras", label: "Compras" }} title="Listas de compras" subtitle="Concentra requerimientos antes de realizar una compra." />
     <FilterBar action="/compras/listas">
-      <select name="estado" defaultValue={status ?? "TODAS"} className={controlClass} aria-label="Estado de lista de compras"><option value="ABIERTA">Listas abiertas</option><option value="CONVERTIDA">Listas convertidas en compra</option><option value="TODAS">Todas las listas</option></select>
-      <select name="proveedor" defaultValue={params.proveedor ?? ""} className={controlClass} aria-label="Proveedor"><option value="">Todos los proveedores</option>{suppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}</select>
-      <input name="fecha" type="date" defaultValue={params.fecha ?? ""} className={controlClass} aria-label="Fecha de creación" />
-      <Button type="submit" tone="ghost">Filtrar</Button>
+      <select name="estado" defaultValue={status ?? "TODAS"} className={`${controlClass} sm:w-auto sm:min-w-[13rem]`} aria-label="Estado de lista de compras"><option value="ABIERTA">Listas abiertas</option><option value="CONVERTIDA">Listas convertidas en compra</option><option value="TODAS">Todas las listas</option></select>
+      <select name="proveedor" defaultValue={params.proveedor ?? ""} className={`${controlClass} sm:min-w-[12rem] sm:flex-1`} aria-label="Proveedor"><option value="">Todos los proveedores</option>{suppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}</select>
+      <input name="fecha" type="date" defaultValue={params.fecha ?? ""} className={`${controlClass} sm:w-auto`} aria-label="Fecha de creación" />
+      <Button type="submit" tone="ghost" className="shrink-0">Filtrar</Button>
     </FilterBar>
     <ActiveFilters items={[
       ...(params.estado === "CONVERTIDA" ? [{ label: "Convertidas", clearHref: filters("estado") }] : []),
