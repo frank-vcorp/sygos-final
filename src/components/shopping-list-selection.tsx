@@ -31,7 +31,6 @@ export function ShoppingListSelection({
 
   return (
     <>
-      <input type="hidden" name="listKind" value={listKind} />
       <Field label="Lista de compras">
         <select name="shoppingListId" value={listId} onChange={(event) => setListId(event.target.value)} className={controlClass}>
           <option value="">Crear nueva lista</option>
