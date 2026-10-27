@@ -8,7 +8,7 @@ import { supplierIdFromForm } from "@/lib/form-quick-entities";
 import { optionalText, parseVersion, requiredText } from "@/lib/form";
 import { moneyFromForm } from "@/lib/money";
 import { can, type Action } from "@/lib/permissions";
-import { addRequirementToShoppingList, cancelOrder, changeAuthorizedOrder, convertShoppingListToPurchase, createPhaseOnePurchase, createRequirement, decideOrder, discardDirectPurchase, editDirectPurchase, editRequirement, processPurchase, purchaseRequirement, registerDirectPurchase, registerOrder, removeShoppingListLine, setRequirementStatus, setShoppingListSupplier, updateShoppingListLine } from "@/lib/purchases";
+import { addRequirementToShoppingList, cancelOrder, changeAuthorizedOrder, convertShoppingListToPurchase, createPhaseOnePurchase, createRequirement, decideOrder, discardDirectPurchase, editDirectPurchase, editRequirement, processPurchase, purchaseRequirement, registerDirectPurchase, registerOrder, removeShoppingListLine, requirementPartNumberRequired, setRequirementStatus, setShoppingListSupplier, updateShoppingListLine } from "@/lib/purchases";
 import { requireCompany } from "@/lib/session";
 
 async function guard(action: Action) {
@@ -164,11 +164,14 @@ export async function createRequirementAction(
   try {
     const session = await requireCompany();
     if (!can(session.role, "purchase.requirement.create", session.activeCompanyCode)) throw new Error("Los Técnicos deben solicitar refacciones desde OS o DX.");
+    const kind = formData.get("kind") === "REFACCION" ? "REFACCION" : "GENERAL";
     await createRequirement(session, {
-      partNumber: requiredText(formData.get("partNumber"), "Número de parte"),
+      partNumber: requirementPartNumberRequired(kind)
+        ? requiredText(formData.get("partNumber"), "Número de parte")
+        : optionalText(formData.get("partNumber")) ?? "",
       description: optionalText(formData.get("description")) ?? "",
       quantity: Number(formData.get("quantity")),
-      kind: formData.get("kind") === "REFACCION" ? "REFACCION" : "GENERAL",
+      kind,
     });
     await setFlash({ tone: "ok", message: "Requerimiento creado." });
     revalidatePath("/compras/requerimientos");
@@ -267,6 +270,11 @@ function purchaseFinanceFromForm(formData: FormData) {
   };
 }
 
+export type RequirementOverlayState =
+  | { status: "idle" }
+  | { status: "success"; message: string }
+  | { status: "error"; message: string };
+
 export async function purchaseRequirementAction(formData: FormData) {
   const requirementId = requiredText(formData.get("requirementId"), "Requerimiento");
   try {
@@ -279,13 +287,29 @@ export async function purchaseRequirementAction(formData: FormData) {
   }
 }
 
+export async function purchaseRequirementOverlayAction(
+  _previousState: RequirementOverlayState,
+  formData: FormData,
+): Promise<RequirementOverlayState> {
+  "use server";
+  const requirementId = requiredText(formData.get("requirementId"), "Requerimiento");
+  try {
+    const purchase = await purchaseRequirement(await guard("purchase.operate"), requirementId, purchaseFinanceFromForm(formData));
+    await setFlash({ tone: "ok", message: `${purchase.folio} creada desde el requerimiento.` });
+    revalidatePath("/compras/requerimientos");
+    return { status: "success", message: `${purchase.folio} registrada.` };
+  } catch (error) {
+    return { status: "error", message: bubble(error) };
+  }
+}
+
 export async function addToShoppingListAction(formData: FormData) {
   const requirementId = requiredText(formData.get("requirementId"), "Requerimiento");
   try {
     const list = await addRequirementToShoppingList(await guard("purchase.operate"), requirementId, {
       shoppingListId: optionalText(formData.get("shoppingListId")),
       supplierId: optionalText(formData.get("supplierId")),
-      partNumber: requiredText(formData.get("partNumber"), "Número de parte"),
+      partNumber: partNumberFromRequirementForm(formData),
       description: optionalText(formData.get("description")) ?? "",
       quantity: Number(formData.get("quantity")),
     });
@@ -295,6 +319,35 @@ export async function addToShoppingListAction(formData: FormData) {
     await setFlash({ tone: "error", message: bubble(error) });
     redirect(`/compras/requerimientos/${requirementId}/agregar-a-lista`);
   }
+}
+
+export async function addToShoppingListOverlayAction(
+  _previousState: RequirementOverlayState,
+  formData: FormData,
+): Promise<RequirementOverlayState> {
+  "use server";
+  const requirementId = requiredText(formData.get("requirementId"), "Requerimiento");
+  try {
+    const list = await addRequirementToShoppingList(await guard("purchase.operate"), requirementId, {
+      shoppingListId: optionalText(formData.get("shoppingListId")),
+      supplierId: optionalText(formData.get("supplierId")),
+      partNumber: partNumberFromRequirementForm(formData),
+      description: optionalText(formData.get("description")) ?? "",
+      quantity: Number(formData.get("quantity")),
+    });
+    await setFlash({ tone: "ok", message: `Agregado a ${list.folio}.` });
+    revalidatePath("/compras/requerimientos");
+    return { status: "success", message: `Agregado a ${list.folio}.` };
+  } catch (error) {
+    return { status: "error", message: bubble(error) };
+  }
+}
+
+function partNumberFromRequirementForm(formData: FormData) {
+  const kind = formData.get("requirementKind") === "REFACCION" ? "REFACCION" : "GENERAL";
+  return requirementPartNumberRequired(kind)
+    ? requiredText(formData.get("partNumber"), "Número de parte")
+    : optionalText(formData.get("partNumber")) ?? "";
 }
 
 export async function updateShoppingListLineAction(formData: FormData) {

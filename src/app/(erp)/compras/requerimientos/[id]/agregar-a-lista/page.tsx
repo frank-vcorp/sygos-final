@@ -18,13 +18,14 @@ export default async function AgregarAListaPage({ params }: { params: Promise<{ 
   if (!requirement) notFound();
   return <><PageHeader back={{ href: "/compras/requerimientos", label: "Requerimientos" }} title="Agregar a lista" subtitle="Ajusta la partida y elige una lista abierta o crea una nueva." />
     <FormPanel action={addToShoppingListAction}><input type="hidden" name="requirementId" value={requirement.id} />
+      <input type="hidden" name="requirementKind" value={requirement.kind} />
       <FormSection title="Lista y partida">
         <ShoppingListSelection
           lists={lists.map((list) => ({ id: list.id, folio: list.folio, supplierId: list.supplierId, supplierName: list.supplier?.name ?? null }))}
           suppliers={suppliers}
           allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)}
         />
-        <Field label="Número de parte"><input name="partNumber" defaultValue={requirement.partNumber} required className={controlClass} /></Field>
+        <Field label="Número de parte"><input name="partNumber" defaultValue={requirement.partNumber} required={requirement.kind === "REFACCION"} className={controlClass} /></Field>
         <Field label="Descripción"><input name="description" defaultValue={requirement.description} className={controlClass} /></Field>
         <Field label="Cantidad"><input name="quantity" type="number" min="1" defaultValue={requirement.quantity} required className={controlClass} /></Field>
       </FormSection><FormActions><Button type="submit">Agregar a lista</Button></FormActions>

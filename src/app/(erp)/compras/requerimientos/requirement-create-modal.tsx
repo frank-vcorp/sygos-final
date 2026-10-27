@@ -33,6 +33,7 @@ function RequirementCreateDialog({ onClose }: { onClose: () => void }) {
   const [state, formAction, pending] = useActionState(createRequirementAction, initialState);
   const router = useRouter();
   const partNumberRef = useRef<HTMLInputElement>(null);
+  const [kind, setKind] = useState<"GENERAL" | "REFACCION">("GENERAL");
 
   useEffect(() => {
     partNumberRef.current?.focus();
@@ -57,13 +58,18 @@ function RequirementCreateDialog({ onClose }: { onClose: () => void }) {
           description="La clasificación financiera ocurre al registrar la compra."
         >
           <Field label="Tipo">
-            <select name="kind" defaultValue="GENERAL" className={controlClass}>
+            <select
+              name="kind"
+              value={kind}
+              onChange={(event) => setKind(event.target.value === "REFACCION" ? "REFACCION" : "GENERAL")}
+              className={controlClass}
+            >
               <option value="GENERAL">General</option>
               <option value="REFACCION">Refacción</option>
             </select>
           </Field>
-          <Field label="Número de parte">
-            <input ref={partNumberRef} name="partNumber" required className={controlClass} />
+          <Field label="Número de parte" hint={kind === "GENERAL" ? "Opcional para compras generales." : undefined}>
+            <input ref={partNumberRef} name="partNumber" required={kind === "REFACCION"} className={controlClass} />
           </Field>
           <Field label="Descripción">
             <input name="description" className={controlClass} />

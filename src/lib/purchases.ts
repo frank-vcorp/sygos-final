@@ -4,6 +4,9 @@ import { ConcurrencyError } from "./form";
 import { recordHistory } from "./history";
 import { DEFAULT_MONTHLY_PURCHASE, DEFAULT_PURCHASE_LIMIT } from "./roles";
 import type { Role } from "./roles";
+import { requirementPartNumberRequired } from "./requirement-display";
+
+export { requirementPartNumberRequired } from "./requirement-display";
 
 type Actor = { userId: string; role: Role; activeCompanyId: string; activeCompanyCode: string };
 
@@ -464,7 +467,8 @@ export async function createRequirement(
   input: { partNumber: string; description?: string; quantity: number; kind?: "REFACCION" | "GENERAL"; sourceType?: string | null; sourceId?: string | null },
 ) {
   if (actor.role === "TECNICO") throw new Error("Los Técnicos solicitan refacciones desde OS o DX.");
-  if (!input.partNumber.trim()) throw new Error("Indica el número de parte.");
+  const kind = input.kind ?? (input.sourceType ? "REFACCION" : "GENERAL");
+  if (requirementPartNumberRequired(kind) && !input.partNumber.trim()) throw new Error("Indica el número de parte.");
   if (!Number.isInteger(input.quantity) || input.quantity < 1) throw new Error("La cantidad debe ser mayor a cero.");
   if (input.sourceType && input.sourceId) {
     const existing = await prisma.requirement.findFirst({ where: { companyId: actor.activeCompanyId, sourceType: input.sourceType, sourceId: input.sourceId } });
@@ -476,7 +480,7 @@ export async function createRequirement(
       partNumber: input.partNumber.trim(),
       description: input.description?.trim() ?? "",
       quantity: input.quantity,
-      kind: input.kind ?? (input.sourceType ? "REFACCION" : "GENERAL"),
+      kind,
       requesterUserId: actor.userId,
       sourceType: input.sourceType ?? null,
       sourceId: input.sourceId ?? null,
@@ -567,9 +571,13 @@ export async function addRequirementToShoppingList(
   requirementId: string,
   input: { shoppingListId?: string | null; supplierId?: string | null; partNumber: string; description?: string; quantity: number },
 ) {
-  if (!input.partNumber.trim() || !Number.isInteger(input.quantity) || input.quantity < 1) throw new Error("La partida no es válida.");
   const requirement = await prisma.requirement.findFirst({ where: { id: requirementId, companyId: actor.activeCompanyId, status: "PENDIENTE" } });
   if (!requirement) throw new Error("El requerimiento ya no está pendiente.");
+  if (requirementPartNumberRequired(requirement.kind) && !input.partNumber.trim()) throw new Error("Indica el número de parte.");
+  if (!requirementPartNumberRequired(requirement.kind) && !input.partNumber.trim() && !input.description?.trim()) {
+    throw new Error("Indica número de parte o descripción.");
+  }
+  if (!Number.isInteger(input.quantity) || input.quantity < 1) throw new Error("La partida no es válida.");
   let list = input.shoppingListId
     ? await prisma.shoppingList.findFirst({ where: { id: input.shoppingListId, companyId: actor.activeCompanyId, status: "ABIERTA" } })
     : null;

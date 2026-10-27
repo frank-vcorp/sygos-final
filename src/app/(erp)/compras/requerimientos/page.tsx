@@ -1,10 +1,11 @@
 import { redirect } from "next/navigation";
-import { Empty, PageHeader, Table, TableActionLink, Td, Th } from "@/components/ui";
+import { Empty, PageHeader } from "@/components/ui";
 import { RequirementCreateModal } from "./requirement-create-modal";
 import { RequirementFilters } from "./requirement-filters";
+import { RequirementListSection } from "./requirement-list-section";
 import { prisma } from "@/lib/db";
-import { formatWhen } from "@/lib/form";
 import { can } from "@/lib/permissions";
+import { loadRequirementListContexts } from "@/lib/requirement-list-enrichment";
 import { requirementStatusFilter } from "@/lib/requirement-filters";
 import { requireCompany } from "@/lib/session";
 
@@ -20,17 +21,42 @@ export default async function ComprasRequerimientosPage({ searchParams }: { sear
     orderBy: { createdAt: "desc" },
     take: 100,
   });
-  const groups = [
-    { title: "Refacciones", rows: rows.filter((row) => row.kind === "REFACCION") },
-    { title: "Generales", rows: rows.filter((row) => row.kind !== "REFACCION") },
-  ].filter((group) => group.rows.length);
-  const [requesters, rowRequesters] = await Promise.all([
+  const contexts = await loadRequirementListContexts(session.activeCompanyId, rows);
+  const [requesters, rowRequesters, suppliers, categories, accounts, shoppingLists] = await Promise.all([
     canManage
       ? prisma.user.findMany({ where: { companyId: session.activeCompanyId, active: true }, select: { id: true, name: true }, orderBy: { name: "asc" } })
       : Promise.resolve([]),
     prisma.user.findMany({ where: { id: { in: rows.map((row) => row.requesterUserId) } }, select: { id: true, name: true } }),
+    canManage
+      ? prisma.supplier.findMany({ where: { companyId: session.activeCompanyId, active: true }, orderBy: { name: "asc" }, select: { id: true, name: true } })
+      : Promise.resolve([]),
+    canManage
+      ? prisma.expenseCategory.findMany({ where: { companyId: session.activeCompanyId, active: true }, include: { subcategories: { where: { active: true } } }, orderBy: { name: "asc" } })
+      : Promise.resolve([]),
+    canManage
+      ? prisma.financeAccount.findMany({ where: { companyId: session.activeCompanyId, active: true }, orderBy: { name: "asc" }, select: { id: true, name: true } })
+      : Promise.resolve([]),
+    canManage
+      ? prisma.shoppingList.findMany({ where: { companyId: session.activeCompanyId, status: "ABIERTA" }, include: { supplier: true }, orderBy: { createdAt: "desc" } })
+      : Promise.resolve([]),
   ]);
   const requesterName = new Map(rowRequesters.map((user) => [user.id, user.name]));
+  const listRows = rows.map((row) => ({
+    id: row.id,
+    quantity: row.quantity,
+    partNumber: row.partNumber,
+    description: row.description,
+    kind: row.kind,
+    status: row.status,
+    requesterName: requesterName.get(row.requesterUserId) ?? "—",
+    shoppingListId: row.shoppingListId,
+    purchaseId: row.purchaseId,
+    context: contexts.get(row.id)!,
+  }));
+  const groups = [
+    { title: "Refacciones", rows: listRows.filter((row) => row.kind === "REFACCION") },
+    { title: "Generales", rows: listRows.filter((row) => row.kind !== "REFACCION") },
+  ].filter((group) => group.rows.length);
   return (
     <>
       <PageHeader
@@ -39,14 +65,28 @@ export default async function ComprasRequerimientosPage({ searchParams }: { sear
         action={canCreate ? <RequirementCreateModal /> : null}
       />
       <RequirementFilters estado={status} solicitante={params.solicitante ?? ""} fecha={params.fecha ?? ""} requesters={requesters} canFilterRequester={canManage} />
-      {rows.length === 0 ? <Empty title={`Sin requerimientos ${status.toLowerCase()}`} body="Crea una solicitud sencilla con número de parte y cantidad." /> : groups.map((group) => (
-        <section key={group.title} className="mb-6 overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--surface)]">
-          <h2 className="border-b border-[var(--line)] px-4 py-3 text-sm font-semibold">{group.title}</h2>
-          <Table><thead><tr><Th>Fecha</Th><Th>Solicitante</Th><Th>Partida</Th><Th>Cantidad</Th><Th>Estado</Th>{canManage ? <Th>Acciones</Th> : null}</tr></thead><tbody>
-            {group.rows.map((row) => <tr key={row.id}><Td>{formatWhen(row.createdAt)}</Td><Td>{requesterName.get(row.requesterUserId) ?? "—"}</Td><Td><strong>{row.partNumber}</strong>{row.description ? <span className="block text-sm text-[var(--muted)]">{row.description}</span> : null}</Td><Td>{row.quantity}</Td><Td>{row.status === "EN_LISTA" ? "En lista" : row.status}</Td>{canManage ? <Td className="flex flex-wrap gap-2">{row.status === "PENDIENTE" ? <><TableActionLink href={`/compras/requerimientos/${row.id}/comprar`} tone="primary">Comprar</TableActionLink><TableActionLink href={`/compras/requerimientos/${row.id}/agregar-a-lista`}>Agregar a lista</TableActionLink></> : row.shoppingListId ? <TableActionLink href={`/compras/listas/${row.shoppingListId}`}>Ver lista</TableActionLink> : row.purchaseId ? <TableActionLink href={`/compras/${row.purchaseId}`}>Ver compra</TableActionLink> : null}</Td> : null}</tr>)}
-          </tbody></Table>
-        </section>
-      ))}
+      {rows.length === 0 ? (
+        <Empty title={`Sin requerimientos ${status.toLowerCase()}`} body="Crea una solicitud con cantidad y, si aplica, número de parte." />
+      ) : (
+        groups.map((group) => (
+          <RequirementListSection
+            key={group.title}
+            title={group.title}
+            rows={group.rows}
+            canManage={canManage}
+            suppliers={suppliers}
+            categories={categories}
+            accounts={accounts}
+            allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)}
+            shoppingLists={shoppingLists.map((list) => ({
+              id: list.id,
+              folio: list.folio,
+              supplierId: list.supplierId,
+              supplierName: list.supplier?.name ?? null,
+            }))}
+          />
+        ))
+      )}
     </>
   );
 }
