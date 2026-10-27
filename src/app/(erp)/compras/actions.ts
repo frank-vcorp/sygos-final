@@ -61,7 +61,7 @@ export async function orderAction(formData: FormData) {
     redirect(`/compras/${purchase.id}`);
   } catch (error) {
     await setFlash({ tone: "error", message: bubble(error) });
-    redirect("/compras/oc");
+    redirect("/compras?vista=oc&nueva=1");
   }
 }
 
@@ -291,7 +291,7 @@ export async function phaseOnePurchaseAction(formData: FormData) {
     redirect(`/compras/${purchase.id}`);
   } catch (error) {
     await setFlash({ tone: "error", message: bubble(error) });
-    redirect(formData.get("order") === "si" ? "/compras/oc" : "/compras/nueva");
+    redirect(formData.get("order") === "si" ? "/compras?vista=oc&nueva=1" : "/compras/nueva");
   }
 }
 

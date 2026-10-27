@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { ActionLink, ActiveFilters, Badge, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, Table, Td, Th } from "@/components/ui";
 import { PurchaseFilters } from "./purchase-filters";
+import { PurchaseOrderModal } from "./oc/purchase-order-modal";
 import { PurchaseRegistrationModal } from "@/components/purchase-registration-modal";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
@@ -18,10 +19,10 @@ const STATUS: Record<string, string> = {
   ELIMINADA: "Eliminada",
 };
 
-export default async function ComprasPage({ searchParams }: { searchParams: Promise<{ vista?: string; q?: string; estado?: string; fecha?: string; categoria?: string; proveedor?: string; solicitante?: string; registrar?: string }> }) {
+export default async function ComprasPage({ searchParams }: { searchParams: Promise<{ vista?: string; q?: string; estado?: string; fecha?: string; categoria?: string; proveedor?: string; solicitante?: string; registrar?: string; nueva?: string }> }) {
   const session = await requireCompany();
   if (!can(session.role, "purchase.operate", session.activeCompanyCode)) redirect("/inicio");
-  const { vista, q, estado, fecha, categoria, proveedor, solicitante, registrar } = await searchParams;
+  const { vista, q, estado, fecha, categoria, proveedor, solicitante, registrar, nueva } = await searchParams;
   if (registrar === "1") redirect("/compras/nueva");
   const query = (q ?? "").trim();
   const view = vista === "autorizar" ? "autorizar" : vista === "procesar" ? "procesar" : vista === "oc" ? "oc" : vista === "legacy" ? "legacy" : "compras";
@@ -84,7 +85,16 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
         subtitle={view === "oc" ? "Autorización y seguimiento de órdenes de compra." : "Consulta compras realizadas y registra compras urgentes sin requerimiento."}
         action={
           <div className="flex flex-wrap gap-2">
-            {view === "oc" ? <ActionLink href="/compras/oc" tone="primary">Nueva O.C.</ActionLink> : null}
+            {view === "oc" ? (
+              <PurchaseOrderModal
+                suppliers={suppliers.map((supplier) => ({ id: supplier.id, name: `${supplier.name} · ${supplier.currency}` }))}
+                categories={categories}
+                accounts={accounts}
+                allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)}
+                initiallyOpen={nueva === "1"}
+                returnHref={filters()}
+              />
+            ) : null}
             {view === "compras" ? <ActionLink href="/compras/listas" tone="ghost">Listas de compras</ActionLink> : null}
             {view === "compras" ? (
             <PurchaseRegistrationModal

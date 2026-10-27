@@ -86,7 +86,7 @@ function erpNavGroups(role: Parameters<typeof can>[0]): Array<{ title: string | 
       const fromCatalog = LABELS[base];
       const label = link.label ?? (typeof fromCatalog === "function" ? fromCatalog : fromCatalog ?? base);
       const create = link.href.includes("vista=oc")
-        ? { href: "/compras/oc", show: (role: Parameters<typeof can>[0], code: string | null) => can(role, "purchase.operate", code) }
+        ? { href: "/compras?vista=oc&nueva=1", show: (role: Parameters<typeof can>[0], code: string | null) => can(role, "purchase.operate", code) }
         : CREATE[base];
       return {
         href: link.href,
