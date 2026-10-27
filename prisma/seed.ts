@@ -44,6 +44,13 @@ async function main() {
   });
 
   for (const companyId of [systron.id, servomotores.id]) {
+    for (const name of ["Refacciones", "Mantenimiento", "Operación", "Servicios"]) {
+      await prisma.expenseCategory.upsert({
+        where: { companyId_name: { companyId, name } },
+        update: { active: true },
+        create: { companyId, name },
+      });
+    }
     for (const account of [
       { suffix: "caja", name: "Caja", kind: "EFECTIVO" },
       { suffix: "banco", name: "Banco", kind: "BANCO" },

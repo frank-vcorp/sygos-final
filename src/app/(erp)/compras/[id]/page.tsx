@@ -1,5 +1,5 @@
 import { notFound, redirect } from "next/navigation";
-import { cancelOrderAction, changeOrderAction, decideOrderAction, discardDirectAction, editDirectAction, processPurchaseAction } from "../actions";
+import { addPurchaseLineAction, cancelOrderAction, changeOrderAction, confirmPhaseOnePurchaseAction, decideOrderAction, discardDirectAction, editDirectAction, processPurchaseAction, updatePurchaseLineAction } from "../actions";
 import { HistoryTimeline } from "@/components/history-timeline";
 import { SupplierPicker } from "@/components/supplier-picker";
 import {
@@ -20,11 +20,13 @@ import {
 import { prisma } from "@/lib/db";
 import { historyFor } from "@/lib/history";
 import { money } from "@/lib/money";
+import { formatWhen } from "@/lib/form";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
 
 const STATUS_LABEL: Record<string, string> = {
   PENDIENTE_VALIDAR: "Pendiente de validar",
+  EN_PREPARACION: "En preparación",
   PENDIENTE_AUTORIZACION: "Pendiente de autorización",
   AUTORIZADA: "Autorizada",
   RECHAZADA: "Rechazada",
@@ -39,7 +41,7 @@ export default async function CompraPage({ params }: { params: Promise<{ id: str
   const { id } = await params;
   const row = await prisma.purchase.findFirst({
     where: { id, companyId: session.activeCompanyId },
-    include: { supplier: true },
+    include: { supplier: true, lines: true },
   });
   if (!row) notFound();
   const accounts = await prisma.financeAccount.findMany({ where: { companyId: session.activeCompanyId, active: true, kind: { not: "TARJETA" } }, orderBy: { name: "asc" } });
@@ -51,7 +53,9 @@ export default async function CompraPage({ params }: { params: Promise<{ id: str
   const ready = (row.kind === "DIRECTA" && row.status === "PENDIENTE_VALIDAR") || (row.kind === "OC" && row.status === "AUTORIZADA");
 
   let primaryAction: React.ReactNode = null;
-  if (row.kind === "OC" && row.status === "PENDIENTE_AUTORIZACION" && canAuthorize) {
+  if (row.kind === "COMPRA" && row.status === "EN_PREPARACION") {
+    primaryAction = <DetailAnchorButton href="#confirmar-compra">Confirmar compra</DetailAnchorButton>;
+  } else if (row.kind === "OC" && row.status === "PENDIENTE_AUTORIZACION" && canAuthorize) {
     primaryAction = (
       <form action={decideOrderAction} className="inline">
         <input type="hidden" name="purchaseId" value={row.id} />
@@ -79,7 +83,7 @@ export default async function CompraPage({ params }: { params: Promise<{ id: str
       <EntityDetailHeader
         back={{ href: "/compras", label: "Compras" }}
         title={row.folio}
-        subtitle={row.kind === "OC" ? "Orden de compra" : "Compra directa"}
+        subtitle={row.kind === "OC" ? "Orden de compra" : row.kind === "COMPRA" ? "Compra Fase 1" : "Compra directa"}
         status={<Badge tone={row.status === "PENDIENTE_AUTORIZACION" || row.status === "PENDIENTE_VALIDAR" ? "warn" : "neutral"}>{STATUS_LABEL[row.status] ?? row.status}</Badge>}
         meta={
           <>
@@ -87,6 +91,9 @@ export default async function CompraPage({ params }: { params: Promise<{ id: str
               {row.supplier ? <TextLink href={`/proveedores/${row.supplier.id}`}>{row.supplier.name}</TextLink> : "Sin proveedor"}
             </EntityMetaItem>
             <EntityMetaItem label="Importe">{money(row.amount)}</EntityMetaItem>
+            <EntityMetaItem label="Moneda">{row.currency}</EntityMetaItem>
+            {row.expenseCategory ? <EntityMetaItem label="Categoría">{row.expenseCategory}{row.expenseSubcategory ? ` · ${row.expenseSubcategory}` : ""}</EntityMetaItem> : null}
+            {row.purchaseDate ? <EntityMetaItem label="Fecha de compra">{formatWhen(row.purchaseDate)}</EntityMetaItem> : null}
             <EntityMetaItem label="Destino">
               {row.destination}
               {row.destinationRef ? ` · ${row.destinationRef}` : ""}
@@ -104,6 +111,14 @@ export default async function CompraPage({ params }: { params: Promise<{ id: str
         {row.settlement ? <p className={row.authorizedAmount != null ? "mt-1" : ""}>Procesada como {row.settlement === "CREDITO" ? "cuenta por pagar" : "egreso"}.</p> : null}
         {row.cancelReason ? <p className="mt-1">Cancelación: {row.cancelReason}</p> : null}
       </Card>
+      {row.kind === "COMPRA" ? (
+        <Card className="mb-4 p-4">
+          <h2 className="font-semibold">Partidas relacionadas</h2>
+          <div className="mt-3 space-y-2">{row.lines.map((line) => <div key={line.id} className="rounded border border-[var(--line)] p-3"><form action={updatePurchaseLineAction} className="grid gap-2 sm:grid-cols-4"><input type="hidden" name="purchaseId" value={row.id} /><input type="hidden" name="lineId" value={line.id} /><input name="partNumber" defaultValue={line.partNumber} className={controlClass} /><input name="description" defaultValue={line.description} className={controlClass} /><input name="quantity" type="number" min="1" defaultValue={line.quantity} className={controlClass} /><Button type="submit" tone="ghost">Guardar</Button></form></div>)}</div>
+          {row.status === "EN_PREPARACION" ? <form action={addPurchaseLineAction} className="mt-4 grid gap-2 sm:grid-cols-4"><input type="hidden" name="purchaseId" value={row.id} /><input name="partNumber" placeholder="Número de parte" required className={controlClass} /><input name="description" placeholder="Descripción" className={controlClass} /><input name="quantity" type="number" min="1" defaultValue="1" className={controlClass} /><Button type="submit" tone="ghost">+ Agregar partida</Button></form> : null}
+        </Card>
+      ) : null}
+      {row.kind === "COMPRA" && row.status === "EN_PREPARACION" ? <FormPanel id="confirmar-compra" action={confirmPhaseOnePurchaseAction} className="mb-4 max-w-xl scroll-mt-24"><input type="hidden" name="purchaseId" value={row.id} /><FormSection title="Confirmar compra" description="Al confirmar pasa a Pendiente de validación."><p className="text-sm text-[var(--muted)]">La compra se considerará realizada y quedará disponible para el proceso administrativo posterior.</p></FormSection><FormActions><Button type="submit">Confirmar compra</Button></FormActions></FormPanel> : null}
       {canManage && row.kind === "DIRECTA" && row.status === "PENDIENTE_VALIDAR" ? (
         <FormPanel id="cuadrar-compra" action={editDirectAction} className="scroll-mt-24 max-w-xl">
           <input type="hidden" name="purchaseId" value={row.id} />

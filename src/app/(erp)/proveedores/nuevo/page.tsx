@@ -14,6 +14,7 @@ export default async function NuevoProveedorPage() {
         <FormSection title="Datos generales" description="Identifica al proveedor y la persona con quien se mantiene contacto.">
           <Field label="Nombre o razón social"><input name="name" required className={controlClass} /></Field>
           <Field label="Categoría"><input name="category" className={controlClass} /></Field>
+          <Field label="Moneda"><select name="currency" defaultValue="MXN" className={controlClass}><option value="MXN">MXN</option><option value="USD">USD</option></select></Field>
           <Field label="Contacto"><input name="contactName" className={controlClass} /></Field>
           <Field label="Teléfono"><input name="phone" className={controlClass} /></Field>
           <Field label="Correo"><input name="email" className={controlClass} /></Field>

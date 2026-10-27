@@ -16,19 +16,22 @@ const STATUS: Record<string, string> = {
   ELIMINADA: "Eliminada",
 };
 
-export default async function ComprasPage({ searchParams }: { searchParams: Promise<{ vista?: string; q?: string }> }) {
+export default async function ComprasPage({ searchParams }: { searchParams: Promise<{ vista?: string; q?: string; estado?: string; fecha?: string; categoria?: string }> }) {
   const session = await requireCompany();
   if (!can(session.role, "purchase.operate", session.activeCompanyCode)) redirect("/inicio");
-  const { vista, q } = await searchParams;
+  const { vista, q, estado, fecha, categoria } = await searchParams;
   const query = (q ?? "").trim();
-  const view = vista === "autorizar" ? "autorizar" : vista === "procesar" ? "procesar" : vista === "oc" ? "oc" : "directas";
+  const view = vista === "autorizar" ? "autorizar" : vista === "procesar" ? "procesar" : vista === "oc" ? "oc" : vista === "legacy" ? "legacy" : "compras";
+  const dateFilter = fecha ? { gte: new Date(`${fecha}T00:00:00`), lt: new Date(`${fecha}T23:59:59`) } : undefined;
   const where = view === "autorizar"
     ? { kind: "OC", status: "PENDIENTE_AUTORIZACION" }
     : view === "procesar"
       ? { OR: [{ kind: "DIRECTA", status: "PENDIENTE_VALIDAR" }, { kind: "OC", status: "AUTORIZADA" }] }
       : view === "oc"
         ? { kind: "OC", status: { not: "ELIMINADA" } }
-        : { kind: "DIRECTA", status: { not: "ELIMINADA" } };
+        : view === "legacy"
+          ? { kind: "DIRECTA", status: { not: "ELIMINADA" } }
+          : { kind: "COMPRA", ...(estado ? { status: estado } : { status: { not: "ELIMINADA" } }) };
   const rows = await prisma.purchase.findMany({
     where: {
       companyId: session.activeCompanyId,
@@ -38,13 +41,15 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
             OR: [{ folio: { contains: query } }, { supplier: { name: { contains: query } } }],
           }
         : {}),
+      ...(categoria && view === "compras" ? { expenseCategory: { contains: categoria } } : {}),
+      ...(dateFilter ? { createdAt: dateFilter } : {}),
     },
     include: { supplier: true },
     orderBy: { createdAt: "desc" },
     take: 100,
   });
   const tabs = [
-    ["directas", "Compras directas"],
+    ["compras", "Compras"],
     ["oc", "Órdenes de compra"],
     ["procesar", "Por procesar"],
     ...(session.role === "CEO" || session.role === "ADMINISTRADOR" ? [["autorizar", "Por autorizar"] as const] : []),
@@ -52,21 +57,24 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
   const viewLabel = tabs.find(([key]) => key === view)?.[1] ?? view;
   return (
     <>
-      <PageHeader title="Compras" subtitle="Cada compra termina en un egreso o en una cuenta por pagar, nunca en ambos." action={<ActionLink href="/compras/nueva">Nueva compra</ActionLink>} />
+      <PageHeader title="Compras" subtitle="Planea compras, registra las ya realizadas y consulta su validación." action={<div className="flex gap-2"><ActionLink href="/compras/nueva">Nueva compra</ActionLink><ActionLink href="/compras/registrar">Registrar compra</ActionLink></div>} />
       <FilterBar action="/compras">
         <select name="vista" defaultValue={view} aria-label="Vista de compras" className={`${controlClass} sm:w-[210px]`}>
           {tabs.map(([key, label]) => <option key={key} value={key}>{label}</option>)}
         </select>
+        {view === "compras" ? <select name="estado" defaultValue={estado ?? ""} className={controlClass}><option value="">Todos los estados</option><option value="EN_PREPARACION">En preparación</option><option value="PENDIENTE_VALIDAR">Pendiente de validación</option></select> : null}
+        {view === "compras" ? <input name="fecha" type="date" defaultValue={fecha ?? ""} className={controlClass} /> : null}
+        {view === "compras" ? <input name="categoria" defaultValue={categoria ?? ""} placeholder="Categoría" className={controlClass} /> : null}
         <input name="q" defaultValue={query} placeholder="Folio o proveedor" className={`${controlClass} sm:flex-1`} />
         <Button type="submit" tone="ghost">Buscar</Button>
       </FilterBar>
       <ActiveFilters
         items={[
-          ...(view !== "directas" ? [{ label: viewLabel, clearHref: listHref("/compras", { q: query || undefined }) }] : []),
-          ...(query ? [{ label: `Búsqueda: ${query}`, clearHref: listHref("/compras", { vista: view !== "directas" ? view : undefined }) }] : []),
+          ...(view !== "compras" ? [{ label: viewLabel, clearHref: listHref("/compras", { q: query || undefined }) }] : []),
+          ...(query ? [{ label: `Búsqueda: ${query}`, clearHref: listHref("/compras", { vista: view !== "compras" ? view : undefined }) }] : []),
         ]}
       />
-      <p className="mb-4 text-sm"><TextLink href="/compras/oc">Nueva orden de compra</TextLink></p>
+      <p className="mb-4 flex gap-4 text-sm"><TextLink href="/compras/oc">Nueva O.C.</TextLink><TextLink href="/compras/requerimientos">Requerimientos</TextLink></p>
       {rows.length === 0 ? <Empty title="Sin compras en esta vista" body="La compra directa consume el presupuesto del mes desde que se registra." /> : (
         <ResponsiveData
           table={

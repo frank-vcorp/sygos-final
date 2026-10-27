@@ -26,6 +26,7 @@ function supplierData(formData: FormData) {
     creditDays: optionalInt(formData.get("creditDays")),
     issuesInvoice: optionalBool(formData.get("issuesInvoice")),
     category: optionalText(formData.get("category")),
+    currency: requiredText(formData.get("currency"), "Moneda"),
   };
 }
 

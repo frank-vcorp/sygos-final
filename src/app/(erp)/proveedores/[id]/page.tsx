@@ -38,6 +38,7 @@ export default async function ProveedorDetallePage({ params }: { params: Promise
               {supplier.contactName ? <EntityMetaItem label="Contacto">{supplier.contactName}</EntityMetaItem> : null}
               {supplier.phone ? <EntityMetaItem label="Teléfono">{supplier.phone}</EntityMetaItem> : null}
               {supplier.category ? <EntityMetaItem label="Categoría">{supplier.category}</EntityMetaItem> : null}
+              <EntityMetaItem label="Moneda">{supplier.currency}</EntityMetaItem>
               {supplier.creditDays != null ? <EntityMetaItem label="Crédito">{supplier.creditDays} días</EntityMetaItem> : null}
             </>
           )
@@ -53,6 +54,7 @@ export default async function ProveedorDetallePage({ params }: { params: Promise
           <FormSection title="Datos generales" description="Nombre, contacto y categoría comercial.">
             <Field label="Nombre o razón social"><input name="name" defaultValue={supplier.name} className={controlClass} /></Field>
             <Field label="Categoría"><input name="category" defaultValue={supplier.category ?? ""} className={controlClass} /></Field>
+            <Field label="Moneda"><select name="currency" defaultValue={supplier.currency} className={controlClass}><option value="MXN">MXN</option><option value="USD">USD</option></select></Field>
             <Field label="Contacto"><input name="contactName" defaultValue={supplier.contactName ?? ""} className={controlClass} /></Field>
             <Field label="Teléfono"><input name="phone" defaultValue={supplier.phone ?? ""} className={controlClass} /></Field>
             <Field label="Correo"><input name="email" defaultValue={supplier.email ?? ""} className={controlClass} /></Field>

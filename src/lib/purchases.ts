@@ -343,6 +343,141 @@ export async function payCard(actor: Actor, cardId: string, bankId: string, amou
   });
 }
 
+export type PurchaseLineInput = {
+  partNumber: string;
+  description?: string;
+  quantity: number;
+  sourceType?: string | null;
+  sourceId?: string | null;
+};
+
+export async function createRequirement(
+  actor: Actor,
+  input: { partNumber: string; description?: string; quantity: number; sourceType?: string | null; sourceId?: string | null },
+) {
+  if (actor.role === "TECNICO") throw new Error("Los Técnicos solicitan refacciones desde OS o DX.");
+  if (!input.partNumber.trim()) throw new Error("Indica el número de parte.");
+  if (!Number.isInteger(input.quantity) || input.quantity < 1) throw new Error("La cantidad debe ser mayor a cero.");
+  return prisma.requirement.create({
+    data: {
+      companyId: actor.activeCompanyId,
+      partNumber: input.partNumber.trim(),
+      description: input.description?.trim() ?? "",
+      quantity: input.quantity,
+      requesterUserId: actor.userId,
+      sourceType: input.sourceType ?? null,
+      sourceId: input.sourceId ?? null,
+    },
+  });
+}
+
+export async function editRequirement(
+  actor: Actor,
+  requirementId: string,
+  input: { partNumber: string; description?: string; quantity: number },
+) {
+  const row = await prisma.requirement.findFirst({ where: { id: requirementId, companyId: actor.activeCompanyId, status: "PENDIENTE" } });
+  if (!row) throw new Error("El requerimiento ya no está pendiente.");
+  if (actor.role === "TECNICO" || (row.requesterUserId !== actor.userId && !["GERENTE_OPERATIVO_SYSTRON", "GERENTE_OPERATIVO_SERVOMOTORES", "CEO", "ADMINISTRADOR", "COORDINACION_ADMINISTRACION"].includes(actor.role))) {
+    throw new Error("No tienes permiso para editar este requerimiento.");
+  }
+  if (!input.partNumber.trim() || !Number.isInteger(input.quantity) || input.quantity < 1) throw new Error("La partida no es válida.");
+  return prisma.requirement.update({
+    where: { id: row.id },
+    data: { partNumber: input.partNumber.trim(), description: input.description?.trim() ?? "", quantity: input.quantity },
+  });
+}
+
+export async function setRequirementStatus(actor: Actor, requirementId: string, status: "ATENDIDO" | "CANCELADO") {
+  if (!["GERENTE_OPERATIVO_SYSTRON", "GERENTE_OPERATIVO_SERVOMOTORES", "CEO", "ADMINISTRADOR", "COORDINACION_ADMINISTRACION"].includes(actor.role)) {
+    throw new Error("Solo el gerente puede cambiar el estado del requerimiento.");
+  }
+  const updated = await prisma.requirement.updateMany({
+    where: { id: requirementId, companyId: actor.activeCompanyId, status: "PENDIENTE" },
+    data: { status },
+  });
+  if (!updated.count) throw new Error("El requerimiento ya no está pendiente.");
+}
+
+function normalizedLines(lines: PurchaseLineInput[]) {
+  if (!lines.length) throw new Error("Agrega al menos una partida.");
+  return lines.map((line) => {
+    if (!line.partNumber.trim() || !Number.isInteger(line.quantity) || line.quantity < 1) throw new Error("Todas las partidas deben tener número y cantidad.");
+    return { ...line, partNumber: line.partNumber.trim(), description: line.description?.trim() ?? "" };
+  });
+}
+
+async function supplierForPurchase(actor: Actor, supplierId: string) {
+  const supplier = await prisma.supplier.findFirst({ where: { id: supplierId, companyId: actor.activeCompanyId, active: true } });
+  if (!supplier) throw new Error("Selecciona un proveedor activo de esta empresa.");
+  return supplier;
+}
+
+export async function createPhaseOnePurchase(
+  actor: Actor,
+  input: {
+    supplierId: string;
+    expenseCategory: string;
+    expenseSubcategory?: string | null;
+    paymentType: string;
+    purchaseDate?: Date | null;
+    amount: number;
+    lines: PurchaseLineInput[];
+    planned: boolean;
+    order?: boolean;
+  },
+) {
+  if (!Number.isFinite(input.amount) || input.amount <= 0) throw new Error("El monto no es válido.");
+  const supplier = await supplierForPurchase(actor, input.supplierId);
+  const lines = normalizedLines(input.lines);
+  if (!input.expenseCategory.trim() || !input.paymentType.trim()) throw new Error("Categoría y tipo de pago son obligatorios.");
+  const folio = await allocateFolio(actor.activeCompanyId, input.order ? "OC" : "COM");
+  return prisma.purchase.create({
+    data: {
+      folio,
+      companyId: actor.activeCompanyId,
+      kind: input.order ? "OC" : "COMPRA",
+      status: input.order ? "PENDIENTE_AUTORIZACION" : input.planned ? "EN_PREPARACION" : "PENDIENTE_VALIDAR",
+      supplierId: supplier.id,
+      currency: supplier.currency,
+      expenseCategory: input.expenseCategory.trim(),
+      expenseSubcategory: input.expenseSubcategory?.trim() || null,
+      paymentType: input.paymentType.trim(),
+      purchaseDate: input.purchaseDate ?? null,
+      concept: lines[0]!.description || lines[0]!.partNumber,
+      quantity: lines[0]!.quantity,
+      amount: input.amount,
+      destination: "INVENTARIO",
+      requesterUserId: actor.userId,
+      lines: { create: lines },
+    },
+    include: { lines: true, supplier: true },
+  });
+}
+
+export async function addPurchaseLine(actor: Actor, purchaseId: string, line: PurchaseLineInput) {
+  const row = await prisma.purchase.findFirst({ where: { id: purchaseId, companyId: actor.activeCompanyId, status: "EN_PREPARACION" } });
+  if (!row) throw new Error("Solo se pueden agregar partidas a una compra en preparación.");
+  const [normalized] = normalizedLines([line]);
+  return prisma.purchaseLine.create({ data: { purchaseId: row.id, ...normalized } });
+}
+
+export async function updatePurchaseLine(actor: Actor, lineId: string, line: PurchaseLineInput) {
+  const current = await prisma.purchaseLine.findFirst({ where: { id: lineId, purchase: { companyId: actor.activeCompanyId, status: "EN_PREPARACION" } } });
+  if (!current) throw new Error("La partida ya no está disponible para edición.");
+  const [normalized] = normalizedLines([line]);
+  return prisma.purchaseLine.update({ where: { id: current.id }, data: normalized });
+}
+
+export async function confirmPhaseOnePurchase(actor: Actor, purchaseId: string) {
+  const row = await prisma.purchase.findFirst({ where: { id: purchaseId, companyId: actor.activeCompanyId, status: "EN_PREPARACION" }, include: { lines: true } });
+  if (!row) throw new Error("La compra no está en preparación.");
+  if (!row.supplierId || !row.expenseCategory || !row.paymentType || !row.purchaseDate || row.amount <= 0 || !row.lines.length) {
+    throw new Error("Completa proveedor, categoría, tipo de pago, fecha, monto y partidas antes de confirmar.");
+  }
+  return prisma.purchase.update({ where: { id: row.id }, data: { status: "PENDIENTE_VALIDAR" } });
+}
+
 export async function attachProof(actor: Actor, movementId: string, proofNote: string) {
   const row = await prisma.financeMovement.findFirst({ where: { id: movementId, companyId: actor.activeCompanyId, pendingProof: true } });
   if (!row) throw new Error("Ese movimiento no está pendiente de comprobación.");

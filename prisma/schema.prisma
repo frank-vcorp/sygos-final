@@ -55,6 +55,8 @@ model Company {
   financeAccounts  FinanceAccount[]
   financeMovements FinanceMovement[]
   purchases        Purchase[]
+  requirements     Requirement[]
+  expenseCategories ExpenseCategory[]
   collaborators    Collaborator[]
   payrollPeriods   PayrollPeriod[]
   commissionRuns   CommissionRun[]
@@ -192,6 +194,7 @@ model Supplier {
   creditDays    Int?
   issuesInvoice Boolean?
   category      String?
+  currency      String   @default("MXN")
   active        Boolean  @default(true)
   isSystem      Boolean  @default(false)
   createdAt     DateTime @default(now())
@@ -855,6 +858,11 @@ model Purchase {
   destination      String
   destinationRef   String?
   settlement       String?
+  currency         String   @default("MXN")
+  expenseCategory  String?
+  expenseSubcategory String?
+  paymentType      String?
+  purchaseDate     DateTime?
   requesterUserId  String
   accountId        String?
   payableId        String?
@@ -863,9 +871,69 @@ model Purchase {
   version          Int       @default(1)
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
+  lines            PurchaseLine[]
 
   @@unique([companyId, folio])
   @@index([companyId, status])
+}
+
+model PurchaseLine {
+  id          String   @id @default(cuid())
+  purchaseId  String
+  purchase    Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+  partNumber  String
+  description String   @default("")
+  quantity    Int      @default(1)
+  sourceType  String?
+  sourceId    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([purchaseId])
+  @@index([sourceType, sourceId])
+}
+
+model Requirement {
+  id              String   @id @default(cuid())
+  companyId       String
+  company         Company  @relation(fields: [companyId], references: [id])
+  partNumber      String
+  description     String   @default("")
+  quantity        Int
+  status          String   @default("PENDIENTE")
+  requesterUserId String
+  sourceType      String?
+  sourceId        String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([companyId, status])
+  @@index([companyId, requesterUserId])
+}
+
+model ExpenseCategory {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id])
+  name      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  subcategories ExpenseSubcategory[]
+
+  @@unique([companyId, name])
+}
+
+model ExpenseSubcategory {
+  id         String          @id @default(cuid())
+  categoryId String
+  category   ExpenseCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  name       String
+  active     Boolean         @default(true)
+  createdAt  DateTime        @default(now())
+
+  @@unique([categoryId, name])
 }
 
 model Collaborator {

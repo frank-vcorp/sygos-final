@@ -1,12 +1,13 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { prisma } from "@/lib/db";
 import { setFlash } from "@/lib/flash";
 import { supplierIdFromForm } from "@/lib/form-quick-entities";
 import { optionalText, parseVersion, requiredText } from "@/lib/form";
 import { moneyFromForm } from "@/lib/money";
 import { can, type Action } from "@/lib/permissions";
-import { cancelOrder, changeAuthorizedOrder, decideOrder, discardDirectPurchase, editDirectPurchase, processPurchase, registerDirectPurchase, registerOrder } from "@/lib/purchases";
+import { cancelOrder, changeAuthorizedOrder, confirmPhaseOnePurchase, createPhaseOnePurchase, createRequirement, decideOrder, discardDirectPurchase, editDirectPurchase, editRequirement, processPurchase, registerDirectPurchase, registerOrder, setRequirementStatus, addPurchaseLine, updatePurchaseLine } from "@/lib/purchases";
 import { requireCompany } from "@/lib/session";
 
 async function guard(action: Action) {
@@ -146,5 +147,117 @@ export async function processPurchaseAction(formData: FormData) {
   } catch (error) {
     await setFlash({ tone: "error", message: bubble(error) });
   }
+  redirect(`/compras/${id}`);
+}
+
+export async function createRequirementAction(formData: FormData) {
+  "use server";
+  try {
+    const session = await requireCompany();
+    if (!can(session.role, "purchase.requirement.create", session.activeCompanyCode)) throw new Error("Los Técnicos deben solicitar refacciones desde OS o DX.");
+    const requirement = await createRequirement(session, {
+      partNumber: requiredText(formData.get("partNumber"), "Número de parte"),
+      description: optionalText(formData.get("description")) ?? "",
+      quantity: Number(formData.get("quantity")),
+    });
+    await setFlash({ tone: "ok", message: "Requerimiento creado." });
+    redirect(`/compras/requerimientos?created=${requirement.id}`);
+  } catch (error) {
+    await setFlash({ tone: "error", message: bubble(error) });
+    redirect("/compras/requerimientos");
+  }
+}
+
+export async function importTechnicalRequirementAction(formData: FormData) {
+  "use server";
+  try {
+    const session = await guard("purchase.operate");
+    const sourceType = requiredText(formData.get("sourceType"), "Origen");
+    const sourceId = requiredText(formData.get("sourceId"), "Solicitud");
+    if (sourceType === "OS") {
+      const source = await prisma.partRequest.findFirst({ where: { id: sourceId, companyId: session.activeCompanyId, status: "SOLICITADA" } });
+      if (!source) throw new Error("La solicitud de OS ya no está pendiente.");
+      await createRequirement(session, { partNumber: source.partNumber, description: source.description, quantity: source.qtyRequested, sourceType, sourceId });
+    } else if (sourceType === "DX") {
+      const source = await prisma.partPresolicitud.findFirst({ where: { id: sourceId, companyId: session.activeCompanyId, status: "ACTIVA" } });
+      if (!source) throw new Error("La solicitud de DX ya no está activa.");
+      await createRequirement(session, { partNumber: source.partNumber, description: source.description, quantity: source.qtyRequested, sourceType, sourceId });
+    } else throw new Error("Origen de solicitud no válido.");
+    await setFlash({ tone: "ok", message: "Solicitud técnica incorporada a Requerimientos." });
+  } catch (error) { await setFlash({ tone: "error", message: bubble(error) }); }
+  redirect("/compras/requerimientos");
+}
+
+export async function updateRequirementAction(formData: FormData) {
+  "use server";
+  const id = requiredText(formData.get("requirementId"), "Requerimiento");
+  try {
+    const session = await guard("purchase.operate");
+    await editRequirement(session, id, {
+      partNumber: requiredText(formData.get("partNumber"), "Número de parte"),
+      description: optionalText(formData.get("description")) ?? "",
+      quantity: Number(formData.get("quantity")),
+    });
+    await setFlash({ tone: "ok", message: "Requerimiento actualizado." });
+  } catch (error) { await setFlash({ tone: "error", message: bubble(error) }); }
+  redirect("/compras/requerimientos");
+}
+
+export async function requirementStatusAction(formData: FormData) {
+  "use server";
+  const id = requiredText(formData.get("requirementId"), "Requerimiento");
+  try {
+    const session = await guard("purchase.operate");
+    await setRequirementStatus(session, id, formData.get("status") === "CANCELADO" ? "CANCELADO" : "ATENDIDO");
+    await setFlash({ tone: "ok", message: "Estado actualizado." });
+  } catch (error) { await setFlash({ tone: "error", message: bubble(error) }); }
+  redirect("/compras/requerimientos");
+}
+
+export async function phaseOnePurchaseAction(formData: FormData) {
+  "use server";
+  try {
+    const session = await guard("purchase.operate");
+    const linePart = optionalText(formData.get("partNumber"));
+    const lines: { partNumber: string; description: string; quantity: number }[] = linePart
+      ? [{ partNumber: linePart, description: optionalText(formData.get("description")) ?? "", quantity: Number(formData.get("quantity")) }]
+      : JSON.parse(String(formData.get("lines") || "[]"));
+    const purchase = await createPhaseOnePurchase(session, {
+      supplierId: requiredText(formData.get("supplierId"), "Proveedor"),
+      expenseCategory: requiredText(formData.get("expenseCategory"), "Categoría"),
+      expenseSubcategory: optionalText(formData.get("expenseSubcategory")),
+      paymentType: requiredText(formData.get("paymentType"), "Tipo de pago"),
+      purchaseDate: new Date(requiredText(formData.get("purchaseDate"), "Fecha de compra")),
+      amount: moneyFromForm(formData.get("amount")),
+      lines,
+      planned: formData.get("planned") === "si",
+      order: formData.get("order") === "si",
+    });
+    await setFlash({ tone: "ok", message: `${purchase.folio} creada.` });
+    redirect(`/compras/${purchase.id}`);
+  } catch (error) { await setFlash({ tone: "error", message: bubble(error) }); redirect("/compras/nueva"); }
+}
+
+export async function confirmPhaseOnePurchaseAction(formData: FormData) {
+  "use server";
+  const id = requiredText(formData.get("purchaseId"), "Compra");
+  try { await confirmPhaseOnePurchase(await guard("purchase.operate"), id); await setFlash({ tone: "ok", message: "Compra confirmada y pendiente de validación." }); }
+  catch (error) { await setFlash({ tone: "error", message: bubble(error) }); }
+  redirect(`/compras/${id}`);
+}
+
+export async function addPurchaseLineAction(formData: FormData) {
+  "use server";
+  const id = requiredText(formData.get("purchaseId"), "Compra");
+  try { await addPurchaseLine(await guard("purchase.operate"), id, { partNumber: requiredText(formData.get("partNumber"), "Número de parte"), description: optionalText(formData.get("description")) ?? "", quantity: Number(formData.get("quantity")) }); await setFlash({ tone: "ok", message: "Partida agregada." }); }
+  catch (error) { await setFlash({ tone: "error", message: bubble(error) }); }
+  redirect(`/compras/${id}`);
+}
+
+export async function updatePurchaseLineAction(formData: FormData) {
+  "use server";
+  const id = requiredText(formData.get("purchaseId"), "Compra");
+  try { await updatePurchaseLine(await guard("purchase.operate"), requiredText(formData.get("lineId"), "Partida"), { partNumber: requiredText(formData.get("partNumber"), "Número de parte"), description: optionalText(formData.get("description")) ?? "", quantity: Number(formData.get("quantity")) }); await setFlash({ tone: "ok", message: "Partida actualizada." }); }
+  catch (error) { await setFlash({ tone: "error", message: bubble(error) }); }
   redirect(`/compras/${id}`);
 }

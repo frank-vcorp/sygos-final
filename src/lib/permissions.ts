@@ -36,6 +36,7 @@ export type Action =
   | "payment.validate"
   | "receivable.view"
   | "purchase.operate"
+  | "purchase.requirement.create"
   | "purchase.authorize"
   | "finance.view"
   | "finance.manage"
@@ -183,6 +184,8 @@ export function can(role: Role, action: Action, companyCode?: string | null): bo
       if (admin || ceo || coord) return true;
       if (companyCode === "SYSTRON") return gerenteSy;
       return companyCode === "SERVOMOTORES" && gerenteSm;
+    case "purchase.requirement.create":
+      return role !== "TECNICO";
     case "purchase.authorize":
       return admin || ceo;
     case "finance.view":
