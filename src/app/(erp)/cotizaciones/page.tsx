@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { ClientNameLink } from "@/components/client-entity-links";
-import { ActionLink, ActiveFilters, Badge, Button, Card, controlClass, Empty, FilterBar, ListCap, MobileCard, PageHeader, RecordLink, ResponsiveData, Table, Td, Th, TextLink } from "@/components/ui";
+import { CotizacionesListFilter } from "@/components/compact-list-filters";
+import { ActionLink, ActiveFilters, Badge, Card, Empty, ListCap, MobileCard, PageHeader, RecordLink, ResponsiveData, Table, Td, Th, TextLink } from "@/components/ui";
 import { listHref } from "@/lib/list-url";
 import { homePath } from "@/lib/home";
 import { prisma } from "@/lib/db";
@@ -68,15 +69,7 @@ export default async function CotizacionesPage({ searchParams }: { searchParams:
         subtitle={session.role === "VENTAS" ? "Consulta el avance de tus propuestas y da seguimiento a las que esperan respuesta del cliente." : "Revisa las propuestas que necesitan precio y las que esperan respuesta del cliente."}
         action={can(session.role, "quote.create", session.activeCompanyCode) ? <ActionLink href="/cotizaciones/nuevo">Nueva cotización</ActionLink> : null}
       />
-      <FilterBar action="/cotizaciones">
-        <select name="vista" defaultValue={pending ? "pendientes" : decision ? "decision" : "todas"} aria-label="Vista de cotizaciones" className={`${controlClass} sm:w-[190px]`}>
-          <option value="todas">Todas</option>
-          <option value="pendientes">Sin precio</option>
-          <option value="decision">Esperan respuesta</option>
-        </select>
-        <input name="q" defaultValue={query} placeholder="Buscar por folio o cliente" className={`${controlClass} sm:flex-1`} />
-        <Button type="submit" tone="ghost">Buscar</Button>
-      </FilterBar>
+      <CotizacionesListFilter vista={pending ? "pendientes" : decision ? "decision" : "todas"} q={query} />
       <ActiveFilters
         items={[
           ...(pending ? [{ label: "Pendientes de cotizar", clearHref: listHref("/cotizaciones", { q: query || undefined }) }] : []),

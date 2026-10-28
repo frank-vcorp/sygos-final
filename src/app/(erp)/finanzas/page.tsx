@@ -1,12 +1,12 @@
 import { redirect } from "next/navigation";
 import { accountAction, payCardAction, payPayableAction, proofAction, transferAction } from "./actions";
+import { FinanzasMesFilter } from "@/components/compact-list-filters";
 import {
   ActiveFilters,
   Button,
   Card,
   controlClass,
   Field,
-  FilterBar,
   FormActions,
   FormPanel,
   FormSection,
@@ -84,13 +84,7 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
           ...(key !== defaultMes ? [{ label: `Mes ${key}`, clearHref: listHref("/finanzas", { vista: focus || undefined }) }] : []),
         ]}
       />
-      <FilterBar action="/finanzas">
-        <Field label="Mes del resumen">
-          <input name="mes" type="month" defaultValue={key} className={controlClass} />
-        </Field>
-        {focus ? <input type="hidden" name="vista" value={focus} /> : null}
-        <Button type="submit" tone="ghost">Ver mes</Button>
-      </FilterBar>
+      <FinanzasMesFilter mes={key} vista={focus} />
       {showSection("dashboard") ? (
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <KpiCard label="Facturado" value={money(facturado)} href="/facturacion" />

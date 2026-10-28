@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { ActionLink, ActiveFilters, Badge, Button, controlClass, Empty, FilterBar, MobileCard, PageHeader, RecordLink, ResponsiveData, Table, Td, Th } from "@/components/ui";
+import { ProspectosListFilter } from "@/components/compact-list-filters";
+import { ActionLink, ActiveFilters, Badge, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, Table, Td, Th } from "@/components/ui";
 import { listHref } from "@/lib/list-url";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
@@ -31,14 +32,7 @@ export default async function ProspectosPage({ searchParams }: { searchParams: P
   return (
     <>
       <PageHeader title="Prospectos" subtitle="Da seguimiento a oportunidades abiertas y convierte en cliente cuando estén listas." action={<ActionLink href="/prospectos/nuevo">Nuevo prospecto</ActionLink>} />
-      <FilterBar action="/prospectos">
-        <input name="q" defaultValue={query} placeholder="Empresa o nombre" className={`${controlClass} sm:flex-1`} />
-        <select name="estado" defaultValue={status} className={`${controlClass} sm:w-auto`}>
-          <option value="ABIERTOS">Abiertos</option>
-          {Object.entries(LABEL).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-        </select>
-        <Button type="submit" tone="ghost">Buscar</Button>
-      </FilterBar>
+      <ProspectosListFilter q={query} estado={status} />
       <ActiveFilters
         items={[
           ...(status !== "ABIERTOS" ? [{ label: LABEL[status] ?? status, clearHref: listHref("/prospectos", { q: query || undefined }) }] : []),

@@ -10,6 +10,7 @@ import {
 import { Card, KpiCard, PageHeader, RecordLink, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
+import { purchaseListHref } from "@/lib/purchase-filter-links";
 import { can } from "@/lib/permissions";
 import { homePath } from "@/lib/home";
 import {
@@ -545,16 +546,29 @@ async function Sales({
 }
 
 async function Coordination({ companyId, code, vista }: { companyId: string; code: string; vista?: string }) {
-  const [invoices, remissions, payments, purchases, orders, proofs, payrolls, dueReceivables] = await Promise.all([
+  const comprasPendientesHref = purchaseListHref({
+    vista: "compras",
+    q: "",
+    estado: "PENDIENTE_VALIDAR",
+    fecha: "",
+    categoria: "",
+    proveedor: "",
+    solicitante: "",
+  });
+  const [invoices, remissions, payments, purchases, openPayables, payableSum] = await Promise.all([
     prisma.billingDocument.findMany({ where: { companyId, status: "SOLICITADA", kind: { not: "REMISION" } }, take: 12 }),
     prisma.billingDocument.findMany({ where: { companyId, status: "SOLICITADA", kind: "REMISION" }, take: 12 }),
     prisma.payment.findMany({ where: { companyId, status: "PENDIENTE" }, orderBy: { createdAt: "asc" }, take: 12 }),
     prisma.purchase.findMany({ where: { companyId, kind: "DIRECTA", status: "PENDIENTE_VALIDAR" }, take: 12 }),
-    prisma.purchase.findMany({ where: { companyId, kind: "OC", status: "AUTORIZADA" }, take: 12 }),
-    prisma.financeMovement.findMany({ where: { companyId, pendingProof: true }, take: 12 }),
-    prisma.payrollPeriod.findMany({ where: { companyId, status: "PRELIMINAR" }, include: { lines: true }, take: 6 }),
-    prisma.receivable.findMany({ where: { companyId, balance: { gt: 0 }, dueAt: { lt: new Date() } }, include: { document: true }, take: 12 }),
+    prisma.payable.findMany({
+      where: { companyId, balance: { gt: 0 } },
+      include: { supplier: true, document: true },
+      orderBy: { dueAt: "asc" },
+      take: 12,
+    }),
+    prisma.payable.aggregate({ where: { companyId, balance: { gt: 0 } }, _sum: { balance: true } }),
   ]);
+  const billingPending = invoices.length + remissions.length;
   const subtitle =
     vista === "pendientes"
       ? "Pendientes administrativos de la empresa activa."
@@ -564,9 +578,9 @@ async function Coordination({ companyId, code, vista }: { companyId: string; cod
   const quickLinks = [
     { href: "/facturacion?vista=solicitudes", label: "Facturación pendiente" },
     { href: "/pagos?vista=pendientes", label: "Pagos por validar" },
-    { href: "/compras?vista=procesar", label: "Compras y O.C. por procesar" },
-    { href: "/cobranza?vista=vencidas", label: "Cobranza vencida" },
-    { href: "/finanzas", label: "Finanzas" },
+    { href: comprasPendientesHref, label: "Compras por validar" },
+    { href: "/finanzas?vista=cxp", label: "Cuentas por pagar" },
+    { href: "/finanzas?vista=ingresos", label: "Finanzas" },
     { href: "/nomina", label: "Nómina" },
   ];
   return (
@@ -580,21 +594,27 @@ async function Coordination({ companyId, code, vista }: { companyId: string; cod
         </section>
       ) : (
         <section className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <KpiCard label="Facturas solicitadas" value={String(invoices.length)} href="/facturacion?vista=solicitudes" />
+          <KpiCard label="Facturas y remisiones" value={String(billingPending)} href="/facturacion?vista=solicitudes" />
           <KpiCard label="Pagos por validar" value={String(payments.length)} href="/pagos?vista=pendientes" />
-          <KpiCard label="Cobranza vencida" value={String(dueReceivables.length)} href="/cobranza?vista=vencidas" />
-          <KpiCard label="Nómina preliminar" value={String(payrolls.length)} href="/nomina" />
+          <KpiCard label="Compras por validar" value={String(purchases.length)} href={comprasPendientesHref} />
+          <KpiCard label="CxP abierta" value={money(payableSum._sum.balance ?? 0)} href="/finanzas?vista=cxp" />
         </section>
       )}
       <div className="grid gap-3">
         <Block title="Facturas solicitadas" empty="Sin solicitudes." bandejaHref="/facturacion?vista=solicitudes" rows={invoices.map((row) => ({ href: `/facturacion/${row.id}`, label: row.folio, detail: row.kind }))} />
         <Block title="Remisiones solicitadas" empty="Sin remisiones por generar." bandejaHref="/facturacion?vista=remisiones" rows={remissions.map((row) => ({ href: `/facturacion/${row.id}`, label: row.folio, detail: "Remisión" }))} />
         <Block title="Pagos por validar" empty="Sin pagos pendientes." bandejaHref="/pagos?vista=pendientes" rows={payments.map((row) => ({ href: `/pagos/${row.id}`, label: row.folio, detail: money(row.amount) }))} />
-        <Block title="Compras directas" empty="Nada por cuadrar." bandejaHref="/compras?vista=procesar" rows={purchases.map((row) => ({ href: `/compras/${row.id}`, label: row.folio, detail: money(row.amount) }))} />
-        <Block title="Órdenes autorizadas" empty="Nada por procesar." bandejaHref="/compras?vista=procesar" rows={orders.map((row) => ({ href: `/compras/${row.id}`, label: row.folio, detail: money(row.amount) }))} />
-        <Block title="Cobranza vencida" empty="Sin cuentas vencidas." bandejaHref="/cobranza?vista=vencidas" rows={dueReceivables.map((row) => ({ href: `/cobranza/${row.id}`, label: row.document.folio, detail: money(row.balance) }))} />
-        <Block title="Nómina preliminar" empty="No hay una semana abierta." bandejaHref="/nomina" rows={payrolls.map((row) => ({ href: `/nomina/${row.id}`, label: row.folio, detail: row.lines.some((line) => line.missing) ? "Falta un dato para timbrar" : row.status }))} />
-        {code === "SERVOMOTORES" || proofs.length > 0 ? <Block title="Pendientes de comprobación" empty="Sin comprobantes pendientes." rows={proofs.map((row) => ({ href: "/finanzas", label: money(row.amount), detail: row.note ?? "Egreso" }))} /> : null}
+        <Block title="Compras por validar" empty="Nada pendiente de validación." bandejaHref={comprasPendientesHref} rows={purchases.map((row) => ({ href: `/compras/${row.id}`, label: row.folio, detail: money(row.amount) }))} />
+        <Block
+          title="Cuentas por pagar"
+          empty="Sin saldos por pagar."
+          bandejaHref="/finanzas?vista=cxp"
+          rows={openPayables.map((row) => ({
+            href: "/finanzas?vista=cxp",
+            label: row.document?.folio ?? row.supplier.name,
+            detail: money(row.balance),
+          }))}
+        />
       </div>
     </>
   );

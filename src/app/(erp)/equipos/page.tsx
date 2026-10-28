@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { ClientNameLink } from "@/components/client-entity-links";
-import { ActionLink, ActiveFilters, Badge, Button, controlClass, Empty, FilterBar, ListCap, MobileCard, PageHeader, RecordLink, ResponsiveData, Table, Td, Th, TextLink } from "@/components/ui";
+import { EquiposQueryFilter } from "@/components/compact-list-filters";
+import { ActionLink, ActiveFilters, Badge, Empty, ListCap, MobileCard, PageHeader, RecordLink, ResponsiveData, Table, Td, Th, TextLink } from "@/components/ui";
 import { CUSTODY_LABEL, type Custody } from "@/lib/custody";
 import { prisma } from "@/lib/db";
 import { homePath } from "@/lib/home";
@@ -11,7 +12,7 @@ export default async function EquiposPage({ searchParams }: { searchParams: Prom
   const session = await requireCompany();
   const mayList =
     can(session.role, "equi.view", session.activeCompanyCode)
-    && (session.role === "VENTAS" || can(session.role, "equipment.catalog", session.activeCompanyCode));
+    && (session.role === "VENTAS" || session.role === "COORDINACION_ADMINISTRACION" || can(session.role, "equipment.catalog", session.activeCompanyCode));
   if (!mayList) redirect(homePath(session.role, session.activeCompanyCode));
   const canEditClient = can(session.role, "client.edit", session.activeCompanyCode);
   const { q } = await searchParams;
@@ -36,10 +37,7 @@ export default async function EquiposPage({ searchParams }: { searchParams: Prom
         subtitle="Identidad EQUI de SYSTRON. El folio no se reutiliza."
         action={can(session.role, "equi.create", session.activeCompanyCode) ? <ActionLink href="/equipos/nuevo">Nuevo EQUI</ActionLink> : null}
       />
-      <FilterBar action="/equipos">
-        <input name="q" defaultValue={query} placeholder="Folio, modelo, serie o cliente" className={`${controlClass} sm:flex-1`} />
-        <Button type="submit" tone="ghost">Buscar</Button>
-      </FilterBar>
+      <EquiposQueryFilter q={query} />
       <ActiveFilters items={query ? [{ label: `Búsqueda: ${query}`, clearHref: "/equipos" }] : []} />
       {rows.length === 0 ? (
         <Empty
