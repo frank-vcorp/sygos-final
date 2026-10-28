@@ -8,7 +8,8 @@ const showCoord = (role: Role) => role === "COORDINACION_ADMINISTRACION";
 export const COORDINATION_NAV_GROUPS: NavGroupDef[] = [
   {
     title: "Inicio",
-    links: [{ href: "/panel?vista=pendientes", label: "Inicio", show: showCoord }],
+    direct: true,
+    links: [{ href: "/panel?vista=pendientes", show: showCoord }],
   },
   {
     title: "Finanzas",
