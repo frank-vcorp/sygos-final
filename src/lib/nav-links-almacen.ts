@@ -7,7 +7,6 @@ const showAlmacen = (role: Role) => role === "ALMACEN";
 
 /** Menú lateral de Almacén SYSTRON: inicio = bandeja de entradas + inventario y horas extra. */
 export const ALMACEN_NAV_GROUPS: NavGroupDef[] = [
-  requerimientosNavGroup(),
   {
     title: "Inicio",
     direct: true,
@@ -30,4 +29,5 @@ export const ALMACEN_NAV_GROUPS: NavGroupDef[] = [
       },
     ],
   },
+  requerimientosNavGroup(),
 ];

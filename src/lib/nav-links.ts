@@ -25,11 +25,11 @@ export type NavGroupDef = {
 /** Entrada lateral suelta para quien puede capturar requerimientos en SYSTRON. */
 export function requerimientosNavGroup(): NavGroupDef {
   return {
-    title: "Requerimientos",
-    direct: true,
+    title: null,
     links: [
       {
         href: "/compras/requerimientos",
+        label: "Requerimientos",
         show: (role, code) => can(role, "purchase.requirement.create", code),
       },
     ],
@@ -130,7 +130,7 @@ export function navGroupsForRole(role: Role): NavGroupDef[] {
   if (role === "SUPERVISOR_TECNICO") return SUPERVISOR_NAV_GROUPS;
   if (role === "TECNICO") return TECNICO_NAV_GROUPS;
   if (role === "GERENTE_OPERATIVO_SYSTRON") return GERENTE_SYSTRON_NAV_GROUPS;
-  if (role === "ADMINISTRADOR") return [requerimientosNavGroup(), ...NAV_GROUPS];
+  if (role === "ADMINISTRADOR") return [...NAV_GROUPS, requerimientosNavGroup()];
   return NAV_GROUPS;
 }
 

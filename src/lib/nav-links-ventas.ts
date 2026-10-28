@@ -12,7 +12,6 @@ function showEquiCatalog(role: Role, companyCode: string | null) {
 
 /** Menú lateral del rol Ventas (SYSTRON). */
 export const VENTAS_NAV_GROUPS: NavGroupDef[] = [
-  requerimientosNavGroup(),
   {
     title: null,
     links: [
@@ -52,4 +51,5 @@ export const VENTAS_NAV_GROUPS: NavGroupDef[] = [
       { href: "/cuenta", label: "Usuario", show: ventas },
     ],
   },
+  requerimientosNavGroup(),
 ];

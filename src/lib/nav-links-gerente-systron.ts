@@ -6,7 +6,6 @@ const gerenteSystron = (role: Role) => role === "GERENTE_OPERATIVO_SYSTRON";
 
 /** Menú lateral del Gerente Operativo SYSTRON. */
 export const GERENTE_SYSTRON_NAV_GROUPS: NavGroupDef[] = [
-  requerimientosNavGroup(),
   {
     title: null,
     links: [
@@ -70,4 +69,5 @@ export const GERENTE_SYSTRON_NAV_GROUPS: NavGroupDef[] = [
       },
     ],
   },
+  requerimientosNavGroup(),
 ];

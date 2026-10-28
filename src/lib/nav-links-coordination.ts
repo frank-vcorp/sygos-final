@@ -6,7 +6,6 @@ const showCoord = (role: Role) => role === "COORDINACION_ADMINISTRACION";
 
 /** Menú lateral de Coordinación de Administración (solo navegación; permisos sin cambio). */
 export const COORDINATION_NAV_GROUPS: NavGroupDef[] = [
-  requerimientosNavGroup(),
   {
     title: "Inicio",
     links: [
@@ -91,4 +90,5 @@ export const COORDINATION_NAV_GROUPS: NavGroupDef[] = [
       { href: "/reportes/nomina", label: "Personal y nómina", show: showCoord },
     ],
   },
+  requerimientosNavGroup(),
 ];

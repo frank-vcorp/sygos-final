@@ -7,7 +7,6 @@ const supervisor = (role: Role) => role === "SUPERVISOR_TECNICO";
 
 /** Menú lateral del Supervisor Técnico (SYSTRON). */
 export const SUPERVISOR_NAV_GROUPS: NavGroupDef[] = [
-  requerimientosNavGroup(),
   {
     title: null,
     links: [
@@ -37,4 +36,5 @@ export const SUPERVISOR_NAV_GROUPS: NavGroupDef[] = [
       { href: "/cuenta", label: "Usuario", show: supervisor },
     ],
   },
+  requerimientosNavGroup(),
 ];

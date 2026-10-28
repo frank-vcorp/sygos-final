@@ -3,7 +3,6 @@ import type { Role } from "@/lib/roles";
 /** Menú lateral esperado por rol (SYSTRON). Alineado al Discovery funcional. */
 export const SYSTRON_NAV: Partial<Record<Role, readonly string[]>> = {
   VENTAS: [
-    "/compras/requerimientos",
     "/panel",
     "/agenda",
     "/servicios/activos",
@@ -18,6 +17,7 @@ export const SYSTRON_NAV: Partial<Record<Role, readonly string[]>> = {
     "/pagos",
     "/personal/horas",
     "/cuenta",
+    "/compras/requerimientos",
   ],
   TECNICO: [
     "/servicios/activos",
@@ -27,16 +27,15 @@ export const SYSTRON_NAV: Partial<Record<Role, readonly string[]>> = {
     "/cuenta",
   ],
   SUPERVISOR_TECNICO: [
-    "/compras/requerimientos",
     "/panel",
     "/servicios/activos",
     "/servicios/historial",
     "/personal/horas",
     "/personal/vacaciones",
     "/cuenta",
+    "/compras/requerimientos",
   ],
   GERENTE_OPERATIVO_SYSTRON: [
-    "/compras/requerimientos",
     "/panel",
     "/servicios/activos",
     "/servicios/historial",
@@ -47,10 +46,10 @@ export const SYSTRON_NAV: Partial<Record<Role, readonly string[]>> = {
     "/personal/horas",
     "/personal/vacaciones",
     "/inventario",
-  ],
-  ALMACEN: ["/compras/requerimientos", "/custodia", "/inventario", "/personal/horas"],
-  CEO: [
     "/compras/requerimientos",
+  ],
+  ALMACEN: ["/custodia", "/inventario", "/personal/horas", "/compras/requerimientos"],
+  CEO: [
     "/panel?vista=autorizacion",
     "/panel?vista=comercial",
     "/panel?vista=tecnico",
@@ -116,9 +115,9 @@ export const SYSTRON_NAV: Partial<Record<Role, readonly string[]>> = {
     "/configuracion#identidad",
     "/configuracion#prioridades",
     "/usuarios",
+    "/compras/requerimientos",
   ],
   COORDINACION_ADMINISTRACION: [
-    "/compras/requerimientos",
     "/panel?vista=pendientes",
     "/cobranza?vista=vencidas",
     "/clientes",
@@ -160,6 +159,7 @@ export const SYSTRON_NAV: Partial<Record<Role, readonly string[]>> = {
     "/reportes/cxp",
     "/reportes/cxc",
     "/reportes/nomina",
+    "/compras/requerimientos",
   ],
   AYUDANTE_GENERAL: [],
   KIOSCO_ASISTENCIA: ["/kiosco"],

@@ -7,7 +7,6 @@ const showCeo = (role: Role) => role === "CEO";
 
 /** Menú lateral del CEO (solo navegación). */
 export const CEO_NAV_GROUPS: NavGroupDef[] = [
-  requerimientosNavGroup(),
   {
     title: "Inicio",
     links: [
@@ -126,4 +125,5 @@ export const CEO_NAV_GROUPS: NavGroupDef[] = [
       { href: "/usuarios", label: "Usuarios", show: showCeo },
     ],
   },
+  requerimientosNavGroup(),
 ];
