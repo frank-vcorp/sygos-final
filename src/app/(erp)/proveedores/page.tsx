@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { SupplierCreateModal } from "./supplier-create-modal";
-import { ActiveFilters, Button, controlClass, Empty, FilterBar, MobileCard, PageHeader, RecordLink, ResponsiveData, Table, Td, Th } from "@/components/ui";
+import { ProveedoresListFilter } from "@/components/compact-list-filters";
+import { ActiveFilters, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, Table, Td, Th } from "@/components/ui";
 import { listHref } from "@/lib/list-url";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
@@ -23,14 +24,7 @@ export default async function ProveedoresPage({ searchParams }: { searchParams: 
   return (
     <>
       <PageHeader title="Proveedores" subtitle={session.activeCompanyName ?? ""} action={<SupplierCreateModal />} />
-      <FilterBar action="/proveedores">
-        <input name="q" defaultValue={query} placeholder="Nombre o razón social" className={`${controlClass} sm:min-w-[12rem] sm:flex-1`} />
-        <select name="estado" defaultValue={estadoFilter} className={`${controlClass} sm:w-auto`}>
-          <option value="activos">Activos</option>
-          <option value="inactivos">Inactivos</option>
-        </select>
-        <Button type="submit" tone="ghost">Buscar</Button>
-      </FilterBar>
+      <ProveedoresListFilter q={query} estado={estadoFilter} />
       <ActiveFilters
         items={[
           ...(estadoFilter === "inactivos" ? [{ label: "Inactivos", clearHref: listHref("/proveedores", { q: query || undefined }) }] : []),

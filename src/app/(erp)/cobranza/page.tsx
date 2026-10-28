@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { ClientNameLink } from "@/components/client-entity-links";
-import { ActiveFilters, Badge, Button, controlClass, Empty, FilterBar, MobileCard, PageHeader, RecordLink, ResponsiveData, Table, Td, Th } from "@/components/ui";
+import { CobranzaVistaFilter } from "@/components/compact-list-filters";
+import { ActiveFilters, Badge, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, Table, Td, Th } from "@/components/ui";
 import { homePath } from "@/lib/home";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
@@ -38,14 +39,7 @@ export default async function CobranzaPage({ searchParams }: { searchParams: Pro
   return (
     <>
       <PageHeader title={session.role === "VENTAS" ? "Mi cobranza" : "Cobranza"} subtitle="Saldos de esta empresa. Vencida es saldo después de la fecha." />
-      <FilterBar action="/cobranza">
-        <select name="vista" defaultValue={selectedVista} aria-label="Vista de cobranza" className={`${controlClass} sm:w-[190px]`}>
-          <option value="todas">Todas</option>
-          <option value="cxc">Con saldo</option>
-          <option value="vencidas">Vencidas</option>
-        </select>
-        <Button type="submit" tone="ghost">Buscar</Button>
-      </FilterBar>
+      <CobranzaVistaFilter vista={selectedVista} />
       <ActiveFilters
         items={[
           ...(selectedVista === "cxc" ? [{ label: "Con saldo", clearHref: "/cobranza" }] : []),

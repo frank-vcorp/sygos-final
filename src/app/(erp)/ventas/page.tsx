@@ -1,13 +1,11 @@
 import { redirect } from "next/navigation";
 import { ClientNameLink } from "@/components/client-entity-links";
+import { VentasListFilter } from "@/components/compact-list-filters";
 import {
   ActionLink,
   ActiveFilters,
   Badge,
-  Button,
-  controlClass,
   Empty,
-  FilterBar,
   MobileCard,
   PageHeader,
   RecordLink,
@@ -76,15 +74,7 @@ export default async function VentasPage({ searchParams }: { searchParams: Promi
         back={session.role === "VENTAS" ? { href: "/panel", label: "Inicio" } : undefined}
         action={can(session.role, "quote.create", session.activeCompanyCode) ? <ActionLink href="/ventas/nuevo">Nueva venta de equipo</ActionLink> : null}
       />
-      <FilterBar action="/ventas">
-        <select name="vista" defaultValue={view} aria-label="Vista de ventas" className={`${controlClass} sm:w-[190px]`}>
-          <option value="todas">Todas</option>
-          <option value="pendientes">Requieren atención</option>
-          <option value="al_dia">Al día</option>
-        </select>
-        <input name="q" defaultValue={query} placeholder="Folio, cliente o cotización" className={`${controlClass} sm:flex-1`} />
-        <Button type="submit" tone="ghost">Buscar</Button>
-      </FilterBar>
+      <VentasListFilter vista={view} q={query} />
       <ActiveFilters
         items={[
           ...(vistaLabel ? [{ label: vistaLabel, clearHref: listHref("/ventas", { q: query || undefined }) }] : []),
