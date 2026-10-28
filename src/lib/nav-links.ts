@@ -1,3 +1,4 @@
+import { AYUDANTE_NAV_GROUPS } from "@/lib/nav-links-ayudante";
 import { ALMACEN_NAV_GROUPS } from "@/lib/nav-links-almacen";
 import { CEO_NAV_GROUPS } from "@/lib/nav-links-ceo";
 import { COORDINATION_NAV_GROUPS } from "@/lib/nav-links-coordination";
@@ -125,6 +126,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
 export function navGroupsForRole(role: Role): NavGroupDef[] {
   if (role === "CEO") return CEO_NAV_GROUPS;
   if (role === "COORDINACION_ADMINISTRACION") return COORDINATION_NAV_GROUPS;
+  if (role === "AYUDANTE_GENERAL") return AYUDANTE_NAV_GROUPS;
   if (role === "ALMACEN") return ALMACEN_NAV_GROUPS;
   if (role === "VENTAS") return VENTAS_NAV_GROUPS;
   if (role === "SUPERVISOR_TECNICO") return SUPERVISOR_NAV_GROUPS;

@@ -161,7 +161,7 @@ export const SYSTRON_NAV: Partial<Record<Role, readonly string[]>> = {
     "/reportes/nomina",
     "/compras/requerimientos",
   ],
-  AYUDANTE_GENERAL: [],
+  AYUDANTE_GENERAL: ["/cuenta"],
   KIOSCO_ASISTENCIA: ["/kiosco"],
 };
 
@@ -251,6 +251,7 @@ export const SYSTRON_NAV_FORBIDDEN: Partial<Record<Role, readonly string[]>> = {
 
 /** Menú lateral esperado por rol en empresa Servomotores. */
 export const SERVOMOTORES_NAV: Partial<Record<Role, readonly string[]>> = {
+  AYUDANTE_GENERAL: ["/cuenta"],
   GERENTE_OPERATIVO_SERVOMOTORES: [
     "/panel",
     "/cotizaciones",

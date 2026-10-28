@@ -11,6 +11,7 @@ describe("homePath", () => {
     assert.equal(homePath("TECNICO", "SYSTRON"), "/servicios/activos");
     assert.equal(homePath("ALMACEN", "SYSTRON"), "/custodia");
     assert.equal(homePath("KIOSCO_ASISTENCIA", "SYSTRON"), "/kiosco");
+    assert.equal(homePath("AYUDANTE_GENERAL", "SERVOMOTORES"), "/cuenta");
     assert.notEqual(homePath("ADMINISTRADOR", "SYSTRON"), "/inicio");
   });
 });

@@ -149,7 +149,11 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
                     };
                   }),
               })).filter((group) => group.links.length > 0),
-              ...(session.role === "VENTAS" || session.role === "SUPERVISOR_TECNICO" || session.role === "TECNICO"
+              ...(session.role === "VENTAS"
+                || session.role === "SUPERVISOR_TECNICO"
+                || session.role === "TECNICO"
+                || session.role === "AYUDANTE_GENERAL"
+                || session.role === "KIOSCO_ASISTENCIA"
                 ? []
                 : [{ title: null, links: [{ href: "/cuenta", label: "Cuenta" }] }]),
             ]}
