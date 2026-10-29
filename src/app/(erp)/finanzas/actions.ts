@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { setFlash } from "@/lib/flash";
 import { requiredText } from "@/lib/form";
@@ -13,6 +14,11 @@ function bubble(error: unknown) {
   if (redirecting) throw error;
   return error instanceof Error ? error.message : "No se pudo guardar.";
 }
+
+export type FinanzasModalState =
+  | { status: "idle" }
+  | { status: "success" }
+  | { status: "error"; message: string };
 
 async function guard() {
   const session = await requireCompany();
@@ -33,24 +39,28 @@ export async function accountAction(formData: FormData) {
   redirect("/finanzas");
 }
 
+async function runManualMovement(formData: FormData) {
+  const session = await guard();
+  const direction = formData.get("direction") === "INGRESO" ? "INGRESO" : "EGRESO";
+  await manualMovement(
+    session,
+    requiredText(formData.get("accountId"), "Cuenta"),
+    direction,
+    moneyFromForm(formData.get("amount")),
+    {
+      incomeCategoryId: formData.get("incomeCategoryId")?.toString() || null,
+      expenseCategoryId: formData.get("expenseCategoryId")?.toString() || null,
+      expenseSubcategoryId: formData.get("expenseSubcategoryId")?.toString() || null,
+    },
+    requiredText(formData.get("note"), "Nota"),
+    formData.get("pendingProof") === "si",
+  );
+}
+
 export async function movementAction(formData: FormData) {
   "use server";
   try {
-    const session = await guard();
-    const direction = formData.get("direction") === "INGRESO" ? "INGRESO" : "EGRESO";
-    await manualMovement(
-      session,
-      requiredText(formData.get("accountId"), "Cuenta"),
-      direction,
-      moneyFromForm(formData.get("amount")),
-      {
-        incomeCategoryId: formData.get("incomeCategoryId")?.toString() || null,
-        expenseCategoryId: formData.get("expenseCategoryId")?.toString() || null,
-        expenseSubcategoryId: formData.get("expenseSubcategoryId")?.toString() || null,
-      },
-      requiredText(formData.get("note"), "Nota"),
-      formData.get("pendingProof") === "si",
-    );
+    await runManualMovement(formData);
     await setFlash({ tone: "ok", message: "Movimiento confirmado." });
   } catch (error) {
     await setFlash({ tone: "error", message: bubble(error) });
@@ -58,11 +68,35 @@ export async function movementAction(formData: FormData) {
   redirect("/finanzas");
 }
 
+export async function movementModalAction(
+  _previousState: FinanzasModalState,
+  formData: FormData,
+): Promise<FinanzasModalState> {
+  "use server";
+  try {
+    await runManualMovement(formData);
+    await setFlash({ tone: "ok", message: "Movimiento confirmado." });
+    revalidatePath("/finanzas");
+    return { status: "success" };
+  } catch (error) {
+    return { status: "error", message: bubble(error) };
+  }
+}
+
+async function runTransfer(formData: FormData) {
+  const session = await guard();
+  await transferAccounts(
+    session,
+    requiredText(formData.get("fromId"), "Origen"),
+    requiredText(formData.get("toId"), "Destino"),
+    moneyFromForm(formData.get("amount")),
+  );
+}
+
 export async function transferAction(formData: FormData) {
   "use server";
   try {
-    const session = await guard();
-    await transferAccounts(session, requiredText(formData.get("fromId"), "Origen"), requiredText(formData.get("toId"), "Destino"), moneyFromForm(formData.get("amount")));
+    await runTransfer(formData);
     await setFlash({ tone: "ok", message: "Transferencia registrada. No es ingreso ni gasto." });
   } catch (error) {
     await setFlash({ tone: "error", message: bubble(error) });
@@ -70,16 +104,54 @@ export async function transferAction(formData: FormData) {
   redirect("/finanzas");
 }
 
+export async function transferModalAction(
+  _previousState: FinanzasModalState,
+  formData: FormData,
+): Promise<FinanzasModalState> {
+  "use server";
+  try {
+    await runTransfer(formData);
+    await setFlash({ tone: "ok", message: "Transferencia registrada. No es ingreso ni gasto." });
+    revalidatePath("/finanzas");
+    return { status: "success" };
+  } catch (error) {
+    return { status: "error", message: bubble(error) };
+  }
+}
+
+async function runProof(formData: FormData) {
+  const session = await guard();
+  await attachProof(
+    session,
+    requiredText(formData.get("movementId"), "Movimiento"),
+    requiredText(formData.get("proofNote"), "Comprobante"),
+  );
+}
+
 export async function proofAction(formData: FormData) {
   "use server";
   try {
-    const session = await guard();
-    await attachProof(session, requiredText(formData.get("movementId"), "Movimiento"), requiredText(formData.get("proofNote"), "Comprobante"));
+    await runProof(formData);
     await setFlash({ tone: "ok", message: "Comprobante relacionado. No hubo una segunda salida." });
   } catch (error) {
     await setFlash({ tone: "error", message: bubble(error) });
   }
   redirect("/finanzas");
+}
+
+export async function proofModalAction(
+  _previousState: FinanzasModalState,
+  formData: FormData,
+): Promise<FinanzasModalState> {
+  "use server";
+  try {
+    await runProof(formData);
+    await setFlash({ tone: "ok", message: "Comprobante relacionado. No hubo una segunda salida." });
+    revalidatePath("/finanzas");
+    return { status: "success" };
+  } catch (error) {
+    return { status: "error", message: bubble(error) };
+  }
 }
 
 export async function payPayableAction(formData: FormData) {

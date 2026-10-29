@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
-import { accountAction, payCardAction, payPayableAction, proofAction, transferAction } from "./actions";
+import { accountAction, payCardAction, payPayableAction } from "./actions";
+import { FinanzasProofDialog, FinanzasTransferDialog, ManualMovementDialog } from "./finanzas-movement-dialog";
 import { FinanzasMesFilter } from "@/components/compact-list-filters";
 import {
   ActiveFilters,
@@ -28,8 +29,6 @@ import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
-import { ManualMovementForm } from "./manual-movement-form";
-
 type FinanceAccountRow = { id: string; name: string; kind: string; balance: number };
 
 export default async function FinanzasPage({ searchParams }: { searchParams: Promise<{ mes?: string; vista?: string }> }) {
@@ -115,12 +114,12 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
         <p className="mt-2 text-sm text-[var(--muted)]">Flujo de movimientos del mes: {money(ingresos - egresos)}</p>
       ) : null}
       {(showSection("movimientos") || showSection("ingresos") || showSection("egresos")) && !showSection("dashboard") ? (
-        <ManualMovementForm
+        <ManualMovementDialog
           accounts={accounts}
           expenseCategories={expenseCategories}
           incomeCategories={incomeCategories}
           directionMode={movementDirectionMode}
-          className="mt-4 max-w-none"
+          className="mt-4 flex justify-end"
         />
       ) : null}
       {(showSection("movimientos") || showSection("ingresos") || showSection("egresos")) && movementRows.length === 0 ? (
@@ -168,12 +167,12 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
           <div id="fin-cuentas" className="scroll-mt-28">
             <AccountsSummary accounts={accounts} cxc={cxc} cxp={cxp} cardDebt={cardDebt} />
           </div>
-          <ManualMovementForm
+          <ManualMovementDialog
             accounts={accounts}
             expenseCategories={expenseCategories}
             incomeCategories={incomeCategories}
             directionMode="both"
-            className="max-w-none"
+            className="flex items-start justify-end"
           />
         </section>
       ) : null}
@@ -182,21 +181,24 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
           <AccountsSummary accounts={accounts} cxc={cxc} cxp={cxp} cardDebt={cardDebt} />
         </div>
       ) : null}
+      {showSection("transferencias") && !showSection("dashboard") ? (
+        <FinanzasTransferDialog banks={banks} className="mt-4" />
+      ) : null}
       {showSection("dashboard") && pending.length > 0 ? (
         <Card className="mt-4 p-4">
           <h2 className="font-medium">Pendientes de comprobación</h2>
           <ul className="mt-3 space-y-3">
             {pending.map((row) => (
-              <li key={row.id}>
-                <FormPanel action={proofAction}>
-                  <input type="hidden" name="movementId" value={row.id} />
-                  <FormSection title={`${row.account.name} · ${money(row.amount)}`} description={row.note ?? undefined} columns={1}>
-                    <Field label="Factura o comprobante">
-                      <input name="proofNote" required placeholder="Referencia del comprobante" className={controlClass} />
-                    </Field>
-                  </FormSection>
-                  <FormActions><Button type="submit" tone="ghost">Relacionar</Button></FormActions>
-                </FormPanel>
+              <li key={row.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-[var(--line)] p-3">
+                <div>
+                  <p className="font-medium">{row.account.name} · {money(row.amount)}</p>
+                  {row.note ? <p className="text-sm text-[var(--muted)]">{row.note}</p> : null}
+                </div>
+                <FinanzasProofDialog
+                  movementId={row.id}
+                  summaryTitle={`${row.account.name} · ${money(row.amount)}`}
+                  description={row.note ?? undefined}
+                />
               </li>
             ))}
           </ul>
@@ -219,18 +221,7 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
             <FormActions><Button type="submit" tone="ghost">Guardar cuenta</Button></FormActions>
           </FormPanel>
           {showSection("transferencias") || showSection("dashboard") ? (
-            <FormPanel action={transferAction}>
-              <FormSection title="Transferencia entre bancos" description="Mueve saldo entre cuentas de tipo banco." columns={1}>
-                <Field label="Desde">
-                  <select name="fromId" className={controlClass}>{banks.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select>
-                </Field>
-                <Field label="Hacia">
-                  <select name="toId" className={controlClass}>{banks.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select>
-                </Field>
-                <Field label="Importe"><MoneyInput name="amount" min="0.01" required /></Field>
-              </FormSection>
-              <FormActions><Button type="submit" tone="ghost">Transferir</Button></FormActions>
-            </FormPanel>
+            <FinanzasTransferDialog banks={banks} variant="card" />
           ) : null}
         </section>
       ) : null}
