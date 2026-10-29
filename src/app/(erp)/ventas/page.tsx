@@ -17,6 +17,7 @@ import {
 } from "@/components/ui";
 import { listHref } from "@/lib/list-url";
 import { prisma } from "@/lib/db";
+import { coordPageSubtitle, coordUsesSidebarNav } from "@/lib/coordination-ui";
 import { can } from "@/lib/permissions";
 import { homePath } from "@/lib/home";
 import { requireCompany } from "@/lib/session";
@@ -64,20 +65,26 @@ export default async function VentasPage({ searchParams }: { searchParams: Promi
       return pendingReceive === 0 && pendingDeliver === 0;
     });
   }
+  const sidebarNav = coordUsesSidebarNav(session.role);
   const vistaLabel = view === "pendientes" ? "Requieren atención" : view === "al_dia" ? "Al día" : null;
 
   return (
     <>
       <PageHeader
         title="Venta de equipos"
-        subtitle="Consulta lo que falta por recibir o entregar. Abre el folio para registrar el avance."
+        subtitle={coordPageSubtitle(
+          sidebarNav,
+          session.activeCompanyCode,
+          "Consulta lo que falta por recibir o entregar. Abre el folio para registrar el avance.",
+          vistaLabel ?? "Entregas y recepciones",
+        )}
         back={session.role === "VENTAS" ? { href: "/panel", label: "Inicio" } : undefined}
         action={can(session.role, "quote.create", session.activeCompanyCode) ? <ActionLink href="/ventas/nuevo">Nueva venta de equipo</ActionLink> : null}
       />
-      <VentasListFilter vista={view} q={query} />
+      {sidebarNav ? null : <VentasListFilter vista={view} q={query} />}
       <ActiveFilters
         items={[
-          ...(vistaLabel ? [{ label: vistaLabel, clearHref: listHref("/ventas", { q: query || undefined }) }] : []),
+          ...(sidebarNav ? [] : vistaLabel ? [{ label: vistaLabel, clearHref: listHref("/ventas", { q: query || undefined }) }] : []),
           ...(query ? [{ label: `Búsqueda: ${query}`, clearHref: listHref("/ventas", { vista: view !== "todas" ? view : undefined }) }] : []),
         ]}
       />

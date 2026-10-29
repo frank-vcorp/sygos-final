@@ -6,6 +6,7 @@ import { listHref } from "@/lib/list-url";
 import { homePath } from "@/lib/home";
 import { prisma } from "@/lib/db";
 import { linesForTotal, money, quoteTotals } from "@/lib/money";
+import { coordFilterChips, coordPageSubtitle, coordPageTitle, coordUsesSidebarNav } from "@/lib/coordination-ui";
 import { can } from "@/lib/permissions";
 import { ensureQuoteFromCase, QUOTE_STATUS_LABEL, QUOTE_TYPE_LABEL, type QuoteType } from "@/lib/quotes";
 import { requireCompany } from "@/lib/session";
@@ -62,20 +63,27 @@ export default async function CotizacionesPage({ searchParams }: { searchParams:
         take: 50,
       })
     : [];
+  const sidebarNav = coordUsesSidebarNav(session.role);
+  const sectionTitle = pending ? "Pendientes de cotizar" : decision ? "Esperando decisión" : undefined;
   return (
     <>
       <PageHeader
-        title={pending ? "Pendientes de cotizar" : decision ? "Esperando decisión del cliente" : "Cotizaciones"}
-        subtitle={session.role === "VENTAS" ? "Consulta el avance de tus propuestas y da seguimiento a las que esperan respuesta del cliente." : "Revisa las propuestas que necesitan precio y las que esperan respuesta del cliente."}
+        title={coordPageTitle(sidebarNav, sectionTitle, pending ? "Pendientes de cotizar" : decision ? "Esperando decisión del cliente" : "Cotizaciones")}
+        subtitle={coordPageSubtitle(
+          sidebarNav,
+          session.activeCompanyCode,
+          session.role === "VENTAS" ? "Consulta el avance de tus propuestas y da seguimiento a las que esperan respuesta del cliente." : "Revisa las propuestas que necesitan precio y las que esperan respuesta del cliente.",
+          pending ? "Por cotizar" : decision ? "Decisión del cliente" : "Propuestas comerciales",
+        )}
         action={can(session.role, "quote.create", session.activeCompanyCode) ? <ActionLink href="/cotizaciones/nuevo">Nueva cotización</ActionLink> : null}
       />
-      <CotizacionesListFilter vista={pending ? "pendientes" : decision ? "decision" : "todas"} q={query} />
+      {sidebarNav ? null : <CotizacionesListFilter vista={pending ? "pendientes" : decision ? "decision" : "todas"} q={query} />}
       <ActiveFilters
-        items={[
+        items={coordFilterChips(sidebarNav, [
           ...(pending ? [{ label: "Pendientes de cotizar", clearHref: listHref("/cotizaciones", { q: query || undefined }) }] : []),
           ...(decision ? [{ label: "Decisión del cliente", clearHref: listHref("/cotizaciones", { q: query || undefined }) }] : []),
           ...(query ? [{ label: `Búsqueda: ${query}`, clearHref: listHref("/cotizaciones", { vista: pending ? "pendientes" : decision ? "decision" : undefined }) }] : []),
-        ]}
+        ])}
       />
       {cases.length > 0 ? (
         <Card className="mb-4 divide-y divide-[var(--line)] overflow-hidden">

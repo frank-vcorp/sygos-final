@@ -4,6 +4,7 @@ import { ProveedoresListFilter } from "@/components/compact-list-filters";
 import { ActiveFilters, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, Table, Td, Th } from "@/components/ui";
 import { listHref } from "@/lib/list-url";
 import { prisma } from "@/lib/db";
+import { coordPageSubtitle, coordUsesSidebarNav } from "@/lib/coordination-ui";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
 
@@ -23,7 +24,16 @@ export default async function ProveedoresPage({ searchParams }: { searchParams: 
   });
   return (
     <>
-      <PageHeader title="Proveedores" subtitle={session.activeCompanyName ?? ""} action={<SupplierCreateModal />} />
+      <PageHeader
+        title="Proveedores"
+        subtitle={coordPageSubtitle(
+          coordUsesSidebarNav(session.role),
+          session.activeCompanyCode,
+          session.activeCompanyName ?? "Catálogo de proveedores",
+          "Catálogo por empresa",
+        )}
+        action={<SupplierCreateModal />}
+      />
       <ProveedoresListFilter q={query} estado={estadoFilter} />
       <ActiveFilters
         items={[

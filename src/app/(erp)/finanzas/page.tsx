@@ -22,7 +22,7 @@ import {
   Td,
   Th,
 } from "@/components/ui";
-import { coordUsesSidebarNav } from "@/lib/coordination-ui";
+import { coordFilterChips, coordPageSubtitle, coordPageTitle, coordUsesSidebarNav } from "@/lib/coordination-ui";
 import { listHref } from "@/lib/list-url";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
@@ -85,21 +85,20 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
   const cxc = receivables._sum.balance ?? 0;
   const cxp = payables._sum.balance ?? 0;
   const sidebarNav = coordUsesSidebarNav(session.role);
-  const pageTitle =
-    sidebarNav && vistaLabel && focus
-      ? vistaLabel
-      : "Finanzas";
-  const pageSubtitle =
-    sidebarNav && focus
-      ? `${session.activeCompanyCode === "SERVOMOTORES" ? "Servomotores" : "SYSTRON"} · mes ${key}`
-      : `${session.activeCompanyCode === "SERVOMOTORES" ? "Servomotores" : "SYSTRON"} · ${key}. No hay consolidado entre empresas.`;
+  const pageTitle = coordPageTitle(sidebarNav, vistaLabel && focus ? vistaLabel : undefined, "Finanzas");
+  const pageSubtitle = coordPageSubtitle(
+    sidebarNav,
+    session.activeCompanyCode,
+    `${session.activeCompanyCode === "SERVOMOTORES" ? "Servomotores" : "SYSTRON"} · ${key}. No hay consolidado entre empresas.`,
+    focus ? `mes ${key}` : `${key}. Resumen del mes`,
+  );
   return (
     <>
       <PageHeader title={pageTitle} subtitle={pageSubtitle} />
       {sidebarNav ? null : <SegmentedNav items={navItems} />}
       <ActiveFilters
         items={[
-          ...(focus && vistaLabel && !sidebarNav ? [{ label: vistaLabel, clearHref: listHref("/finanzas", { mes: key !== defaultMes ? key : undefined }) }] : []),
+          ...coordFilterChips(sidebarNav, focus && vistaLabel ? [{ label: vistaLabel, clearHref: listHref("/finanzas", { mes: key !== defaultMes ? key : undefined }) }] : []),
           ...(key !== defaultMes ? [{ label: `Mes ${key}`, clearHref: listHref("/finanzas", { vista: focus || undefined }) }] : []),
         ]}
       />

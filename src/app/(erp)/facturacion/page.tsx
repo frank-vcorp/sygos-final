@@ -5,6 +5,7 @@ import { ActionLink, ActiveFilters, Badge, Empty, MobileCard, PageHeader, Record
 import { homePath } from "@/lib/home";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
+import { coordFilterChips, coordPageSubtitle, coordPageTitle, coordUsesSidebarNav } from "@/lib/coordination-ui";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
 
@@ -56,12 +57,22 @@ export default async function FacturacionPage({ searchParams }: { searchParams: 
     { href: "/facturacion?vista=canceladas", label: "Canceladas", active: vista === "canceladas", key: "canceladas" },
   ];
   const vistaLabel = tabs.find((tab) => tab.key === vista)?.label;
+  const sidebarNav = coordUsesSidebarNav(session.role);
   return (
     <>
-      <PageHeader title="Facturación" subtitle="Solicitud, emisión y remisión de esta empresa. El timbrado no se duplica." action={can(session.role, "invoice.issue", session.activeCompanyCode) ? <ActionLink href="/facturacion/nuevo">Factura libre</ActionLink> : null} />
-      <BillingVistaFilter vista={vista} options={tabs.map((tab) => ({ value: tab.key, label: tab.label }))} />
+      <PageHeader
+        title={coordPageTitle(sidebarNav, vista !== "todas" ? vistaLabel : undefined, "Facturación")}
+        subtitle={coordPageSubtitle(
+          sidebarNav,
+          session.activeCompanyCode,
+          "Solicitud, emisión y remisión de esta empresa. El timbrado no se duplica.",
+          vista === "solicitudes" ? "Pendientes de emitir" : vista === "facturas" ? "Emitidas" : "Solicitudes y emisión",
+        )}
+        action={can(session.role, "invoice.issue", session.activeCompanyCode) ? <ActionLink href="/facturacion/nuevo">Factura libre</ActionLink> : null}
+      />
+      {sidebarNav ? null : <BillingVistaFilter vista={vista} options={tabs.map((tab) => ({ value: tab.key, label: tab.label }))} />}
       <ActiveFilters
-        items={vista !== "todas" && vistaLabel ? [{ label: vistaLabel, clearHref: "/facturacion" }] : []}
+        items={coordFilterChips(sidebarNav, vista !== "todas" && vistaLabel ? [{ label: vistaLabel, clearHref: "/facturacion" }] : [])}
       />
       {rows.length === 0 ? <Empty title="Sin documentos" body="Una factura nace de una operación autorizada o de una factura libre." /> : (
         <ResponsiveData

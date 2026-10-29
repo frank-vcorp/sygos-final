@@ -15,7 +15,7 @@ import {
 import { listHref } from "@/lib/list-url";
 import { prisma } from "@/lib/db";
 import { mexicoToday } from "@/lib/personnel";
-import { coordUsesSidebarNav } from "@/lib/coordination-ui";
+import { coordFilterChips, coordFormWidthClass, coordPageSubtitle, coordPageTitle, coordUsesSidebarNav } from "@/lib/coordination-ui";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
 
@@ -32,15 +32,22 @@ export default async function AsistenciaPage({ searchParams }: { searchParams: P
     orderBy: { user: { name: "asc" } },
   });
   const listed = vacations ? people.filter((person) => person.attendance[0]?.status === "VACACIONES") : people;
+  const sidebarNav = coordUsesSidebarNav(session.role);
+  const sectionTitle = vacations ? "Vacaciones" : "Asistencia";
 
   return (
     <>
       <PageHeader
-        back={coordUsesSidebarNav(session.role) ? undefined : { href: "/personal", label: "Personal" }}
-        title={vacations ? "Vacaciones del día" : "Asistencia"}
-        subtitle="Normal, retardo, ausencia, vacaciones, permiso y salida faltante. La salida faltante no descuenta."
+        back={sidebarNav ? undefined : { href: "/personal", label: "Personal" }}
+        title={coordPageTitle(sidebarNav, sectionTitle, vacations ? "Vacaciones del día" : "Asistencia")}
+        subtitle={coordPageSubtitle(
+          sidebarNav,
+          session.activeCompanyCode,
+          "Normal, retardo, ausencia, vacaciones, permiso y salida faltante. La salida faltante no descuenta.",
+          vacations ? `Día ${day}` : "Marcas del día",
+        )}
       />
-      {coordUsesSidebarNav(session.role) ? null : (
+      {sidebarNav ? null : (
         <SegmentedNav
           items={[
             { href: listHref("/personal/asistencia", { dia: day !== today ? day : undefined }), label: "Asistencia", active: !vacations },
@@ -57,7 +64,7 @@ export default async function AsistenciaPage({ searchParams }: { searchParams: P
       </form>
       <ActiveFilters
         items={[
-          ...(vacations ? [{ label: "Vacaciones", clearHref: listHref("/personal/asistencia", { dia: day !== today ? day : undefined }) }] : []),
+          ...coordFilterChips(sidebarNav, vacations ? [{ label: "Vacaciones", clearHref: listHref("/personal/asistencia", { dia: day !== today ? day : undefined }) }] : []),
           ...(day !== today ? [{ label: `Día ${day}`, clearHref: listHref("/personal/asistencia", { vista: vacations ? "vacaciones" : undefined }) }] : []),
         ]}
       />
@@ -76,7 +83,7 @@ export default async function AsistenciaPage({ searchParams }: { searchParams: P
           })
         )}
       </ul>
-      <FormPanel id="registro-manual" action={attendanceAction} className="mt-4 scroll-mt-24">
+      <FormPanel id="registro-manual" action={attendanceAction} className={`mt-4 scroll-mt-24 ${coordFormWidthClass(sidebarNav)}`}>
         <FormSection title="Registro manual" description="Captura permisos, ausencias y correcciones con motivo obligatorio." columns={1}>
           <Field label="Colaborador">
             <select name="collaboratorId" className={controlClass}>

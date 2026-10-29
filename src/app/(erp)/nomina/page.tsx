@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { aguinaldoAction, payrollAction } from "./actions";
 import { ActiveFilters, Badge, Button, controlClass, Empty, Field, FormActions, FormPanel, FormSection, MobileCard, PageHeader, RecordLink, ResponsiveData, SegmentedNav, Table, Td, Th } from "@/components/ui";
 import { prisma } from "@/lib/db";
-import { coordUsesSidebarNav } from "@/lib/coordination-ui";
+import { coordFilterChips, coordFormWidthClass, coordPageSubtitle, coordPageTitle, coordUsesSidebarNav } from "@/lib/coordination-ui";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
 
@@ -43,19 +43,36 @@ export default async function NominaPage({ searchParams }: { searchParams: Promi
     { href: "/nomina?vista=extraordinarios", label: "Extraordinarios", active: vista === "extraordinarios" },
     { href: "/nomina?vista=aguinaldo", label: "Aguinaldo", active: vista === "aguinaldo" },
   ];
-  const subtitle =
+  const sidebarNav = coordUsesSidebarNav(session.role);
+  const sectionHint =
+    vista === "documentos"
+      ? "Documentos y timbrado"
+      : vista === "incidencias"
+        ? "Faltantes por cerrar"
+        : vista === "actual"
+          ? "Periodo en curso"
+          : vista === "aguinaldo"
+            ? "Corte anual"
+            : vista === "extraordinarios"
+              ? "Ajustes fuera de semanal"
+              : "Semanal por empresa";
+  const defaultSubtitle =
     vista === "documentos"
       ? "Cada folio abre el detalle con documentos y timbrado."
       : vista === "incidencias"
         ? "Periodos con faltantes que impiden cerrar o timbrar."
         : "Semanal y por empresa. Autorizada no se reabre.";
+  const formWidth = coordFormWidthClass(sidebarNav);
   return (
     <>
-      <PageHeader title="Nómina" subtitle={subtitle} />
-      {coordUsesSidebarNav(session.role) ? null : <SegmentedNav items={tabs} />}
-      <ActiveFilters items={vista && vistaLabels[vista] ? [{ label: vistaLabels[vista], clearHref: "/nomina" }] : []} />
+      <PageHeader
+        title={coordPageTitle(sidebarNav, vista && vistaLabels[vista] ? vistaLabels[vista] : undefined, "Nómina")}
+        subtitle={coordPageSubtitle(sidebarNav, session.activeCompanyCode, defaultSubtitle, sectionHint)}
+      />
+      {sidebarNav ? null : <SegmentedNav items={tabs} />}
+      <ActiveFilters items={coordFilterChips(sidebarNav, vista && vistaLabels[vista] ? [{ label: vistaLabels[vista], clearHref: "/nomina" }] : [])} />
       {vista !== "aguinaldo" && vista !== "documentos" ? (
-        <FormPanel action={payrollAction} className="mb-4">
+        <FormPanel action={payrollAction} className={`mb-4 ${formWidth}`}>
           <FormSection title="Nómina semanal" description="Genera el preliminar del lunes que indiques.">
             <Field label="Lunes de la semana"><input name="weekStart" type="date" required className={controlClass} /></Field>
           </FormSection>
@@ -63,7 +80,7 @@ export default async function NominaPage({ searchParams }: { searchParams: Promi
         </FormPanel>
       ) : null}
       {vista === "aguinaldo" || !vista ? (
-        <FormPanel action={aguinaldoAction} className="mb-4">
+        <FormPanel action={aguinaldoAction} className={`mb-4 ${formWidth}`}>
           <FormSection title="Aguinaldo" description="Corte anual separado de la nómina semanal.">
             <Field label="Aguinaldo del año"><input name="year" type="number" defaultValue={new Date().getFullYear()} className={controlClass} /></Field>
           </FormSection>

@@ -4,6 +4,7 @@ import { ActionLink, ActiveFilters, Empty, MobileCard, PageHeader, RecordLink, R
 import { listHref } from "@/lib/list-url";
 import { clientMatchesQuery, PREVIEW_LIMIT, SEARCH_LIMIT } from "@/lib/client-search";
 import { prisma } from "@/lib/db";
+import { coordPageSubtitle, coordUsesSidebarNav } from "@/lib/coordination-ui";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
 
@@ -48,15 +49,15 @@ export default async function ClientesPage({ searchParams }: { searchParams: Pro
     select: { id: true, name: true },
   });
   const ownerName = new Map(owners.map((owner) => [owner.id, owner.name]));
+  const sidebarNav = coordUsesSidebarNav(session.role);
+  const catalogSubtitle = query
+    ? `${searchTruncated ? `${SEARCH_LIMIT}+` : matchCount} coincidencias · ${session.activeCompanyName ?? ""}`
+    : `${totalInCatalog} en catálogo · mostrando ${Math.min(clients.length, PREVIEW_LIMIT)} · ${session.activeCompanyName ?? ""}`;
   return (
     <>
       <PageHeader
         title="Clientes"
-        subtitle={
-          query
-            ? `${searchTruncated ? `${SEARCH_LIMIT}+` : matchCount} coincidencias · ${session.activeCompanyName ?? ""}`
-            : `${totalInCatalog} en catálogo · mostrando ${Math.min(clients.length, PREVIEW_LIMIT)} · ${session.activeCompanyName ?? ""}`
-        }
+        subtitle={coordPageSubtitle(sidebarNav, session.activeCompanyCode, catalogSubtitle, "Catálogo comercial")}
         action={can(session.role, "client.create", session.activeCompanyCode) ? <ActionLink href="/clientes/nuevo">Nuevo cliente</ActionLink> : null}
       />
       <ClientesFilter query={query} estado={estadoFilter} />

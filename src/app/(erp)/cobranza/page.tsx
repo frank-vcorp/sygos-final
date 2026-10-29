@@ -6,7 +6,7 @@ import { homePath } from "@/lib/home";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
 import { money } from "@/lib/money";
-import { coordUsesSidebarNav } from "@/lib/coordination-ui";
+import { coordFilterChips, coordPageSubtitle, coordPageTitle, coordUsesSidebarNav } from "@/lib/coordination-ui";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
 
@@ -37,24 +37,36 @@ export default async function CobranzaPage({ searchParams }: { searchParams: Pro
     const late = (row: typeof a) => row.balance > 0 && row.dueAt.getTime() < Date.now() ? Date.now() - row.dueAt.getTime() : 0;
     return late(b) - late(a);
   });
+  const sidebarNav = coordUsesSidebarNav(session.role);
+  const vistaTitle =
+    selectedVista === "cxc"
+      ? "Cuentas por cobrar"
+      : selectedVista === "vencidas"
+        ? "Cobranza vencida"
+        : undefined;
   return (
     <>
       <PageHeader
         title={
-          coordUsesSidebarNav(session.role) && selectedVista === "cxc"
-            ? "Cuentas por cobrar"
-            : session.role === "VENTAS"
-              ? "Mi cobranza"
-              : "Cobranza"
+          coordPageTitle(
+            sidebarNav,
+            vistaTitle,
+            session.role === "VENTAS" ? "Mi cobranza" : "Cobranza",
+          )
         }
-        subtitle="Saldos de esta empresa. Vencida es saldo después de la fecha."
+        subtitle={coordPageSubtitle(
+          sidebarNav,
+          session.activeCompanyCode,
+          "Saldos de esta empresa. Vencida es saldo después de la fecha.",
+          selectedVista === "cxc" ? "Saldos abiertos" : selectedVista === "vencidas" ? "Vencidas" : "Todas las cuentas",
+        )}
       />
-      {coordUsesSidebarNav(session.role) ? null : <CobranzaVistaFilter vista={selectedVista} />}
+      {sidebarNav ? null : <CobranzaVistaFilter vista={selectedVista} />}
       <ActiveFilters
-        items={[
+        items={coordFilterChips(sidebarNav, [
           ...(selectedVista === "cxc" ? [{ label: "Con saldo", clearHref: "/cobranza" }] : []),
           ...(selectedVista === "vencidas" ? [{ label: "Vencidas", clearHref: "/cobranza" }] : []),
-        ]}
+        ])}
       />
       {ordered.length === 0 ? <Empty title="Sin cuentas por cobrar" body="Aparecen cuando Coordinación emite una factura." /> : (
         <ResponsiveData

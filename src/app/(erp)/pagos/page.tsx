@@ -4,7 +4,7 @@ import { ActionLink, ActiveFilters, Badge, Empty, MobileCard, PageHeader, Record
 import { homePath } from "@/lib/home";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
-import { coordUsesSidebarNav } from "@/lib/coordination-ui";
+import { coordFilterChips, coordPageSubtitle, coordPageTitle, coordUsesSidebarNav } from "@/lib/coordination-ui";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
 
@@ -28,15 +28,21 @@ export default async function PagosPage({ searchParams }: { searchParams: Promis
     { href: "/pagos?vista=pendientes", label: "Por validar", active: filter === "PENDIENTE" },
     { href: "/pagos?vista=validados", label: "Validados", active: filter === "VALIDADO" },
   ];
+  const sidebarNav = coordUsesSidebarNav(session.role);
+  const vistaTitle = filter === "PENDIENTE" ? "Pagos por validar" : filter === "VALIDADO" ? "Pagos validados" : undefined;
   return (
     <>
-      <PageHeader title="Pagos" subtitle="Un pago pendiente no reduce saldos. Validarlo sí." action={can(session.role, "payment.register", session.activeCompanyCode) ? <ActionLink href="/pagos/nuevo">Registrar pago</ActionLink> : null} />
-      {coordUsesSidebarNav(session.role) ? null : <SegmentedNav items={tabs} />}
+      <PageHeader
+        title={coordPageTitle(sidebarNav, vistaTitle, "Pagos")}
+        subtitle={coordPageSubtitle(sidebarNav, session.activeCompanyCode, "Un pago pendiente no reduce saldos. Validarlo sí.", "Comprobante, importe y destino")}
+        action={can(session.role, "payment.register", session.activeCompanyCode) ? <ActionLink href="/pagos/nuevo">Registrar pago</ActionLink> : null}
+      />
+      {sidebarNav ? null : <SegmentedNav items={tabs} />}
       <ActiveFilters
-        items={[
+        items={coordFilterChips(sidebarNav, [
           ...(filter === "PENDIENTE" ? [{ label: "Por validar", clearHref: "/pagos" }] : []),
           ...(filter === "VALIDADO" ? [{ label: "Validados", clearHref: "/pagos" }] : []),
-        ]}
+        ])}
       />
       {rows.length === 0 ? <Empty title="Sin pagos" body="El comprobante, el importe y el destino se capturan al registrar." /> : (
         <ResponsiveData

@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { ActionLink, ActiveFilters, Badge, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, SegmentedNav, Table, Td, Th, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
-import { coordUsesSidebarNav } from "@/lib/coordination-ui";
+import { coordFilterChips, coordPageSubtitle, coordPageTitle, coordUsesSidebarNav } from "@/lib/coordination-ui";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
 
@@ -15,14 +15,20 @@ export default async function PersonalPage({ searchParams }: { searchParams: Pro
     include: { user: true, boss: true },
     orderBy: { createdAt: "desc" },
   });
+  const sidebarNav = coordUsesSidebarNav(session.role);
   return (
     <>
       <PageHeader
-        title="Personal"
-        subtitle={vista === "documentos" ? "Abre cada colaborador para ver y cargar documentos laborales." : "Cada empresa tiene sus colaboradores. No hay alta rápida."}
+        title={coordPageTitle(sidebarNav, undefined, "Colaboradores")}
+        subtitle={coordPageSubtitle(
+          sidebarNav,
+          session.activeCompanyCode,
+          vista === "documentos" ? "Abre cada colaborador para ver y cargar documentos laborales." : "Cada empresa tiene sus colaboradores. No hay alta rápida.",
+          vista === "documentos" ? "Documentos laborales" : "Alta, salario y jefe",
+        )}
         action={<ActionLink href="/personal/nuevo">Alta de colaborador</ActionLink>}
       />
-      {coordUsesSidebarNav(session.role) ? null : (
+      {sidebarNav ? null : (
         <SegmentedNav
           items={[
             { href: "/personal", label: "Colaboradores", active: vista !== "documentos" },
@@ -30,7 +36,7 @@ export default async function PersonalPage({ searchParams }: { searchParams: Pro
           ]}
         />
       )}
-      {coordUsesSidebarNav(session.role) ? null : (
+      {sidebarNav ? null : (
         <div className="mb-4 flex flex-wrap gap-2 text-sm">
           <TextLink href="/personal/asistencia">Asistencia</TextLink>
           <span className="text-[var(--muted)]">·</span>
@@ -39,7 +45,7 @@ export default async function PersonalPage({ searchParams }: { searchParams: Pro
           <TextLink href="/nomina">Nómina</TextLink>
         </div>
       )}
-      <ActiveFilters items={vista === "documentos" ? [{ label: "Vista documentos", clearHref: "/personal" }] : []} />
+      <ActiveFilters items={coordFilterChips(sidebarNav, vista === "documentos" ? [{ label: "Vista documentos", clearHref: "/personal" }] : [])} />
       {rows.length === 0 ? <Empty title="Sin colaboradores" body="El alta pide empresa, tipo, ingreso, jefe y salario." /> : (
         <ResponsiveData
           table={

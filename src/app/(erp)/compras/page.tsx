@@ -5,6 +5,7 @@ import { PurchaseOrderModal } from "./oc/purchase-order-modal";
 import { PurchaseRegistrationModal } from "@/components/purchase-registration-modal";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
+import { coordFilterChips, coordPageSubtitle, coordPageTitle, coordUsesSidebarNav } from "@/lib/coordination-ui";
 import { can } from "@/lib/permissions";
 import { purchaseListHref } from "@/lib/purchase-filter-links";
 import { requireCompany } from "@/lib/session";
@@ -78,11 +79,18 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
     proveedor: omit === "proveedor" ? undefined : proveedor,
     solicitante: omit === "solicitante" ? undefined : solicitante,
   });
+  const sidebarNav = coordUsesSidebarNav(session.role);
+  const comprasTitle = view === "oc" ? "Órdenes de compra" : "Compras";
   return (
     <>
       <PageHeader
-        title={view === "oc" ? "Órdenes de compra" : "Compras"}
-        subtitle={view === "oc" ? "Autorización y seguimiento de órdenes de compra." : "Consulta compras realizadas y registra compras urgentes sin requerimiento."}
+        title={coordPageTitle(sidebarNav, comprasTitle, comprasTitle)}
+        subtitle={coordPageSubtitle(
+          sidebarNav,
+          session.activeCompanyCode,
+          view === "oc" ? "Autorización y seguimiento de órdenes de compra." : "Consulta compras realizadas y registra compras urgentes sin requerimiento.",
+          view === "oc" ? "Autorización y seguimiento" : "Compras registradas",
+        )}
         action={
           <div className="flex flex-wrap gap-2">
             {view === "oc" ? (
@@ -123,7 +131,7 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
       />
       <ActiveFilters
         items={[
-          ...(view !== "compras" ? [{ label: viewLabel, clearHref: filters("vista") }] : []),
+          ...coordFilterChips(sidebarNav, view !== "compras" ? [{ label: viewLabel, clearHref: filters("vista") }] : []),
           ...((view === "compras" || view === "oc") && estadoCompras ? [{ label: STATUS[estadoCompras] ?? estadoCompras, clearHref: filters("estado") }] : []),
           ...(fecha ? [{ label: `Fecha: ${fecha}`, clearHref: filters("fecha") }] : []),
           ...(proveedor ? [{ label: `Proveedor: ${suppliers.find((supplier) => supplier.id === proveedor)?.name ?? "Seleccionado"}`, clearHref: filters("proveedor") }] : []),

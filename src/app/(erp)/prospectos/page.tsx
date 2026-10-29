@@ -3,6 +3,7 @@ import { ProspectosListFilter } from "@/components/compact-list-filters";
 import { ActionLink, ActiveFilters, Badge, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, Table, Td, Th } from "@/components/ui";
 import { listHref } from "@/lib/list-url";
 import { prisma } from "@/lib/db";
+import { coordPageSubtitle, coordUsesSidebarNav } from "@/lib/coordination-ui";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
 
@@ -31,7 +32,16 @@ export default async function ProspectosPage({ searchParams }: { searchParams: P
   });
   return (
     <>
-      <PageHeader title="Prospectos" subtitle="Da seguimiento a oportunidades abiertas y convierte en cliente cuando estén listas." action={<ActionLink href="/prospectos/nuevo">Nuevo prospecto</ActionLink>} />
+      <PageHeader
+        title="Prospectos"
+        subtitle={coordPageSubtitle(
+          coordUsesSidebarNav(session.role),
+          session.activeCompanyCode,
+          "Da seguimiento a oportunidades abiertas y convierte en cliente cuando estén listas.",
+          "Oportunidades comerciales",
+        )}
+        action={<ActionLink href="/prospectos/nuevo">Nuevo prospecto</ActionLink>}
+      />
       <ProspectosListFilter q={query} estado={status} />
       <ActiveFilters
         items={[
