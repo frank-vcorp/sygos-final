@@ -22,8 +22,11 @@ import { requireCompany } from "@/lib/session";
 
 export default async function HorasPage() {
   const session = await requireCompany();
-  const capture = can(session.role, "overtime.capture", session.activeCompanyCode) || can(session.role, "personnel.authorize");
-  if (!capture) redirect("/inicio");
+  const canAccessHoras =
+    can(session.role, "overtime.capture", session.activeCompanyCode) ||
+    can(session.role, "personnel.authorize") ||
+    can(session.role, "personnel.manage");
+  if (!canAccessHoras) redirect("/inicio");
   const mine = session.role === "GERENTE_OPERATIVO_SERVOMOTORES"
     ? await prisma.collaborator.findMany({ where: { companyId: session.activeCompanyId, status: "ACTIVO", user: { role: "AYUDANTE_GENERAL" } }, include: { user: true } })
     : await prisma.collaborator.findMany({

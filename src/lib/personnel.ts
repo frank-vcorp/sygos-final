@@ -371,7 +371,9 @@ export async function reviewOvertime(actor: Actor, overtimeId: string, version: 
     return;
   }
   if (row.status === "PENDIENTE_CEO") {
-    assertCeo(actor);
+    if (actor.role !== "ADMINISTRADOR" && actor.role !== "CEO" && actor.role !== "COORDINACION_ADMINISTRACION") {
+      throw new Error("Esa decisión es del CEO.");
+    }
     if (!approved) {
       await prisma.overtimeRequest.updateMany({ where: { id: row.id, version }, data: { status: "RECHAZADA", version: { increment: 1 } } });
       return;

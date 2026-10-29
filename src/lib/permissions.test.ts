@@ -59,6 +59,13 @@ describe("permisos de fase 1", () => {
     assert.equal(can("COORDINACION_ADMINISTRACION", "operation.queue", "SYSTRON"), false);
   });
 
+  it("deja a coordinación operar personal y revisar horas extra sin capturarlas", () => {
+    assert.equal(can("COORDINACION_ADMINISTRACION", "personnel.manage"), true);
+    assert.equal(can("COORDINACION_ADMINISTRACION", "personnel.authorize"), false);
+    assert.equal(can("COORDINACION_ADMINISTRACION", "overtime.capture", "SYSTRON"), false);
+    assert.equal(can("COORDINACION_ADMINISTRACION", "overtime.capture", "SERVOMOTORES"), false);
+  });
+
   it("limita requerimientos a SYSTRON y tipos por rol", () => {
     assert.equal(can("VENTAS", "purchase.requirement.create", "SYSTRON"), true);
     assert.equal(can("VENTAS", "purchase.requirement.create", "SERVOMOTORES"), false);

@@ -90,7 +90,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
     links: [
       { href: "/personal", show: (role) => can(role, "personnel.manage") },
       { href: "/personal/asistencia", show: (role) => can(role, "personnel.manage") },
-      { href: "/personal/horas", show: (role, code) => notVentas(role) && (can(role, "overtime.capture", code) || can(role, "personnel.authorize")) },
+      { href: "/personal/horas", show: (role, code) => notVentas(role) && (can(role, "overtime.capture", code) || can(role, "personnel.authorize") || can(role, "personnel.manage")) },
       { href: "/nomina", show: (role) => can(role, "personnel.manage") },
       { href: "/comisiones", show: (role) => can(role, "personnel.manage") },
       { href: "/produccion", show: (role) => can(role, "production.view") },
