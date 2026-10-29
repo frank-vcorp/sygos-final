@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { aguinaldoAction, payrollAction } from "./actions";
 import { ActiveFilters, Badge, Button, controlClass, Empty, Field, FormActions, FormPanel, FormSection, MobileCard, PageHeader, RecordLink, ResponsiveData, SegmentedNav, Table, Td, Th } from "@/components/ui";
 import { prisma } from "@/lib/db";
+import { coordUsesSidebarNav } from "@/lib/coordination-ui";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
 
@@ -51,7 +52,7 @@ export default async function NominaPage({ searchParams }: { searchParams: Promi
   return (
     <>
       <PageHeader title="Nómina" subtitle={subtitle} />
-      <SegmentedNav items={tabs} />
+      {coordUsesSidebarNav(session.role) ? null : <SegmentedNav items={tabs} />}
       <ActiveFilters items={vista && vistaLabels[vista] ? [{ label: vistaLabels[vista], clearHref: "/nomina" }] : []} />
       {vista !== "aguinaldo" && vista !== "documentos" ? (
         <FormPanel action={payrollAction} className="mb-4">

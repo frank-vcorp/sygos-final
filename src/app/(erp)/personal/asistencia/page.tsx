@@ -15,6 +15,7 @@ import {
 import { listHref } from "@/lib/list-url";
 import { prisma } from "@/lib/db";
 import { mexicoToday } from "@/lib/personnel";
+import { coordUsesSidebarNav } from "@/lib/coordination-ui";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
 
@@ -35,16 +36,18 @@ export default async function AsistenciaPage({ searchParams }: { searchParams: P
   return (
     <>
       <PageHeader
-        back={{ href: "/personal", label: "Personal" }}
+        back={coordUsesSidebarNav(session.role) ? undefined : { href: "/personal", label: "Personal" }}
         title={vacations ? "Vacaciones del día" : "Asistencia"}
         subtitle="Normal, retardo, ausencia, vacaciones, permiso y salida faltante. La salida faltante no descuenta."
       />
-      <SegmentedNav
-        items={[
-          { href: listHref("/personal/asistencia", { dia: day !== today ? day : undefined }), label: "Asistencia", active: !vacations },
-          { href: listHref("/personal/asistencia", { vista: "vacaciones", dia: day !== today ? day : undefined }), label: "Vacaciones", active: vacations },
-        ]}
-      />
+      {coordUsesSidebarNav(session.role) ? null : (
+        <SegmentedNav
+          items={[
+            { href: listHref("/personal/asistencia", { dia: day !== today ? day : undefined }), label: "Asistencia", active: !vacations },
+            { href: listHref("/personal/asistencia", { vista: "vacaciones", dia: day !== today ? day : undefined }), label: "Vacaciones", active: vacations },
+          ]}
+        />
+      )}
       <form className="mb-4 flex flex-wrap items-end gap-2 rounded-xl border border-[var(--line)] bg-white p-4">
         <Field label="Día">
           <input name="dia" type="date" defaultValue={day} className={controlClass} />

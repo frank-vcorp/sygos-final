@@ -3,9 +3,11 @@ import { accountAction, payCardAction, payPayableAction, proofAction, transferAc
 import { FinanzasMesFilter } from "@/components/compact-list-filters";
 import {
   ActiveFilters,
+  Badge,
   Button,
   Card,
   controlClass,
+  Empty,
   Field,
   FormActions,
   FormPanel,
@@ -16,7 +18,11 @@ import {
   PageHeader,
   ResponsiveData,
   SegmentedNav,
+  Table,
+  Td,
+  Th,
 } from "@/components/ui";
+import { coordUsesSidebarNav } from "@/lib/coordination-ui";
 import { listHref } from "@/lib/list-url";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
@@ -74,10 +80,19 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
   const defaultMes = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
   const cxc = receivables._sum.balance ?? 0;
   const cxp = payables._sum.balance ?? 0;
+  const sidebarNav = coordUsesSidebarNav(session.role);
+  const pageTitle =
+    sidebarNav && vistaLabel && focus
+      ? vistaLabel
+      : "Finanzas";
+  const pageSubtitle =
+    sidebarNav && focus
+      ? `${session.activeCompanyCode === "SERVOMOTORES" ? "Servomotores" : "SYSTRON"} · mes ${key}`
+      : `${session.activeCompanyCode === "SERVOMOTORES" ? "Servomotores" : "SYSTRON"} · ${key}. No hay consolidado entre empresas.`;
   return (
     <>
-      <PageHeader title="Finanzas" subtitle={`${session.activeCompanyCode === "SERVOMOTORES" ? "Servomotores" : "SYSTRON"} · ${key}. No hay consolidado entre empresas.`} />
-      <SegmentedNav items={navItems} />
+      <PageHeader title={pageTitle} subtitle={pageSubtitle} />
+      {sidebarNav ? null : <SegmentedNav items={navItems} />}
       <ActiveFilters
         items={[
           ...(focus && vistaLabel ? [{ label: vistaLabel, clearHref: listHref("/finanzas", { mes: key !== defaultMes ? key : undefined }) }] : []),
@@ -96,26 +111,45 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
       {showSection("dashboard") ? (
         <p className="mt-2 text-sm text-[var(--muted)]">Flujo de movimientos del mes: {money(ingresos - egresos)}</p>
       ) : null}
+      {(showSection("movimientos") || showSection("ingresos") || showSection("egresos")) && movementRows.length === 0 ? (
+        <Empty title="Sin movimientos en el mes" body="Registra un ingreso o egreso manual o espera movimientos de operación." />
+      ) : null}
       {(showSection("movimientos") || showSection("ingresos") || showSection("egresos")) && movementRows.length > 0 ? (
-        <Card className="mt-4 p-4 text-sm">
-          <h2 className="font-medium">Movimientos del mes</h2>
-          <div className="mt-2">
-          <ResponsiveData
-            table={
-              <ul className="max-h-80 space-y-1 overflow-y-auto">
+        <ResponsiveData
+          table={
+            <Table>
+              <thead>
+                <tr>
+                  <Th>Tipo</Th>
+                  <Th>Importe</Th>
+                  <Th>Concepto</Th>
+                </tr>
+              </thead>
+              <tbody>
                 {movementRows.map((row) => (
-                  <li key={row.id}>{row.direction} · {money(row.amount)} · {row.note ?? row.category}</li>
+                  <tr key={row.id}>
+                    <Td>
+                      <Badge tone={row.direction === "INGRESO" ? "ok" : "warn"}>
+                        {row.direction === "INGRESO" ? "Ingreso" : "Egreso"}
+                      </Badge>
+                    </Td>
+                    <Td>{money(row.amount)}</Td>
+                    <Td>{row.note ?? row.category}</Td>
+                  </tr>
                 ))}
-              </ul>
-            }
-            cards={movementRows.map((row) => (
-              <MobileCard key={row.id} title={row.direction} meta={money(row.amount)}>
-                <p>{row.note ?? row.category}</p>
-              </MobileCard>
-            ))}
-          />
-          </div>
-        </Card>
+              </tbody>
+            </Table>
+          }
+          cards={movementRows.map((row) => (
+            <MobileCard
+              key={row.id}
+              title={row.direction === "INGRESO" ? "Ingreso" : "Egreso"}
+              meta={<Badge tone={row.direction === "INGRESO" ? "ok" : "warn"}>{money(row.amount)}</Badge>}
+            >
+              <p>{row.note ?? row.category}</p>
+            </MobileCard>
+          ))}
+        />
       ) : null}
       {showSection("dashboard") ? (
         <section className="mt-6 grid gap-4 lg:grid-cols-2">

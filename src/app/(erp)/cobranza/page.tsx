@@ -6,6 +6,7 @@ import { homePath } from "@/lib/home";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
 import { money } from "@/lib/money";
+import { coordUsesSidebarNav } from "@/lib/coordination-ui";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
 
@@ -38,8 +39,17 @@ export default async function CobranzaPage({ searchParams }: { searchParams: Pro
   });
   return (
     <>
-      <PageHeader title={session.role === "VENTAS" ? "Mi cobranza" : "Cobranza"} subtitle="Saldos de esta empresa. Vencida es saldo después de la fecha." />
-      <CobranzaVistaFilter vista={selectedVista} />
+      <PageHeader
+        title={
+          coordUsesSidebarNav(session.role) && selectedVista === "cxc"
+            ? "Cuentas por cobrar"
+            : session.role === "VENTAS"
+              ? "Mi cobranza"
+              : "Cobranza"
+        }
+        subtitle="Saldos de esta empresa. Vencida es saldo después de la fecha."
+      />
+      {coordUsesSidebarNav(session.role) ? null : <CobranzaVistaFilter vista={selectedVista} />}
       <ActiveFilters
         items={[
           ...(selectedVista === "cxc" ? [{ label: "Con saldo", clearHref: "/cobranza" }] : []),
