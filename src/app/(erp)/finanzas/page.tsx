@@ -91,9 +91,23 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
     `${session.activeCompanyCode === "SERVOMOTORES" ? "Servomotores" : "SYSTRON"} · ${key}. No hay consolidado entre empresas.`,
     focus ? `mes ${key}` : `${key}. Resumen del mes`,
   );
+  const focusedMovementView =
+    !showSection("dashboard") &&
+    (showSection("movimientos") || showSection("ingresos") || showSection("egresos"));
+  const focusedTransferView = !showSection("dashboard") && showSection("transferencias");
+  const pageHeaderAction = focusedMovementView ? (
+    <ManualMovementDialog
+      accounts={accounts}
+      expenseCategories={expenseCategories}
+      incomeCategories={incomeCategories}
+      directionMode={movementDirectionMode}
+    />
+  ) : focusedTransferView ? (
+    <FinanzasTransferDialog banks={banks} />
+  ) : null;
   return (
     <>
-      <PageHeader title={pageTitle} subtitle={pageSubtitle} />
+      <PageHeader title={pageTitle} subtitle={pageSubtitle} action={pageHeaderAction} />
       {sidebarNav ? null : <SegmentedNav items={navItems} />}
       <ActiveFilters
         items={[
@@ -112,15 +126,6 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
       ) : null}
       {showSection("dashboard") ? (
         <p className="mt-2 text-sm text-[var(--muted)]">Flujo de movimientos del mes: {money(ingresos - egresos)}</p>
-      ) : null}
-      {(showSection("movimientos") || showSection("ingresos") || showSection("egresos")) && !showSection("dashboard") ? (
-        <ManualMovementDialog
-          accounts={accounts}
-          expenseCategories={expenseCategories}
-          incomeCategories={incomeCategories}
-          directionMode={movementDirectionMode}
-          className="mt-4 flex justify-end"
-        />
       ) : null}
       {(showSection("movimientos") || showSection("ingresos") || showSection("egresos")) && movementRows.length === 0 ? (
         <Empty title="Sin movimientos en el mes" body="Registra un ingreso o egreso manual o espera movimientos de operación." />
@@ -180,9 +185,6 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
         <div id="fin-cuentas" className="mt-4 scroll-mt-28">
           <AccountsSummary accounts={accounts} cxc={cxc} cxp={cxp} cardDebt={cardDebt} />
         </div>
-      ) : null}
-      {showSection("transferencias") && !showSection("dashboard") ? (
-        <FinanzasTransferDialog banks={banks} className="mt-4" />
       ) : null}
       {showSection("dashboard") && pending.length > 0 ? (
         <Card className="mt-4 p-4">
