@@ -1,6 +1,8 @@
 import { notFound, redirect } from "next/navigation";
 import { collectionNoteAction } from "../actions";
 import { ClientNameLink } from "@/components/client-entity-links";
+import { RegisterPaymentDialog } from "@/app/(erp)/pagos/register-payment-dialog";
+import { getPaymentFormOptions } from "@/app/(erp)/pagos/payment-form-data";
 import { Badge, Button, Card, controlClass, DetailAnchorButton, EntityDetailHeader, EntityMetaItem, Field, FormActions, FormPanel, FormSection, MobileCard, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
@@ -24,6 +26,8 @@ export default async function CuentaPage({ params }: { params: Promise<{ id: str
   const overdue = row.balance > 0 && row.dueAt.getTime() < Date.now();
   const statusLabel = overdue ? "Vencida" : row.status === "SALDADA" ? "Saldada" : row.status === "PARCIAL" ? "Parcial" : "Abierta";
   const confirmedApps = row.applications.filter((item) => item.confirmedAt);
+  const canRegisterPayment = can(session.role, "payment.register", session.activeCompanyCode);
+  const paymentFormOptions = canRegisterPayment ? await getPaymentFormOptions(session) : { receivables: [], payables: [] };
 
   return (
     <>
@@ -46,7 +50,16 @@ export default async function CuentaPage({ params }: { params: Promise<{ id: str
           </>
         }
         primaryAction={canNote && row.balance > 0 ? <DetailAnchorButton href="#seguimiento-cobranza">Registrar seguimiento</DetailAnchorButton> : null}
-        secondaryActions={can(session.role, "payment.register", session.activeCompanyCode) ? <TextLink href="/pagos/nuevo">Registrar pago</TextLink> : null}
+        secondaryActions={
+          canRegisterPayment ? (
+            <RegisterPaymentDialog
+              receivables={paymentFormOptions.receivables}
+              payables={paymentFormOptions.payables}
+              defaultReceivableId={row.id}
+              triggerVariant="text"
+            />
+          ) : null
+        }
       />
       <Card className="mb-4 p-4 text-sm">
         <h2 className="font-medium">Pagos aplicados</h2>

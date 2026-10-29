@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
+import { RegisterPaymentDialog } from "./register-payment-dialog";
+import { getPaymentFormOptions } from "./payment-form-data";
+import { ActiveFilters, Badge, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, SegmentedNav, Table, Td, Th } from "@/components/ui";
 import { ClientNameLink } from "@/components/client-entity-links";
-import { ActionLink, ActiveFilters, Badge, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, SegmentedNav, Table, Td, Th } from "@/components/ui";
 import { homePath } from "@/lib/home";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
@@ -8,11 +10,13 @@ import { coordFilterChips, coordPageSubtitle, coordPageTitle, coordUsesSidebarNa
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
 
-export default async function PagosPage({ searchParams }: { searchParams: Promise<{ vista?: string }> }) {
+export default async function PagosPage({ searchParams }: { searchParams: Promise<{ vista?: string; nuevo?: string }> }) {
   const session = await requireCompany();
   if (!can(session.role, "payment.register", session.activeCompanyCode) && !can(session.role, "payment.validate", session.activeCompanyCode)) redirect(homePath(session.role, session.activeCompanyCode));
-  const { vista } = await searchParams;
+  const { vista, nuevo } = await searchParams;
   const filter = vista === "pendientes" ? "PENDIENTE" : vista === "validados" ? "VALIDADO" : null;
+  const canRegister = can(session.role, "payment.register", session.activeCompanyCode);
+  const paymentFormOptions = canRegister ? await getPaymentFormOptions(session) : { receivables: [], payables: [] };
   const canEditClient = can(session.role, "client.edit", session.activeCompanyCode);
   const own = session.activeCompanyCode === "SERVOMOTORES"
     ? { OR: [{ companyId: session.activeCompanyId }, { kind: "INTERCOMPANIA", status: "PENDIENTE" }] }
@@ -30,12 +34,22 @@ export default async function PagosPage({ searchParams }: { searchParams: Promis
   ];
   const sidebarNav = coordUsesSidebarNav(session.role);
   const vistaTitle = filter === "PENDIENTE" ? "Pagos por validar" : filter === "VALIDADO" ? "Pagos validados" : undefined;
+  const listHref = filter === "PENDIENTE" ? "/pagos?vista=pendientes" : filter === "VALIDADO" ? "/pagos?vista=validados" : "/pagos";
   return (
     <>
       <PageHeader
         title={coordPageTitle(sidebarNav, vistaTitle, "Pagos")}
         subtitle={coordPageSubtitle(sidebarNav, session.activeCompanyCode, "Un pago pendiente no reduce saldos. Validarlo sí.", "Comprobante, importe y destino")}
-        action={can(session.role, "payment.register", session.activeCompanyCode) ? <ActionLink href="/pagos/nuevo">Registrar pago</ActionLink> : null}
+        action={
+          canRegister ? (
+            <RegisterPaymentDialog
+              receivables={paymentFormOptions.receivables}
+              payables={paymentFormOptions.payables}
+              initiallyOpen={nuevo === "1"}
+              returnHref={nuevo === "1" ? listHref : undefined}
+            />
+          ) : null
+        }
       />
       {sidebarNav ? null : <SegmentedNav items={tabs} />}
       <ActiveFilters
