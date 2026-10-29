@@ -3,35 +3,7 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
-
-function isLinkActive(pathname: string, search: URLSearchParams, href: string, locationHash: string): boolean {
-  const hashIdx = href.indexOf("#");
-  const wantHash = hashIdx >= 0 ? href.slice(hashIdx) : "";
-  const pathQuery = hashIdx >= 0 ? href.slice(0, hashIdx) : href;
-  const [path, queryString] = pathQuery.split("?", 2);
-  if (pathname !== path && !pathname.startsWith(`${path}/`)) return false;
-  if (wantHash) return locationHash === wantHash;
-  if (!queryString) {
-    if (pathname !== path) return pathname.startsWith(`${path}/`);
-    return !search.get("vista");
-  }
-  const expected = new URLSearchParams(queryString.split("#")[0] ?? queryString);
-  for (const [key, value] of expected.entries()) {
-    if (search.get(key) !== value) return false;
-  }
-  return true;
-}
-
-function activeLinkHref(
-  pathname: string,
-  search: URLSearchParams,
-  links: Array<{ href: string }>,
-  locationHash: string,
-): string | undefined {
-  return links
-    .filter((link) => isLinkActive(pathname, search, link.href, locationHash))
-    .sort((a, b) => b.href.length - a.href.length)[0]?.href;
-}
+import { pickGlobalActiveNavHref } from "@/lib/side-nav-active";
 
 export function SideNav({
   groups,
@@ -55,12 +27,14 @@ export function SideNav({
     window.addEventListener("hashchange", sync);
     return () => window.removeEventListener("hashchange", sync);
   }, [path]);
+  const allHrefs = groups.flatMap((group) => group.links.map((link) => link.href));
+  const globalActiveHref = pickGlobalActiveNavHref(path, search, allHrefs, locationHash);
   return (
     <nav className="space-y-2 px-3 pb-6" aria-label="Secciones">
       {groups.map((group) => {
         if (group.direct && group.title && group.links.length === 1) {
           const link = group.links[0]!;
-          const active = isLinkActive(path, search, link.href, locationHash);
+          const active = link.href === globalActiveHref;
           return (
             <div
               key={link.href}
@@ -85,10 +59,9 @@ export function SideNav({
             </div>
           );
         }
-        const activeHref = activeLinkHref(path, search, group.links, locationHash);
-        const groupActive = activeHref !== undefined;
+        const groupActive = group.links.some((link) => link.href === globalActiveHref);
         const links = group.links.map((link) => {
-            const active = link.href === activeHref;
+            const active = link.href === globalActiveHref;
             return (
               <div key={link.href} className={`flex min-h-10 items-center rounded-xl transition-colors ${active ? "bg-[var(--accent)] text-white shadow-[0_5px_14px_rgba(10,71,126,0.18)]" : "text-[#263b55] hover:bg-[var(--accent-soft)]"}`}>
                 <Link href={link.href} className="block min-w-0 flex-1 px-3 py-2.5 text-[14px] font-medium" aria-current={active ? "page" : undefined}>
