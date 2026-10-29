@@ -7,12 +7,18 @@ import {
   SalesPanelServiciosGrouped,
   SalesPanelServiciosSection,
 } from "@/components/sales-panel-bandeja";
+import { RequirementListSection } from "@/app/(erp)/compras/requerimientos/requirement-list-section";
 import { Card, KpiCard, PageHeader, RecordLink, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
 import { purchaseListHref } from "@/lib/purchase-filter-links";
 import { can } from "@/lib/permissions";
 import { homePath } from "@/lib/home";
+import {
+  loadRequirementListContexts,
+  syncPendingPartRequestRequirements,
+} from "@/lib/requirement-list-enrichment";
+import { shoppingListKindFromList } from "@/lib/shopping-list-display";
 import {
   receivableEsVigente,
   servicioCotizadaSinAutorizacion,
@@ -193,7 +199,13 @@ export default async function PanelPage({ searchParams }: { searchParams: Promis
     return <SupervisorShop companyId={companyId} userId={session.userId} />;
   }
   if (session.role === "GERENTE_OPERATIVO_SYSTRON") {
-    return <GerenteSystronPanel companyId={companyId} history={vista === "historial"} />;
+    return (
+      <GerenteSystronPanel
+        companyId={companyId}
+        companyCode={session.activeCompanyCode}
+        history={vista === "historial"}
+      />
+    );
   }
   if (session.role === "CEO") return <CeoExecutive companyId={companyId} name={session.activeCompanyName ?? "Empresa"} vista={vista} />;
   return <Executive companyId={companyId} name={session.activeCompanyName} />;
@@ -238,7 +250,15 @@ async function Technician({ companyId, userId, history }: { companyId: string; u
   );
 }
 
-async function GerenteSystronPanel({ companyId, history }: { companyId: string; history: boolean }) {
+async function GerenteSystronPanel({
+  companyId,
+  companyCode,
+  history,
+}: {
+  companyId: string;
+  companyCode: string | null;
+  history: boolean;
+}) {
   const role: Role = "GERENTE_OPERATIVO_SYSTRON";
   const bandejaHistorial = serviciosBandejaHref({ vista: "historial" });
 
@@ -263,10 +283,80 @@ async function GerenteSystronPanel({ companyId, history }: { companyId: string; 
     );
   }
 
-  const [activeRows, panelCtx] = await Promise.all([
+  await syncPendingPartRequestRequirements(companyId);
+
+  const canManageRequirements = can(role, "purchase.operate", companyCode);
+  const allowQuickSupplier = can(role, "supplier.operate", companyCode);
+
+  const [
+    activeRows,
+    panelCtx,
+    refaccionRows,
+    suppliers,
+    categories,
+    accounts,
+    shoppingLists,
+  ] = await Promise.all([
     listActiveServicios(companyId, ""),
     loadGerenteServicioPanelContext(companyId),
+    prisma.requirement.findMany({
+      where: { companyId, kind: "REFACCION", status: "PENDIENTE" },
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    }),
+    canManageRequirements
+      ? prisma.supplier.findMany({
+          where: { companyId, active: true },
+          orderBy: { name: "asc" },
+          select: { id: true, name: true, currency: true },
+        })
+      : Promise.resolve([]),
+    canManageRequirements
+      ? prisma.expenseCategory.findMany({
+          where: { companyId, active: true },
+          include: { subcategories: { where: { active: true } } },
+          orderBy: { name: "asc" },
+        })
+      : Promise.resolve([]),
+    canManageRequirements
+      ? prisma.financeAccount.findMany({
+          where: { companyId, active: true },
+          orderBy: { name: "asc" },
+          select: { id: true, name: true },
+        })
+      : Promise.resolve([]),
+    canManageRequirements
+      ? prisma.shoppingList.findMany({
+          where: { companyId, status: "ABIERTA" },
+          include: { supplier: true, lines: { include: { requirement: { select: { kind: true } } } } },
+          orderBy: { createdAt: "desc" },
+        })
+      : Promise.resolve([]),
   ]);
+
+  const [contexts, rowRequesters] = await Promise.all([
+    loadRequirementListContexts(companyId, refaccionRows),
+    refaccionRows.length
+      ? prisma.user.findMany({
+          where: { id: { in: refaccionRows.map((row) => row.requesterUserId) } },
+          select: { id: true, name: true },
+        })
+      : Promise.resolve([]),
+  ]);
+
+  const requesterName = new Map(rowRequesters.map((user) => [user.id, user.name]));
+  const refaccionListRows = refaccionRows.map((row) => ({
+    id: row.id,
+    quantity: row.quantity,
+    partNumber: row.partNumber,
+    description: row.description,
+    kind: row.kind,
+    status: row.status,
+    requesterName: requesterName.get(row.requesterUserId) ?? "—",
+    shoppingListId: row.shoppingListId,
+    purchaseId: row.purchaseId,
+    context: contexts.get(row.id)!,
+  }));
 
   const servicioRows = activeRows.filter((row): row is ServicioBandejaRow => row.kind === "servicio");
   const sections = gerentePanelSections(servicioRows, panelCtx);
@@ -286,21 +376,45 @@ async function GerenteSystronPanel({ companyId, history }: { companyId: string; 
         action={<TextLink href="/panel?vista=historial">Ver historial</TextLink>}
       />
       <section className="flex w-full max-w-none flex-col gap-4">
-        {sections.map(({ filtro, rows }) => (
-          <SalesPanelServiciosSection
-            key={filtro}
-            title={GERENTE_SERVICIO_PANEL_FILTROS[filtro]}
-            empty={emptyByFiltro[filtro]}
-            bandejaHref={serviciosBandejaHref({ vista: "activos", filtro })}
-            rows={rows}
-            role={role}
-            highlightRow={
-              filtro === "vencidos"
-                ? (row) => servicioRowHighlight(row, panelCtx.now).markers.includes("Vencido")
-                : undefined
-            }
-          />
-        ))}
+        {sections.map(({ filtro, rows }) =>
+          filtro === "refacciones" ? (
+            <RequirementListSection
+              key={filtro}
+              title={GERENTE_SERVICIO_PANEL_FILTROS[filtro]}
+              empty={emptyByFiltro[filtro]}
+              bandejaHref="/compras/requerimientos"
+              variant="panel"
+              rows={refaccionListRows}
+              canManage={canManageRequirements}
+              showRequester={canManageRequirements}
+              suppliers={suppliers}
+              categories={categories}
+              accounts={accounts}
+              allowQuickSupplier={allowQuickSupplier}
+              shoppingLists={shoppingLists.map((list) => ({
+                id: list.id,
+                folio: list.folio,
+                kind: shoppingListKindFromList(list),
+                supplierId: list.supplierId,
+                supplierName: list.supplier?.name ?? null,
+              }))}
+            />
+          ) : (
+            <SalesPanelServiciosSection
+              key={filtro}
+              title={GERENTE_SERVICIO_PANEL_FILTROS[filtro]}
+              empty={emptyByFiltro[filtro]}
+              bandejaHref={serviciosBandejaHref({ vista: "activos", filtro })}
+              rows={rows}
+              role={role}
+              highlightRow={
+                filtro === "vencidos"
+                  ? (row) => servicioRowHighlight(row, panelCtx.now).markers.includes("Vencido")
+                  : undefined
+              }
+            />
+          ),
+        )}
       </section>
     </>
   );

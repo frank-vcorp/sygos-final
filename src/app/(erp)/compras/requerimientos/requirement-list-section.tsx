@@ -14,6 +14,7 @@ import { SlaCountdown } from "@/components/sla-countdown";
 import { SupplierPicker } from "@/components/supplier-picker";
 import {
   Button,
+  Card,
   controlClass,
   Field,
   FormActions,
@@ -22,6 +23,7 @@ import {
   Table,
   TableActionLink,
   Td,
+  TextLink,
   Th,
 } from "@/components/ui";
 import type { ExpenseCategoryCatalogItem } from "@/lib/expense-catalog";
@@ -81,6 +83,12 @@ function ContextLink({ label, href }: { label: string; href: string | null }) {
   return <RecordLink href={href}>{label}</RecordLink>;
 }
 
+function countLabel(count: number) {
+  if (count === 0) return "Sin pendientes";
+  if (count === 1) return "1 pendiente mostrado";
+  return `${count} pendientes mostrados`;
+}
+
 export function RequirementListSection({
   title,
   rows,
@@ -91,6 +99,10 @@ export function RequirementListSection({
   accounts,
   allowQuickSupplier,
   shoppingLists,
+  bandejaHref,
+  bandejaLabel = "Ver bandeja",
+  empty,
+  variant = "default",
 }: {
   title: string;
   rows: RequirementListRow[];
@@ -101,54 +113,60 @@ export function RequirementListSection({
   accounts: Array<{ id: string; name: string }>;
   allowQuickSupplier: boolean;
   shoppingLists: ShoppingListOption[];
+  bandejaHref?: string;
+  bandejaLabel?: string;
+  empty?: string;
+  variant?: "default" | "panel";
 }) {
   const [purchaseRow, setPurchaseRow] = useState<RequirementListRow | null>(null);
   const [listRow, setListRow] = useState<RequirementListRow | null>(null);
 
-  return (
-    <section className="mb-6 overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--surface)]">
-      <h2 className="border-b border-[var(--line)] px-4 py-3 text-sm font-semibold">{title}</h2>
-      <Table>
-        <thead>
-          <tr>
-            <Th>Cantidad</Th>
-            <Th>Partida</Th>
-            <Th>Diag</Th>
-            <Th>OS</Th>
-            <Th>Equipo</Th>
-            {showRequester ? <Th>Solicitante</Th> : null}
-            <Th>SLA</Th>
-            {canManage ? <Th>Acciones</Th> : null}
+  const tableContent = (
+    <Table>
+      <thead>
+        <tr>
+          <Th>Cantidad</Th>
+          <Th>Partida</Th>
+          <Th>Diag</Th>
+          <Th>OS</Th>
+          <Th>Equipo</Th>
+          {showRequester ? <Th>Solicitante</Th> : null}
+          <Th>SLA</Th>
+          {canManage ? <Th>Acciones</Th> : null}
+        </tr>
+      </thead>
+      <tbody>
+        {rows.map((row) => (
+          <tr key={row.id}>
+            <Td>{row.quantity}</Td>
+            <Td>{requirementPartidaLabel(row)}</Td>
+            <Td><ContextLink label={row.context.diagLabel} href={row.context.diagHref} /></Td>
+            <Td><ContextLink label={row.context.osLabel} href={row.context.osHref} /></Td>
+            <Td><ContextLink label={row.context.equipmentLabel} href={row.context.equipmentHref} /></Td>
+            {showRequester ? <Td>{row.requesterName}</Td> : null}
+            <Td><SlaCountdown dueAt={row.context.slaDueAt} /></Td>
+            {canManage ? (
+              <Td className="flex flex-wrap gap-2">
+                {row.status === "PENDIENTE" ? (
+                  <>
+                    <TableActionButton tone="primary" onClick={() => setPurchaseRow(row)}>Comprar</TableActionButton>
+                    <TableActionButton onClick={() => setListRow(row)}>Agregar a lista</TableActionButton>
+                  </>
+                ) : row.shoppingListId ? (
+                  <TableActionLink href={`/compras/listas/${row.shoppingListId}`}>Ver lista</TableActionLink>
+                ) : row.purchaseId ? (
+                  <TableActionLink href={`/compras/${row.purchaseId}`}>Ver compra</TableActionLink>
+                ) : null}
+              </Td>
+            ) : null}
           </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.id}>
-              <Td>{row.quantity}</Td>
-              <Td>{requirementPartidaLabel(row)}</Td>
-              <Td><ContextLink label={row.context.diagLabel} href={row.context.diagHref} /></Td>
-              <Td><ContextLink label={row.context.osLabel} href={row.context.osHref} /></Td>
-              <Td><ContextLink label={row.context.equipmentLabel} href={row.context.equipmentHref} /></Td>
-              {showRequester ? <Td>{row.requesterName}</Td> : null}
-              <Td><SlaCountdown dueAt={row.context.slaDueAt} /></Td>
-              {canManage ? (
-                <Td className="flex flex-wrap gap-2">
-                  {row.status === "PENDIENTE" ? (
-                    <>
-                      <TableActionButton tone="primary" onClick={() => setPurchaseRow(row)}>Comprar</TableActionButton>
-                      <TableActionButton onClick={() => setListRow(row)}>Agregar a lista</TableActionButton>
-                    </>
-                  ) : row.shoppingListId ? (
-                    <TableActionLink href={`/compras/listas/${row.shoppingListId}`}>Ver lista</TableActionLink>
-                  ) : row.purchaseId ? (
-                    <TableActionLink href={`/compras/${row.purchaseId}`}>Ver compra</TableActionLink>
-                  ) : null}
-                </Td>
-              ) : null}
-            </tr>
-          ))}
-        </tbody>
-      </Table>
+        ))}
+      </tbody>
+    </Table>
+  );
+
+  const dialogs = (
+    <>
       {purchaseRow ? (
         <RequirementPurchaseDialog
           row={purchaseRow}
@@ -168,6 +186,45 @@ export function RequirementListSection({
           onClose={() => setListRow(null)}
         />
       ) : null}
+    </>
+  );
+
+  if (variant === "panel") {
+    return (
+      <Card className="flex w-full flex-col overflow-hidden p-0">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--line)] bg-[#fbfdff] px-5 py-4">
+          <div>
+            <h2 className="text-base font-bold tracking-tight text-[var(--ink)]">{title}</h2>
+            <p className="mt-1 text-xs text-[var(--muted)]">{countLabel(rows.length)}</p>
+          </div>
+          {bandejaHref ? <TextLink href={bandejaHref}>{bandejaLabel}</TextLink> : null}
+        </div>
+        {rows.length === 0 ? (
+          <p className="m-5 rounded-lg bg-[#f5f8fb] px-4 py-3 text-sm text-[var(--muted)]">
+            {empty ?? "No hay solicitudes de refacción abiertas."}
+          </p>
+        ) : (
+          <div className="w-full px-4 pb-5 pt-2 sm:px-5">
+            {tableContent}
+          </div>
+        )}
+        {dialogs}
+      </Card>
+    );
+  }
+
+  return (
+    <section className="mb-6 overflow-hidden rounded-xl border border-[var(--line)] bg-[var(--surface)]">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--line)] px-4 py-3">
+        <h2 className="text-sm font-semibold">{title}</h2>
+        {bandejaHref ? <TextLink href={bandejaHref}>{bandejaLabel}</TextLink> : null}
+      </div>
+      {rows.length === 0 && empty ? (
+        <p className="m-4 rounded-lg bg-[#f5f8fb] px-4 py-3 text-sm text-[var(--muted)]">{empty}</p>
+      ) : (
+        tableContent
+      )}
+      {dialogs}
     </section>
   );
 }

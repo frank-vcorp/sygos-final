@@ -357,6 +357,7 @@ export async function purchaseRequirementOverlayAction(
     const purchase = await purchaseRequirement(await guard("purchase.operate"), requirementId, purchaseRequirementFinanceFromForm(formData));
     await setFlash({ tone: "ok", message: `${purchase.folio} creada desde el requerimiento.` });
     revalidatePath("/compras/requerimientos");
+    revalidatePath("/panel");
     return { status: "success", message: `${purchase.folio} registrada.` };
   } catch (error) {
     return { status: "error", message: bubble(error) };
@@ -397,6 +398,7 @@ export async function addToShoppingListOverlayAction(
     });
     await setFlash({ tone: "ok", message: `Agregado a ${list.folio}.` });
     revalidatePath("/compras/requerimientos");
+    revalidatePath("/panel");
     return { status: "success", message: `Agregado a ${list.folio}.` };
   } catch (error) {
     return { status: "error", message: bubble(error) };

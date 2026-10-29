@@ -16,6 +16,16 @@ describe("requerimientos en lista", () => {
 
   it("formatea identificación de equipo como en equipos", () => {
     assert.equal(
+      equipmentIdentificationLabel({
+        folio: "EQUI-0001",
+        typeName: "SERVO",
+        brandName: "Siemens",
+        model: "1LA7",
+        serial: "SN-9",
+      }),
+      "EQUI-0001 | SERVO | Siemens | 1LA7",
+    );
+    assert.equal(
       equipmentIdentificationLabel({ brandName: "Siemens", model: "1LA7", serial: "SN-9" }),
       "Siemens · 1LA7 · SN-9",
     );

@@ -11,10 +11,17 @@ export function requirementPartidaLabel(row: { partNumber: string; description: 
 }
 
 export function equipmentIdentificationLabel(equipment: {
+  folio?: string | null;
+  typeName?: string | null;
   brandName: string | null;
   model: string;
-  serial: string | null;
+  serial?: string | null;
 }) {
+  const folio = equipment.folio?.trim();
+  if (folio) {
+    const spec = [equipment.typeName, equipment.brandName, equipment.model].filter(Boolean).join(" | ");
+    return spec ? `${folio} | ${spec}` : folio;
+  }
   const label = [equipment.brandName, equipment.model, equipment.serial].filter(Boolean).join(" · ");
   return label || "—";
 }

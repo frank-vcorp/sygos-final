@@ -28,13 +28,21 @@ function contextFromCase(
     kind: string;
     slaDueAt: Date | null;
     spawnedFromId: string | null;
-    equipment: { id: string; kind: string; brandName: string | null; model: string; serial: string | null };
+    equipment: {
+      id: string;
+      kind: string;
+      folio?: string | null;
+      typeName?: string | null;
+      brandName: string | null;
+      model: string;
+      serial: string | null;
+    };
   },
   diagnosisById: Map<string, { id: string; folio: string }>,
 ): RequirementListContext {
   const equipmentLabel = equipmentIdentificationLabel(caseRow.equipment);
   const equipmentHref = equipmentDetailHref(caseRow.equipment);
-  if (caseRow.kind === "DX") {
+  if (caseRow.kind === "DX" || caseRow.kind === "DIAGNOSTICO") {
     return {
       diagLabel: caseRow.folio,
       diagHref: `/operacion/${caseRow.id}`,
@@ -55,6 +63,69 @@ function contextFromCase(
     equipmentHref,
     slaDueAt: caseRow.slaDueAt,
   };
+}
+
+const CLOSED_CASES = ["VALIDADO", "TERMINADA", "SIN_REPARACION"] as const;
+
+export async function syncPendingPartRequestRequirements(companyId: string): Promise<void> {
+  const openRequests = await prisma.partRequest.findMany({
+    where: {
+      companyId,
+      status: "SOLICITADA",
+      case: { status: { notIn: [...CLOSED_CASES] } },
+    },
+    include: {
+      case: {
+        select: {
+          assigneeUserId: true,
+          attention: { select: { createdByUserId: true } },
+          equipment: { select: { createdByUserId: true } },
+        },
+      },
+    },
+  });
+  if (openRequests.length === 0) return;
+
+  const existing = await prisma.requirement.findMany({
+    where: {
+      companyId,
+      sourceType: "OS",
+      sourceId: { in: openRequests.map((row) => row.id) },
+    },
+    select: { sourceId: true },
+  });
+  const existingIds = new Set(existing.map((row) => row.sourceId));
+  const missing = openRequests.filter((row) => !existingIds.has(row.id) && row.qtyIssued < row.qtyRequested);
+  if (missing.length === 0) return;
+
+  const fallbackUser = await prisma.user.findFirst({
+    where: { OR: [{ companyId }, { companyId: null }], active: true },
+    orderBy: { createdAt: "asc" },
+    select: { id: true },
+  });
+
+  for (const request of missing) {
+    const requesterUserId =
+      request.case.assigneeUserId
+      ?? request.case.attention.createdByUserId
+      ?? request.case.equipment.createdByUserId
+      ?? fallbackUser?.id;
+    if (!requesterUserId) continue;
+    await prisma.requirement.upsert({
+      where: { companyId_sourceType_sourceId: { companyId, sourceType: "OS", sourceId: request.id } },
+      update: {},
+      create: {
+        companyId,
+        partNumber: request.partNumber,
+        description: request.description,
+        quantity: request.qtyRequested,
+        kind: "REFACCION",
+        requesterUserId,
+        sourceType: "OS",
+        sourceId: request.id,
+      },
+    });
+  }
 }
 
 export async function loadRequirementListContexts(
@@ -92,7 +163,7 @@ export async function loadRequirementListContexts(
   const diagnosisById = new Map<string, { id: string; folio: string }>();
   if (spawnedFromIds.length) {
     const diagnoses = await prisma.technicalCase.findMany({
-      where: { id: { in: spawnedFromIds }, kind: "DX" },
+      where: { id: { in: spawnedFromIds }, kind: { in: ["DIAGNOSTICO", "DX"] } },
       select: { id: true, folio: true },
     });
     for (const row of diagnoses) diagnosisById.set(row.id, row);

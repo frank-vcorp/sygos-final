@@ -5,7 +5,7 @@ import { RequirementFilters } from "./requirement-filters";
 import { RequirementListSection } from "./requirement-list-section";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
-import { loadRequirementListContexts } from "@/lib/requirement-list-enrichment";
+import { loadRequirementListContexts, syncPendingPartRequestRequirements } from "@/lib/requirement-list-enrichment";
 import { requirementStatusFilter } from "@/lib/requirement-filters";
 import { shoppingListKindFromList } from "@/lib/shopping-list-display";
 import { requireCompany } from "@/lib/session";
@@ -18,6 +18,9 @@ export default async function ComprasRequerimientosPage({ searchParams }: { sear
   if (!canManage && !canCreate) redirect("/inicio");
   const params = await searchParams;
   const status = requirementStatusFilter(params.estado);
+  if (status === "PENDIENTE") {
+    await syncPendingPartRequestRequirements(session.activeCompanyId);
+  }
   const rows = await prisma.requirement.findMany({
     where: { companyId: session.activeCompanyId, status, ...(canManage ? (params.solicitante ? { requesterUserId: params.solicitante } : {}) : { requesterUserId: session.userId }), ...(params.fecha ? { createdAt: { gte: new Date(`${params.fecha}T00:00:00`), lt: new Date(`${params.fecha}T23:59:59`) } } : {}) },
     orderBy: { createdAt: "desc" },
