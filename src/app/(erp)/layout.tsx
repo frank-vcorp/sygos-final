@@ -173,17 +173,17 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
     </>
   );
   const toolbar = (
-    <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/90 px-4 py-2.5 shadow-[0_1px_2px_rgba(15,23,42,0.03)] backdrop-blur-md md:px-8 md:py-3">
-      <div className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-4">
-          <div className="flex min-w-0 flex-1 items-center gap-3">
-            <span className="hidden text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500 xl:inline">Empresa activa</span>
+    <header className="sticky top-0 z-20 border-b border-slate-200/70 bg-white/90 px-4 py-2 backdrop-blur-md md:px-10 md:py-2.5">
+      <div className="flex w-full flex-wrap items-center justify-between gap-4">
+          <div className="flex min-w-0 flex-1 items-center gap-2.5">
+            <span className="hidden text-[11px] font-medium text-slate-400 xl:inline">Empresa</span>
             {companies.length > 1 ? (
-              <form action={switchCompanyAction} className="flex min-w-0 items-center gap-1.5 rounded-xl border border-slate-200/90 bg-slate-50/80 p-1 shadow-2xs">
+              <form action={switchCompanyAction} className="flex min-w-0 items-center gap-1 rounded-lg p-0.5">
                 <select
                   key={session.activeCompanyId ?? "none"}
                   name="companyId"
                   defaultValue={session.activeCompanyId ?? ""}
-                  className="min-h-8 min-w-0 max-w-48 rounded-lg border-0 bg-white px-2.5 py-1 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/80 focus:ring-2 focus:ring-[#0a477e]/20"
+                  className="min-h-7 min-w-0 max-w-48 rounded-md border border-slate-200/90 bg-white px-2.5 py-1 text-xs font-semibold text-slate-800 hover:bg-slate-50 focus:ring-2 focus:ring-[#0a477e]/20"
                   aria-label="Empresa activa"
                 >
                   <option value="" disabled>Selecciona empresa</option>
@@ -191,44 +191,44 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
                     <option key={company.id} value={company.id}>{company.name}</option>
                   ))}
                 </select>
-                <button className="min-h-8 rounded-lg px-2.5 text-xs font-semibold text-[#0a477e] hover:bg-white hover:shadow-2xs" type="submit">Cambiar</button>
+                <button className="min-h-7 rounded-md px-2 text-xs font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900" type="submit">Cambiar</button>
               </form>
             ) : (
-              <strong className="inline-flex items-center gap-1.5 rounded-full border border-slate-200/90 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-800 shadow-2xs">
+              <strong className="inline-flex items-center gap-1.5 rounded-md bg-slate-100/80 px-2.5 py-1 text-xs font-semibold text-slate-800">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden />
                 {session.activeCompanyName ?? "Sin empresa"}
               </strong>
             )}
           </div>
           <details className="relative md:hidden">
-            <summary className="flex min-h-10 cursor-pointer list-none items-center rounded-lg border border-slate-200/90 bg-white px-3 text-sm font-medium text-slate-700 shadow-2xs hover:bg-slate-50">Opciones</summary>
-            <div className="absolute right-0 top-12 z-30 grid w-[min(88vw,340px)] gap-3 rounded-xl border border-slate-200/90 bg-white p-3.5 shadow-xl">
+            <summary className="flex min-h-9 cursor-pointer list-none items-center rounded-lg border border-slate-200/90 bg-white px-3 text-xs font-medium text-slate-700 hover:bg-slate-50">Opciones</summary>
+            <div className="absolute right-0 top-11 z-30 grid w-[min(88vw,340px)] gap-3 rounded-xl border border-slate-200/90 bg-white p-3.5 shadow-xl">
               {session.realRole === "ADMINISTRADOR" ? (
                 <form action={viewAsAction} className="grid gap-2">
                   <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500" htmlFor="view-as-mobile">Ver como</label>
-                  <select id="view-as-mobile" name="userId" defaultValue={session.impersonating ? session.userId : ""} className="min-h-10 w-full rounded-lg border border-slate-300/90 bg-white px-2.5 text-sm shadow-2xs">
+                  <select id="view-as-mobile" name="userId" defaultValue={session.impersonating ? session.userId : ""} className="min-h-9 w-full rounded-lg border border-slate-300/90 bg-white px-2.5 text-sm">
                     <option value="">Administrador</option>
                     {viewAsUsers.filter((user) => isRole(user.role)).map((user) => <option key={user.id} value={user.id}>{user.name}{user.company ? ` · ${user.company.name}` : ""}</option>)}
                   </select>
-                  <button className="min-h-10 rounded-lg bg-gradient-to-b from-[#0e5696] to-[#083d6e] px-3 text-sm font-semibold text-white shadow-xs">Aplicar</button>
+                  <button className="min-h-9 rounded-lg bg-[#0d5ca1] px-3 text-xs font-semibold text-white">Aplicar</button>
                 </form>
               ) : null}
               {can(session.role, "search.global") && session.activeCompanyId ? (
-                <form action="/buscar"><input name="q" placeholder="Buscar en esta empresa" className="min-h-10 w-full rounded-lg border border-slate-300/90 bg-slate-50/70 px-3 text-sm focus:bg-white" /></form>
+                <form action="/buscar"><input name="q" placeholder="Buscar en esta empresa" className="min-h-9 w-full rounded-lg border border-slate-300/90 bg-slate-50/70 px-3 text-sm focus:bg-white" /></form>
               ) : null}
-              <form action={logoutAction}><button className="min-h-10 w-full rounded-lg border border-slate-200/90 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50">Salir</button></form>
+              <form action={logoutAction}><button className="min-h-9 w-full rounded-lg border border-slate-200/90 bg-white text-xs font-medium text-slate-700 hover:bg-slate-50">Salir</button></form>
             </div>
           </details>
-          <div className="hidden items-center gap-3 md:flex">
+          <div className="hidden items-center gap-2.5 md:flex">
             {session.realRole === "ADMINISTRADOR" ? (
-              <form action={viewAsAction} className="flex items-center gap-2 rounded-xl border border-slate-200/90 bg-slate-50/80 px-2.5 py-1 shadow-2xs">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500" htmlFor="view-as">Ver como</label>
+              <form action={viewAsAction} className="flex items-center gap-1.5">
+                <label className="text-[11px] font-medium text-slate-400" htmlFor="view-as">Ver como</label>
                 <select
                   id="view-as"
                   name="userId"
                   key={session.impersonating ? session.userId : "admin"}
                   defaultValue={session.impersonating ? session.userId : ""}
-                  className="min-h-8 rounded-lg border border-slate-200/90 bg-white px-2.5 py-1 text-xs font-medium text-slate-800 shadow-2xs"
+                  className="min-h-7 rounded-md border border-slate-200/90 bg-white px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
                 >
                   <option value="">Administrador</option>
                   {viewAsUsers.filter((user) => isRole(user.role)).map((user) => (
@@ -237,16 +237,16 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
                     </option>
                   ))}
                 </select>
-                <button className="min-h-8 rounded-lg px-2 text-xs font-semibold text-[#0a477e] hover:bg-white hover:shadow-2xs" type="submit">Aplicar</button>
+                <button className="min-h-7 rounded-md px-2 text-xs font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900" type="submit">Aplicar</button>
               </form>
             ) : null}
             {can(session.role, "search.global") && session.activeCompanyId ? (
               <form action="/buscar" className="flex">
-                <input name="q" placeholder="Buscar en esta empresa…" className="min-h-9 w-48 rounded-lg border border-slate-200/90 bg-slate-50/80 px-3 py-1.5 text-sm text-slate-800 shadow-2xs focus:border-[#0a477e] focus:bg-white focus:ring-3 focus:ring-[#0a477e]/15 md:w-64" />
+                <input name="q" placeholder="Buscar…" className="min-h-7 w-44 rounded-md border border-slate-200/90 bg-slate-50/80 px-2.5 py-1 text-xs text-slate-800 focus:border-[#0a477e] focus:bg-white focus:ring-2 focus:ring-[#0a477e]/15 md:w-56" />
               </form>
             ) : null}
             <form action={logoutAction}>
-              <button className="inline-flex min-h-9 items-center rounded-lg border border-transparent px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:border-slate-200/90 hover:bg-slate-100/80 hover:text-slate-900" type="submit">Salir</button>
+              <button className="inline-flex min-h-7 items-center rounded-md px-2 py-1 text-xs font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900" type="submit">Salir</button>
             </form>
           </div>
       </div>
@@ -255,13 +255,16 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
 
   return (
     <ErpShell sidebar={sidebar} toolbar={toolbar}>
-        <main className="mx-auto max-w-[1440px] px-4 py-5 sm:px-6 md:px-8 md:py-9 lg:px-10 print:max-w-none print:p-0">
+        <main className="w-full max-w-[1600px] px-5 py-6 sm:px-8 md:px-10 md:py-8 print:max-w-none print:p-0">
           {session.impersonating ? (
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-md border border-[#ead9a8] bg-[var(--warn-soft)] px-3 py-2 text-sm print:hidden">
-              <p>Viendo como <strong>{session.name}</strong> · {ROLE_LABEL[session.role]}. Lo que guardes queda a nombre de esta cuenta.</p>
+            <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200/90 bg-amber-50/70 px-3.5 py-2 text-xs text-amber-900 print:hidden">
+              <p className="flex items-center gap-2">
+                <span className="inline-flex h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" aria-hidden />
+                <span>Viendo como <strong>{session.name}</strong> · {ROLE_LABEL[session.role]}. Lo que guardes queda a nombre de esta cuenta.</span>
+              </p>
               <form action={viewAsAction}>
                 <input type="hidden" name="userId" value="" />
-                <button className="font-medium text-[var(--accent)]" type="submit">Volver a Administrador</button>
+                <button className="font-semibold text-amber-900 underline decoration-amber-400 underline-offset-2 hover:text-slate-900" type="submit">Volver a Administrador</button>
               </form>
             </div>
           ) : null}

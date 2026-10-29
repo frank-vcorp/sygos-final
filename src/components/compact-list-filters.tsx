@@ -144,8 +144,8 @@ export function FinanzasMesFilter({ mes, vista }: { mes: string; vista: string }
   );
   return (
     <CompactFilterBar onSubmit={apply}>
-      <Field label="Mes del resumen">
-        <input name="mes" type="month" value={filters.mes} className={controlClass} onChange={(event) => update("mes", event.target.value)} />
+      <Field label="Mes del resumen" className="sm:w-auto">
+        <input name="mes" type="month" value={filters.mes} className={`${controlClass} sm:w-auto`} onChange={(event) => update("mes", event.target.value)} />
       </Field>
     </CompactFilterBar>
   );

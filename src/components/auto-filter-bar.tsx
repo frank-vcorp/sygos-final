@@ -16,13 +16,18 @@ export function CompactFilterBar({
 }) {
   return (
     <form
-      className={`mb-4 flex flex-col gap-2.5 rounded-xl border border-slate-200/80 bg-white/95 p-3.5 shadow-2xs sm:flex-row sm:flex-wrap sm:items-center ${className}`}
+      className={`mb-3 flex flex-col gap-2 py-1 sm:flex-row sm:flex-wrap sm:items-center ${className} [&_input]:min-h-8 [&_input]:rounded-full [&_input]:border-slate-200/90 [&_input]:bg-slate-100/70 [&_input]:px-3.5 [&_input]:py-1 [&_input]:text-xs [&_input]:font-medium [&_input]:shadow-none [&_input:hover]:bg-slate-100 [&_input:focus]:bg-white [&_select]:min-h-8 [&_select]:rounded-full [&_select]:border-slate-200/90 [&_select]:bg-slate-100/70 [&_select]:px-3 [&_select]:py-1 [&_select]:text-xs [&_select]:font-medium [&_select]:shadow-none [&_select:hover]:bg-slate-100 [&_label]:flex [&_label]:items-center [&_label]:gap-2 [&_label>span:first-child]:mb-0 [&_label>span:first-child]:text-xs [&_label>span:first-child]:font-medium [&_label>span:first-child]:text-slate-500`}
       role="search"
       onSubmit={(event) => {
         event.preventDefault();
         onSubmit();
       }}
     >
+      <span className="hidden items-center gap-1.5 pr-1 text-xs font-medium text-slate-400 sm:inline-flex" aria-hidden>
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+          <path d="M2 3.5h12M4.5 8h7M6.5 12.5h3" />
+        </svg>
+      </span>
       {children}
     </form>
   );

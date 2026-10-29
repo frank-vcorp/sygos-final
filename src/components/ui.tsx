@@ -1,4 +1,178 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
+
+function flattenText(node: ReactNode): string {
+  if (node == null || typeof node === "boolean") return "";
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (Array.isArray(node)) return node.map(flattenText).join(" ");
+  if (typeof node === "object" && "props" in node) {
+    const props = (node as { props?: { children?: ReactNode } }).props;
+    return flattenText(props?.children);
+  }
+  return "";
+}
+
+function ColumnHeaderIcon({ label }: { label: string }) {
+  const key = label.toLowerCase().trim();
+  const baseProps = {
+    viewBox: "0 0 16 16",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.5,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    className: "h-3.5 w-3.5 shrink-0 text-slate-400",
+    "aria-hidden": true as const,
+  };
+  if (!key || key === "acción" || key === "acciones" || key === "opciones") {
+    return null;
+  }
+  if (
+    key.includes("cliente") ||
+    key.includes("proveedor") ||
+    key.includes("colaborador") ||
+    key.includes("ejecutor") ||
+    key.includes("vendedor") ||
+    key.includes("responsable") ||
+    key.includes("usuario") ||
+    key.includes("contacto") ||
+    key.includes("creado")
+  ) {
+    return (
+      <svg {...baseProps}>
+        <circle cx="8" cy="5.25" r="2.25" />
+        <path d="M3.5 13.25c.55-2.1 2.2-3.25 4.5-3.25s3.95 1.15 4.5 3.25" />
+      </svg>
+    );
+  }
+  if (
+    key.includes("fecha") ||
+    key.includes("mes") ||
+    key.includes("periodo") ||
+    key.includes("vencimiento") ||
+    key.includes("sla") ||
+    key.includes("horario") ||
+    key.includes("día") ||
+    key.includes("dia") ||
+    key.includes("visita") ||
+    key.includes("edición")
+  ) {
+    return (
+      <svg {...baseProps}>
+        <circle cx="8" cy="8" r="5.5" />
+        <path d="M8 5v3.25l2.25 1.25" />
+      </svg>
+    );
+  }
+  if (
+    key.includes("importe") ||
+    key.includes("saldo") ||
+    key.includes("total") ||
+    key.includes("monto") ||
+    key.includes("precio") ||
+    key.includes("valor") ||
+    key.includes("costo") ||
+    key.includes("transferencia") ||
+    key.includes("comisión") ||
+    key.includes("efectivo")
+  ) {
+    return (
+      <svg {...baseProps}>
+        <path d="M8 2.5v11M10.5 5H6.75a1.75 1.75 0 1 0 0 3.5h2.5a1.75 1.75 0 1 1 0 3.5H5.5" />
+      </svg>
+    );
+  }
+  if (
+    key.includes("estado") ||
+    key.includes("tipo") ||
+    key.includes("etapa") ||
+    key.includes("prioridad") ||
+    key.includes("dirección") ||
+    key.includes("fuente") ||
+    key.includes("rol")
+  ) {
+    return (
+      <svg {...baseProps}>
+        <circle cx="8" cy="8" r="5.25" />
+        <circle cx="8" cy="8" r="1.75" fill="currentColor" />
+      </svg>
+    );
+  }
+  if (
+    key.includes("folio") ||
+    key.includes("nombre") ||
+    key.includes("concepto") ||
+    key.includes("documento") ||
+    key.includes("cotización") ||
+    key.includes("nota") ||
+    key.includes("descripción") ||
+    key.includes("parte") ||
+    key.includes("equipo") ||
+    key.includes("motor")
+  ) {
+    return (
+      <svg {...baseProps}>
+        <path d="M4.5 2.5h4.75L12.5 5.75v7.25a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1v-9.5a1 1 0 0 1 1-1Z" />
+        <path d="M9 2.5v3.5h3.5M6 8.5h4M6 11h2.5" />
+      </svg>
+    );
+  }
+  return (
+    <svg {...baseProps}>
+      <path d="M3 4.5h10M3 8h10M3 11.5h6.5" />
+    </svg>
+  );
+}
+
+function SegmentedTabIcon({ label }: { label: string }) {
+  const key = label.toLowerCase();
+  const baseProps = {
+    viewBox: "0 0 16 16",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.5,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    className: "h-3.5 w-3.5 shrink-0 opacity-80",
+    "aria-hidden": true as const,
+  };
+  if (key.includes("resumen") || key.includes("reciente") || key.includes("todas") || key.includes("todos")) {
+    return (
+      <svg {...baseProps}>
+        <circle cx="8" cy="8" r="5.5" />
+        <path d="M8 5v3.25l2 1.25" />
+      </svg>
+    );
+  }
+  if (key.includes("ingreso")) {
+    return (
+      <svg {...baseProps}>
+        <path d="M4.5 11.5 11.5 4.5M11.5 4.5H6M11.5 4.5V10" />
+      </svg>
+    );
+  }
+  if (key.includes("egreso") || key.includes("gasto")) {
+    return (
+      <svg {...baseProps}>
+        <path d="M4.5 4.5 11.5 11.5M11.5 11.5H6M11.5 11.5V6" />
+      </svg>
+    );
+  }
+  if (key.includes("cuenta") || key.includes("banco") || key.includes("cxp") || key.includes("cxc")) {
+    return (
+      <svg {...baseProps}>
+        <rect x="2.25" y="3.75" width="11.5" height="8.5" rx="1.5" />
+        <path d="M2.25 6.75h11.5" />
+      </svg>
+    );
+  }
+  return (
+    <svg {...baseProps}>
+      <rect x="2.75" y="3" width="10.5" height="10" rx="1.5" />
+      <path d="M5.25 6.5h5.5M5.25 9.5h3.5" />
+    </svg>
+  );
+}
 
 export function PageHeader({
   title,
@@ -12,17 +186,17 @@ export function PageHeader({
   back?: { href: string; label: string };
 }) {
   return (
-    <div className="mb-7 flex flex-wrap items-end justify-between gap-4 border-b border-slate-200/80 pb-5">
-      <div>
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
+      <div className="min-w-0">
         {back ? (
-          <Link href={back.href} className="mb-1.5 inline-flex items-center gap-1 text-xs font-semibold text-slate-500 transition-colors hover:text-[#0a477e]">
+          <Link href={back.href} className="mb-1 inline-flex items-center gap-1 text-xs font-medium text-slate-400 transition-colors hover:text-slate-800">
             ← {back.label}
           </Link>
         ) : null}
         <h1 className="text-2xl font-bold tracking-tight text-slate-900 md:text-[30px] md:leading-tight">{title}</h1>
-        {subtitle ? <p className="mt-1.5 max-w-3xl text-sm leading-6 text-slate-600">{subtitle}</p> : null}
+        {subtitle ? <p className="mt-0.5 max-w-3xl text-xs font-medium text-slate-400">{subtitle}</p> : null}
       </div>
-      {action}
+      {action ? <div className="shrink-0">{action}</div> : null}
     </div>
   );
 }
@@ -179,11 +353,11 @@ export function ActionLink({
 
 /** Clase compartida: folio o nombre principal en listados (§3.1 guía UX). */
 export const recordLinkClass =
-  "font-semibold text-[#0a477e] hover:text-[#0d5ca1] hover:underline decoration-sky-500/40 underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1 rounded-sm";
+  "inline-flex items-center gap-1.5 font-semibold text-slate-900 hover:text-[#0a477e] underline decoration-slate-300/80 underline-offset-4 hover:decoration-[#0a477e] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1 rounded-sm";
 
 /** Relaciones navegables en detalle o texto corrido. */
 export const inlineLinkClass =
-  "font-medium text-[#0a477e] hover:text-[#0d5ca1] hover:underline decoration-sky-500/40 underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1 rounded-sm";
+  "font-medium text-slate-800 hover:text-[#0a477e] underline decoration-slate-300/80 underline-offset-4 hover:decoration-[#0a477e] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1 rounded-sm";
 
 export function RecordLink({
   href,
@@ -196,7 +370,11 @@ export function RecordLink({
 }) {
   return (
     <Link href={href} className={`${recordLinkClass} ${className}`.trim()}>
-      {children}
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 shrink-0 text-slate-400" aria-hidden>
+        <path d="M4.5 2.5h4.75L12.5 5.75v7.25a1 1 0 0 1-1 1h-7a1 1 0 0 1-1-1v-9.5a1 1 0 0 1 1-1Z" />
+        <path d="M9 2.5v3.5h3.5" />
+      </svg>
+      <span>{children}</span>
     </Link>
   );
 }
@@ -289,24 +467,32 @@ export const controlClass =
 export { MoneyInput } from "@/components/money-input";
 
 export function FilterBar({ children, action, className = "" }: { children: React.ReactNode; action: string; className?: string }) {
-  return <form className={`mb-4 flex flex-col gap-2 rounded-xl border border-slate-200/80 bg-white/95 p-3.5 shadow-2xs sm:flex-row sm:flex-wrap sm:items-center ${className}`} action={action}>{children}</form>;
+  return (
+    <form
+      className={`mb-3 flex flex-col gap-2 py-1 sm:flex-row sm:flex-wrap sm:items-center ${className} [&_input]:min-h-8 [&_input]:rounded-full [&_input]:border-slate-200/90 [&_input]:bg-slate-100/70 [&_input]:px-3.5 [&_input]:py-1 [&_input]:text-xs [&_input]:font-medium [&_input]:shadow-none [&_input:hover]:bg-slate-100 [&_input:focus]:bg-white [&_select]:min-h-8 [&_select]:rounded-full [&_select]:border-slate-200/90 [&_select]:bg-slate-100/70 [&_select]:px-3 [&_select]:py-1 [&_select]:text-xs [&_select]:font-medium [&_select]:shadow-none [&_select:hover]:bg-slate-100`}
+      action={action}
+    >
+      {children}
+    </form>
+  );
 }
 
 export function SegmentedNav({ items }: { items: Array<{ href: string; label: string; active: boolean }> }) {
   return (
-    <nav className="mb-4 inline-flex max-w-full gap-1 overflow-x-auto rounded-xl bg-slate-100/90 p-1 ring-1 ring-slate-200/70" aria-label="Vistas">
+    <nav className="mb-3 flex flex-wrap items-center gap-1.5 overflow-x-auto py-1" aria-label="Vistas">
       {items.map((item) => (
         <Link
           key={item.href}
           href={item.href}
           aria-current={item.active ? "page" : undefined}
-          className={`inline-flex min-h-9 shrink-0 items-center rounded-lg px-3.5 py-1.5 text-sm font-semibold transition-all ${
+          className={`inline-flex min-h-8 shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs transition-all ${
             item.active
-              ? "bg-white text-slate-900 shadow-xs ring-1 ring-slate-200/80"
-              : "text-slate-600 hover:bg-white/60 hover:text-slate-900"
+              ? "bg-slate-900/[0.07] font-semibold text-slate-900 ring-1 ring-slate-300/80"
+              : "font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-800"
           }`}
         >
-          {item.label}
+          <SegmentedTabIcon label={item.label} />
+          <span>{item.label}</span>
         </Link>
       ))}
     </nav>
@@ -319,16 +505,16 @@ export function Card({ children, className = "" }: { children: React.ReactNode; 
 
 export function Empty({ title, body, action }: { title: string; body: string; action?: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-dashed border-slate-300/90 bg-white/90 px-6 py-11 text-center shadow-2xs">
-      <div className="mx-auto mb-3 inline-flex h-11 w-11 items-center justify-center rounded-xl bg-slate-100 text-slate-500 ring-1 ring-slate-200/80" aria-hidden>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
-          <path d="M22 12h-6l-2 3h-4l-2-3H2" />
-          <path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+    <div className="border-y border-slate-200/80 py-12 text-center">
+      <div className="mx-auto mb-2.5 inline-flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100/80 text-slate-400" aria-hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" className="h-4.5 w-4.5">
+          <path d="M4 4h10l6 6v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z" />
+          <path d="M14 4v6h6M8 13h8M8 17h5" />
         </svg>
       </div>
-      <p className="text-sm font-semibold text-slate-900">{title}</p>
-      <p className="mx-auto mt-1 max-w-md text-sm text-slate-500">{body}</p>
-      {action ? <div className="mt-4">{action}</div> : null}
+      <p className="text-sm font-medium text-slate-700">{title}</p>
+      <p className="mx-auto mt-0.5 max-w-md text-xs text-slate-400">{body}</p>
+      {action ? <div className="mt-3.5">{action}</div> : null}
     </div>
   );
 }
@@ -372,11 +558,11 @@ export function Table({ children, stickyHeader = false }: { children: React.Reac
     <div
       className={
         stickyHeader
-          ? "max-h-[calc(100dvh-11rem)] overflow-auto rounded-xl border border-slate-200/90 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)] [&_thead_th]:sticky [&_thead_th]:top-0 [&_thead_th]:z-10 [&_thead_th]:bg-slate-50/95 [&_thead_th]:shadow-[inset_0_-1px_0_var(--line)]"
-          : "overflow-x-auto overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04)]"
+          ? "max-h-[calc(100dvh-11rem)] overflow-auto border-b border-slate-200/80 bg-white [&_thead_th]:sticky [&_thead_th]:top-0 [&_thead_th]:z-10 [&_thead_th]:bg-white [&_thead_th]:shadow-[inset_0_-1px_0_#e2e8f0]"
+          : "overflow-x-auto border-b border-slate-200/80 bg-white"
       }
     >
-      <table className="min-w-full text-left text-sm [&_tbody_tr:nth-child(even)]:bg-[#f8fafc] [&_tbody_tr:hover]:bg-[#eef6fb]">{children}</table>
+      <table className="min-w-full text-left text-[13.5px] [&_tbody_tr:hover]:bg-slate-50/90">{children}</table>
     </div>
   );
 }
@@ -385,7 +571,7 @@ export function ResponsiveData({ table, cards }: { table: React.ReactNode; cards
   return (
     <>
       <div className="hidden md:block">{table}</div>
-      <div className="grid gap-3 md:hidden [&>*:nth-child(even)]:!bg-[#f8fafc] [&>*:hover]:!bg-[#eef6fb]">{cards}</div>
+      <div className="divide-y divide-slate-200/80 border-y border-slate-200/80 md:hidden [&>*]:rounded-none [&>*]:border-0 [&>*]:shadow-none [&>*:hover]:!bg-slate-50/90">{cards}</div>
     </>
   );
 }
@@ -504,7 +690,15 @@ export function FormActions({ children, note }: { children: React.ReactNode; not
 }
 
 export function Th({ children }: { children: React.ReactNode }) {
-  return <th className="border-b border-slate-200/90 bg-slate-50/95 px-4 py-3 text-[11px] font-bold uppercase tracking-[0.07em] text-slate-500">{children}</th>;
+  const label = flattenText(children);
+  return (
+    <th className="border-b border-slate-200/80 px-3 py-2.5 text-xs font-medium text-slate-500">
+      <span className="inline-flex items-center gap-1.5">
+        <ColumnHeaderIcon label={label} />
+        <span>{children}</span>
+      </span>
+    </th>
+  );
 }
 
 export function Td({
@@ -516,7 +710,7 @@ export function Td({
   colSpan?: number;
   className?: string;
 }) {
-  const cellClass = ["border-b border-slate-200/70 px-4 py-3 align-middle text-slate-800", className].filter(Boolean).join(" ");
+  const cellClass = ["border-b border-slate-100 px-3 py-2.5 align-middle text-[13.5px] text-slate-700", className].filter(Boolean).join(" ");
   return (
     <td colSpan={colSpan} className={cellClass}>
       {children}

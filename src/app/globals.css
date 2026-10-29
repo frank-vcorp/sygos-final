@@ -2,10 +2,10 @@
 
 :root {
   color-scheme: light;
-  --bg: #f1f5f9;
+  --bg: #ffffff;
   --surface: #ffffff;
   --ink: #0f172a;
-  --muted: #475569;
+  --muted: #64748b;
   --line: #e2e8f0;
   --accent: #0a477e;
   --accent-soft: #e0f2fe;
@@ -107,9 +107,9 @@ summary {
 
 /* Capa visual compartida para las vistas operativas. */
 :root {
-  --bg: #f4f7fb;
+  --bg: #ffffff;
   --ink: #0f172a;
-  --muted: #475569;
+  --muted: #64748b;
   --line: #e2e8f0;
   --accent: #0a477e;
   --accent-soft: #e0f2fe;
@@ -117,10 +117,9 @@ summary {
 }
 
 body {
-  background-image:
-    radial-gradient(ellipse 80% 36rem at 50% -12rem, rgba(186, 230, 253, 0.42), transparent),
-    radial-gradient(circle at 92% -10%, rgba(224, 242, 254, 0.65) 0, transparent 34rem);
-  letter-spacing: -0.01em;
+  background-color: var(--bg);
+  background-image: none;
+  letter-spacing: -0.011em;
 }
 
 ::selection {

@@ -76,7 +76,7 @@ export function ErpShell({
 
       <aside
         data-erp-chrome
-        className={`fixed inset-y-0 left-0 z-50 w-[min(86vw,320px)] overflow-y-auto border-r border-slate-200/80 bg-[#f8fafc] text-slate-800 shadow-xl transition-[transform,width] md:sticky md:top-0 md:z-20 md:h-screen md:w-auto md:translate-x-0 md:shadow-none ${
+        className={`fixed inset-y-0 left-0 z-50 w-[min(86vw,320px)] overflow-y-auto border-r border-slate-200/80 bg-[#f7f8fa] text-slate-800 shadow-xl transition-[transform,width] md:sticky md:top-0 md:z-20 md:h-screen md:w-auto md:translate-x-0 md:shadow-none ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
         aria-label="Navegación principal"
