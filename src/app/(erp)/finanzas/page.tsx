@@ -67,9 +67,13 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
       : focus === "egresos"
         ? movements.filter((row) => row.direction === "EGRESO")
         : movements;
+  const movementDirectionMode =
+    focus === "ingresos" ? "ingreso" as const
+      : focus === "egresos" ? "egreso" as const
+        : "both" as const;
   const navItems = [
     { href: `/finanzas?mes=${key}`, label: "Resumen", active: !focus },
-    { href: `/finanzas?vista=movimientos&mes=${key}`, label: "Movimientos", active: focus === "movimientos" || focus === "ingresos" || focus === "egresos" },
+    { href: `/finanzas?vista=movimientos&mes=${key}`, label: "Movimientos", active: focus === "movimientos" },
     { href: `/finanzas?vista=ingresos&mes=${key}`, label: "Ingresos", active: focus === "ingresos" },
     { href: `/finanzas?vista=egresos&mes=${key}`, label: "Egresos", active: focus === "egresos" },
     { href: `/finanzas?vista=transferencias&mes=${key}`, label: "Transferencias", active: focus === "transferencias" },
@@ -95,7 +99,7 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
       {sidebarNav ? null : <SegmentedNav items={navItems} />}
       <ActiveFilters
         items={[
-          ...(focus && vistaLabel ? [{ label: vistaLabel, clearHref: listHref("/finanzas", { mes: key !== defaultMes ? key : undefined }) }] : []),
+          ...(focus && vistaLabel && !sidebarNav ? [{ label: vistaLabel, clearHref: listHref("/finanzas", { mes: key !== defaultMes ? key : undefined }) }] : []),
           ...(key !== defaultMes ? [{ label: `Mes ${key}`, clearHref: listHref("/finanzas", { vista: focus || undefined }) }] : []),
         ]}
       />
@@ -110,6 +114,15 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
       ) : null}
       {showSection("dashboard") ? (
         <p className="mt-2 text-sm text-[var(--muted)]">Flujo de movimientos del mes: {money(ingresos - egresos)}</p>
+      ) : null}
+      {(showSection("movimientos") || showSection("ingresos") || showSection("egresos")) && !showSection("dashboard") ? (
+        <ManualMovementForm
+          accounts={accounts}
+          expenseCategories={expenseCategories}
+          incomeCategories={incomeCategories}
+          directionMode={movementDirectionMode}
+          className="mt-4 max-w-none"
+        />
       ) : null}
       {(showSection("movimientos") || showSection("ingresos") || showSection("egresos")) && movementRows.length === 0 ? (
         <Empty title="Sin movimientos en el mes" body="Registra un ingreso o egreso manual o espera movimientos de operación." />
@@ -156,16 +169,19 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
           <div id="fin-cuentas" className="scroll-mt-28">
             <AccountsSummary accounts={accounts} cxc={cxc} cxp={cxp} cardDebt={cardDebt} />
           </div>
-          <ManualMovementForm accounts={accounts} expenseCategories={expenseCategories} incomeCategories={incomeCategories} className="max-w-none" />
+          <ManualMovementForm
+            accounts={accounts}
+            expenseCategories={expenseCategories}
+            incomeCategories={incomeCategories}
+            directionMode="both"
+            className="max-w-none"
+          />
         </section>
       ) : null}
       {showSection("cuentas") && !showSection("dashboard") ? (
         <div id="fin-cuentas" className="mt-4 scroll-mt-28">
           <AccountsSummary accounts={accounts} cxc={cxc} cxp={cxp} cardDebt={cardDebt} />
         </div>
-      ) : null}
-      {(showSection("movimientos") || showSection("ingresos") || showSection("egresos")) && !showSection("dashboard") ? (
-        <ManualMovementForm accounts={accounts} expenseCategories={expenseCategories} incomeCategories={incomeCategories} className="mt-4 max-w-xl" />
       ) : null}
       {showSection("dashboard") && pending.length > 0 ? (
         <Card className="mt-4 p-4">
