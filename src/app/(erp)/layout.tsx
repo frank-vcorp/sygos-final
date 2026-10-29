@@ -115,9 +115,26 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
       })
     : [];
 
+  const initials =
+    session.name
+      .trim()
+      .split(/\s+/)
+      .filter((w) => w.length > 2 || session.name.trim().split(/\s+/).length <= 2)
+      .slice(0, 2)
+      .map((w) => w[0]?.toUpperCase() ?? "")
+      .join("") || "SY";
+
+  const isServomotores = session.activeCompanyCode === "SERVOMOTORES";
+  const companyDotClass = isServomotores
+    ? "bg-amber-500 ring-2 ring-amber-500/20"
+    : "bg-[#0284c7] ring-2 ring-sky-500/20";
+  const companyBadgeToneClass = isServomotores
+    ? "border-amber-200/90 bg-amber-50/70 text-amber-900"
+    : "border-sky-200/90 bg-sky-50/70 text-sky-950";
+
   const sidebar = (
     <>
-        <div className="mb-3 border-b border-slate-200/80 px-5 pb-4 pt-5">
+        <div className="mb-3 border-b border-slate-200/80 px-4 pb-4 pt-5">
           <div className="flex items-center gap-2.5 pr-10">
             <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#0a477e] text-white shadow-2xs ring-1 ring-[#0a477e]/15">
               <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4" aria-hidden>
@@ -130,9 +147,19 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
               <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Sistema Operativo</p>
             </div>
           </div>
-          <div className="mt-4 rounded-xl bg-white px-3.5 py-2.5 shadow-2xs ring-1 ring-slate-200/80">
-            <p className="truncate text-sm font-semibold text-slate-900">{session.name}</p>
-            <p className="mt-0.5 truncate text-xs font-medium text-slate-500">{ROLE_LABEL[session.role]}</p>
+          <div className="mt-4 flex items-center gap-2.5 rounded-xl bg-white px-3 py-2.5 shadow-2xs ring-1 ring-slate-200/80">
+            <span
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sky-50 text-xs font-bold tracking-tight text-[#0a477e] ring-1 ring-sky-200/80"
+              aria-hidden
+            >
+              {initials}
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-semibold text-slate-900">{session.name}</p>
+              <span className="mt-0.5 inline-flex max-w-full items-center truncate rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-medium text-slate-600">
+                {ROLE_LABEL[session.role]}
+              </span>
+            </div>
           </div>
         </div>
         <Suspense fallback={<nav className="px-3 pb-5 text-sm text-slate-500">Menú…</nav>}>
@@ -178,12 +205,13 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
           <div className="flex min-w-0 flex-1 items-center gap-2.5">
             <span className="hidden text-[11px] font-medium text-slate-400 xl:inline">Empresa</span>
             {companies.length > 1 ? (
-              <form action={switchCompanyAction} className="flex min-w-0 items-center gap-1 rounded-lg p-0.5">
+              <form action={switchCompanyAction} className="flex min-w-0 items-center gap-1.5 rounded-full border border-slate-200/90 bg-slate-50/70 py-0.5 pl-2.5 pr-1">
+                <span className={`h-2 w-2 shrink-0 rounded-full ${companyDotClass}`} aria-hidden />
                 <select
                   key={session.activeCompanyId ?? "none"}
                   name="companyId"
                   defaultValue={session.activeCompanyId ?? ""}
-                  className="min-h-7 min-w-0 max-w-48 rounded-md border border-slate-200/90 bg-white px-2.5 py-1 text-xs font-semibold text-slate-800 hover:bg-slate-50 focus:ring-2 focus:ring-[#0a477e]/20"
+                  className="min-h-6 min-w-0 max-w-48 rounded-md border-0 bg-transparent pr-1 text-xs font-semibold text-slate-800 focus:outline-none"
                   aria-label="Empresa activa"
                 >
                   <option value="" disabled>Selecciona empresa</option>
@@ -191,11 +219,11 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
                     <option key={company.id} value={company.id}>{company.name}</option>
                   ))}
                 </select>
-                <button className="min-h-7 rounded-md px-2 text-xs font-medium text-slate-500 hover:bg-slate-100 hover:text-slate-900" type="submit">Cambiar</button>
+                <button className="min-h-6 rounded-full bg-white px-2.5 py-0.5 text-[11px] font-semibold text-slate-600 shadow-2xs ring-1 ring-slate-200/80 hover:bg-slate-100 hover:text-slate-900" type="submit">Cambiar</button>
               </form>
             ) : (
-              <strong className="inline-flex items-center gap-1.5 rounded-md bg-slate-100/80 px-2.5 py-1 text-xs font-semibold text-slate-800">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden />
+              <strong className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${companyBadgeToneClass}`}>
+                <span className={`h-2 w-2 rounded-full ${companyDotClass}`} aria-hidden />
                 {session.activeCompanyName ?? "Sin empresa"}
               </strong>
             )}
@@ -257,14 +285,19 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
     <ErpShell sidebar={sidebar} toolbar={toolbar}>
         <main className="w-full max-w-[1600px] px-5 py-6 sm:px-8 md:px-10 md:py-8 print:max-w-none print:p-0">
           {session.impersonating ? (
-            <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-200/90 bg-amber-50/70 px-3.5 py-2 text-xs text-amber-900 print:hidden">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200/80 bg-amber-50/60 px-3 py-1.5 text-xs text-amber-900 print:hidden">
               <p className="flex items-center gap-2">
-                <span className="inline-flex h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" aria-hidden />
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-3.5 w-3.5 shrink-0 text-amber-600" aria-hidden>
+                  <path d="M1.5 8s2.25-4.25 6.5-4.25S14.5 8 14.5 8s-2.25 4.25-6.5 4.25S1.5 8 1.5 8Z" />
+                  <circle cx="8" cy="8" r="2" />
+                </svg>
                 <span>Viendo como <strong>{session.name}</strong> · {ROLE_LABEL[session.role]}. Lo que guardes queda a nombre de esta cuenta.</span>
               </p>
               <form action={viewAsAction}>
                 <input type="hidden" name="userId" value="" />
-                <button className="font-semibold text-amber-900 underline decoration-amber-400 underline-offset-2 hover:text-slate-900" type="submit">Volver a Administrador</button>
+                <button className="inline-flex items-center rounded-full bg-white px-2.5 py-0.5 text-[11px] font-semibold text-amber-900 shadow-2xs ring-1 ring-amber-300/80 hover:bg-amber-100/60" type="submit">
+                  Volver a Administrador
+                </button>
               </form>
             </div>
           ) : null}

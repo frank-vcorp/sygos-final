@@ -33,6 +33,10 @@ function ColumnHeaderIcon({ label }: { label: string }) {
     key.includes("colaborador") ||
     key.includes("ejecutor") ||
     key.includes("vendedor") ||
+    key.includes("técnico") ||
+    key.includes("tecnico") ||
+    key.includes("jefe") ||
+    key.includes("solicitante") ||
     key.includes("responsable") ||
     key.includes("usuario") ||
     key.includes("contacto") ||
@@ -50,6 +54,12 @@ function ColumnHeaderIcon({ label }: { label: string }) {
     key.includes("mes") ||
     key.includes("periodo") ||
     key.includes("vencimiento") ||
+    key.includes("vence") ||
+    key.includes("emisión") ||
+    key.includes("registrado") ||
+    key.includes("seguimiento") ||
+    key.includes("crédito") ||
+    key.includes("vacaciones") ||
     key.includes("sla") ||
     key.includes("horario") ||
     key.includes("día") ||
@@ -67,9 +77,14 @@ function ColumnHeaderIcon({ label }: { label: string }) {
   if (
     key.includes("importe") ||
     key.includes("saldo") ||
+    key.includes("original") ||
     key.includes("total") ||
     key.includes("monto") ||
     key.includes("precio") ||
+    key.includes("salario") ||
+    key.includes("moneda") ||
+    key.includes("cxc") ||
+    key.includes("cxp") ||
     key.includes("valor") ||
     key.includes("costo") ||
     key.includes("transferencia") ||
@@ -79,6 +94,19 @@ function ColumnHeaderIcon({ label }: { label: string }) {
     return (
       <svg {...baseProps}>
         <path d="M8 2.5v11M10.5 5H6.75a1.75 1.75 0 1 0 0 3.5h2.5a1.75 1.75 0 1 1 0 3.5H5.5" />
+      </svg>
+    );
+  }
+  if (
+    key.includes("equipo") ||
+    key.includes("motor") ||
+    key.includes("identificación") ||
+    key.includes("serie")
+  ) {
+    return (
+      <svg {...baseProps}>
+        <path d="M8 2.25 13.25 5.25v5.5L8 13.75 2.75 10.75v-5.5L8 2.25Z" />
+        <path d="M2.75 5.25 8 8.25l5.25-3M8 8.25v5.5" />
       </svg>
     );
   }
@@ -100,15 +128,18 @@ function ColumnHeaderIcon({ label }: { label: string }) {
   }
   if (
     key.includes("folio") ||
+    key.includes("factura") ||
+    key === "os" ||
+    key === "dx" ||
+    key.includes("comprobante") ||
+    key.includes("lista") ||
     key.includes("nombre") ||
     key.includes("concepto") ||
     key.includes("documento") ||
     key.includes("cotización") ||
     key.includes("nota") ||
     key.includes("descripción") ||
-    key.includes("parte") ||
-    key.includes("equipo") ||
-    key.includes("motor")
+    key.includes("parte")
   ) {
     return (
       <svg {...baseProps}>
@@ -222,23 +253,27 @@ export function EntityDetailHeader({
   return (
     <header className="mb-6">
       {back ? (
-        <Link href={back.href} className="mb-2 inline-flex items-center gap-1 text-xs font-semibold text-slate-500 transition-colors hover:text-[#0a477e]">
+        <Link href={back.href} className="mb-2 inline-flex items-center gap-1 text-xs font-medium text-slate-400 transition-colors hover:text-slate-800">
           ← {back.label}
         </Link>
       ) : null}
-      <div className="rounded-xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_3px_rgba(15,23,42,0.04),0_1px_2px_rgba(15,23,42,0.02)] md:p-6">
+      <div className="border-b border-slate-200/80 pb-5">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2.5">
               <h1 className="text-2xl font-bold tracking-tight text-slate-900 md:text-[28px]">{title}</h1>
               {status}
             </div>
-            {subtitle ? <p className="mt-1.5 text-sm leading-6 text-slate-600">{subtitle}</p> : null}
+            {subtitle ? <p className="mt-1 text-xs font-medium text-slate-400">{subtitle}</p> : null}
           </div>
         </div>
-        {meta ? <div className="mt-4 grid gap-3 border-t border-slate-100 pt-4 text-sm sm:grid-cols-2 lg:grid-cols-3">{meta}</div> : null}
+        {meta ? (
+          <div className="mt-4 grid gap-x-8 gap-y-1.5 border-t border-slate-100 pt-3.5 text-sm sm:grid-cols-2 lg:grid-cols-3">
+            {meta}
+          </div>
+        ) : null}
         {primaryAction || secondaryActions ? (
-          <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-slate-200/80 pt-4">
+          <div className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-slate-100 pt-3.5">
             {primaryAction ? <div className="w-full min-w-0">{primaryAction}</div> : null}
             {secondaryActions ? (
               <div className="ml-auto flex min-w-0 flex-wrap items-center justify-end gap-2 text-sm">
@@ -254,9 +289,12 @@ export function EntityDetailHeader({
 
 export function EntityMetaItem({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div>
-      <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{label}</p>
-      <div className="mt-0.5 font-medium text-slate-900">{children}</div>
+    <div className="flex items-baseline gap-2.5 rounded-md py-1">
+      <span className="inline-flex min-w-[7.5rem] shrink-0 items-center gap-1.5 text-xs font-medium text-slate-400">
+        <ColumnHeaderIcon label={label} />
+        <span className="truncate">{label}</span>
+      </span>
+      <div className="min-w-0 flex-1 text-[13.5px] font-medium text-slate-800">{children}</div>
     </div>
   );
 }
@@ -281,26 +319,78 @@ export function DetailFormSubmitButton({ form, children }: { form: string; child
   );
 }
 
+function KpiIcon({ label }: { label: string }) {
+  const key = label.toLowerCase();
+  const baseProps = {
+    viewBox: "0 0 18 18",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.6,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+    className: "h-4 w-4 shrink-0",
+    "aria-hidden": true as const,
+  };
+  if (key.includes("cobrado") || key.includes("ingreso") || key.includes("utilidad") || key.includes("flujo") || key.includes("valor")) {
+    return (
+      <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 ring-1 ring-emerald-200/70">
+        <svg {...baseProps}>
+          <path d="M5 13 13 5M13 5H7M13 5v6" />
+        </svg>
+      </span>
+    );
+  }
+  if (key.includes("egreso") || key.includes("cxp") || key.includes("deuda") || key.includes("compra")) {
+    return (
+      <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-amber-50 text-amber-600 ring-1 ring-amber-200/70">
+        <svg {...baseProps}>
+          <path d="M5 5l8 8M13 13H7M13 13V7" />
+        </svg>
+      </span>
+    );
+  }
+  if (key.includes("vencid") || key.includes("sla") || key.includes("pendiente") || key.includes("por ") || key.includes("cxc")) {
+    return (
+      <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-sky-50 text-[#0a477e] ring-1 ring-sky-200/70">
+        <svg {...baseProps}>
+          <circle cx="9" cy="9" r="6.25" />
+          <path d="M9 5.5v3.75l2.5 1.5" />
+        </svg>
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-slate-600 ring-1 ring-slate-200/80">
+      <svg {...baseProps}>
+        <path d="M3 13.5 7 9.5l2.75 2.75L15 6.5" />
+        <path d="M11.5 6.5H15V10" />
+      </svg>
+    </span>
+  );
+}
+
 /** KPI accionable en panel (guía §11.2). */
 export function KpiCard({ label, value, href }: { label: string; value: string; href?: string }) {
   const body = (
     <>
-      <div className="mb-3 h-1 w-8 rounded-full bg-gradient-to-r from-[#0e5696] to-sky-400" aria-hidden />
-      <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">{label}</p>
-      <p className="mt-1.5 text-2xl font-bold tracking-tight text-slate-900 tabular-nums">{value}</p>
+      <div className="flex items-start justify-between gap-2">
+        <p className="text-xs font-medium text-slate-500">{label}</p>
+        <KpiIcon label={label} />
+      </div>
+      <p className="mt-2 text-2xl font-bold tracking-tight text-slate-900 tabular-nums">{value}</p>
     </>
   );
   if (href) {
     return (
       <Link
         href={href}
-        className="block rounded-xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_3px_rgba(15,23,42,0.04),0_1px_2px_rgba(15,23,42,0.02)] outline-none transition-all hover:-translate-y-0.5 hover:border-sky-300 hover:shadow-[0_10px_24px_rgba(15,23,42,0.08)] focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2"
+        className="block rounded-xl border border-slate-200/80 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.03)] outline-none transition-all hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_6px_16px_rgba(15,23,42,0.06)] focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2"
       >
         {body}
       </Link>
     );
   }
-  return <div className="rounded-xl border border-slate-200/80 bg-white p-5 shadow-[0_1px_3px_rgba(15,23,42,0.04),0_1px_2px_rgba(15,23,42,0.02)]">{body}</div>;
+  return <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.03)]">{body}</div>;
 }
 
 export function Button({
@@ -682,7 +772,7 @@ export function FormBlock({
 
 export function FormActions({ children, note }: { children: React.ReactNode; note?: string }) {
   return (
-    <footer data-form-actions className="sticky bottom-0 z-30 flex flex-col-reverse gap-2 rounded-b-xl border-t border-slate-200/80 bg-slate-50/95 px-5 py-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur-md sm:flex-row sm:items-center sm:justify-between sm:gap-3 md:px-7 print:static print:shadow-none" style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
+    <footer data-form-actions className="sticky bottom-0 z-30 flex flex-col-reverse gap-2 rounded-b-xl border-t border-slate-200/80 bg-slate-50/80 px-5 py-3 shadow-[0_-6px_20px_rgba(15,23,42,0.06)] backdrop-blur-xs sm:flex-row sm:items-center sm:justify-between sm:gap-3 md:px-7 print:static print:shadow-none" style={{ paddingBottom: "max(0.75rem, env(safe-area-inset-bottom))" }}>
       {note ? <p className="text-xs text-slate-500">{note}</p> : <span />}
       <div className="flex flex-col gap-2 sm:flex-row">{children}</div>
     </footer>
