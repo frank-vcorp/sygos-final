@@ -35,7 +35,7 @@ export function CountForm() {
           <input type="hidden" name="conteo" value={preview.conteoPayload} />
           <FormSection title="Diferencias" description="Revisa antes de aplicar. Solo actualiza existencias ya registradas." columns={1}>
             <div className="overflow-x-auto">
-              <table className="min-w-full text-left text-sm">
+              <table className="min-w-full text-left text-sm [&_tbody_tr:nth-child(even)]:bg-[#f6f9fb] [&_tbody_tr:hover]:bg-[#edf5f8]">
                 <thead>
                   <tr>
                     <th className="py-1">Producto</th>

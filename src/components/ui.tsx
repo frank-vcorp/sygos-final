@@ -335,7 +335,7 @@ export function Table({ children, stickyHeader = false }: { children: React.Reac
           : "overflow-x-auto rounded-lg border border-[var(--line)] bg-white"
       }
     >
-      <table className="min-w-full text-left text-sm">{children}</table>
+      <table className="min-w-full text-left text-sm [&_tbody_tr:nth-child(even)]:bg-[#f6f9fb] [&_tbody_tr:hover]:bg-[#edf5f8]">{children}</table>
     </div>
   );
 }
@@ -344,7 +344,7 @@ export function ResponsiveData({ table, cards }: { table: React.ReactNode; cards
   return (
     <>
       <div className="hidden md:block">{table}</div>
-      <div className="grid gap-3 md:hidden">{cards}</div>
+      <div className="grid gap-3 md:hidden [&>*:nth-child(even)]:!bg-[#f6f9fb] [&>*:hover]:!bg-[#edf5f8]">{cards}</div>
     </>
   );
 }

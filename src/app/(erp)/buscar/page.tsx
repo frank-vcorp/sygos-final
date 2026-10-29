@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { ActiveFilters, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, TextLink } from "@/components/ui";
+import { ActiveFilters, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, Table, Td, TextLink, Th } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { partInventorySearchWhere } from "@/lib/inventory-search";
@@ -73,17 +73,24 @@ export default async function BuscarPage({ searchParams }: { searchParams: Promi
       ) : (
         <ResponsiveData
           table={
-            <table className="w-full text-sm">
-              <thead><tr><th className="px-3 py-2 text-left font-medium">Registro</th><th className="px-3 py-2 text-left font-medium">Tipo</th></tr></thead>
+            <Table>
+              <thead>
+                <tr>
+                  <Th>Registro</Th>
+                  <Th>Tipo</Th>
+                </tr>
+              </thead>
               <tbody>
                 {rows.map((row) => (
-                  <tr key={`${row.kind}-${row.href}-${row.label}`} className="border-t border-[var(--line)]">
-                    <td className="px-3 py-2"><RecordLink href={row.href}>{row.label}</RecordLink></td>
-                    <td className="px-3 py-2 text-[var(--muted)]">{row.kind}</td>
+                  <tr key={`${row.kind}-${row.href}-${row.label}`}>
+                    <Td>
+                      <RecordLink href={row.href}>{row.label}</RecordLink>
+                    </Td>
+                    <Td className="text-[var(--muted)]">{row.kind}</Td>
                   </tr>
                 ))}
               </tbody>
-            </table>
+            </Table>
           }
           cards={rows.map((row) => (
             <MobileCard key={`${row.kind}-${row.href}-${row.label}`} href={row.href} title={row.label} meta={row.kind} />
