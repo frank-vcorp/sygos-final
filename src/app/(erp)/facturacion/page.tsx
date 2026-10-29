@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { ClientNameLink } from "@/components/client-entity-links";
+import { FolioCell } from "@/components/folio-cell";
 import { BillingVistaFilter } from "@/components/compact-list-filters";
 import { ActionLink, ActiveFilters, Badge, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, Table, Td, Th } from "@/components/ui";
 import { homePath } from "@/lib/home";
@@ -7,6 +8,11 @@ import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
 import { coordFilterChips, coordPageSubtitle, coordPageTitle, coordUsesSidebarNav } from "@/lib/coordination-ui";
 import { can } from "@/lib/permissions";
+import {
+  batchLoadBillingDocumentServiceLinks,
+  linksForBillingDocument,
+  pickBillingDocumentTechnicalCaseId,
+} from "@/lib/billing-document-service-links";
 import { requireCompany } from "@/lib/session";
 
 const KIND: Record<string, string> = {
@@ -45,10 +51,13 @@ export default async function FacturacionPage({ searchParams }: { searchParams: 
       ...where,
       ...(session.role === "VENTAS" ? { client: { ownerUserId: session.userId } } : {}),
     },
-    include: { client: true },
+    include: { client: true, quote: { select: { technicalCaseId: true } } },
     orderBy: { createdAt: "desc" },
     take: 100,
   });
+  const serviceLinkMap = await batchLoadBillingDocumentServiceLinks(
+    rows.map((row) => pickBillingDocumentTechnicalCaseId(row)),
+  );
   const tabs: Array<{ href: string; label: string; active: boolean; key: Vista }> = [
     { href: "/facturacion", label: "Todas", active: vista === "todas", key: "todas" },
     { href: "/facturacion?vista=solicitudes", label: "Solicitudes", active: vista === "solicitudes", key: "solicitudes" },
@@ -78,13 +87,16 @@ export default async function FacturacionPage({ searchParams }: { searchParams: 
         <ResponsiveData
           table={
             <Table>
-              <thead><tr><Th>Folio</Th><Th>Tipo</Th><Th>Cliente</Th><Th>Estado</Th><Th>Total</Th></tr></thead>
+              <thead><tr><Th>Folio</Th><Th>DX</Th><Th>OS</Th><Th>Tipo</Th><Th>Cliente</Th><Th>Estado</Th><Th>Total</Th></tr></thead>
               <tbody>
                 {rows.map((row) => {
                   const statusLabel = row.status === "SOLICITADA" ? "Solicitada" : row.status === "EMITIDA" ? "Emitida" : row.status;
+                  const serviceLinks = linksForBillingDocument(row, serviceLinkMap);
                   return (
                     <tr key={row.id}>
                       <Td><RecordLink href={`/facturacion/${row.id}`}>{row.folio}</RecordLink></Td>
+                      <Td><FolioCell folio={serviceLinks.diagnosisFolio} href={serviceLinks.diagnosisHref} /></Td>
+                      <Td><FolioCell folio={serviceLinks.osFolio} href={serviceLinks.osHref} /></Td>
                       <Td>{KIND[row.kind] ?? row.kind}</Td>
                       <Td><ClientNameLink clientId={row.client.id} name={row.client.name} isSystem={row.client.isSystem} canEdit={canEditClient} /></Td>
                       <Td><Badge>{statusLabel}</Badge></Td>
@@ -97,6 +109,7 @@ export default async function FacturacionPage({ searchParams }: { searchParams: 
           }
           cards={rows.map((row) => {
             const statusLabel = row.status === "SOLICITADA" ? "Solicitada" : row.status === "EMITIDA" ? "Emitida" : row.status;
+            const serviceLinks = linksForBillingDocument(row, serviceLinkMap);
             return (
               <MobileCard
                 key={row.id}
@@ -105,6 +118,8 @@ export default async function FacturacionPage({ searchParams }: { searchParams: 
                 meta={<Badge>{statusLabel}</Badge>}
                 footer={<ClientNameLink clientId={row.client.id} name={row.client.name} isSystem={row.client.isSystem} canEdit={canEditClient} />}
               >
+                {serviceLinks.diagnosisFolio ? <p>DX: {serviceLinks.diagnosisFolio}</p> : null}
+                {serviceLinks.osFolio ? <p>OS: {serviceLinks.osFolio}</p> : null}
                 <p>{KIND[row.kind] ?? row.kind} · {money(row.total)}</p>
               </MobileCard>
             );

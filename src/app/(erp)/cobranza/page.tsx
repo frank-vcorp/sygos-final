@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { ClientNameLink } from "@/components/client-entity-links";
+import { FolioCell } from "@/components/folio-cell";
 import { CobranzaVistaFilter } from "@/components/compact-list-filters";
 import { ActiveFilters, Badge, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, Table, Td, Th } from "@/components/ui";
 import { homePath } from "@/lib/home";
@@ -8,6 +9,11 @@ import { formatWhen } from "@/lib/form";
 import { money } from "@/lib/money";
 import { coordFilterChips, coordPageSubtitle, coordPageTitle, coordUsesSidebarNav } from "@/lib/coordination-ui";
 import { can } from "@/lib/permissions";
+import {
+  batchLoadBillingDocumentServiceLinks,
+  linksForBillingDocument,
+  pickBillingDocumentTechnicalCaseId,
+} from "@/lib/billing-document-service-links";
 import { requireCompany } from "@/lib/session";
 
 export default async function CobranzaPage({ searchParams }: { searchParams: Promise<{ vista?: string }> }) {
@@ -26,10 +32,16 @@ export default async function CobranzaPage({ searchParams }: { searchParams: Pro
         : {};
   const rows = await prisma.receivable.findMany({
     where: { companyId: session.activeCompanyId, ...own, ...balanceFilter },
-    include: { client: true, document: true },
+    include: {
+      client: true,
+      document: { include: { quote: { select: { technicalCaseId: true } } } },
+    },
     orderBy: { dueAt: "asc" },
     take: 100,
   });
+  const serviceLinkMap = await batchLoadBillingDocumentServiceLinks(
+    rows.map((row) => pickBillingDocumentTechnicalCaseId(row.document)),
+  );
   const payables = session.activeCompanyCode === "SYSTRON" && (session.role === "ADMINISTRADOR" || session.role === "CEO" || session.role === "COORDINACION_ADMINISTRACION")
     ? await prisma.payable.findMany({ where: { companyId: session.activeCompanyId }, include: { supplier: true, document: true }, orderBy: { dueAt: "asc" } })
     : [];
@@ -72,14 +84,17 @@ export default async function CobranzaPage({ searchParams }: { searchParams: Pro
         <ResponsiveData
           table={
             <Table>
-              <thead><tr><Th>Documento</Th><Th>Cliente</Th><Th>Saldo</Th><Th>Vence</Th><Th>Estado</Th></tr></thead>
+              <thead><tr><Th>Documento</Th><Th>DX</Th><Th>OS</Th><Th>Cliente</Th><Th>Saldo</Th><Th>Vence</Th><Th>Estado</Th></tr></thead>
               <tbody>
                 {ordered.map((row) => {
                   const overdue = row.balance > 0 && row.dueAt.getTime() < Date.now();
                   const statusLabel = overdue ? "Vencida" : row.status === "SALDADA" ? "Saldada" : row.status === "PARCIAL" ? "Parcial" : "Abierta";
+                  const serviceLinks = linksForBillingDocument(row.document, serviceLinkMap);
                   return (
                     <tr key={row.id}>
                       <Td><RecordLink href={`/cobranza/${row.id}`}>{row.document.folio}</RecordLink></Td>
+                      <Td><FolioCell folio={serviceLinks.diagnosisFolio} href={serviceLinks.diagnosisHref} /></Td>
+                      <Td><FolioCell folio={serviceLinks.osFolio} href={serviceLinks.osHref} /></Td>
                       <Td><ClientNameLink clientId={row.client.id} name={row.client.name} isSystem={row.client.isSystem} canEdit={canEditClient} /></Td>
                       <Td>{money(row.balance)}</Td>
                       <Td>{formatWhen(row.dueAt)}</Td>
@@ -93,6 +108,7 @@ export default async function CobranzaPage({ searchParams }: { searchParams: Pro
           cards={ordered.map((row) => {
             const overdue = row.balance > 0 && row.dueAt.getTime() < Date.now();
             const statusLabel = overdue ? "Vencida" : row.status === "SALDADA" ? "Saldada" : row.status === "PARCIAL" ? "Parcial" : "Abierta";
+            const serviceLinks = linksForBillingDocument(row.document, serviceLinkMap);
             return (
               <MobileCard
                 key={row.id}
@@ -101,6 +117,8 @@ export default async function CobranzaPage({ searchParams }: { searchParams: Pro
                 meta={<Badge tone={overdue ? "warn" : "neutral"}>{statusLabel}</Badge>}
                 footer={<ClientNameLink clientId={row.client.id} name={row.client.name} isSystem={row.client.isSystem} canEdit={canEditClient} />}
               >
+                {serviceLinks.diagnosisFolio ? <p>DX: {serviceLinks.diagnosisFolio}</p> : null}
+                {serviceLinks.osFolio ? <p>OS: {serviceLinks.osFolio}</p> : null}
                 <p>{money(row.balance)} · vence {formatWhen(row.dueAt)}</p>
               </MobileCard>
             );

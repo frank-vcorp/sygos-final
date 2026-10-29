@@ -34,11 +34,34 @@ import {
   servicioRowHighlight,
   type ServicioBandejaRow,
 } from "@/lib/servicios-supervisor";
+import {
+  batchLoadBillingDocumentServiceLinks,
+  formatBillingDocumentServiceLinksDetail,
+  linksForBillingDocument,
+  pickBillingDocumentTechnicalCaseId,
+  type BillingDocumentServiceLinks,
+} from "@/lib/billing-document-service-links";
 import { requireCompany } from "@/lib/session";
 
 const CLOSED = ["VALIDADO", "TERMINADA", "SIN_REPARACION"];
 
 type PanelRow = { key?: string; href: string; label: string; detail: ReactNode; highlight?: boolean };
+
+function billingDocumentPanelDetail(
+  row: { technicalCaseId: string | null; quote?: { technicalCaseId: string | null } | null },
+  baseDetail: ReactNode,
+  linkMap: Map<string, BillingDocumentServiceLinks>,
+): ReactNode {
+  const serviceDetail = formatBillingDocumentServiceLinksDetail(linksForBillingDocument(row, linkMap));
+  if (!serviceDetail) return baseDetail;
+  return (
+    <>
+      {baseDetail}
+      {" · "}
+      {serviceDetail}
+    </>
+  );
+}
 
 function Block({
   title,
@@ -556,8 +579,16 @@ async function Coordination({ companyId, code, vista }: { companyId: string; cod
     solicitante: "",
   });
   const [invoices, remissions, payments, purchases, openPayables, payableSum] = await Promise.all([
-    prisma.billingDocument.findMany({ where: { companyId, status: "SOLICITADA", kind: { not: "REMISION" } }, take: 12 }),
-    prisma.billingDocument.findMany({ where: { companyId, status: "SOLICITADA", kind: "REMISION" }, take: 12 }),
+    prisma.billingDocument.findMany({
+      where: { companyId, status: "SOLICITADA", kind: { not: "REMISION" } },
+      select: { id: true, folio: true, kind: true, technicalCaseId: true, quote: { select: { technicalCaseId: true } } },
+      take: 12,
+    }),
+    prisma.billingDocument.findMany({
+      where: { companyId, status: "SOLICITADA", kind: "REMISION" },
+      select: { id: true, folio: true, kind: true, technicalCaseId: true, quote: { select: { technicalCaseId: true } } },
+      take: 12,
+    }),
     prisma.payment.findMany({ where: { companyId, status: "PENDIENTE" }, orderBy: { createdAt: "asc" }, take: 12 }),
     prisma.purchase.findMany({ where: { companyId, kind: "DIRECTA", status: "PENDIENTE_VALIDAR" }, take: 12 }),
     prisma.payable.findMany({
@@ -567,6 +598,10 @@ async function Coordination({ companyId, code, vista }: { companyId: string; cod
       take: 12,
     }),
     prisma.payable.aggregate({ where: { companyId, balance: { gt: 0 } }, _sum: { balance: true } }),
+  ]);
+  const billingServiceLinkMap = await batchLoadBillingDocumentServiceLinks([
+    ...invoices.map((row) => pickBillingDocumentTechnicalCaseId(row)),
+    ...remissions.map((row) => pickBillingDocumentTechnicalCaseId(row)),
   ]);
   const billingPending = invoices.length + remissions.length;
   const subtitle =
@@ -601,8 +636,8 @@ async function Coordination({ companyId, code, vista }: { companyId: string; cod
         </section>
       )}
       <div className="grid gap-3">
-        <Block title="Facturas solicitadas" empty="Sin solicitudes." bandejaHref="/facturacion?vista=solicitudes" rows={invoices.map((row) => ({ href: `/facturacion/${row.id}`, label: row.folio, detail: row.kind }))} />
-        <Block title="Remisiones solicitadas" empty="Sin remisiones por generar." bandejaHref="/facturacion?vista=remisiones" rows={remissions.map((row) => ({ href: `/facturacion/${row.id}`, label: row.folio, detail: "Remisión" }))} />
+        <Block title="Facturas solicitadas" empty="Sin solicitudes." bandejaHref="/facturacion?vista=solicitudes" rows={invoices.map((row) => ({ href: `/facturacion/${row.id}`, label: row.folio, detail: billingDocumentPanelDetail(row, row.kind, billingServiceLinkMap) }))} />
+        <Block title="Remisiones solicitadas" empty="Sin remisiones por generar." bandejaHref="/facturacion?vista=remisiones" rows={remissions.map((row) => ({ href: `/facturacion/${row.id}`, label: row.folio, detail: billingDocumentPanelDetail(row, "Remisión", billingServiceLinkMap) }))} />
         <Block title="Pagos por validar" empty="Sin pagos pendientes." bandejaHref="/pagos?vista=pendientes" rows={payments.map((row) => ({ href: `/pagos/${row.id}`, label: row.folio, detail: money(row.amount) }))} />
         <Block title="Compras por validar" empty="Nada pendiente de validación." bandejaHref={comprasPendientesHref} rows={purchases.map((row) => ({ href: `/compras/${row.id}`, label: row.folio, detail: money(row.amount) }))} />
         <Block

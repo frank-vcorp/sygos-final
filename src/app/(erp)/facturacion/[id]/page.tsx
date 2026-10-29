@@ -4,6 +4,7 @@ import { HistoryTimeline } from "@/components/history-timeline";
 import { ClientNameLink } from "@/components/client-entity-links";
 import { IssueBillingDocumentForm } from "@/components/issue-billing-document-form";
 import { Badge, Button, Card, EntityDetailHeader, EntityMetaItem, TextLink } from "@/components/ui";
+import { loadBillingDocumentServiceLinksForDocument } from "@/lib/billing-document-service-links";
 import { cfdiUseLabel } from "@/lib/sat-cfdi-use";
 import { paymentMethodLabel } from "@/lib/sat-payment-method";
 import { prisma } from "@/lib/db";
@@ -27,10 +28,11 @@ export default async function DocumentoPage({ params }: { params: Promise<{ id: 
   const { id } = await params;
   const row = await prisma.billingDocument.findFirst({
     where: { id, companyId: session.activeCompanyId },
-    include: { client: true, quote: true, receivable: true, lines: true },
+    include: { client: true, quote: { select: { id: true, folio: true, technicalCaseId: true } }, receivable: true, lines: true },
   });
   if (!row) notFound();
   await redirectIfSalesNotAssigned(session, row.client.ownerUserId, "/facturacion");
+  const serviceLinks = await loadBillingDocumentServiceLinksForDocument(row);
   const canEditClient = can(session.role, "client.edit", session.activeCompanyCode);
   const canIssue = can(session.role, "invoice.issue", session.activeCompanyCode);
   const history = await historyFor("DOCUMENTO", row.id);
@@ -89,6 +91,20 @@ export default async function DocumentoPage({ params }: { params: Promise<{ id: 
             {row.quote ? (
               <EntityMetaItem label="Cotización">
                 <TextLink href={`/cotizaciones/${row.quote.id}`}>{row.quote.folio}</TextLink>
+              </EntityMetaItem>
+            ) : null}
+            {serviceLinks.diagnosisFolio ? (
+              <EntityMetaItem label="DX">
+                {serviceLinks.diagnosisHref ? (
+                  <TextLink href={serviceLinks.diagnosisHref}>{serviceLinks.diagnosisFolio}</TextLink>
+                ) : (
+                  serviceLinks.diagnosisFolio
+                )}
+              </EntityMetaItem>
+            ) : null}
+            {serviceLinks.osFolio && serviceLinks.osHref ? (
+              <EntityMetaItem label="OS">
+                <TextLink href={serviceLinks.osHref}>{serviceLinks.osFolio}</TextLink>
               </EntityMetaItem>
             ) : null}
             {row.issuedAt ? (
