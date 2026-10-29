@@ -2,18 +2,18 @@
 
 :root {
   color-scheme: light;
-  --bg: #f3f6fa;
+  --bg: #f1f5f9;
   --surface: #ffffff;
-  --ink: #0b1f3a;
-  --muted: #5d6b7d;
-  --line: #dce4ed;
-  --accent: #073b78;
-  --accent-soft: #e5f6f8;
-  --danger: #8c2f2f;
-  --danger-soft: #f8ecec;
-  --warn: #8a5a12;
-  --warn-soft: #f8f1e4;
-  --ok: #008d9b;
+  --ink: #0f172a;
+  --muted: #475569;
+  --line: #e2e8f0;
+  --accent: #0a477e;
+  --accent-soft: #e0f2fe;
+  --danger: #be123c;
+  --danger-soft: #ffe4e6;
+  --warn: #b45309;
+  --warn-soft: #fef3c7;
+  --ok: #047857;
 }
 
 html,
@@ -23,9 +23,19 @@ body {
 }
 
 body {
-  font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  font-family: var(--font-sans), "Plus Jakarta Sans", "Inter", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
   min-height: 100vh;
   line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+code,
+kbd,
+samp,
+pre,
+.font-mono {
+  font-family: var(--font-mono), "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
 }
 
 /* Enlaces sin clase explícita heredan color (nav, chrome). Registros y relaciones usan RecordLink / TextLink. */
@@ -98,37 +108,39 @@ summary {
 /* Capa visual compartida para las vistas operativas. */
 :root {
   --bg: #f4f7fb;
-  --ink: #14243b;
-  --muted: #52647a;
-  --line: #dbe4ef;
+  --ink: #0f172a;
+  --muted: #475569;
+  --line: #e2e8f0;
   --accent: #0a477e;
-  --accent-soft: #e8f3fa;
-  --ok: #067782;
+  --accent-soft: #e0f2fe;
+  --ok: #047857;
 }
 
 body {
-  background-image: radial-gradient(circle at 90% -15%, #e7f2fa 0, transparent 34rem);
-  letter-spacing: -0.005em;
+  background-image:
+    radial-gradient(ellipse 80% 36rem at 50% -12rem, rgba(186, 230, 253, 0.42), transparent),
+    radial-gradient(circle at 92% -10%, rgba(224, 242, 254, 0.65) 0, transparent 34rem);
+  letter-spacing: -0.01em;
 }
 
 ::selection {
-  background: #c7e9f2;
+  background: #bae6fd;
   color: var(--ink);
 }
 
 :where(a, button, input, select, textarea, summary):focus-visible {
-  outline: 2px solid #087d99;
+  outline: 2px solid #0a477e;
   outline-offset: 2px;
 }
 
 :where(input, select, textarea):disabled {
   cursor: not-allowed;
-  background: #f1f4f7;
+  background: #f1f5f9;
   color: var(--muted);
 }
 
 :where(input, select, textarea)::placeholder {
-  color: #718197;
+  color: #94a3b8;
 }
 
 :where(input, select, textarea):not([type="checkbox"]):not([type="radio"]):not([type="hidden"]) {
@@ -136,11 +148,11 @@ body {
 }
 
 :where(input, select, textarea):not([type="checkbox"]):not([type="radio"]):not([type="hidden"]):hover:not(:disabled) {
-  border-color: #aabbd0;
+  border-color: #94a3b8;
 }
 
 :where(button, a) {
-  transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, box-shadow 160ms ease, transform 160ms ease;
 }
 
 :where(button):active:not(:disabled) {
@@ -150,10 +162,15 @@ body {
 :where(table) {
   border-collapse: separate;
   border-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+:where(td, th, .tabular-nums) {
+  font-variant-numeric: tabular-nums;
 }
 
 :where(tbody tr):hover {
-  background: #f4f9fc;
+  background: #eef6fb;
 }
 
 :where(tbody tr:last-child td) {

@@ -117,14 +117,25 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
 
   const sidebar = (
     <>
-        <div className="mb-3 border-b border-[#dce4ed] px-5 pb-5 pt-6">
-          <p className="text-lg font-semibold tracking-tight text-[var(--accent)]">SYGOS</p>
-          <div className="mt-4 rounded-lg bg-white px-3 py-2.5 ring-1 ring-[#dce4ed]">
-            <p className="text-sm font-semibold">{session.name}</p>
-            <p className="mt-0.5 text-xs text-[var(--muted)]">{ROLE_LABEL[session.role]}</p>
+        <div className="mb-3 border-b border-slate-200/80 px-5 pb-4 pt-5">
+          <div className="flex items-center gap-2.5 pr-10">
+            <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#0a477e] text-white shadow-2xs ring-1 ring-[#0a477e]/15">
+              <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4" aria-hidden>
+                <path d="M10 2.5 16.5 6.25v7.5L10 17.5 3.5 13.75v-7.5L10 2.5Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
+                <path d="M10 6.5 13.5 8.5v3L10 13.5 6.5 11.5v-3L10 6.5Z" fill="currentColor" fillOpacity="0.25" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+              </svg>
+            </span>
+            <div>
+              <p className="text-base font-bold tracking-tight text-slate-900">SYGOS</p>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">Sistema Operativo</p>
+            </div>
+          </div>
+          <div className="mt-4 rounded-xl bg-white px-3.5 py-2.5 shadow-2xs ring-1 ring-slate-200/80">
+            <p className="truncate text-sm font-semibold text-slate-900">{session.name}</p>
+            <p className="mt-0.5 truncate text-xs font-medium text-slate-500">{ROLE_LABEL[session.role]}</p>
           </div>
         </div>
-        <Suspense fallback={<nav className="px-3 pb-5 text-sm text-[var(--muted)]">Menú…</nav>}>
+        <Suspense fallback={<nav className="px-3 pb-5 text-sm text-slate-500">Menú…</nav>}>
           <SideNav
             accordionGroups={
               session.role !== "VENTAS"
@@ -162,17 +173,17 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
     </>
   );
   const toolbar = (
-    <header className="border-b border-[var(--line)] bg-white px-4 py-3 md:px-8 md:py-4">
+    <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/90 px-4 py-2.5 shadow-[0_1px_2px_rgba(15,23,42,0.03)] backdrop-blur-md md:px-8 md:py-3">
       <div className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-4">
-          <div className="flex min-w-0 flex-1 items-center gap-4">
-            <span className="hidden text-xs font-semibold uppercase tracking-wide text-[var(--muted)] xl:inline">Empresa activa</span>
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <span className="hidden text-[11px] font-bold uppercase tracking-[0.08em] text-slate-500 xl:inline">Empresa activa</span>
             {companies.length > 1 ? (
-              <form action={switchCompanyAction} className="flex min-w-0 items-center">
+              <form action={switchCompanyAction} className="flex min-w-0 items-center gap-1.5 rounded-xl border border-slate-200/90 bg-slate-50/80 p-1 shadow-2xs">
                 <select
                   key={session.activeCompanyId ?? "none"}
                   name="companyId"
                   defaultValue={session.activeCompanyId ?? ""}
-                  className="min-h-10 min-w-0 max-w-44 rounded-md border border-[var(--line)] bg-white px-2 text-sm font-semibold"
+                  className="min-h-8 min-w-0 max-w-48 rounded-lg border-0 bg-white px-2.5 py-1 text-sm font-semibold text-slate-900 ring-1 ring-slate-200/80 focus:ring-2 focus:ring-[#0a477e]/20"
                   aria-label="Empresa activa"
                 >
                   <option value="" disabled>Selecciona empresa</option>
@@ -180,41 +191,44 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
                     <option key={company.id} value={company.id}>{company.name}</option>
                   ))}
                 </select>
-                <button className="ml-1 min-h-10 rounded-md px-2 text-sm font-medium text-[var(--accent)]" type="submit">Cambiar</button>
+                <button className="min-h-8 rounded-lg px-2.5 text-xs font-semibold text-[#0a477e] hover:bg-white hover:shadow-2xs" type="submit">Cambiar</button>
               </form>
             ) : (
-              <strong className="text-sm">{session.activeCompanyName ?? "Sin empresa"}</strong>
+              <strong className="inline-flex items-center gap-1.5 rounded-full border border-slate-200/90 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-800 shadow-2xs">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" aria-hidden />
+                {session.activeCompanyName ?? "Sin empresa"}
+              </strong>
             )}
           </div>
           <details className="relative md:hidden">
-            <summary className="flex min-h-11 cursor-pointer list-none items-center rounded-md border border-[var(--line)] px-3 text-sm font-medium">Opciones</summary>
-            <div className="absolute right-0 top-12 z-30 grid w-[min(88vw,340px)] gap-3 rounded-lg border border-[var(--line)] bg-white p-3">
+            <summary className="flex min-h-10 cursor-pointer list-none items-center rounded-lg border border-slate-200/90 bg-white px-3 text-sm font-medium text-slate-700 shadow-2xs hover:bg-slate-50">Opciones</summary>
+            <div className="absolute right-0 top-12 z-30 grid w-[min(88vw,340px)] gap-3 rounded-xl border border-slate-200/90 bg-white p-3.5 shadow-xl">
               {session.realRole === "ADMINISTRADOR" ? (
                 <form action={viewAsAction} className="grid gap-2">
-                  <label className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]" htmlFor="view-as-mobile">Ver como</label>
-                  <select id="view-as-mobile" name="userId" defaultValue={session.impersonating ? session.userId : ""} className="min-h-11 w-full rounded-md border border-[var(--line)] bg-white px-2 text-sm">
+                  <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500" htmlFor="view-as-mobile">Ver como</label>
+                  <select id="view-as-mobile" name="userId" defaultValue={session.impersonating ? session.userId : ""} className="min-h-10 w-full rounded-lg border border-slate-300/90 bg-white px-2.5 text-sm shadow-2xs">
                     <option value="">Administrador</option>
                     {viewAsUsers.filter((user) => isRole(user.role)).map((user) => <option key={user.id} value={user.id}>{user.name}{user.company ? ` · ${user.company.name}` : ""}</option>)}
                   </select>
-                  <button className="min-h-11 rounded-md bg-[var(--accent)] px-3 text-sm font-medium text-white">Aplicar</button>
+                  <button className="min-h-10 rounded-lg bg-gradient-to-b from-[#0e5696] to-[#083d6e] px-3 text-sm font-semibold text-white shadow-xs">Aplicar</button>
                 </form>
               ) : null}
               {can(session.role, "search.global") && session.activeCompanyId ? (
-                <form action="/buscar"><input name="q" placeholder="Buscar en esta empresa" className="min-h-11 w-full rounded-md border border-[var(--line)] px-3 text-sm" /></form>
+                <form action="/buscar"><input name="q" placeholder="Buscar en esta empresa" className="min-h-10 w-full rounded-lg border border-slate-300/90 bg-slate-50/70 px-3 text-sm focus:bg-white" /></form>
               ) : null}
-              <form action={logoutAction}><button className="min-h-11 w-full rounded-md border border-[var(--line)] text-sm">Salir</button></form>
+              <form action={logoutAction}><button className="min-h-10 w-full rounded-lg border border-slate-200/90 bg-white text-sm font-medium text-slate-700 hover:bg-slate-50">Salir</button></form>
             </div>
           </details>
-          <div className="hidden items-center gap-4 md:flex">
+          <div className="hidden items-center gap-3 md:flex">
             {session.realRole === "ADMINISTRADOR" ? (
-              <form action={viewAsAction} className="flex items-center gap-2">
-                <label className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]" htmlFor="view-as">Ver como</label>
+              <form action={viewAsAction} className="flex items-center gap-2 rounded-xl border border-slate-200/90 bg-slate-50/80 px-2.5 py-1 shadow-2xs">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500" htmlFor="view-as">Ver como</label>
                 <select
                   id="view-as"
                   name="userId"
                   key={session.impersonating ? session.userId : "admin"}
                   defaultValue={session.impersonating ? session.userId : ""}
-                  className="rounded-md border border-[var(--line)] bg-white px-2 py-1 text-sm"
+                  className="min-h-8 rounded-lg border border-slate-200/90 bg-white px-2.5 py-1 text-xs font-medium text-slate-800 shadow-2xs"
                 >
                   <option value="">Administrador</option>
                   {viewAsUsers.filter((user) => isRole(user.role)).map((user) => (
@@ -223,16 +237,16 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
                     </option>
                   ))}
                 </select>
-                <button className="text-sm font-medium text-[var(--accent)]" type="submit">Aplicar</button>
+                <button className="min-h-8 rounded-lg px-2 text-xs font-semibold text-[#0a477e] hover:bg-white hover:shadow-2xs" type="submit">Aplicar</button>
               </form>
             ) : null}
             {can(session.role, "search.global") && session.activeCompanyId ? (
               <form action="/buscar" className="flex">
-                <input name="q" placeholder="Buscar en esta empresa" className="w-48 rounded-md border border-[var(--line)] px-2 py-1 text-sm md:w-64" />
+                <input name="q" placeholder="Buscar en esta empresa…" className="min-h-9 w-48 rounded-lg border border-slate-200/90 bg-slate-50/80 px-3 py-1.5 text-sm text-slate-800 shadow-2xs focus:border-[#0a477e] focus:bg-white focus:ring-3 focus:ring-[#0a477e]/15 md:w-64" />
               </form>
             ) : null}
             <form action={logoutAction}>
-              <button className="text-sm text-[var(--muted)]" type="submit">Salir</button>
+              <button className="inline-flex min-h-9 items-center rounded-lg border border-transparent px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:border-slate-200/90 hover:bg-slate-100/80 hover:text-slate-900" type="submit">Salir</button>
             </form>
           </div>
       </div>

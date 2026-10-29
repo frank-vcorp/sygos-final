@@ -46,32 +46,37 @@ export function ErpShell({
       data-sidebar-collapsed={collapsed ? "true" : "false"}
       className={`min-h-screen md:grid ${collapsed ? "md:grid-cols-[72px_minmax(0,1fr)]" : "md:grid-cols-[280px_minmax(0,1fr)]"}`}
     >
-      <div data-erp-chrome className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-[var(--line)] bg-white px-4 md:hidden print:hidden">
+      <div data-erp-chrome className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-slate-200/80 bg-white/95 px-4 backdrop-blur-md md:hidden print:hidden">
         <button
           type="button"
-          className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md border border-[var(--line)] text-xl"
+          className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg border border-slate-200/90 bg-white text-lg text-slate-700 shadow-2xs hover:bg-slate-50"
           aria-label="Abrir navegación"
           aria-expanded={open}
           onClick={() => setOpen(true)}
         >
           ☰
         </button>
-        <span className="text-sm font-semibold tracking-tight text-[var(--accent)]">SYGOS</span>
-        <span className="w-11" aria-hidden />
+        <span className="inline-flex items-center gap-2 text-sm font-bold tracking-tight text-slate-900">
+          <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-[#0a477e] text-[11px] font-bold text-white shadow-2xs">
+            S
+          </span>
+          SYGOS
+        </span>
+        <span className="w-10" aria-hidden />
       </div>
 
       {open ? (
         <button
           type="button"
           aria-label="Cerrar navegación"
-          className="fixed inset-0 z-40 bg-black/35 md:hidden"
+          className="fixed inset-0 z-40 bg-slate-900/35 backdrop-blur-[2px] md:hidden"
           onClick={() => setOpen(false)}
         />
       ) : null}
 
       <aside
         data-erp-chrome
-        className={`fixed inset-y-0 left-0 z-50 w-[min(86vw,320px)] overflow-y-auto border-r border-[#d7e1ec] bg-[#f8fbfd] transition-[transform,width] md:sticky md:top-0 md:z-20 md:h-screen md:w-auto md:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 w-[min(86vw,320px)] overflow-y-auto border-r border-slate-200/80 bg-[#f8fafc] text-slate-800 shadow-xl transition-[transform,width] md:sticky md:top-0 md:z-20 md:h-screen md:w-auto md:translate-x-0 md:shadow-none ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
         aria-label="Navegación principal"
@@ -79,18 +84,18 @@ export function ErpShell({
         <div className="flex justify-end p-2 md:hidden">
           <button
             type="button"
-            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-md text-2xl text-[var(--muted)]"
+            className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg text-2xl text-slate-500 hover:bg-slate-200/60 hover:text-slate-800"
             aria-label="Cerrar navegación"
             onClick={() => setOpen(false)}
           >
             ×
           </button>
         </div>
-        <div className={`hidden md:flex ${collapsed ? "justify-center px-2 py-5" : "absolute right-3 top-3 z-10"}`}>
+        <div className={`hidden md:flex ${collapsed ? "justify-center px-2 py-5" : "absolute right-3 top-4 z-10"}`}>
           <button
             type="button"
             onClick={toggleCollapsed}
-            className="inline-flex min-h-10 min-w-10 items-center justify-center rounded-lg border border-[#d7e1ec] bg-white text-2xl font-medium text-[var(--accent)] hover:bg-[var(--accent-soft)]"
+            className="inline-flex min-h-9 min-w-9 items-center justify-center rounded-lg border border-slate-200/90 bg-white text-xl font-medium text-slate-600 shadow-2xs hover:border-slate-300 hover:bg-slate-50 hover:text-[#0a477e]"
             aria-label={collapsed ? "Expandir menú lateral" : "Contraer menú lateral"}
             title={collapsed ? "Expandir menú lateral" : "Contraer menú lateral"}
           >

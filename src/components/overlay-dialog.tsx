@@ -61,7 +61,7 @@ export function FormOverlayDialog({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/45 p-4 sm:items-center"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/45 p-4 backdrop-blur-[2px] sm:items-center"
       role="dialog"
       aria-modal="true"
       aria-labelledby={titleId}
@@ -72,17 +72,17 @@ export function FormOverlayDialog({
       <div
         ref={dialogRef}
         tabIndex={-1}
-        className={`flex w-full max-h-[min(94vh,56rem)] flex-col overflow-hidden rounded-xl border border-[var(--line)] bg-white shadow-xl ${
+        className={`flex w-full max-h-[min(94vh,56rem)] flex-col overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-2xl ${
           documentWide ? "max-w-4xl" : wide ? "max-w-3xl" : "max-w-lg"
         }`}
       >
-        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[var(--line)] bg-white px-4 py-3">
-          <h3 id={titleId} className="text-sm font-semibold text-[#0b1f3a]">{title}</h3>
-          <Button type="button" tone="ghost" className="min-h-9 px-2 text-xs" onClick={onClose}>
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200/80 bg-slate-50/70 px-5 py-3.5">
+          <h3 id={titleId} className="text-sm font-bold tracking-tight text-slate-900">{title}</h3>
+          <Button type="button" tone="ghost" className="min-h-8 px-2.5 text-xs" onClick={onClose}>
             Cerrar
           </Button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto p-4">{children}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto p-5">{children}</div>
       </div>
     </div>
   );

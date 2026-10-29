@@ -16,7 +16,7 @@ export function CompactFilterBar({
 }) {
   return (
     <form
-      className={`mb-4 flex flex-col gap-2 rounded-xl border border-[var(--line)] bg-white p-3 shadow-[0_4px_14px_rgba(20,45,75,0.04)] sm:flex-row sm:flex-wrap sm:items-center ${className}`}
+      className={`mb-4 flex flex-col gap-2.5 rounded-xl border border-slate-200/80 bg-white/95 p-3.5 shadow-2xs sm:flex-row sm:flex-wrap sm:items-center ${className}`}
       role="search"
       onSubmit={(event) => {
         event.preventDefault();
