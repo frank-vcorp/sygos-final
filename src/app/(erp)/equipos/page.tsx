@@ -5,6 +5,7 @@ import { ActionLink, ActiveFilters, Badge, Empty, ListCap, MobileCard, PageHeade
 import { CUSTODY_LABEL, type Custody } from "@/lib/custody";
 import { prisma } from "@/lib/db";
 import { homePath } from "@/lib/home";
+import { coordPageSubtitle, coordUsesSidebarNav } from "@/lib/coordination-ui";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
 
@@ -34,7 +35,12 @@ export default async function EquiposPage({ searchParams }: { searchParams: Prom
     <>
       <PageHeader
         title="Equipos"
-        subtitle="Identidad EQUI de SYSTRON. El folio no se reutiliza."
+        subtitle={coordPageSubtitle(
+          coordUsesSidebarNav(session.role),
+          session.activeCompanyCode,
+          "Identidad EQUI de SYSTRON. El folio no se reutiliza.",
+          "Catálogo EQUI",
+        )}
         action={can(session.role, "equi.create", session.activeCompanyCode) ? <ActionLink href="/equipos/nuevo">Nuevo EQUI</ActionLink> : null}
       />
       <EquiposQueryFilter q={query} />
