@@ -4,7 +4,12 @@ import { useState } from "react";
 import { generatePayrollAction } from "./actions";
 import { FormOverlayDialog } from "@/components/overlay-dialog";
 import { Button, controlClass, Field } from "@/components/ui";
-import { formatPayrollFolio } from "@/lib/payroll";
+
+function formatPayrollFolioPreview(companyCode: string, year: number, weekNumber: number): string {
+  const cleanCode = (companyCode || "SYSTRON").toUpperCase();
+  const paddedWeek = String(weekNumber).padStart(2, "0");
+  return `NOM-${cleanCode}-${year}-S${paddedWeek}`;
+}
 
 export function GeneratePayrollModal({
   companyCode,
@@ -20,7 +25,7 @@ export function GeneratePayrollModal({
 
   const match = /^(\d{4})-W(\d{1,2})$/i.exec(periodInput);
   const previewFolio = match
-    ? formatPayrollFolio(companyCode, Number(match[1]), Number(match[2]))
+    ? formatPayrollFolioPreview(companyCode, Number(match[1]), Number(match[2]))
     : `NOM-${companyCode}-AAAA-S00`;
 
   return (
