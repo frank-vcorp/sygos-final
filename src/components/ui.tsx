@@ -589,8 +589,8 @@ export function SegmentedNav({ items }: { items: Array<{ href: string; label: st
   );
 }
 
-export function Card({ children, className = "" }: { children: React.ReactNode; className?: string }) {
-  return <section className={`rounded-xl border border-slate-200/80 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04),0_1px_2px_rgba(15,23,42,0.02)] ${className}`}>{children}</section>;
+export function Card({ children, className = "", id }: { children: React.ReactNode; className?: string; id?: string }) {
+  return <section id={id} className={`rounded-xl border border-slate-200/80 bg-white shadow-[0_1px_3px_rgba(15,23,42,0.04),0_1px_2px_rgba(15,23,42,0.02)] ${className}`}>{children}</section>;
 }
 
 export function Empty({ title, body, action }: { title: string; body: string; action?: React.ReactNode }) {

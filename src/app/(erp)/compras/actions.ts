@@ -7,6 +7,7 @@ import { setFlash } from "@/lib/flash";
 import { supplierIdFromForm } from "@/lib/form-quick-entities";
 import { optionalText, parseVersion, requiredText } from "@/lib/form";
 import { moneyFromForm } from "@/lib/money";
+import { partRequestShortfall } from "@/lib/part-inventory";
 import { can, type Action } from "@/lib/permissions";
 import { addRequirementToShoppingList, cancelOrder, changeAuthorizedOrder, convertShoppingListToPurchase, createPhaseOnePurchase, createRequirement, createShoppingList, decideOrder, discardDirectPurchase, editDirectPurchase, editRequirement, processPurchase, purchaseRequirement, registerDirectPurchase, registerOrder, removeShoppingListLine, requirementPartNumberRequired, setRequirementStatus, setShoppingListSupplier, updateShoppingListLine } from "@/lib/purchases";
 import { requireCompany } from "@/lib/session";
@@ -208,9 +209,10 @@ export async function importTechnicalRequirementAction(formData: FormData) {
     const sourceType = requiredText(formData.get("sourceType"), "Origen");
     const sourceId = requiredText(formData.get("sourceId"), "Solicitud");
     if (sourceType === "OS") {
-      const source = await prisma.partRequest.findFirst({ where: { id: sourceId, companyId: session.activeCompanyId, status: "SOLICITADA" } });
-      if (!source) throw new Error("La solicitud de OS ya no está pendiente.");
-      await createRequirement(session, { partNumber: source.partNumber, description: source.description, quantity: source.qtyRequested, sourceType, sourceId });
+      const source = await prisma.partRequest.findFirst({ where: { id: sourceId, companyId: session.activeCompanyId } });
+      const shortfall = source ? partRequestShortfall(source) : 0;
+      if (!source || shortfall <= 0) throw new Error("La solicitud de OS ya no está pendiente de compra.");
+      await createRequirement(session, { partNumber: source.partNumber, description: source.description, quantity: shortfall, sourceType, sourceId });
     } else if (sourceType === "DX") {
       const source = await prisma.partPresolicitud.findFirst({ where: { id: sourceId, companyId: session.activeCompanyId, status: "ACTIVA" } });
       if (!source) throw new Error("La solicitud de DX ya no está activa.");
@@ -358,6 +360,7 @@ export async function purchaseRequirementOverlayAction(
     await setFlash({ tone: "ok", message: `${purchase.folio} creada desde el requerimiento.` });
     revalidatePath("/compras/requerimientos");
     revalidatePath("/panel");
+    revalidatePath("/custodia");
     return { status: "success", message: `${purchase.folio} registrada.` };
   } catch (error) {
     return { status: "error", message: bubble(error) };
@@ -399,6 +402,7 @@ export async function addToShoppingListOverlayAction(
     await setFlash({ tone: "ok", message: `Agregado a ${list.folio}.` });
     revalidatePath("/compras/requerimientos");
     revalidatePath("/panel");
+    revalidatePath("/custodia");
     return { status: "success", message: `Agregado a ${list.folio}.` };
   } catch (error) {
     return { status: "error", message: bubble(error) };
@@ -519,6 +523,7 @@ export async function convertShoppingListOverlayAction(
     await setFlash({ tone: "ok", message: `${purchase.folio} creada desde la lista.` });
     revalidatePath("/compras/listas");
     revalidatePath(`/compras/listas/${listId}`);
+    revalidatePath("/custodia");
     return { status: "success", message: `${purchase.folio} registrada.` };
   } catch (error) {
     return { status: "error", message: bubble(error) };

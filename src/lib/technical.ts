@@ -15,9 +15,13 @@ import { CASE_STATUS_LABEL } from "./case-labels";
 import { buildPartSearchKey } from "./inventory-search";
 import {
   createPartRequestWithReservation,
+  findCatalogPartForRequest,
   findInventoryPartForRequest,
   partRequestIssueable,
+  partRequestShortfall,
   partRequestStatusAfterMove,
+  releasePartRequestReservationToPurchase,
+  resolvePendingPartReceivesForPurchase,
   syncTechnicalCaseRefaccionesWait,
 } from "./part-inventory";
 
@@ -363,7 +367,11 @@ async function spawnWarrantyRepair(diagnosisCaseId: string, authorUserId: string
   });
   if (!diagnosis) return;
   const existing = await prisma.technicalCase.findFirst({ where: { spawnedFromId: diagnosis.id, kind: "OS" } });
-  if (existing) return;
+  if (existing) {
+    const { promotePartPresolicitudesToRepairOrder } = await import("./part-presolicitud");
+    await promotePartPresolicitudesToRepairOrder(diagnosis.id, existing.id, authorUserId);
+    return;
+  }
   const folio = await allocateFolio(diagnosis.serviceCompanyId, "OS");
   const created = await prisma.technicalCase.create({
     data: {
@@ -387,6 +395,8 @@ async function spawnWarrantyRepair(diagnosisCaseId: string, authorUserId: string
     summary: `Reparación en garantía ${folio}. No genera un cobro nuevo si se resuelve.`,
     authorUserId,
   });
+  const { promotePartPresolicitudesToRepairOrder } = await import("./part-presolicitud");
+  await promotePartPresolicitudesToRepairOrder(diagnosis.id, created.id, authorUserId);
 }
 
 export async function finishRepair(actor: Actor, caseId: string, version: number, outcome: "TERMINADA" | "SIN_REPARACION", resultText: string) {
@@ -561,7 +571,7 @@ export async function receivePartRequest(actor: Actor, requestId: string, versio
       let part =
         request.partId != null
           ? await tx.part.findFirst({ where: { id: request.partId, companyId: company.id, active: true } })
-          : await findInventoryPartForRequest(tx, company.id, request.partNumber, request.description);
+          : await findCatalogPartForRequest(tx, company.id, request.partNumber, request.description);
       if (!part) {
         part = await tx.part.create({
           data: {
@@ -572,6 +582,8 @@ export async function receivePartRequest(actor: Actor, requestId: string, versio
             qty: 0,
           },
         });
+      }
+      if (request.partId !== part.id) {
         await tx.partRequest.update({ where: { id: request.id }, data: { partId: part.id } });
       }
       const qtyAfter = part.qty + quantity;
@@ -580,8 +592,133 @@ export async function receivePartRequest(actor: Actor, requestId: string, versio
         data: { companyId: company.id, partId: part.id, kind: "ENTRADA", quantity, qtyAfter, note: `Recepción para ${request.case.folio}`, authorUserId: actor.userId },
       });
     }
+    const remainingShortfall = partRequestShortfall({ ...request, qtyReceived });
+    if (remainingShortfall <= 0) {
+      await tx.requirement.deleteMany({
+        where: {
+          companyId: request.companyId,
+          sourceType: "OS",
+          sourceId: request.id,
+          status: "PENDIENTE",
+        },
+      });
+    } else {
+      await tx.requirement.updateMany({
+        where: {
+          companyId: request.companyId,
+          sourceType: "OS",
+          sourceId: request.id,
+          status: "PENDIENTE",
+        },
+        data: { quantity: remainingShortfall },
+      });
+    }
     await syncTechnicalCaseRefaccionesWait(tx, request.caseId);
   });
+}
+
+export async function markPartRequestNotFoundInWarehouse(actor: Actor, requestId: string, version: number) {
+  const { fieldPresolicitudOnly } = await import("./part-presolicitud");
+  if (fieldPresolicitudOnly(actor.role)) {
+    throw new Error("Solo almacén o gerencia liberan el apartado para solicitar compra.");
+  }
+  return prisma.$transaction((tx) =>
+    releasePartRequestReservationToPurchase(tx, {
+      requestId,
+      companyId: actor.activeCompanyId,
+      version,
+      actorUserId: actor.userId,
+    }),
+  );
+}
+
+export async function receivePurchasePackageForAlmacen(actor: Actor, purchaseId: string) {
+  const { fieldPresolicitudOnly } = await import("./part-presolicitud");
+  if (fieldPresolicitudOnly(actor.role)) {
+    throw new Error("La recepción de paquetes de refacciones la registra almacén o gerencia.");
+  }
+  const purchase = await prisma.purchase.findFirst({
+    where: {
+      id: purchaseId,
+      companyId: actor.activeCompanyId,
+      status: { notIn: ["CANCELADA", "RECHAZADA", "ELIMINADA"] },
+    },
+    include: {
+      lines: {
+        include: {
+          requirement: { select: { sourceType: true, sourceId: true } },
+        },
+      },
+      requirements: {
+        select: {
+          id: true,
+          partNumber: true,
+          description: true,
+          quantity: true,
+          sourceType: true,
+          sourceId: true,
+        },
+      },
+    },
+  });
+  if (!purchase) throw new Error("No se encontró el paquete de compra en esta empresa.");
+
+  const osIds = new Set<string>();
+  const dxIds = new Set<string>();
+  for (const line of purchase.lines) {
+    const srcType = line.sourceType ?? line.requirement?.sourceType ?? null;
+    const srcId = line.sourceId ?? line.requirement?.sourceId ?? null;
+    if (srcType === "OS" && srcId) osIds.add(srcId);
+    if (srcType === "DX" && srcId) dxIds.add(srcId);
+  }
+  for (const req of purchase.requirements) {
+    if (req.sourceType === "OS" && req.sourceId) osIds.add(req.sourceId);
+    if (req.sourceType === "DX" && req.sourceId) dxIds.add(req.sourceId);
+  }
+
+  const dxPresolicitudToPartRequestId = new Map<string, string>();
+  if (dxIds.size > 0) {
+    const presols = await prisma.partPresolicitud.findMany({
+      where: { id: { in: [...dxIds] }, companyId: actor.activeCompanyId, partRequestId: { not: null } },
+      select: { id: true, partRequestId: true },
+    });
+    for (const p of presols) {
+      if (p.partRequestId) {
+        dxPresolicitudToPartRequestId.set(p.id, p.partRequestId);
+        osIds.add(p.partRequestId);
+      }
+    }
+  }
+
+  const partRequests =
+    osIds.size > 0
+      ? await prisma.partRequest.findMany({
+          where: { id: { in: [...osIds] }, companyId: actor.activeCompanyId },
+        })
+      : [];
+  const partRequestsById = new Map(partRequests.map((pr) => [pr.id, pr]));
+
+  const resolved = resolvePendingPartReceivesForPurchase({
+    lines: purchase.lines,
+    requirements: purchase.requirements,
+    partRequestsById,
+    dxPresolicitudToPartRequestId,
+  });
+
+  if (resolved.aggregatedByRequest.length === 0) {
+    throw new Error("Todas las refacciones de este paquete ya fueron ingresadas a almacén.");
+  }
+
+  for (const item of resolved.aggregatedByRequest) {
+    await receivePartRequest(actor, item.requestId, item.version, item.qtyToReceive);
+  }
+
+  return {
+    purchaseId: purchase.id,
+    folio: purchase.folio,
+    receivedRequests: resolved.aggregatedByRequest.length,
+    totalUnits: resolved.aggregatedByRequest.reduce((sum, item) => sum + item.qtyToReceive, 0),
+  };
 }
 
 export async function issuePartRequest(actor: Actor, requestId: string, version: number, quantity: number) {

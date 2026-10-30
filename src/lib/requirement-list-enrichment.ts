@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { partRequestShortfall } from "@/lib/part-inventory";
 import { equipmentDetailHref, equipmentIdentificationLabel } from "@/lib/requirement-display";
 
 export type RequirementListContext = {
@@ -68,34 +69,69 @@ function contextFromCase(
 const CLOSED_CASES = ["VALIDADO", "TERMINADA", "SIN_REPARACION"] as const;
 
 export async function syncPendingPartRequestRequirements(companyId: string): Promise<void> {
-  const openRequests = await prisma.partRequest.findMany({
-    where: {
-      companyId,
-      status: "SOLICITADA",
-      case: { status: { notIn: [...CLOSED_CASES] } },
-    },
-    include: {
-      case: {
-        select: {
-          assigneeUserId: true,
-          attention: { select: { createdByUserId: true } },
-          equipment: { select: { createdByUserId: true } },
+  const [openRequests, pendingOsRequirements] = await Promise.all([
+    prisma.partRequest.findMany({
+      where: {
+        companyId,
+        case: { status: { notIn: [...CLOSED_CASES] } },
+      },
+      include: {
+        case: {
+          select: {
+            assigneeUserId: true,
+            attention: { select: { createdByUserId: true } },
+            equipment: { select: { createdByUserId: true } },
+          },
         },
       },
-    },
-  });
-  if (openRequests.length === 0) return;
+    }),
+    prisma.requirement.findMany({
+      where: {
+        companyId,
+        sourceType: "OS",
+        status: "PENDIENTE",
+      },
+      select: { id: true, sourceId: true, quantity: true },
+    }),
+  ]);
+
+  const openById = new Map(openRequests.map((row) => [row.id, row]));
+  const obsoleteReqIds: string[] = [];
+  for (const req of pendingOsRequirements) {
+    const pr = req.sourceId ? openById.get(req.sourceId) : undefined;
+    if (!pr || pr.qtyIssued >= pr.qtyRequested || partRequestShortfall(pr) <= 0) {
+      obsoleteReqIds.push(req.id);
+    } else {
+      const shortfall = partRequestShortfall(pr);
+      if (req.quantity !== shortfall) {
+        await prisma.requirement.update({
+          where: { id: req.id },
+          data: { quantity: shortfall },
+        });
+      }
+    }
+  }
+  if (obsoleteReqIds.length > 0) {
+    await prisma.requirement.deleteMany({
+      where: { id: { in: obsoleteReqIds }, status: "PENDIENTE" },
+    });
+  }
+
+  const requestsNeedingPurchase = openRequests.filter(
+    (row) => row.qtyIssued < row.qtyRequested && partRequestShortfall(row) > 0,
+  );
+  if (requestsNeedingPurchase.length === 0) return;
 
   const existing = await prisma.requirement.findMany({
     where: {
       companyId,
       sourceType: "OS",
-      sourceId: { in: openRequests.map((row) => row.id) },
+      sourceId: { in: requestsNeedingPurchase.map((row) => row.id) },
     },
     select: { sourceId: true },
   });
   const existingIds = new Set(existing.map((row) => row.sourceId));
-  const missing = openRequests.filter((row) => !existingIds.has(row.id) && row.qtyIssued < row.qtyRequested);
+  const missing = requestsNeedingPurchase.filter((row) => !existingIds.has(row.id));
   if (missing.length === 0) return;
 
   const fallbackUser = await prisma.user.findFirst({
@@ -105,6 +141,8 @@ export async function syncPendingPartRequestRequirements(companyId: string): Pro
   });
 
   for (const request of missing) {
+    const shortfall = partRequestShortfall(request);
+    if (shortfall <= 0) continue;
     const requesterUserId =
       request.case.assigneeUserId
       ?? request.case.attention.createdByUserId
@@ -113,12 +151,14 @@ export async function syncPendingPartRequestRequirements(companyId: string): Pro
     if (!requesterUserId) continue;
     await prisma.requirement.upsert({
       where: { companyId_sourceType_sourceId: { companyId, sourceType: "OS", sourceId: request.id } },
-      update: {},
+      update: {
+        quantity: shortfall,
+      },
       create: {
         companyId,
         partNumber: request.partNumber,
         description: request.description,
-        quantity: request.qtyRequested,
+        quantity: shortfall,
         kind: "REFACCION",
         requesterUserId,
         sourceType: "OS",

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { AlmacenBandejaList } from "@/components/almacen-bandeja-list";
+import { AlmacenRefaccionesPanel } from "@/components/almacen-refacciones-panel";
 import { ClientNameLink } from "@/components/client-entity-links";
 import { ActiveFilters, Badge, Card, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, SegmentedNav, Table, Td, Th } from "@/components/ui";
 import { mapEquipmentToAlmacenRow } from "@/lib/almacen-bandeja";
@@ -112,6 +113,8 @@ export default async function CustodiaPage({ searchParams }: { searchParams: Pro
       : [];
     return resolveEntradaAttentionType(attentions, pendingQuotesByEquipment.get(row.id) ?? null);
   }
+  const showRefaccionesAlmacen =
+    can(session.role, "inventory.operate", session.activeCompanyCode) || session.role === "ALMACEN";
   const title = systron ? "Almacén" : "Custodia";
   const tabsAll = systron
     ? [
@@ -156,6 +159,9 @@ export default async function CustodiaPage({ searchParams }: { searchParams: Pro
           ? "EQUI de SYSTRON. Los MOT enviados a Servomotores no aparecen aquí."
           : "Ingreso, resguardo, salida a prueba y egreso definitivo de MOT."}
       />
+      {showRefaccionesAlmacen ? (
+        <AlmacenRefaccionesPanel companyId={session.activeCompanyId} />
+      ) : null}
       <SegmentedNav items={tabs.map(([key, label]) => ({ href: `/custodia?vista=${key}`, label, active: view === key }))} />
       <ActiveFilters
         items={

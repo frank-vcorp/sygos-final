@@ -134,6 +134,14 @@ export async function promotePartPresolicitudesToRepairOrder(
         where: { id: need.id },
         data: { status: "PROMOVIDA", partRequestId: request.id },
       });
+      await tx.requirement.deleteMany({
+        where: {
+          companyId: need.companyId,
+          sourceType: "DX",
+          sourceId: need.id,
+          status: "PENDIENTE",
+        },
+      });
     }
   });
 

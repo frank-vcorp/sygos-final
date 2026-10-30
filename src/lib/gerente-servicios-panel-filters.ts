@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { partRequestNeedsSupply } from "@/lib/part-inventory";
 import type { ServicioBandejaRow } from "@/lib/servicios-supervisor";
 
 const CLOSED = ["VALIDADO", "TERMINADA", "SIN_REPARACION"] as const;
@@ -41,7 +42,7 @@ export async function loadGerenteServicioPanelContext(companyId: string): Promis
   return {
     now: Date.now(),
     refaccionAttentionIds: new Set(
-      partRequests.filter((row) => row.qtyIssued < row.qtyRequested).map((row) => row.case.attentionId),
+      partRequests.filter((row) => partRequestNeedsSupply(row)).map((row) => row.case.attentionId),
     ),
     purchaseRefs: new Set(
       pendingPurchases

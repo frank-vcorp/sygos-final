@@ -18,6 +18,11 @@ export const ALMACEN_NAV_GROUPS: NavGroupDef[] = [
     title: null,
     links: [
       {
+        href: "/custodia#refacciones-almacen",
+        label: "Refacciones",
+        show: (role, code) => showAlmacen(role) && can(role, "inventory.operate", code),
+      },
+      {
         href: "/inventario",
         label: "Inventario",
         show: (role, code) => showAlmacen(role) && can(role, "inventory.operate", code),
