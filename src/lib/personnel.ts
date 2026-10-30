@@ -573,7 +573,9 @@ export async function updateLaborDataSection(
     const boss = await prisma.user.findFirst({ where: { id: input.bossUserId, active: true } });
     if (!boss) throw new Error("El jefe seleccionado no existe.");
   }
-  const hasClosedProcesses = row.payrollLines.some((line) => line.period.status === "AUTORIZADA");
+  const hasClosedProcesses = row.payrollLines.some(
+    (line) => line.period.status === "AUTORIZADA" || line.period.status === "CERRADA",
+  );
   const nextHiredAt = hasClosedProcesses ? row.hiredAt : noonUtc(input.hiredAt);
   const updated = await prisma.collaborator.updateMany({
     where: { id: row.id, version },

@@ -1216,25 +1216,43 @@ model LaborDocument {
 }
 
 model PayrollPeriod {
-  id           String   @id @default(cuid())
-  folio        String
-  companyId    String
-  company      Company  @relation(fields: [companyId], references: [id])
-  kind         String
-  periodStart  String
-  periodEnd    String
-  status       String
-  fiscalStatus String   @default("PENDIENTE")
-  fiscalError  String?
+  id               String   @id @default(cuid())
+  folio            String
+  companyId        String
+  company          Company  @relation(fields: [companyId], references: [id])
+  kind             String
+  year             Int      @default(2026)
+  weekNumber       Int      @default(1)
+  periodLabel      String   @default("")
+  periodStart      String
+  periodEnd        String
+  paymentDate      String   @default("")
+  status           String
+  fiscalStatus     String   @default("PENDIENTE")
+  fiscalError      String?
   fiscalExternalId String?
-  version      Int      @default(1)
-  createdAt    DateTime @default(now())
+  version          Int      @default(1)
+  createdAt        DateTime @default(now())
 
   lines       PayrollLine[]
   adjustments PayrollAdjustment[]
+  documents   PayrollDocument[]
 
   @@unique([companyId, folio])
   @@index([companyId, status])
+}
+
+model PayrollDocument {
+  id          String        @id @default(cuid())
+  periodId    String
+  period      PayrollPeriod @relation(fields: [periodId], references: [id], onDelete: Cascade)
+  title       String
+  fileName    String?
+  mimeType    String?
+  fileDataUrl String?
+  createdAt   DateTime      @default(now())
+
+  @@index([periodId])
 }
 
 model PayrollLine {
@@ -1258,6 +1276,25 @@ model PayrollLine {
   aguinaldoCash    Float          @default(0)
   transferTotal    Float          @default(0)
   cashTotal        Float          @default(0)
+  calcSueldo          Float       @default(0)
+  calcHorasExtra      Float       @default(0)
+  calcBonos           Float       @default(0)
+  calcComision        Float       @default(0)
+  calcCompensaciones  Float       @default(0)
+  calcPrimaVacacional Float       @default(0)
+  calcOtrosConceptos  Float       @default(0)
+  calcDescuentos      Float       @default(0)
+  sueldo              Float       @default(0)
+  horasExtra          Float       @default(0)
+  bonos               Float       @default(0)
+  comision            Float       @default(0)
+  compensaciones      Float       @default(0)
+  primaVacacional     Float       @default(0)
+  otrosConceptos      Float       @default(0)
+  descuentos          Float       @default(0)
+  totalPercepciones   Float       @default(0)
+  totalPagar          Float       @default(0)
+  originsJson         String      @default("{}")
   missing          String?
   fiscalStatus     String?
   fiscalExternalId String?

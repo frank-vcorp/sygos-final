@@ -774,7 +774,10 @@ async function Coordination({ companyId, code, vista }: { companyId: string; cod
 async function CeoExecutive({ companyId, name }: { companyId: string; name: string }) {
   const [quotes, payrolls, overtime, vacations, leavePermissions, pendingJustifications, compensationRequests, commissions] = await Promise.all([
     prisma.quote.findMany({ where: { companyId, status: "PENDIENTE_COTIZAR" }, take: 12 }),
-    prisma.payrollPeriod.findMany({ where: { companyId, status: "PRELIMINAR" }, take: 6 }),
+    prisma.payrollPeriod.findMany({
+      where: { companyId, status: { in: ["PENDIENTE_VALIDACION", "PRELIMINAR"] } },
+      take: 6,
+    }),
     prisma.overtimeRequest.findMany({
       where: { status: "PENDIENTE_CEO", collaborator: { companyId } },
       include: { collaborator: { include: { user: true } } },
@@ -845,9 +848,9 @@ async function CeoExecutive({ companyId, name }: { companyId: string; name: stri
         />
         <Block
           title="Nóminas"
-          empty="Sin preliminar."
+          empty="Sin nóminas pendientes de validación."
           bandejaHref="/nomina"
-          rows={payrolls.map((row) => ({ href: `/nomina/${row.id}`, label: row.folio, detail: "Autorizar" }))}
+          rows={payrolls.map((row) => ({ href: `/nomina/${row.id}`, label: row.folio, detail: "Validar nómina" }))}
         />
         <GroupedBlock
           title="Colaboradores"
@@ -898,7 +901,10 @@ async function Executive({ companyId, name }: { companyId: string; name: string 
     prisma.quote.findMany({ where: { companyId, status: "PENDIENTE_COTIZAR" }, take: 12 }),
     prisma.purchase.findMany({ where: { companyId, kind: "OC", status: "PENDIENTE_AUTORIZACION" }, take: 12 }),
     prisma.technicalCase.findMany({ where: { serviceCompanyId: companyId, warrantyDecision: "NO_PROCEDENTE", commercialDecision: null }, take: 12 }),
-    prisma.payrollPeriod.findMany({ where: { companyId, status: "PRELIMINAR" }, take: 6 }),
+    prisma.payrollPeriod.findMany({
+      where: { companyId, status: { in: ["PENDIENTE_VALIDACION", "PRELIMINAR"] } },
+      take: 6,
+    }),
     prisma.commissionRun.findMany({ where: { companyId, status: "PRELIMINAR" }, take: 6 }),
     prisma.overtimeRequest.findMany({ where: { status: "PENDIENTE_CEO", collaborator: { companyId } }, include: { collaborator: { include: { user: true } } }, take: 12 }),
     prisma.technicalCase.count({ where: { serviceCompanyId: companyId, status: { notIn: CLOSED }, slaDueAt: { lt: new Date() } } }),

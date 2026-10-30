@@ -113,7 +113,9 @@ export default async function ColaboradorPage({
   const roleLabel = isRole(row.user.role) ? ROLE_LABEL[row.user.role] : row.user.role;
   const today = mexicoToday();
   const currentTime = formatTimeMexico(new Date()) ?? "09:00";
-  const hasClosedProcesses = row.payrollLines.some((line) => line.period.status === "AUTORIZADA");
+  const hasClosedProcesses = row.payrollLines.some(
+    (line) => line.period.status === "AUTORIZADA" || line.period.status === "CERRADA",
+  );
 
   const availableRoles = ROLES.filter((r) =>
     roleAvailableForCollaborator(r, session.activeCompanyCode),

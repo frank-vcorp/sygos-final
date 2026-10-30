@@ -24,6 +24,12 @@ import {
   normalizeWhatsAppPhone,
   suggestCollaboratorUsername,
 } from "./collaborator-credentials";
+import {
+  formatPayrollFolio,
+  isoWeekFromDate,
+  parsePayrollPeriodInput,
+  payrollStatusLabel,
+} from "./payroll";
 
 describe("personal y nómina", () => {
   it("cuenta solo lunes a viernes y reparte la prima del 25% por semana", () => {
@@ -132,6 +138,28 @@ describe("personal y nómina", () => {
     assert.equal(waUrl.startsWith("https://wa.me/525512345678?text="), true);
   });
 
+  it("genera folio automático de nómina NOM-<EMPRESA>-<AÑO>-S<SEMANA> y parsea semanas ISO", () => {
+    assert.equal(formatPayrollFolio("SYSTRON", 2026, 44), "NOM-SYSTRON-2026-S44");
+    assert.equal(formatPayrollFolio("SERVOMOTORES", 2026, 44), "NOM-SERVOMOTORES-2026-S44");
+    assert.equal(formatPayrollFolio("SYSTRON", 2026, 5), "NOM-SYSTRON-2026-S05");
+
+    const parsedWeek = parsePayrollPeriodInput("2026-W44");
+    assert.equal(parsedWeek.year, 2026);
+    assert.equal(parsedWeek.weekNumber, 44);
+    assert.equal(parsedWeek.periodStart, "2026-10-26");
+    assert.equal(parsedWeek.periodEnd, "2026-11-01");
+
+    const fromDate = isoWeekFromDate("2026-10-30");
+    assert.equal(fromDate.year, 2026);
+    assert.equal(fromDate.weekNumber, 44);
+    assert.equal(fromDate.isoWeekString, "2026-W44");
+
+    assert.equal(payrollStatusLabel("EN_PREPARACION"), "En preparación");
+    assert.equal(payrollStatusLabel("PENDIENTE_VALIDACION"), "Pendiente de validación");
+    assert.equal(payrollStatusLabel("EN_CORRECCION"), "En corrección");
+    assert.equal(payrollStatusLabel("CERRADA"), "Cerrada");
+  });
+
   it("flujos de base de datos para Personal > Colaboradores (CEO vs Coordinación)", async () => {
     const { mkdtempSync } = await import("node:fs");
     const { tmpdir } = await import("node:os");
@@ -169,6 +197,15 @@ describe("personal y nómina", () => {
       addLaborDocument,
     } = await import("./personnel");
     const { verifyPassword } = await import("./crypto");
+    const {
+      addPayrollDocument,
+      generateOrOpenWeeklyPayroll,
+      getPayrollPendingWarnings,
+      returnPayrollToCorrection,
+      sendPayrollToValidation,
+      updatePayrollLineAppliedAmounts,
+      validateAndClosePayroll,
+    } = await import("./payroll");
 
     const company = await prisma.company.create({ data: { code: "SYSTRON", name: "SYSTRON" } });
     const ceoUser = await prisma.user.create({
@@ -359,5 +396,101 @@ describe("personal y nómina", () => {
     assert.equal(afterCredsUser.username, "j.perez");
     assert.equal(afterCredsCollab.credentialPasswordPreview, "Clave-9988!xyz");
     assert.equal(verifyPassword("Clave-9988!xyz", afterCredsUser.passwordHash), true);
+
+    // Módulo de Nómina: folio automático, no duplicados, advertencias, ajuste calculado vs aplicado y flujo de estados
+    await requestOvertimeByHours(coordActor, integratedCollab.id, "2026-10-28", 2, "Soporte urgente");
+    const warningsBefore = await getPayrollPendingWarnings(company.id, "2026-10-26", "2026-11-01");
+    assert.equal(warningsBefore.some((w) => w.concept === "Horas extra" && w.collaboratorId === integratedCollab.id), true);
+
+    const firstGen = await generateOrOpenWeeklyPayroll(ceoActor, {
+      periodInput: "2026-W44",
+      paymentDate: "2026-10-30",
+    });
+    assert.equal(firstGen.existed, false);
+    assert.equal(firstGen.period.folio, "NOM-SYSTRON-2026-S44");
+
+    // Prevención de duplicados: segunda llamada devuelve existed = true con el mismo id y folio
+    const duplicateGen = await generateOrOpenWeeklyPayroll(coordActor, {
+      periodInput: "2026-W44",
+      paymentDate: "2026-10-30",
+    });
+    assert.equal(duplicateGen.existed, true);
+    assert.equal(duplicateGen.period.id, firstGen.period.id);
+
+    const periodRow = await prisma.payrollPeriod.findUniqueOrThrow({
+      where: { id: firstGen.period.id },
+      include: { lines: true },
+    });
+    // Aun generada por el CEO, inicia en EN_PREPARACION
+    assert.equal(periodRow.status, "EN_PREPARACION");
+    assert.equal(periodRow.lines.length, 2);
+
+    const juanLine = periodRow.lines.find((l) => l.collaboratorId === integratedCollab.id)!;
+    assert.equal(juanLine.calcSueldo, 18500);
+    assert.equal(juanLine.sueldo, 18500);
+    assert.equal(juanLine.calcBonos, 1200);
+    assert.equal(juanLine.bonos, 1200);
+
+    // Ajuste de Valor aplicado conservando Valor calculado
+    await updatePayrollLineAppliedAmounts(coordActor, periodRow.id, integratedCollab.id, {
+      sueldo: 18500,
+      horasExtra: 500,
+      bonos: 1500,
+      comision: 2000,
+      compensaciones: 0,
+      primaVacacional: 0,
+      otrosConceptos: 300,
+      descuentos: 200,
+    });
+    const juanLineAdjusted = await prisma.payrollLine.findUniqueOrThrow({ where: { id: juanLine.id } });
+    assert.equal(juanLineAdjusted.calcBonos, 1200);
+    assert.equal(juanLineAdjusted.bonos, 1500);
+    assert.equal(juanLineAdjusted.totalPercepciones, 22800);
+    assert.equal(juanLineAdjusted.totalPagar, 22600);
+
+    // Flujo de estados: En preparación -> Enviar a validación -> En corrección -> Enviar a validación -> Validar (Cerrada)
+    await sendPayrollToValidation(coordActor, periodRow.id, periodRow.version);
+    const inValidation = await prisma.payrollPeriod.findUniqueOrThrow({ where: { id: periodRow.id } });
+    assert.equal(inValidation.status, "PENDIENTE_VALIDACION");
+
+    // Coordinación no puede validar ni regresar a corrección
+    await assert.rejects(() => validateAndClosePayroll(coordActor, periodRow.id, inValidation.version), /CEO/);
+    await assert.rejects(() => returnPayrollToCorrection(coordActor, periodRow.id, inValidation.version), /CEO/);
+
+    // CEO regresa a corrección (conserva folio)
+    await returnPayrollToCorrection(ceoActor, periodRow.id, inValidation.version);
+    const inCorrection = await prisma.payrollPeriod.findUniqueOrThrow({ where: { id: periodRow.id } });
+    assert.equal(inCorrection.status, "EN_CORRECCION");
+    assert.equal(inCorrection.folio, "NOM-SYSTRON-2026-S44");
+
+    // Se envía nuevamente a validación y el CEO valida/cierra
+    await sendPayrollToValidation(coordActor, periodRow.id, inCorrection.version);
+    const inValidation2 = await prisma.payrollPeriod.findUniqueOrThrow({ where: { id: periodRow.id } });
+    await validateAndClosePayroll(ceoActor, periodRow.id, inValidation2.version);
+    const closedPeriod = await prisma.payrollPeriod.findUniqueOrThrow({ where: { id: periodRow.id } });
+    assert.equal(closedPeriod.status, "CERRADA");
+
+    // Una vez Cerrada, no permite ajustar importes
+    await assert.rejects(
+      () =>
+        updatePayrollLineAppliedAmounts(ceoActor, periodRow.id, integratedCollab.id, {
+          sueldo: 20000,
+          horasExtra: 0,
+          bonos: 0,
+          comision: 0,
+          compensaciones: 0,
+          primaVacacional: 0,
+          otrosConceptos: 0,
+          descuentos: 0,
+        }),
+      /En preparación o En corrección/,
+    );
+
+    const payrollDoc = await addPayrollDocument(coordActor, periodRow.id, "Comprobante dispersión S44", {
+      fileName: "dispersion.pdf",
+      mimeType: "application/pdf",
+      fileDataUrl: "data:application/pdf;base64,JVBERi0xLjQ=",
+    });
+    assert.equal(payrollDoc.title, "Comprobante dispersión S44");
   });
 });
