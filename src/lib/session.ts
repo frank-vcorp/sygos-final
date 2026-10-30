@@ -4,7 +4,6 @@ import { bindSandbox, prismaProd, sandboxFor } from "./db";
 import { hashToken, newSessionToken, verifyPassword } from "./crypto";
 import { SESSION_COOKIE } from "./session-cookie";
 import { isRole, type Role } from "./roles";
-import { needsExplicitCompany } from "./permissions";
 
 const SESSION_DAYS = 14;
 
@@ -24,6 +23,14 @@ export type AppSession = {
   impersonating: boolean;
 };
 
+export async function resolveDefaultCompanyId(preferredCompanyId?: string | null): Promise<string | null> {
+  if (preferredCompanyId) return preferredCompanyId;
+  const systron = await prismaProd.company.findUnique({ where: { code: "SYSTRON" }, select: { id: true } });
+  if (systron) return systron.id;
+  const first = await prismaProd.company.findFirst({ orderBy: { name: "asc" }, select: { id: true } });
+  return first?.id ?? null;
+}
+
 export async function startSession(username: string, password: string): Promise<AppSession | null> {
   const user = await prismaProd.user.findUnique({
     where: { username },
@@ -34,7 +41,7 @@ export async function startSession(username: string, password: string): Promise<
   if (!verifyPassword(password, user.passwordHash)) return null;
 
   const { token, tokenHash } = newSessionToken();
-  const activeCompanyId = needsExplicitCompany(user.role) ? null : user.companyId;
+  const activeCompanyId = await resolveDefaultCompanyId(user.companyId);
   const expiresAt = new Date(Date.now() + SESSION_DAYS * 24 * 60 * 60 * 1000);
   await prismaProd.session.create({
     data: { userId: user.id, tokenHash, activeCompanyId, expiresAt },
@@ -68,16 +75,31 @@ async function loadSession(token: string): Promise<AppSession | null> {
   if (!row || row.expiresAt.getTime() < Date.now() || !row.user.active) return null;
   if (!isRole(row.user.role)) return null;
 
-  const impersonated = row.user.role === "ADMINISTRADOR" && row.impersonatedUser?.active && isRole(row.impersonatedUser.role) && row.impersonatedUser.role !== "ADMINISTRADOR"
-    ? row.impersonatedUser
-    : null;
+  const impersonated =
+    row.user.role === "ADMINISTRADOR" &&
+    row.impersonatedUser?.active &&
+    isRole(row.impersonatedUser.role) &&
+    row.impersonatedUser.role !== "ADMINISTRADOR"
+      ? row.impersonatedUser
+      : null;
   const actor = impersonated ?? row.user;
   if (!isRole(actor.role)) return null;
 
+  let activeCompanyId = row.activeCompanyId;
+  if (!activeCompanyId) {
+    activeCompanyId = await resolveDefaultCompanyId(actor.companyId);
+    if (activeCompanyId) {
+      await prismaProd.session.update({
+        where: { id: row.id },
+        data: { activeCompanyId },
+      });
+    }
+  }
+
   let activeCompanyCode: string | null = null;
   let activeCompanyName: string | null = null;
-  if (row.activeCompanyId) {
-    const company = await prismaProd.company.findUnique({ where: { id: row.activeCompanyId } });
+  if (activeCompanyId) {
+    const company = await prismaProd.company.findUnique({ where: { id: activeCompanyId } });
     activeCompanyCode = company?.code ?? null;
     activeCompanyName = company?.name ?? null;
   }
@@ -92,7 +114,7 @@ async function loadSession(token: string): Promise<AppSession | null> {
     role: actor.role,
     homeCompanyId: actor.companyId,
     homeCompanyCode: actor.company?.code ?? null,
-    activeCompanyId: row.activeCompanyId,
+    activeCompanyId,
     activeCompanyCode,
     activeCompanyName,
     realUserId: row.user.id,
@@ -107,10 +129,25 @@ export async function requireSession(): Promise<AppSession> {
   return session;
 }
 
-export async function requireCompany(): Promise<AppSession & { activeCompanyId: string; activeCompanyCode: string; activeCompanyName: string }> {
+export async function requireCompany(): Promise<
+  AppSession & { activeCompanyId: string; activeCompanyCode: string; activeCompanyName: string }
+> {
   const session = await requireSession();
   if (!session.activeCompanyId || !session.activeCompanyCode || !session.activeCompanyName) {
-    redirect("/empresa");
+    const fallbackId = await resolveDefaultCompanyId(session.homeCompanyId);
+    if (fallbackId) {
+      await setActiveCompany(session.sessionId, fallbackId);
+      const company = await prismaProd.company.findUnique({ where: { id: fallbackId } });
+      if (company) {
+        return {
+          ...session,
+          activeCompanyId: company.id,
+          activeCompanyCode: company.code,
+          activeCompanyName: company.name,
+        };
+      }
+    }
+    redirect("/login");
   }
   return session as AppSession & {
     activeCompanyId: string;

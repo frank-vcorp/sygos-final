@@ -12,7 +12,7 @@ export default async function LoginPage() {
   const session = await getSession();
   if (session) {
     const { homePath } = await import("@/lib/home");
-    redirect(session.activeCompanyId ? homePath(session.role, session.activeCompanyCode) : "/empresa");
+    redirect(homePath(session.role, session.activeCompanyCode));
   }
   const flash = await takeFlash();
   return (

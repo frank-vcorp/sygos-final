@@ -28,9 +28,6 @@ export const COORDINATION_NAV_GROUPS: NavGroupDef[] = [
     links: [
       { href: "/nomina", label: "Nómina", show: showCoord },
       { href: "/personal", label: "Colaboradores", show: showCoord },
-      { href: "/personal/asistencia", label: "Asistencia", show: showCoord },
-      { href: "/personal/asistencia?vista=vacaciones", label: "Vacaciones", show: showCoord },
-      { href: "/personal/horas", label: "Tiempo extra", show: showCoord },
     ],
   },
   {

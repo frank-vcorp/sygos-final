@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { redirect } from "next/navigation";
-import { logoutAction, switchCompanyAction, viewAsAction } from "@/app/auth-actions";
+import { logoutAction, viewAsAction } from "@/app/auth-actions";
+import { CompanySwitcher } from "@/components/company-switcher";
 import { FlashBanner } from "@/components/flash-banner";
 import { ErpShell } from "@/components/erp-shell";
 import { SideNav } from "@/components/side-nav";
@@ -205,22 +206,11 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
           <div className="flex min-w-0 flex-1 items-center gap-2.5">
             <span className="hidden text-[11px] font-medium text-slate-400 xl:inline">Empresa</span>
             {companies.length > 1 ? (
-              <form action={switchCompanyAction} className="flex min-w-0 items-center gap-1.5 rounded-full border border-slate-200/90 bg-slate-50/70 py-0.5 pl-2.5 pr-1">
-                <span className={`h-2 w-2 shrink-0 rounded-full ${companyDotClass}`} aria-hidden />
-                <select
-                  key={session.activeCompanyId ?? "none"}
-                  name="companyId"
-                  defaultValue={session.activeCompanyId ?? ""}
-                  className="min-h-6 min-w-0 max-w-48 rounded-md border-0 bg-transparent pr-1 text-xs font-semibold text-slate-800 focus:outline-none"
-                  aria-label="Empresa activa"
-                >
-                  <option value="" disabled>Selecciona empresa</option>
-                  {companies.map((company) => (
-                    <option key={company.id} value={company.id}>{company.name}</option>
-                  ))}
-                </select>
-                <button className="min-h-6 rounded-full bg-white px-2.5 py-0.5 text-[11px] font-semibold text-slate-600 shadow-2xs ring-1 ring-slate-200/80 hover:bg-slate-100 hover:text-slate-900" type="submit">Cambiar</button>
-              </form>
+              <CompanySwitcher
+                activeCompanyId={session.activeCompanyId}
+                companyDotClass={companyDotClass}
+                companies={companies.map((c) => ({ id: c.id, name: c.name }))}
+              />
             ) : (
               <strong className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-xs font-semibold ${companyBadgeToneClass}`}>
                 <span className={`h-2 w-2 rounded-full ${companyDotClass}`} aria-hidden />

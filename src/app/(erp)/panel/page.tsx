@@ -855,7 +855,7 @@ async function CeoExecutive({ companyId, name }: { companyId: string; name: stri
             {
               subtitle: "Horas extra",
               empty: "Nada espera autorización final.",
-              bandejaHref: "/personal/horas",
+              bandejaHref: "/personal",
               rows: overtime.map((row) => ({
                 key: `ot-${row.id}`,
                 href: `/personal/colaboradores/${row.collaboratorId}?tab=solicitudes&subtab=horas`,
@@ -866,7 +866,7 @@ async function CeoExecutive({ companyId, name }: { companyId: string; name: stri
             {
               subtitle: "Vacaciones",
               empty: "Sin solicitudes pendientes.",
-              bandejaHref: "/personal/asistencia?vista=vacaciones",
+              bandejaHref: "/personal",
               rows: vacations.map((row) => ({
                 key: `vac-${row.id}`,
                 href: `/personal/colaboradores/${row.collaboratorId}?tab=solicitudes&subtab=vacaciones`,
@@ -919,7 +919,7 @@ async function Executive({ companyId, name }: { companyId: string; name: string 
         <Block title="Garantías no procedentes" empty="Sin decisión comercial pendiente." bandejaHref="/operacion" rows={warranties.map((row) => ({ href: `/operacion/${row.id}`, label: row.folio, detail: "Decidir comercialmente" }))} />
         <Block title="Nómina" empty="Sin preliminar." bandejaHref="/nomina" rows={payrolls.map((row) => ({ href: `/nomina/${row.id}`, label: row.folio, detail: "Autorizar" }))} />
         <Block title="Comisiones" empty="Sin preliminar." bandejaHref="/comisiones" rows={commissions.map((row) => ({ href: `/comisiones/${row.id}`, label: row.month, detail: "Validar" }))} />
-        <Block title="Horas extra" empty="Nada espera autorización final." bandejaHref="/personal/horas" rows={overtime.map((row) => ({ href: "/personal/horas", label: row.collaborator.user.name, detail: `${row.hours} h` }))} />
+        <Block title="Horas extra" empty="Nada espera autorización final." bandejaHref="/personal" rows={overtime.map((row) => ({ href: `/personal/colaboradores/${row.collaboratorId}?tab=solicitudes&subtab=horas`, label: row.collaborator.user.name, detail: `${row.hours} h` }))} />
         <section className="grid gap-3 sm:grid-cols-2">
           <KpiCard label="Operación vencida" value={String(overdue)} href="/operacion" />
           <KpiCard label="Producción técnica" value="Ver reporte" href="/produccion" />

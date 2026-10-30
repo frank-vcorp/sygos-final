@@ -23,9 +23,6 @@ export const CEO_NAV_GROUPS: NavGroupDef[] = [
     links: [
       { href: "/nomina", label: "Nómina", show: showCeo },
       { href: "/personal", label: "Colaboradores", show: showCeo },
-      { href: "/personal/asistencia", label: "Asistencia", show: showCeo },
-      { href: "/personal/asistencia?vista=vacaciones", label: "Vacaciones", show: showCeo },
-      { href: "/personal/horas", label: "Tiempo extra", show: showCeo },
     ],
   },
   {

@@ -6,7 +6,7 @@ import { verifyPassword } from "@/lib/crypto";
 import { homePath } from "@/lib/home";
 import { needsExplicitCompany } from "@/lib/permissions";
 import { isRole } from "@/lib/roles";
-import { endSession, requireSession, setActiveCompany, startSession } from "@/lib/session";
+import { endSession, requireSession, resolveDefaultCompanyId, setActiveCompany, startSession } from "@/lib/session";
 
 export async function loginAction(formData: FormData) {
   "use server";
@@ -21,7 +21,6 @@ export async function loginAction(formData: FormData) {
     await setFlash({ tone: "error", message: "Usuario o contraseña incorrectos, o la cuenta está inactiva." });
     redirect("/login");
   }
-  if (!session.activeCompanyId) redirect("/empresa");
   redirect(homePath(session.role, session.activeCompanyCode));
 }
 
@@ -36,21 +35,22 @@ export async function switchCompanyAction(formData: FormData) {
   const session = await requireSession();
   const companyId = optionalText(formData.get("companyId"));
   if (!companyId) {
-    await setFlash({ tone: "error", message: "Selecciona una empresa." });
-    redirect("/empresa");
+    redirect(homePath(session.role, session.activeCompanyCode));
   }
   const company = await prismaProd.company.findUnique({ where: { id: companyId } });
   if (!company) {
-    await setFlash({ tone: "error", message: "La empresa no existe." });
-    redirect("/empresa");
+    redirect(homePath(session.role, session.activeCompanyCode));
   }
   if (session.homeCompanyId && session.homeCompanyId !== company.id) {
     await setFlash({ tone: "error", message: "Tu usuario opera en una sola empresa." });
     redirect(homePath(session.role, session.activeCompanyCode));
   }
   await setActiveCompany(session.sessionId, company.id);
-  const next = optionalText(formData.get("next")) ?? homePath(session.role, company.code);
-  redirect(next.startsWith("/") ? next : homePath(session.role, company.code));
+  const next = optionalText(formData.get("next"));
+  if (next && next.startsWith("/") && next !== "/empresa") {
+    redirect(next);
+  }
+  redirect(homePath(session.role, company.code));
 }
 
 export async function viewAsAction(formData: FormData) {
@@ -62,28 +62,35 @@ export async function viewAsAction(formData: FormData) {
   }
   const userId = optionalText(formData.get("userId"));
   if (!userId) {
+    const activeCompanyId = session.activeCompanyId ?? (await resolveDefaultCompanyId(null));
     await prismaProd.session.update({
       where: { id: session.sessionId },
-      data: { impersonatedUserId: null },
+      data: { impersonatedUserId: null, activeCompanyId },
     });
-    redirect(homePath(session.role, session.activeCompanyCode));
+    const company = activeCompanyId
+      ? await prismaProd.company.findUnique({ where: { id: activeCompanyId }, select: { code: true } })
+      : null;
+    redirect(homePath("ADMINISTRADOR", company?.code ?? session.activeCompanyCode));
   }
   const target = await prismaProd.user.findUnique({ where: { id: userId } });
   if (!target || !target.active || !isRole(target.role) || target.role === "ADMINISTRADOR") {
     await setFlash({ tone: "error", message: "Esa cuenta no se puede usar para ver el sistema." });
     redirect(homePath(session.role, session.activeCompanyCode));
   }
+  const nextActiveCompanyId = needsExplicitCompany(target.role)
+    ? (session.activeCompanyId ?? (await resolveDefaultCompanyId(null)))
+    : (target.companyId ?? session.activeCompanyId ?? (await resolveDefaultCompanyId(null)));
   await prismaProd.session.update({
     where: { id: session.sessionId },
     data: {
       impersonatedUserId: target.id,
-      activeCompanyId: needsExplicitCompany(target.role) ? null : target.companyId,
+      activeCompanyId: nextActiveCompanyId,
     },
   });
-  const company = target.companyId
-    ? await prismaProd.company.findUnique({ where: { id: target.companyId }, select: { code: true } })
+  const company = nextActiveCompanyId
+    ? await prismaProd.company.findUnique({ where: { id: nextActiveCompanyId }, select: { code: true } })
     : null;
-  redirect(needsExplicitCompany(target.role) ? "/empresa" : homePath(target.role, company?.code ?? null));
+  redirect(homePath(target.role, company?.code ?? null));
 }
 
 export async function changeOwnPasswordAction(formData: FormData) {

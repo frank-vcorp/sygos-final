@@ -7,6 +7,7 @@ import { parseMoneyInput } from "@/lib/money";
 import { recordHistory } from "@/lib/history";
 import { can, canSeeUser } from "@/lib/permissions";
 import {
+  companiesForRole,
   DEFAULT_MONTHLY_PURCHASE,
   DEFAULT_PURCHASE_LIMIT,
   isPurchaseManager,
@@ -14,10 +15,10 @@ import {
   roleFitsCompany,
   type Role,
 } from "@/lib/roles";
-import { requireSession } from "@/lib/session";
+import { requireCompany } from "@/lib/session";
 
 async function guard(admins = false) {
-  const session = await requireSession();
+  const session = await requireCompany();
   if (!can(session.role, admins ? "user.manageAdmins" : "user.manage")) {
     await setFlash({ tone: "error", message: "No tienes permiso para usuarios." });
     redirect("/inicio");
@@ -34,8 +35,12 @@ export async function createUserAction(formData: FormData) {
     if (roleRaw === "ADMINISTRADOR" && !can(session.role, "user.manageAdmins")) {
       throw new Error("No puedes crear cuentas de Administrador.");
     }
-    const companyCode = optionalText(formData.get("companyCode"));
-    if (!roleFitsCompany(roleRaw, companyCode)) throw new Error("Ese rol no corresponde a la empresa elegida.");
+    const explicitCode = optionalText(formData.get("companyCode"));
+    const companyCode =
+      companiesForRole(roleRaw) === "both"
+        ? null
+        : (explicitCode ?? session.activeCompanyCode);
+    if (!roleFitsCompany(roleRaw, companyCode)) throw new Error("Ese rol no corresponde a la empresa activa.");
     const company = companyCode ? await prisma.company.findUnique({ where: { code: companyCode } }) : null;
     if (companyCode && !company) throw new Error("La empresa no existe.");
     const username = requiredText(formData.get("username"), "Usuario");

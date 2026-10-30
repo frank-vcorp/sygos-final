@@ -86,6 +86,7 @@ export default async function ColaboradorPage({
   const bosses = await prisma.user.findMany({
     where: {
       active: true,
+      OR: [{ companyId: session.activeCompanyId }, { companyId: null }],
       role: {
         in: [
           "CEO",
