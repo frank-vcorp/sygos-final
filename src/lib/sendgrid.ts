@@ -211,9 +211,9 @@ export async function getSendGridSmtpConfig(
   };
 }
 
-const SMTP_CONNECTION_TIMEOUT_MS = 8000;
-const SMTP_GREETING_TIMEOUT_MS = 8000;
-const SMTP_SOCKET_TIMEOUT_MS = 12000;
+const SMTP_CONNECTION_TIMEOUT_MS = 10000;
+const SMTP_GREETING_TIMEOUT_MS = 10000;
+const SMTP_SOCKET_TIMEOUT_MS = 10000;
 
 function createSmtpTransporter(config: {
   host: string;
@@ -286,7 +286,7 @@ export async function verifySendGrid(
     };
   } catch (smtpError) {
     const smtpMsg = smtpError instanceof Error ? smtpError.message : String(smtpError);
-    if (host === DEFAULT_SMTP_HOST && cleanSecret.startsWith("SG.")) {
+    if (isSendGridHost(host) && cleanSecret.startsWith("SG.")) {
       try {
         const response = await fetch("https://api.sendgrid.com/v3/scopes", {
           headers: { Authorization: `Bearer ${cleanSecret}` },
@@ -294,15 +294,20 @@ export async function verifySendGrid(
         if (response.ok) {
           return {
             ok: true,
-            message: "La API Key de SendGrid es válida. El remitente debe estar verificado en SendGrid.",
+            message: `SMTP ${host}:${port} no conectó (${smtpMsg}). La API Key de SendGrid sí es válida. El remitente tiene que estar verificado en SendGrid.`,
           };
         }
+        const detail = await response.text();
         return {
           ok: false,
-          message: `SendGrid rechazó la API Key (${response.status}). Detalle SMTP: ${smtpMsg}`,
+          message: `SMTP ${host}:${port}: ${smtpMsg}. ${parseSendGridErrorBody(response.status, detail)}`,
         };
-      } catch {
-        // Fall through to SMTP error message
+      } catch (apiError) {
+        const apiMsg = apiError instanceof Error ? apiError.message : String(apiError);
+        return {
+          ok: false,
+          message: `SMTP ${host}:${port}: ${smtpMsg}. SendGrid API no respondió: ${apiMsg}`,
+        };
       }
     }
     return {

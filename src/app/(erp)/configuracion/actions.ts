@@ -235,15 +235,20 @@ export async function verifySendgridAction(formData: FormData) {
   const port = formData.get("port") ? normalizeSmtpPort(formData.get("port")) : stored.port;
   const username = optionalText(formData.get("username")) || stored.username || DEFAULT_SMTP_USERNAME;
 
+  let result: { ok: boolean; message: string };
   try {
-    const result = await verifySendGrid(secret, { host, port, username });
-    await setFlash({ tone: result.ok ? "ok" : "error", message: result.message });
-    redirectWithNotice(back, result.ok ? "ok" : "error", result.message);
+    result = await verifySendGrid(secret, { host, port, username });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "No se pudo verificar SendGrid SMTP.";
-    await setFlash({ tone: "error", message });
-    redirectWithNotice(back, "error", message);
+    if (isRedirect(error)) throw error;
+    result = {
+      ok: false,
+      message: error instanceof Error && !isRedirectMessage(error.message)
+        ? error.message
+        : "No se pudo verificar SendGrid SMTP.",
+    };
   }
+  await setFlash({ tone: result.ok ? "ok" : "error", message: result.message });
+  redirectWithNotice(back, result.ok ? "ok" : "error", result.message);
 }
 
 export async function sendTestEmailAction(formData: FormData) {
@@ -280,8 +285,9 @@ export async function sendTestEmailAction(formData: FormData) {
       "Si recibes este mensaje, la integración está funcionando.",
     ].join("\n");
 
+  let result: { ok: boolean; message: string };
   try {
-    const result = await sendSystemEmail({
+    result = await sendSystemEmail({
       companyId: session.activeCompanyId,
       to: toEmail,
       subject,
@@ -289,13 +295,17 @@ export async function sendTestEmailAction(formData: FormData) {
       ignoreEnabled: true,
       overrides: { host, port, username, secret, fromEmail, fromName },
     });
-    await setFlash({ tone: result.ok ? "ok" : "error", message: result.message });
-    redirectWithNotice(back, result.ok ? "ok" : "error", result.message);
   } catch (error) {
-    const message = error instanceof Error ? error.message : "No se pudo enviar el correo de prueba.";
-    await setFlash({ tone: "error", message });
-    redirectWithNotice(back, "error", message);
+    if (isRedirect(error)) throw error;
+    result = {
+      ok: false,
+      message: error instanceof Error && !isRedirectMessage(error.message)
+        ? error.message
+        : "No se pudo enviar el correo de prueba.",
+    };
   }
+  await setFlash({ tone: result.ok ? "ok" : "error", message: result.message });
+  redirectWithNotice(back, result.ok ? "ok" : "error", result.message);
 }
 
 export async function toggleInventoryAction(formData: FormData) {
@@ -364,5 +374,13 @@ function optionalPercent(value: FormDataEntryValue | null) {
 }
 
 function isRedirect(error: unknown) {
-  return typeof error === "object" && error !== null && "digest" in error && String((error as { digest?: string }).digest).startsWith("NEXT_REDIRECT");
+  if (typeof error === "object" && error !== null && "digest" in error) {
+    if (String((error as { digest?: string }).digest).startsWith("NEXT_REDIRECT")) return true;
+  }
+  if (error instanceof Error && isRedirectMessage(error.message)) return true;
+  return false;
+}
+
+function isRedirectMessage(message: string) {
+  return message === "NEXT_REDIRECT" || message.startsWith("NEXT_REDIRECT;");
 }

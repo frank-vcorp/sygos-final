@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { decryptSecret, encryptSecret, secretHint } from "./crypto";
+import { sanitizeIntegrationNotice } from "./integration-notice";
 import { facturapiMode, invoicePayload } from "./facturapi";
 import {
   DEFAULT_SMTP_HOST,
@@ -111,6 +112,17 @@ describe("integraciones", () => {
     assert.match(unverified, /verified Sender Identity/);
     assert.equal(isSmtpTransportError("connect ETIMEDOUT 167.89.118.52:587"), true);
     assert.equal(isSmtpTransportError("Invalid login: 535 Authentication failed"), false);
+  });
+
+  it("no muestra el digest NEXT_REDIRECT y decodifica el aviso de SendGrid", () => {
+    const hidden = sanitizeIntegrationNotice("NEXT_REDIRECT");
+    assert.equal(hidden.includes("NEXT_REDIRECT"), false);
+    assert.match(hidden, /Vuelve a intentar/);
+    const encoded = sanitizeIntegrationNotice(
+      "SMTP%20smtp.sendgrid.net%3A587%20fall%C3%B3%3A%20connect%20ETIMEDOUT",
+    );
+    assert.equal(encoded, "SMTP smtp.sendgrid.net:587 falló: connect ETIMEDOUT");
+    assert.equal(sanitizeIntegrationNotice("Error SMTP 535 Authentication failed"), "Error SMTP 535 Authentication failed");
   });
 
   it("normaliza teléfonos, JIDs y enlaces de respaldo para WhatsApp (Baileys)", () => {

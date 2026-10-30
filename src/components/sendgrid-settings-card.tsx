@@ -4,13 +4,14 @@ import {
   verifySendgridAction,
 } from "@/app/(erp)/configuracion/actions";
 import { Alert, Badge, Button, Card, controlClass, Field } from "@/components/ui";
+import { sanitizeIntegrationNotice } from "@/lib/integration-notice";
 import type { SendGridSmtpConfig } from "@/lib/sendgrid";
 
 export function readIntegrationNotice(params: { sg?: string; sgm?: string }): { tone: "ok" | "error"; message: string } | null {
-  if ((params.sg === "ok" || params.sg === "error") && params.sgm?.trim()) {
-    return { tone: params.sg, message: params.sgm.trim() };
-  }
-  return null;
+  if (params.sg !== "ok" && params.sg !== "error") return null;
+  const message = sanitizeIntegrationNotice(params.sgm ?? "");
+  if (!message) return null;
+  return { tone: params.sg, message };
 }
 
 export function SendGridSettingsCard({

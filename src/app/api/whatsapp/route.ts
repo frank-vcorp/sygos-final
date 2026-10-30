@@ -81,8 +81,17 @@ export async function POST(request: Request) {
     const fresh = body.action === "fresh" || body.fresh === true;
     return NextResponse.json(await linkWhatsApp(fresh));
   } catch (error) {
+    if (
+      typeof error === "object" &&
+      error !== null &&
+      "digest" in error &&
+      String((error as { digest?: string }).digest).startsWith("NEXT_REDIRECT")
+    ) {
+      throw error;
+    }
+    const message = error instanceof Error ? error.message : "WhatsApp no respondió.";
     return NextResponse.json(
-      { message: error instanceof Error ? error.message : "WhatsApp no respondió." },
+      { message: message === "NEXT_REDIRECT" ? "WhatsApp no respondió." : message },
       { status: 400 },
     );
   }
