@@ -772,7 +772,7 @@ async function Coordination({ companyId, code, vista }: { companyId: string; cod
 }
 
 async function CeoExecutive({ companyId, name }: { companyId: string; name: string }) {
-  const [quotes, payrolls, overtime, vacations, commissions] = await Promise.all([
+  const [quotes, payrolls, overtime, vacations, leavePermissions, pendingJustifications, compensationRequests, commissions] = await Promise.all([
     prisma.quote.findMany({ where: { companyId, status: "PENDIENTE_COTIZAR" }, take: 12 }),
     prisma.payrollPeriod.findMany({ where: { companyId, status: "PRELIMINAR" }, take: 6 }),
     prisma.overtimeRequest.findMany({
@@ -785,8 +785,53 @@ async function CeoExecutive({ companyId, name }: { companyId: string; name: stri
       include: { collaborator: { include: { user: true } } },
       take: 12,
     }),
+    prisma.leavePermissionRequest.findMany({
+      where: { status: "PENDIENTE", collaborator: { companyId } },
+      include: { collaborator: { include: { user: true } } },
+      take: 12,
+    }),
+    prisma.attendanceDay.findMany({
+      where: { justificationStatus: "PENDIENTE_VALIDACION_CEO", collaborator: { companyId } },
+      include: { collaborator: { include: { user: true } } },
+      take: 12,
+    }),
+    prisma.compensationRequest.findMany({
+      where: { status: "PENDIENTE", collaborator: { companyId } },
+      include: { collaborator: { include: { user: true } } },
+      take: 12,
+    }),
     prisma.commissionRun.findMany({ where: { companyId, status: "PRELIMINAR" }, take: 6 }),
   ]);
+
+  const permisoRows: PanelRow[] = [
+    ...leavePermissions.map((row) => ({
+      key: `perm-${row.id}`,
+      href: `/personal/colaboradores/${row.collaboratorId}?tab=solicitudes&subtab=permisos`,
+      label: row.collaborator.user.name,
+      detail: `${row.startDate === row.endDate ? row.startDate : `${row.startDate} – ${row.endDate}`} · ${row.reason}`,
+    })),
+    ...pendingJustifications.map((row) => ({
+      key: `just-${row.id}`,
+      href: `/personal/colaboradores/${row.collaboratorId}?tab=asistencia`,
+      label: row.collaborator.user.name,
+      detail: `${row.workDate} · Justificación de ${row.status === "RETARDO" ? "retardo" : "falta"}`,
+    })),
+  ];
+
+  const compensacionRows: PanelRow[] = [
+    ...compensationRequests.map((row) => ({
+      key: `comp-${row.id}`,
+      href: `/personal/colaboradores/${row.collaboratorId}?tab=solicitudes&subtab=compensaciones`,
+      label: row.collaborator.user.name,
+      detail: `${row.concept} · ${money(row.requestedAmount)}`,
+    })),
+    ...commissions.map((row) => ({
+      key: `comm-${row.id}`,
+      href: `/comisiones/${row.id}`,
+      label: row.month,
+      detail: "Validar corrida de comisiones",
+    })),
+  ];
 
   return (
     <>
@@ -812,7 +857,8 @@ async function CeoExecutive({ companyId, name }: { companyId: string; name: stri
               empty: "Nada espera autorización final.",
               bandejaHref: "/personal/horas",
               rows: overtime.map((row) => ({
-                href: "/personal/horas",
+                key: `ot-${row.id}`,
+                href: `/personal/colaboradores/${row.collaboratorId}?tab=solicitudes&subtab=horas`,
                 label: row.collaborator.user.name,
                 detail: `${row.hours} h`,
               })),
@@ -822,16 +868,23 @@ async function CeoExecutive({ companyId, name }: { companyId: string; name: stri
               empty: "Sin solicitudes pendientes.",
               bandejaHref: "/personal/asistencia?vista=vacaciones",
               rows: vacations.map((row) => ({
-                href: `/personal/${row.collaboratorId}`,
+                key: `vac-${row.id}`,
+                href: `/personal/colaboradores/${row.collaboratorId}?tab=solicitudes&subtab=vacaciones`,
                 label: row.collaborator.user.name,
                 detail: `${row.startDate} – ${row.endDate}`,
               })),
             },
             {
+              subtitle: "Permisos",
+              empty: "Sin permisos ni justificaciones pendientes.",
+              bandejaHref: "/personal",
+              rows: permisoRows,
+            },
+            {
               subtitle: "Compensaciones",
-              empty: "Sin preliminar.",
-              bandejaHref: "/comisiones",
-              rows: commissions.map((row) => ({ href: `/comisiones/${row.id}`, label: row.month, detail: "Validar" })),
+              empty: "Sin compensaciones pendientes.",
+              bandejaHref: "/personal",
+              rows: compensacionRows,
             },
           ]}
         />

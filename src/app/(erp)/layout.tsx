@@ -68,7 +68,7 @@ const CREATE: Partial<Record<string, { href: string; show: NavLink["showCreate"]
   "/facturacion": { href: "/facturacion/nuevo", show: (role, code) => can(role, "invoice.issue", code) },
   "/pagos": { href: "/pagos?nuevo=1", show: (role, code) => can(role, "payment.register", code) },
   "/compras": { href: "/compras/nueva", show: (role, code) => can(role, "purchase.operate", code) },
-  "/personal": { href: "/personal/nuevo", show: (role) => can(role, "personnel.manage") },
+  "/personal": { href: "/personal?nuevo=1", show: (role) => can(role, "personnel.authorize") },
   "/servicios/activos": { href: "/servicios/nuevo", show: (role, code) => can(role, "attention.create", code) },
   "/equipos": { href: "/equipos/nuevo", show: (role, code) => can(role, "equi.create", code) },
   "/motores": { href: "/motores/nuevo", show: (role, code) => can(role, "mot.create", code) },

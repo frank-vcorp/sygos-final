@@ -86,6 +86,14 @@ model User {
   technicalCases TechnicalCase[]
   collaborator   Collaborator?
   directed       Collaborator[] @relation("CollaboratorBoss")
+  vacationsRequested      VacationRequest[]       @relation("VacationRequestedBy")
+  vacationsDecided        VacationRequest[]       @relation("VacationDecidedBy")
+  overtimeRequested       OvertimeRequest[]       @relation("OvertimeRequestedBy")
+  overtimeAuthorized      OvertimeRequest[]       @relation("OvertimeAuthorizedBy")
+  compensationsRequested  CompensationRequest[]   @relation("CompensationRequestedBy")
+  compensationsDecided    CompensationRequest[]   @relation("CompensationDecidedBy")
+  leavePermissionsRequested LeavePermissionRequest[] @relation("LeavePermissionRequestedBy")
+  leavePermissionsDecided LeavePermissionRequest[] @relation("LeavePermissionDecidedBy")
 }
 
 model Session {
@@ -1028,6 +1036,21 @@ model Collaborator {
   hireKind            String
   status              String
   hiredAt             DateTime
+  birthDate           String?
+  phone               String?
+  email               String?
+  address             String?
+  emergencyContact    String?
+  jobTitle            String?
+  workSchedule        String   @default("Lunes a viernes 09:00 a 18:00")
+  attendanceMode      String   @default("AUTOMATICA")
+  commissionEnabled   Boolean  @default(false)
+  commissionTiersJson String   @default("[]")
+  activitiesEnabled   Boolean  @default(false)
+  activitiesJson      String   @default("[]")
+  bonusesEnabled      Boolean  @default(false)
+  punctualityBonusEnabled Boolean @default(false)
+  productivityBonusEnabled Boolean @default(false)
   vacationBalance     Float    @default(0)
   dailyStamped        Float    @default(0)
   dailyCash           Float    @default(0)
@@ -1049,11 +1072,13 @@ model Collaborator {
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
 
-  vacations   VacationRequest[]
-  attendance  AttendanceDay[]
-  overtime    OvertimeRequest[]
-  documents   LaborDocument[]
-  payrollLines PayrollLine[]
+  vacations         VacationRequest[]
+  attendance        AttendanceDay[]
+  overtime          OvertimeRequest[]
+  compensations     CompensationRequest[]
+  leavePermissions  LeavePermissionRequest[]
+  documents         LaborDocument[]
+  payrollLines      PayrollLine[]
 
   @@index([companyId, status])
 }
@@ -1064,8 +1089,14 @@ model VacationRequest {
   collaborator      Collaborator @relation(fields: [collaboratorId], references: [id])
   startDate         String
   endDate           String
+  days              Int          @default(0)
+  comment           String?
   status            String
   requestedByUserId String
+  requestedBy       User?        @relation("VacationRequestedBy", fields: [requestedByUserId], references: [id])
+  decidedByUserId   String?
+  decidedBy         User?        @relation("VacationDecidedBy", fields: [decidedByUserId], references: [id])
+  decidedAt         DateTime?
   version           Int          @default(1)
   createdAt         DateTime     @default(now())
 
@@ -1083,49 +1114,100 @@ model VacationPrima {
 }
 
 model AttendanceDay {
-  id             String       @id @default(cuid())
-  collaboratorId String
-  collaborator   Collaborator @relation(fields: [collaboratorId], references: [id])
-  workDate       String
-  entryAt        DateTime?
-  exitAt         DateTime?
-  status         String
-  justified      Boolean      @default(false)
-  paidLeave      Boolean      @default(false)
-  note           String?
-  version        Int          @default(1)
+  id                  String       @id @default(cuid())
+  collaboratorId      String
+  collaborator        Collaborator @relation(fields: [collaboratorId], references: [id])
+  workDate            String
+  entryAt             DateTime?
+  exitAt              DateTime?
+  status              String
+  justified           Boolean      @default(false)
+  justificationStatus String       @default("NO_JUSTIFICADA")
+  paidLeave           Boolean      @default(false)
+  note                String?
+  decidedByUserId     String?
+  decidedAt           DateTime?
+  version             Int          @default(1)
 
   @@unique([collaboratorId, workDate])
 }
 
 model OvertimeRequest {
+  id                 String       @id @default(cuid())
+  collaboratorId     String
+  collaborator       Collaborator @relation(fields: [collaboratorId], references: [id])
+  workDate           String
+  startedAt          String
+  endedAt            String
+  hours              Float
+  authorizedHours    Float?
+  reason             String
+  status             String
+  requestedByUserId  String
+  requestedBy        User?        @relation("OvertimeRequestedBy", fields: [requestedByUserId], references: [id])
+  authorizedByUserId String?
+  authorizedBy       User?        @relation("OvertimeAuthorizedBy", fields: [authorizedByUserId], references: [id])
+  authorizedAt       DateTime?
+  frozenRate         Float?
+  doubleHours        Float        @default(0)
+  tripleHours        Float        @default(0)
+  amountStamped      Float        @default(0)
+  amountCash         Float        @default(0)
+  payrollPeriodId    String?
+  version            Int          @default(1)
+  createdAt          DateTime     @default(now())
+}
+
+model CompensationRequest {
   id                String       @id @default(cuid())
   collaboratorId    String
   collaborator      Collaborator @relation(fields: [collaboratorId], references: [id])
-  workDate          String
-  startedAt         String
-  endedAt           String
-  hours             Float
-  reason            String
-  status            String
+  concept           String
+  requestedAmount   Float
+  authorizedAmount  Float?
+  comment           String?
+  status            String       @default("PENDIENTE")
   requestedByUserId String
-  frozenRate        Float?
-  doubleHours       Float        @default(0)
-  tripleHours       Float        @default(0)
-  amountStamped     Float        @default(0)
-  amountCash        Float        @default(0)
-  payrollPeriodId   String?
+  requestedBy       User?        @relation("CompensationRequestedBy", fields: [requestedByUserId], references: [id])
+  decidedByUserId   String?
+  decidedBy         User?        @relation("CompensationDecidedBy", fields: [decidedByUserId], references: [id])
+  decidedAt         DateTime?
   version           Int          @default(1)
   createdAt         DateTime     @default(now())
+
+  @@index([collaboratorId, status])
+}
+
+model LeavePermissionRequest {
+  id                String       @id @default(cuid())
+  collaboratorId    String
+  collaborator      Collaborator @relation(fields: [collaboratorId], references: [id])
+  startDate         String
+  endDate           String
+  reason            String
+  comment           String?
+  status            String       @default("PENDIENTE")
+  requestedByUserId String
+  requestedBy       User?        @relation("LeavePermissionRequestedBy", fields: [requestedByUserId], references: [id])
+  decidedByUserId   String?
+  decidedBy         User?        @relation("LeavePermissionDecidedBy", fields: [decidedByUserId], references: [id])
+  decidedAt         DateTime?
+  version           Int          @default(1)
+  createdAt         DateTime     @default(now())
+
+  @@index([collaboratorId, status])
 }
 
 model LaborDocument {
   id             String       @id @default(cuid())
   collaboratorId String
   collaborator   Collaborator @relation(fields: [collaboratorId], references: [id])
-  kind           String
+  kind           String       @default("GENERAL")
   title          String
-  note           String
+  note           String       @default("")
+  fileName       String?
+  mimeType       String?
+  fileDataUrl    String?
   occurredOn     String?
   createdAt      DateTime     @default(now())
 }

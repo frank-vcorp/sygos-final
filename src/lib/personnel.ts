@@ -105,6 +105,83 @@ export function bracketRate(amount: number, brackets: Array<{ upTo: number | nul
   return ordered.find((row) => row.upTo == null || amount <= row.upTo)?.rate ?? 0;
 }
 
+export type CommissionTier = {
+  targetAmount: number;
+  kind: "PORCENTAJE" | "MONTO";
+  value: number;
+};
+
+export type CollaboratorActivity = {
+  name: string;
+  targetCount: number;
+};
+
+export function normalizeCommissionTiers(input: CommissionTier[]): CommissionTier[] {
+  return input
+    .map((tier) => ({
+      targetAmount: roundMoney(Math.max(0, Number(tier.targetAmount) || 0)),
+      kind: (tier.kind === "MONTO" ? "MONTO" : "PORCENTAJE") as "PORCENTAJE" | "MONTO",
+      value: roundMoney(Math.max(0, Number(tier.value) || 0)),
+    }))
+    .sort((a, b) => a.targetAmount - b.targetAmount);
+}
+
+export function parseCommissionTiers(json: string | null | undefined): CommissionTier[] {
+  if (!json) return [];
+  try {
+    const parsed = JSON.parse(json);
+    if (!Array.isArray(parsed)) return [];
+    return normalizeCommissionTiers(parsed as CommissionTier[]);
+  } catch {
+    return [];
+  }
+}
+
+export function normalizeActivities(input: CollaboratorActivity[]): CollaboratorActivity[] {
+  return input
+    .map((item) => ({
+      name: String(item.name ?? "").trim(),
+      targetCount: Math.max(0, Math.trunc(Number(item.targetCount) || 0)),
+    }))
+    .filter((item) => item.name.length > 0);
+}
+
+export function parseActivities(json: string | null | undefined): CollaboratorActivity[] {
+  if (!json) return [];
+  try {
+    const parsed = JSON.parse(json);
+    if (!Array.isArray(parsed)) return [];
+    return normalizeActivities(parsed as CollaboratorActivity[]);
+  } catch {
+    return [];
+  }
+}
+
+export function collaboratorDisplayStatus(status: string): "ACTIVO" | "INACTIVO" {
+  return status === "ACTIVO" ? "ACTIVO" : "INACTIVO";
+}
+
+export function filterCollaborators<
+  T extends {
+    status: string;
+    jobTitle?: string | null;
+    user: { name: string; role: string };
+  },
+>(rows: T[], filters: { q?: string; estado?: string; puesto?: string }): T[] {
+  const q = (filters.q ?? "").trim().toLowerCase();
+  const estado = (filters.estado ?? "ACTIVOS").toUpperCase();
+  const puesto = (filters.puesto ?? "").trim();
+  return rows.filter((row) => {
+    const isActive = collaboratorDisplayStatus(row.status) === "ACTIVO";
+    if (estado === "ACTIVOS" && !isActive) return false;
+    if (estado === "INACTIVOS" && isActive) return false;
+    const rowJob = (row.jobTitle && row.jobTitle.trim()) || row.user.role;
+    if (puesto && rowJob !== puesto && row.user.role !== puesto) return false;
+    if (q && !row.user.name.toLowerCase().includes(q) && !rowJob.toLowerCase().includes(q)) return false;
+    return true;
+  });
+}
+
 const SELLER_BRACKETS = [
   { upTo: 100000, rate: 0.02 },
   { upTo: null, rate: 0.03 },
@@ -122,9 +199,28 @@ function assertCeo(actor: Actor) {
 
 export async function registerCollaborator(
   actor: Actor,
-  input: { userId: string; hireKind: "NUEVO" | "MIGRADO"; hiredAt: string; bossUserId: string | null; dailyStamped: number; dailyCash: number; vacationBalance: number; rfc: string | null; overtimeRate: number },
+  input: {
+    userId: string;
+    hireKind: "NUEVO" | "MIGRADO";
+    hiredAt: string;
+    bossUserId: string | null;
+    dailyStamped: number;
+    dailyCash: number;
+    vacationBalance: number;
+    rfc: string | null;
+    overtimeRate: number;
+    jobTitle?: string | null;
+    workSchedule?: string | null;
+    birthDate?: string | null;
+    phone?: string | null;
+    email?: string | null;
+    address?: string | null;
+    emergencyContact?: string | null;
+    curp?: string | null;
+    nss?: string | null;
+  },
 ) {
-  assertHr(actor);
+  assertCeo(actor);
   const user = await prisma.user.findFirst({ where: { id: input.userId, active: true, companyId: actor.activeCompanyId } });
   if (!user) throw new Error("El colaborador tiene que ser un usuario de esta empresa.");
   if (user.role === "CEO") throw new Error("El CEO no lleva jefe ni ficha de una sola empresa.");
@@ -149,6 +245,15 @@ export async function registerCollaborator(
       dailyCash: input.dailyCash,
       overtimeRate: profile.exempt ? 0 : input.overtimeRate,
       rfc: input.rfc,
+      curp: input.curp ?? null,
+      nss: input.nss ?? null,
+      jobTitle: input.jobTitle?.trim() || null,
+      workSchedule: input.workSchedule?.trim() || "Lunes a viernes 09:00 a 18:00",
+      birthDate: input.birthDate?.trim() || null,
+      phone: input.phone?.trim() || null,
+      email: input.email?.trim() || null,
+      address: input.address?.trim() || null,
+      emergencyContact: input.emergencyContact?.trim() || null,
       exemptBenefits: profile.exempt,
     },
   });
@@ -161,6 +266,247 @@ export async function registerCollaborator(
     authorUserId: actor.userId,
   });
   return row;
+}
+
+export async function updatePersonalDataSection(
+  actor: Actor,
+  collaboratorId: string,
+  version: number,
+  input: {
+    name: string;
+    birthDate: string | null;
+    phone: string | null;
+    email: string | null;
+    address: string | null;
+    emergencyContact: string | null;
+  },
+) {
+  assertCeo(actor);
+  const row = await prisma.collaborator.findFirst({ where: { id: collaboratorId, companyId: actor.activeCompanyId }, include: { user: true } });
+  if (!row) throw new Error("Esa ficha no es de esta empresa.");
+  const cleanName = input.name.trim();
+  if (!cleanName) throw new Error("El nombre es obligatorio.");
+  const updated = await prisma.collaborator.updateMany({
+    where: { id: row.id, version },
+    data: {
+      birthDate: input.birthDate?.trim() || null,
+      phone: input.phone?.trim() || null,
+      email: input.email?.trim() || null,
+      address: input.address?.trim() || null,
+      emergencyContact: input.emergencyContact?.trim() || null,
+      version: { increment: 1 },
+    },
+  });
+  if (updated.count === 0) throw new ConcurrencyError();
+  if (cleanName !== row.user.name) {
+    await prisma.user.update({ where: { id: row.userId }, data: { name: cleanName } });
+  }
+  await recordHistory({
+    companyId: actor.activeCompanyId,
+    entityType: "COLABORADOR",
+    entityId: row.id,
+    action: "DATOS_PERSONALES",
+    summary: `Actualizó datos personales de ${cleanName}.`,
+    authorUserId: actor.userId,
+  });
+}
+
+export async function updateLaborDataSection(
+  actor: Actor,
+  collaboratorId: string,
+  version: number,
+  input: {
+    jobTitle: string | null;
+    bossUserId: string | null;
+    hiredAt: string;
+    workSchedule: string;
+  },
+) {
+  assertCeo(actor);
+  const row = await prisma.collaborator.findFirst({
+    where: { id: collaboratorId, companyId: actor.activeCompanyId },
+    include: { user: true, payrollLines: { include: { period: true }, take: 1 } },
+  });
+  if (!row) throw new Error("Esa ficha no es de esta empresa.");
+  if (input.bossUserId) {
+    const boss = await prisma.user.findFirst({ where: { id: input.bossUserId, active: true } });
+    if (!boss) throw new Error("El jefe seleccionado no existe.");
+  }
+  const hasClosedProcesses = row.payrollLines.some((line) => line.period.status === "AUTORIZADA");
+  const nextHiredAt = hasClosedProcesses ? row.hiredAt : noonUtc(input.hiredAt);
+  const updated = await prisma.collaborator.updateMany({
+    where: { id: row.id, version },
+    data: {
+      jobTitle: input.jobTitle?.trim() || null,
+      bossUserId: input.bossUserId || null,
+      hiredAt: nextHiredAt,
+      workSchedule: input.workSchedule.trim() || "Lunes a viernes 09:00 a 18:00",
+      version: { increment: 1 },
+    },
+  });
+  if (updated.count === 0) throw new ConcurrencyError();
+  await recordHistory({
+    companyId: actor.activeCompanyId,
+    entityType: "COLABORADOR",
+    entityId: row.id,
+    action: "DATOS_LABORALES",
+    summary: `Actualizó datos laborales de ${row.user.name}.`,
+    authorUserId: actor.userId,
+  });
+}
+
+export async function updateFiscalDataSection(
+  actor: Actor,
+  collaboratorId: string,
+  version: number,
+  input: { rfc: string | null; curp: string | null; nss: string | null },
+) {
+  assertCeo(actor);
+  const row = await prisma.collaborator.findFirst({ where: { id: collaboratorId, companyId: actor.activeCompanyId }, include: { user: true } });
+  if (!row) throw new Error("Esa ficha no es de esta empresa.");
+  const updated = await prisma.collaborator.updateMany({
+    where: { id: row.id, version },
+    data: {
+      rfc: input.rfc?.trim() || null,
+      curp: input.curp?.trim() || null,
+      nss: input.nss?.trim() || null,
+      version: { increment: 1 },
+    },
+  });
+  if (updated.count === 0) throw new ConcurrencyError();
+  await recordHistory({
+    companyId: actor.activeCompanyId,
+    entityType: "COLABORADOR",
+    entityId: row.id,
+    action: "DATOS_FISCALES",
+    summary: `Actualizó datos fiscales y de seguridad social de ${row.user.name}.`,
+    authorUserId: actor.userId,
+  });
+}
+
+export async function updateCommissionSection(
+  actor: Actor,
+  collaboratorId: string,
+  version: number,
+  enabled: boolean,
+  tiers: CommissionTier[],
+) {
+  assertCeo(actor);
+  const row = await prisma.collaborator.findFirst({ where: { id: collaboratorId, companyId: actor.activeCompanyId }, include: { user: true } });
+  if (!row) throw new Error("Esa ficha no es de esta empresa.");
+  const sortedTiers = normalizeCommissionTiers(tiers);
+  const updated = await prisma.collaborator.updateMany({
+    where: { id: row.id, version },
+    data: {
+      commissionEnabled: enabled,
+      commissionTiersJson: JSON.stringify(sortedTiers),
+      version: { increment: 1 },
+    },
+  });
+  if (updated.count === 0) throw new ConcurrencyError();
+  await recordHistory({
+    companyId: actor.activeCompanyId,
+    entityType: "COLABORADOR",
+    entityId: row.id,
+    action: "COMISION",
+    summary: `Comisión por facturación de ${row.user.name} quedó ${enabled ? "habilitada" : "deshabilitada"} (${sortedTiers.length} escalafones).`,
+    authorUserId: actor.userId,
+  });
+}
+
+export async function updateActivitiesSection(
+  actor: Actor,
+  collaboratorId: string,
+  version: number,
+  enabled: boolean,
+  activities: CollaboratorActivity[],
+) {
+  assertCeo(actor);
+  const row = await prisma.collaborator.findFirst({ where: { id: collaboratorId, companyId: actor.activeCompanyId }, include: { user: true } });
+  if (!row) throw new Error("Esa ficha no es de esta empresa.");
+  const normalized = normalizeActivities(activities);
+  const updated = await prisma.collaborator.updateMany({
+    where: { id: row.id, version },
+    data: {
+      activitiesEnabled: enabled,
+      activitiesJson: JSON.stringify(normalized),
+      version: { increment: 1 },
+    },
+  });
+  if (updated.count === 0) throw new ConcurrencyError();
+  await recordHistory({
+    companyId: actor.activeCompanyId,
+    entityType: "COLABORADOR",
+    entityId: row.id,
+    action: "ACTIVIDADES",
+    summary: `Actividades comerciales de ${row.user.name} quedaron ${enabled ? "habilitadas" : "deshabilitadas"} (${normalized.length} actividades).`,
+    authorUserId: actor.userId,
+  });
+}
+
+export async function updateBonusesSection(
+  actor: Actor,
+  collaboratorId: string,
+  version: number,
+  input: {
+    bonusesEnabled: boolean;
+    punctualityBonusEnabled: boolean;
+    punctualityBonus: number;
+    productivityBonusEnabled: boolean;
+    productivityBonus: number;
+  },
+) {
+  assertCeo(actor);
+  const row = await prisma.collaborator.findFirst({ where: { id: collaboratorId, companyId: actor.activeCompanyId }, include: { user: true } });
+  if (!row) throw new Error("Esa ficha no es de esta empresa.");
+  const updated = await prisma.collaborator.updateMany({
+    where: { id: row.id, version },
+    data: {
+      bonusesEnabled: input.bonusesEnabled,
+      punctualityBonusEnabled: input.punctualityBonusEnabled,
+      punctualityBonus: roundMoney(Math.max(0, input.punctualityBonus)),
+      productivityBonusEnabled: input.productivityBonusEnabled,
+      productivityBonus: roundMoney(Math.max(0, input.productivityBonus)),
+      version: { increment: 1 },
+    },
+  });
+  if (updated.count === 0) throw new ConcurrencyError();
+  await recordHistory({
+    companyId: actor.activeCompanyId,
+    entityType: "COLABORADOR",
+    entityId: row.id,
+    action: "BONOS",
+    summary: `Bonos de ${row.user.name} actualizados (${input.bonusesEnabled ? "habilitados" : "deshabilitados"}).`,
+    authorUserId: actor.userId,
+  });
+}
+
+export async function toggleCollaboratorActiveStatus(
+  actor: Actor,
+  collaboratorId: string,
+  version: number,
+  enable: boolean,
+) {
+  assertCeo(actor);
+  const row = await prisma.collaborator.findFirst({ where: { id: collaboratorId, companyId: actor.activeCompanyId }, include: { user: true } });
+  if (!row) throw new Error("Esa ficha no es de esta empresa.");
+  const nextStatus = enable ? "ACTIVO" : "INACTIVO";
+  const updated = await prisma.collaborator.updateMany({
+    where: { id: row.id, version },
+    data: { status: nextStatus, version: { increment: 1 } },
+  });
+  if (updated.count === 0) throw new ConcurrencyError();
+  await prisma.user.update({ where: { id: row.userId }, data: { active: enable } });
+  await recordHistory({
+    companyId: actor.activeCompanyId,
+    entityType: "COLABORADOR",
+    entityId: row.id,
+    action: enable ? "HABILITAR" : "DESHABILITAR",
+    summary: enable
+      ? `${row.user.name} fue habilitado nuevamente en la operación.`
+      : `${row.user.name} fue deshabilitado. Conserva todo su historial e información.`,
+    authorUserId: actor.userId,
+  });
 }
 
 export async function changeBoss(actor: Actor, collaboratorId: string, version: number, bossUserId: string) {
@@ -204,23 +550,28 @@ export async function adjustVacationBalance(actor: Actor, collaboratorId: string
   await recordHistory({ companyId: actor.activeCompanyId, entityType: "COLABORADOR", entityId: row.id, action: "VACACIONES", summary: `Saldo de vacaciones de ${row.user.name} quedó en ${balance}. ${reason.trim()}`, authorUserId: actor.userId });
 }
 
-export async function requestVacation(actor: Actor, collaboratorId: string, startDate: string, endDate: string) {
+export async function requestVacation(actor: Actor, collaboratorId: string, startDate: string, endDate: string, comment?: string | null) {
   const row = await prisma.collaborator.findFirst({ where: { id: collaboratorId, companyId: actor.activeCompanyId, status: "ACTIVO" }, include: { user: true } });
   if (!row || row.exemptBenefits) throw new Error("Ese colaborador no toma vacaciones por este proceso.");
   const isBoss = row.bossUserId === actor.userId;
   const isCeo = actor.role === "CEO" || actor.role === "ADMINISTRADOR";
-  if (!isBoss && !isCeo) throw new Error("Las vacaciones las registra el jefe directo.");
+  const isCoord = actor.role === "COORDINACION_ADMINISTRACION";
+  if (!isBoss && !isCeo && !isCoord) throw new Error("Las vacaciones las registra Coordinación, el jefe directo o el CEO.");
   const days = weekdaysBetween(startDate, endDate);
   if (days.length === 0) throw new Error("El rango no tiene días hábiles.");
-  if (days.length > row.vacationBalance) throw new Error("El saldo de vacaciones no alcanza.");
-  const auto = isCeo && isBoss;
+  if (row.vacationBalance > 0 && days.length > row.vacationBalance) throw new Error("El saldo de vacaciones no alcanza.");
+  const auto = isCeo && isBoss && comment === undefined;
   const vacation = await prisma.vacationRequest.create({
     data: {
       collaboratorId: row.id,
       startDate,
       endDate,
+      days: days.length,
+      comment: comment?.trim() || null,
       status: auto ? "AUTORIZADA" : "PENDIENTE",
       requestedByUserId: actor.userId,
+      decidedByUserId: auto ? actor.userId : null,
+      decidedAt: auto ? new Date() : null,
       primas: auto ? { create: primaByWeek(days, row.dailyStamped, row.dailyCash) } : undefined,
     },
   });
@@ -237,12 +588,13 @@ export async function requestVacation(actor: Actor, collaboratorId: string, star
 }
 
 async function applyVacation(collaboratorId: string, balance: number, days: string[]) {
-  await prisma.collaborator.update({ where: { id: collaboratorId }, data: { vacationBalance: roundMoney(balance - days.length) } });
+  const nextBalance = Math.max(0, roundMoney(balance - days.length));
+  await prisma.collaborator.update({ where: { id: collaboratorId }, data: { vacationBalance: nextBalance } });
   for (const workDate of days) {
     await prisma.attendanceDay.upsert({
       where: { collaboratorId_workDate: { collaboratorId, workDate } },
-      update: { status: "VACACIONES", justified: true, paidLeave: true, entryAt: null, exitAt: null },
-      create: { collaboratorId, workDate, status: "VACACIONES", justified: true, paidLeave: true },
+      update: { status: "VACACIONES", justified: true, justificationStatus: "JUSTIFICADA", paidLeave: true, entryAt: null, exitAt: null },
+      create: { collaboratorId, workDate, status: "VACACIONES", justified: true, justificationStatus: "JUSTIFICADA", paidLeave: true },
     });
   }
 }
@@ -252,8 +604,17 @@ export async function decideVacation(actor: Actor, vacationId: string, version: 
   const row = await prisma.vacationRequest.findFirst({ where: { id: vacationId, status: "PENDIENTE" }, include: { collaborator: { include: { user: true } } } });
   if (!row || row.collaborator.companyId !== actor.activeCompanyId) throw new Error("Esa solicitud no está pendiente en esta empresa.");
   const days = weekdaysBetween(row.startDate, row.endDate);
-  if (authorized && days.length > row.collaborator.vacationBalance) throw new Error("El saldo ya no alcanza.");
-  const updated = await prisma.vacationRequest.updateMany({ where: { id: row.id, version }, data: { status: authorized ? "AUTORIZADA" : "RECHAZADA", version: { increment: 1 } } });
+  if (authorized && row.collaborator.vacationBalance > 0 && days.length > row.collaborator.vacationBalance) throw new Error("El saldo ya no alcanza.");
+  const updated = await prisma.vacationRequest.updateMany({
+    where: { id: row.id, version },
+    data: {
+      status: authorized ? "AUTORIZADA" : "RECHAZADA",
+      days: days.length,
+      decidedByUserId: actor.userId,
+      decidedAt: new Date(),
+      version: { increment: 1 },
+    },
+  });
   if (updated.count === 0) throw new ConcurrencyError();
   if (authorized) {
     await prisma.vacationPrima.createMany({ data: primaByWeek(days, row.collaborator.dailyStamped, row.collaborator.dailyCash).map((prima) => ({ ...prima, vacationId: row.id })) });
@@ -312,6 +673,166 @@ export async function manualAttendance(actor: Actor, collaboratorId: string, wor
   await recordHistory({ companyId: actor.activeCompanyId, entityType: "ASISTENCIA", entityId: row.id, action: "CORRECCION", summary: `${workDate} quedó como ${status}. ${note.trim()}`, authorUserId: actor.userId });
 }
 
+export async function updateAttendanceMode(
+  actor: Actor,
+  collaboratorId: string,
+  version: number,
+  mode: "AUTOMATICA" | "MANUAL",
+) {
+  assertHr(actor);
+  const row = await prisma.collaborator.findFirst({ where: { id: collaboratorId, companyId: actor.activeCompanyId }, include: { user: true } });
+  if (!row) throw new Error("Esa ficha no es de esta empresa.");
+  const updated = await prisma.collaborator.updateMany({
+    where: { id: row.id, version },
+    data: { attendanceMode: mode, version: { increment: 1 } },
+  });
+  if (updated.count === 0) throw new ConcurrencyError();
+  await recordHistory({
+    companyId: actor.activeCompanyId,
+    entityType: "ASISTENCIA",
+    entityId: row.id,
+    action: "MODO",
+    summary: `Modo de asistencia de ${row.user.name} cambió a ${mode === "MANUAL" ? "Manual" : "Automática"}.`,
+    authorUserId: actor.userId,
+  });
+}
+
+function buildMexicoTimestamp(workDate: string, timeStr: string) {
+  const [h, m] = timeStr.split(":").map(Number);
+  const d = noonUtc(workDate);
+  d.setUTCHours((Number.isFinite(h) ? h : 9) + 6, Number.isFinite(m) ? m : 0, 0, 0);
+  return d;
+}
+
+export async function registerManualEntry(
+  actor: Actor,
+  collaboratorId: string,
+  workDate: string,
+  entryTime: string,
+) {
+  assertHr(actor);
+  const row = await prisma.collaborator.findFirst({ where: { id: collaboratorId, companyId: actor.activeCompanyId }, include: { user: true } });
+  if (!row) throw new Error("Esa ficha no es de esta empresa.");
+  const entryAt = buildMexicoTimestamp(workDate, entryTime);
+  await prisma.attendanceDay.upsert({
+    where: { collaboratorId_workDate: { collaboratorId: row.id, workDate } },
+    update: { entryAt, status: "NORMAL", justified: true, justificationStatus: "JUSTIFICADA" },
+    create: { collaboratorId: row.id, workDate, entryAt, status: "NORMAL", justified: true, justificationStatus: "JUSTIFICADA" },
+  });
+  await recordHistory({
+    companyId: actor.activeCompanyId,
+    entityType: "ASISTENCIA",
+    entityId: row.id,
+    action: "ENTRADA_MANUAL",
+    summary: `Entrada manual de ${row.user.name} el ${workDate} (${entryTime}).`,
+    authorUserId: actor.userId,
+  });
+}
+
+export async function registerManualExit(
+  actor: Actor,
+  collaboratorId: string,
+  workDate: string,
+  exitTime: string,
+) {
+  assertHr(actor);
+  const row = await prisma.collaborator.findFirst({ where: { id: collaboratorId, companyId: actor.activeCompanyId }, include: { user: true } });
+  if (!row) throw new Error("Esa ficha no es de esta empresa.");
+  const existing = await prisma.attendanceDay.findUnique({ where: { collaboratorId_workDate: { collaboratorId: row.id, workDate } } });
+  if (!existing || !existing.entryAt) {
+    throw new Error("No existe una entrada previa registrada en esa jornada para poder registrar la salida.");
+  }
+  const exitAt = buildMexicoTimestamp(workDate, exitTime);
+  await prisma.attendanceDay.update({
+    where: { id: existing.id },
+    data: { exitAt, status: existing.status === "EN_JORNADA" ? "NORMAL" : existing.status },
+  });
+  await recordHistory({
+    companyId: actor.activeCompanyId,
+    entityType: "ASISTENCIA",
+    entityId: row.id,
+    action: "SALIDA_MANUAL",
+    summary: `Salida manual de ${row.user.name} el ${workDate} (${exitTime}).`,
+    authorUserId: actor.userId,
+  });
+}
+
+export async function registerAttendanceIncidence(
+  actor: Actor,
+  collaboratorId: string,
+  workDate: string,
+  kind: "AUSENCIA" | "RETARDO",
+  reason: string,
+  asksJustification: boolean,
+) {
+  assertHr(actor);
+  const cleanReason = reason.trim();
+  if (!cleanReason) throw new Error("El motivo es obligatorio.");
+  const row = await prisma.collaborator.findFirst({ where: { id: collaboratorId, companyId: actor.activeCompanyId }, include: { user: true } });
+  if (!row) throw new Error("Esa ficha no es de esta empresa.");
+  const justificationStatus = asksJustification ? "PENDIENTE_VALIDACION_CEO" : "NO_JUSTIFICADA";
+  await prisma.attendanceDay.upsert({
+    where: { collaboratorId_workDate: { collaboratorId: row.id, workDate } },
+    update: {
+      status: kind,
+      note: cleanReason,
+      justified: false,
+      justificationStatus,
+      decidedByUserId: null,
+      decidedAt: null,
+    },
+    create: {
+      collaboratorId: row.id,
+      workDate,
+      status: kind,
+      note: cleanReason,
+      justified: false,
+      justificationStatus,
+    },
+  });
+  await recordHistory({
+    companyId: actor.activeCompanyId,
+    entityType: "ASISTENCIA",
+    entityId: row.id,
+    action: kind === "AUSENCIA" ? "FALTA" : "RETARDO",
+    summary: `${kind === "AUSENCIA" ? "Falta" : "Retardo"} de ${row.user.name} el ${workDate} (${asksJustification ? "pendiente de validación del CEO" : "no justificada"}).`,
+    authorUserId: actor.userId,
+  });
+}
+
+export async function decideAttendanceJustification(
+  actor: Actor,
+  attendanceId: string,
+  version: number,
+  approved: boolean,
+) {
+  assertCeo(actor);
+  const row = await prisma.attendanceDay.findFirst({
+    where: { id: attendanceId },
+    include: { collaborator: { include: { user: true } } },
+  });
+  if (!row || row.collaborator.companyId !== actor.activeCompanyId) throw new Error("Ese registro de asistencia no es de esta empresa.");
+  const updated = await prisma.attendanceDay.updateMany({
+    where: { id: row.id, version },
+    data: {
+      justified: approved,
+      justificationStatus: approved ? "JUSTIFICADA" : "NO_JUSTIFICADA",
+      decidedByUserId: actor.userId,
+      decidedAt: new Date(),
+      version: { increment: 1 },
+    },
+  });
+  if (updated.count === 0) throw new ConcurrencyError();
+  await recordHistory({
+    companyId: actor.activeCompanyId,
+    entityType: "ASISTENCIA",
+    entityId: row.collaboratorId,
+    action: "VALIDACION_JUSTIFICACION",
+    summary: `${row.status === "RETARDO" ? "Retardo" : "Falta"} de ${row.collaborator.user.name} el ${row.workDate} fue ${approved ? "validada como justificada" : "rechazada (no justificada)"}.`,
+    authorUserId: actor.userId,
+  });
+}
+
 export async function updateSchedule(actor: Actor, collaboratorId: string, version: number, scheduleStart: string, toleranceMinutes: number) {
   assertHr(actor);
   const updated = await prisma.collaborator.updateMany({
@@ -352,18 +873,58 @@ export async function requestOvertime(actor: Actor, collaboratorId: string, work
   return overtime;
 }
 
-export async function reviewOvertime(actor: Actor, overtimeId: string, version: number, approved: boolean) {
+export async function requestOvertimeByHours(
+  actor: Actor,
+  collaboratorId: string,
+  workDate: string,
+  hoursInput: number,
+  reason: string,
+) {
+  assertHr(actor);
+  const row = await prisma.collaborator.findFirst({ where: { id: collaboratorId, companyId: actor.activeCompanyId }, include: { user: true } });
+  if (!row) throw new Error("Esa ficha no es de esta empresa.");
+  const hours = roundMoney(Number(hoursInput));
+  if (!Number.isFinite(hours) || hours <= 0) throw new Error("La cantidad de horas debe ser mayor a cero.");
+  const cleanReason = reason.trim();
+  if (!cleanReason) throw new Error("El motivo es obligatorio.");
+  const overtime = await prisma.overtimeRequest.create({
+    data: {
+      collaboratorId: row.id,
+      workDate,
+      startedAt: "18:00",
+      endedAt: "19:00",
+      hours,
+      reason: cleanReason,
+      status: "PENDIENTE_CEO",
+      requestedByUserId: actor.userId,
+    },
+  });
+  await recordHistory({
+    companyId: actor.activeCompanyId,
+    entityType: "HORAS",
+    entityId: overtime.id,
+    action: "ALTA",
+    summary: `${row.user.name} tiene ${hours} h extra pendientes de autorización.`,
+    authorUserId: actor.userId,
+  });
+  return overtime;
+}
+
+export async function reviewOvertime(actor: Actor, overtimeId: string, version: number, approved: boolean, authorizedHoursOverride?: number) {
   const row = await prisma.overtimeRequest.findFirst({ where: { id: overtimeId }, include: { collaborator: { include: { user: true } } } });
   if (!row || row.collaborator.companyId !== actor.activeCompanyId) throw new Error("Esa solicitud no es de esta empresa.");
   const ceo = actor.role === "CEO" || actor.role === "ADMINISTRADOR";
   if (row.status === "PENDIENTE_JEFE") {
     if (row.collaborator.bossUserId !== actor.userId && !ceo) throw new Error("La valida el jefe directo.");
     if (!approved) {
-      await prisma.overtimeRequest.updateMany({ where: { id: row.id, version }, data: { status: "RECHAZADA", version: { increment: 1 } } });
+      await prisma.overtimeRequest.updateMany({
+        where: { id: row.id, version },
+        data: { status: "RECHAZADA", authorizedByUserId: actor.userId, authorizedAt: new Date(), version: { increment: 1 } },
+      });
       return;
     }
     if (ceo && row.collaborator.bossUserId === actor.userId) {
-      await authorizeOvertime(actor, row.id, version);
+      await authorizeOvertime(actor, row.id, version, authorizedHoursOverride);
       return;
     }
     const updated = await prisma.overtimeRequest.updateMany({ where: { id: row.id, version }, data: { status: "PENDIENTE_CEO", version: { increment: 1 } } });
@@ -375,30 +936,224 @@ export async function reviewOvertime(actor: Actor, overtimeId: string, version: 
       throw new Error("Esa decisión es del CEO.");
     }
     if (!approved) {
-      await prisma.overtimeRequest.updateMany({ where: { id: row.id, version }, data: { status: "RECHAZADA", version: { increment: 1 } } });
+      await prisma.overtimeRequest.updateMany({
+        where: { id: row.id, version },
+        data: { status: "RECHAZADA", authorizedByUserId: actor.userId, authorizedAt: new Date(), version: { increment: 1 } },
+      });
       return;
     }
-    await authorizeOvertime(actor, row.id, version);
+    await authorizeOvertime(actor, row.id, version, authorizedHoursOverride);
   }
 }
 
-async function authorizeOvertime(actor: Actor, overtimeId: string, version: number) {
+async function authorizeOvertime(actor: Actor, overtimeId: string, version: number, authorizedHoursOverride?: number) {
   const row = await prisma.overtimeRequest.findFirst({ where: { id: overtimeId }, include: { collaborator: true } });
   if (!row) throw new Error("No se encontró la solicitud.");
+  const finalHours =
+    authorizedHoursOverride != null && Number.isFinite(authorizedHoursOverride) && authorizedHoursOverride > 0
+      ? roundMoney(authorizedHoursOverride)
+      : row.hours;
   const range = weekRange(row.workDate);
   const prior = await prisma.overtimeRequest.findMany({
     where: { collaboratorId: row.collaboratorId, status: { in: ["AUTORIZADA", "PAGADA"] }, workDate: { gte: range.start, lte: range.end }, id: { not: row.id } },
   });
-  const previousHours = prior.reduce((sum, item) => sum + item.hours, 0);
-  const bands = overtimeBands(previousHours, row.hours);
+  const previousHours = prior.reduce((sum, item) => sum + (item.authorizedHours ?? item.hours), 0);
+  const bands = overtimeBands(previousHours, finalHours);
   const amount = overtimeAmount(bands.doubleHours, bands.tripleHours, row.collaborator.overtimeRate);
   const split = splitBySalary(amount, row.collaborator.dailyStamped, row.collaborator.dailyCash);
   const updated = await prisma.overtimeRequest.updateMany({
     where: { id: row.id, version },
-    data: { status: "AUTORIZADA", frozenRate: row.collaborator.overtimeRate, doubleHours: bands.doubleHours, tripleHours: bands.tripleHours, amountStamped: split.stamped, amountCash: split.cash, version: { increment: 1 } },
+    data: {
+      status: "AUTORIZADA",
+      authorizedHours: finalHours,
+      authorizedByUserId: actor.userId,
+      authorizedAt: new Date(),
+      frozenRate: row.collaborator.overtimeRate,
+      doubleHours: bands.doubleHours,
+      tripleHours: bands.tripleHours,
+      amountStamped: split.stamped,
+      amountCash: split.cash,
+      version: { increment: 1 },
+    },
   });
   if (updated.count === 0) throw new ConcurrencyError();
-  await recordHistory({ companyId: actor.activeCompanyId, entityType: "HORAS", entityId: row.id, action: "AUTORIZACION", summary: `Quedaron ${bands.doubleHours} h dobles y ${bands.tripleHours} h triples. La tarifa quedó congelada.`, authorUserId: actor.userId });
+  await recordHistory({ companyId: actor.activeCompanyId, entityType: "HORAS", entityId: row.id, action: "AUTORIZACION", summary: `Quedaron ${bands.doubleHours} h dobles y ${bands.tripleHours} h triples (${finalHours} h autorizadas de ${row.hours} h solicitadas). La tarifa quedó congelada.`, authorUserId: actor.userId });
+}
+
+export async function requestCompensation(
+  actor: Actor,
+  collaboratorId: string,
+  concept: string,
+  requestedAmount: number,
+  comment?: string | null,
+) {
+  assertHr(actor);
+  const row = await prisma.collaborator.findFirst({ where: { id: collaboratorId, companyId: actor.activeCompanyId }, include: { user: true } });
+  if (!row) throw new Error("Esa ficha no es de esta empresa.");
+  const cleanConcept = concept.trim();
+  if (!cleanConcept) throw new Error("El concepto o motivo es obligatorio.");
+  const amount = roundMoney(Number(requestedAmount));
+  if (!Number.isFinite(amount) || amount <= 0) throw new Error("El monto solicitado debe ser mayor a cero.");
+  const created = await prisma.compensationRequest.create({
+    data: {
+      collaboratorId: row.id,
+      concept: cleanConcept,
+      requestedAmount: amount,
+      comment: comment?.trim() || null,
+      status: "PENDIENTE",
+      requestedByUserId: actor.userId,
+    },
+  });
+  await recordHistory({
+    companyId: actor.activeCompanyId,
+    entityType: "COMPENSACION",
+    entityId: created.id,
+    action: "ALTA",
+    summary: `Solicitud de compensación para ${row.user.name}: ${cleanConcept} por $${amount}.`,
+    authorUserId: actor.userId,
+  });
+  return created;
+}
+
+export async function decideCompensation(
+  actor: Actor,
+  compensationId: string,
+  version: number,
+  authorized: boolean,
+  authorizedAmountOverride?: number,
+) {
+  assertCeo(actor);
+  const row = await prisma.compensationRequest.findFirst({
+    where: { id: compensationId, status: "PENDIENTE" },
+    include: { collaborator: { include: { user: true } } },
+  });
+  if (!row || row.collaborator.companyId !== actor.activeCompanyId) throw new Error("Esa solicitud de compensación no está pendiente en esta empresa.");
+  const finalAmount =
+    authorized
+      ? authorizedAmountOverride != null && Number.isFinite(authorizedAmountOverride) && authorizedAmountOverride >= 0
+        ? roundMoney(authorizedAmountOverride)
+        : row.requestedAmount
+      : null;
+  const updated = await prisma.compensationRequest.updateMany({
+    where: { id: row.id, version },
+    data: {
+      status: authorized ? "AUTORIZADA" : "RECHAZADA",
+      authorizedAmount: finalAmount,
+      decidedByUserId: actor.userId,
+      decidedAt: new Date(),
+      version: { increment: 1 },
+    },
+  });
+  if (updated.count === 0) throw new ConcurrencyError();
+  await recordHistory({
+    companyId: actor.activeCompanyId,
+    entityType: "COMPENSACION",
+    entityId: row.id,
+    action: "AUTORIZACION",
+    summary: authorized
+      ? `Compensación de ${row.collaborator.user.name} autorizada por $${finalAmount} (solicitado $${row.requestedAmount}).`
+      : `Compensación de ${row.collaborator.user.name} rechazada.`,
+    authorUserId: actor.userId,
+  });
+}
+
+export async function requestLeavePermission(
+  actor: Actor,
+  collaboratorId: string,
+  startDate: string,
+  endDate: string | null,
+  reason: string,
+  comment?: string | null,
+) {
+  assertHr(actor);
+  const row = await prisma.collaborator.findFirst({ where: { id: collaboratorId, companyId: actor.activeCompanyId }, include: { user: true } });
+  if (!row) throw new Error("Esa ficha no es de esta empresa.");
+  const cleanReason = reason.trim();
+  if (!cleanReason) throw new Error("El motivo del permiso es obligatorio.");
+  const finalEndDate = endDate?.trim() || startDate;
+  if (finalEndDate < startDate) throw new Error("La fecha final no puede ser anterior a la fecha inicial.");
+  const created = await prisma.leavePermissionRequest.create({
+    data: {
+      collaboratorId: row.id,
+      startDate,
+      endDate: finalEndDate,
+      reason: cleanReason,
+      comment: comment?.trim() || null,
+      status: "PENDIENTE",
+      requestedByUserId: actor.userId,
+    },
+  });
+  await recordHistory({
+    companyId: actor.activeCompanyId,
+    entityType: "PERMISO_FALTA",
+    entityId: created.id,
+    action: "ALTA",
+    summary: `Solicitud de permiso de falta para ${row.user.name} (${startDate}${finalEndDate !== startDate ? ` a ${finalEndDate}` : ""}).`,
+    authorUserId: actor.userId,
+  });
+  return created;
+}
+
+export async function decideLeavePermission(
+  actor: Actor,
+  permissionId: string,
+  version: number,
+  authorized: boolean,
+) {
+  assertCeo(actor);
+  const row = await prisma.leavePermissionRequest.findFirst({
+    where: { id: permissionId, status: "PENDIENTE" },
+    include: { collaborator: { include: { user: true } } },
+  });
+  if (!row || row.collaborator.companyId !== actor.activeCompanyId) throw new Error("Esa solicitud de permiso no está pendiente en esta empresa.");
+  const updated = await prisma.leavePermissionRequest.updateMany({
+    where: { id: row.id, version },
+    data: {
+      status: authorized ? "AUTORIZADO" : "RECHAZADO",
+      decidedByUserId: actor.userId,
+      decidedAt: new Date(),
+      version: { increment: 1 },
+    },
+  });
+  if (updated.count === 0) throw new ConcurrencyError();
+  if (authorized) {
+    const dates = eachDate(row.startDate, row.endDate);
+    for (const workDate of dates) {
+      await prisma.attendanceDay.upsert({
+        where: { collaboratorId_workDate: { collaboratorId: row.collaboratorId, workDate } },
+        update: {
+          status: "PERMISO",
+          justified: true,
+          justificationStatus: "JUSTIFICADA",
+          paidLeave: true,
+          note: row.reason,
+          decidedByUserId: actor.userId,
+          decidedAt: new Date(),
+        },
+        create: {
+          collaboratorId: row.collaboratorId,
+          workDate,
+          status: "PERMISO",
+          justified: true,
+          justificationStatus: "JUSTIFICADA",
+          paidLeave: true,
+          note: row.reason,
+          decidedByUserId: actor.userId,
+          decidedAt: new Date(),
+        },
+      });
+    }
+  }
+  await recordHistory({
+    companyId: actor.activeCompanyId,
+    entityType: "PERMISO_FALTA",
+    entityId: row.id,
+    action: "AUTORIZACION",
+    summary: authorized
+      ? `Permiso de falta de ${row.collaborator.user.name} autorizado y reflejado como justificado en asistencia.`
+      : `Permiso de falta de ${row.collaborator.user.name} rechazado.`,
+    authorUserId: actor.userId,
+  });
 }
 
 function lineTotals(line: { stampedBase: number; cashBase: number; discountStamped: number; discountCash: number; overtimeStamped: number; overtimeCash: number; primaStamped: number; primaCash: number; bonus: number; extraStamped: number; extraCash: number; aguinaldoStamped: number; aguinaldoCash: number }) {
@@ -638,9 +1393,39 @@ export async function payCommissions(actor: Actor, runId: string, version: numbe
   await payFromAccount(actor.activeCompanyId, "BANCO", Math.max(0, total), `COMISION-${run.month}`, run.id);
 }
 
-export async function addLaborDocument(actor: Actor, collaboratorId: string, kind: "GENERAL" | "ACTA", title: string, note: string, occurredOn: string | null) {
+export async function addLaborDocument(
+  actor: Actor,
+  collaboratorId: string,
+  kind: "GENERAL" | "ACTA",
+  title: string,
+  note: string,
+  occurredOn: string | null,
+  fileMeta?: { fileName?: string | null; mimeType?: string | null; fileDataUrl?: string | null },
+) {
   assertHr(actor);
-  const row = await prisma.collaborator.findFirst({ where: { id: collaboratorId, companyId: actor.activeCompanyId } });
+  const row = await prisma.collaborator.findFirst({ where: { id: collaboratorId, companyId: actor.activeCompanyId }, include: { user: true } });
   if (!row) throw new Error("Esa ficha no es de esta empresa.");
-  return prisma.laborDocument.create({ data: { collaboratorId, kind, title, note, occurredOn } });
+  const cleanTitle = title.trim();
+  if (!cleanTitle) throw new Error("El nombre del documento es obligatorio.");
+  const created = await prisma.laborDocument.create({
+    data: {
+      collaboratorId,
+      kind,
+      title: cleanTitle,
+      note: note.trim(),
+      occurredOn,
+      fileName: fileMeta?.fileName ?? null,
+      mimeType: fileMeta?.mimeType ?? null,
+      fileDataUrl: fileMeta?.fileDataUrl ?? null,
+    },
+  });
+  await recordHistory({
+    companyId: actor.activeCompanyId,
+    entityType: "DOCUMENTO_LABORAL",
+    entityId: created.id,
+    action: "SUBIR",
+    summary: `Subió documento "${cleanTitle}" para ${row.user.name}.`,
+    authorUserId: actor.userId,
+  });
+  return created;
 }

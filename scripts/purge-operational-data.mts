@@ -27,6 +27,8 @@ const TABLES_TO_WIPE = [
   "payrollAdjustment",
   "payrollLine",
   "overtimeRequest",
+  "compensationRequest",
+  "leavePermissionRequest",
   "payrollPeriod",
   "vacationPrima",
   "vacationRequest",
@@ -84,6 +86,8 @@ async function execute() {
       await tx.payrollAdjustment.deleteMany();
       await tx.payrollLine.deleteMany();
       await tx.overtimeRequest.deleteMany();
+      await tx.compensationRequest.deleteMany();
+      await tx.leavePermissionRequest.deleteMany();
       await tx.payrollPeriod.deleteMany();
       await tx.vacationPrima.deleteMany();
       await tx.vacationRequest.deleteMany();

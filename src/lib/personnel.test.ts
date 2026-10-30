@@ -1,6 +1,22 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { absenceDiscount, bracketRate, laborProfile, overtimeAmount, overtimeBands, primaByWeek, splitBySalary, vacationDaysForSeniority, weekdaysBetween } from "./personnel";
+import {
+  absenceDiscount,
+  bracketRate,
+  collaboratorDisplayStatus,
+  filterCollaborators,
+  laborProfile,
+  normalizeActivities,
+  normalizeCommissionTiers,
+  overtimeAmount,
+  overtimeBands,
+  parseActivities,
+  parseCommissionTiers,
+  primaByWeek,
+  splitBySalary,
+  vacationDaysForSeniority,
+  weekdaysBetween,
+} from "./personnel";
 
 describe("personal y nómina", () => {
   it("cuenta solo lunes a viernes y reparte la prima del 25% por semana", () => {
@@ -35,5 +51,217 @@ describe("personal y nómina", () => {
     const brackets = [{ upTo: 100000, rate: 0.02 }, { upTo: null, rate: 0.03 }];
     assert.equal(bracketRate(80000, brackets), 0.02);
     assert.equal(bracketRate(150000, brackets), 0.03);
+  });
+
+  it("ordena los escalafones de comisión por facturación de menor a mayor y permite valor 0", () => {
+    const tiers = normalizeCommissionTiers([
+      { targetAmount: 250000, kind: "PORCENTAJE", value: 3 },
+      { targetAmount: 50000, kind: "PORCENTAJE", value: 0 },
+      { targetAmount: 100000, kind: "MONTO", value: 2500 },
+    ]);
+    assert.deepEqual(tiers, [
+      { targetAmount: 50000, kind: "PORCENTAJE", value: 0 },
+      { targetAmount: 100000, kind: "MONTO", value: 2500 },
+      { targetAmount: 250000, kind: "PORCENTAJE", value: 3 },
+    ]);
+    assert.deepEqual(parseCommissionTiers(JSON.stringify(tiers)), tiers);
+    assert.deepEqual(parseCommissionTiers("invalid"), []);
+  });
+
+  it("normaliza actividades comerciales únicamente con nombre y número objetivo", () => {
+    const activities = normalizeActivities([
+      { name: "  Visitas comerciales ", targetCount: 15.8 },
+      { name: "", targetCount: 5 },
+      { name: "Llamadas de seguimiento", targetCount: 40 },
+    ]);
+    assert.deepEqual(activities, [
+      { name: "Visitas comerciales", targetCount: 15 },
+      { name: "Llamadas de seguimiento", targetCount: 40 },
+    ]);
+    assert.deepEqual(parseActivities(JSON.stringify(activities)), activities);
+  });
+
+  it("filtra colaboradores por nombre, estado (Activos, Inactivos, Todos) y puesto", () => {
+    const sample = [
+      { status: "ACTIVO", jobTitle: "Ventas", user: { name: "Ana López", role: "VENTAS" } },
+      { status: "INACTIVO", jobTitle: "Técnico", user: { name: "Carlos Ruiz", role: "TECNICO" } },
+      { status: "BAJA", jobTitle: "Ventas", user: { name: "Luis Gómez", role: "VENTAS" } },
+    ];
+    assert.equal(collaboratorDisplayStatus("ACTIVO"), "ACTIVO");
+    assert.equal(collaboratorDisplayStatus("INACTIVO"), "INACTIVO");
+    assert.equal(collaboratorDisplayStatus("BAJA"), "INACTIVO");
+
+    assert.equal(filterCollaborators(sample, { estado: "ACTIVOS" }).length, 1);
+    assert.equal(filterCollaborators(sample, { estado: "INACTIVOS" }).length, 2);
+    assert.equal(filterCollaborators(sample, { estado: "TODOS" }).length, 3);
+    assert.equal(filterCollaborators(sample, { estado: "TODOS", puesto: "Ventas" }).length, 2);
+    assert.equal(filterCollaborators(sample, { estado: "TODOS", q: "carlos" }).length, 1);
+  });
+
+  it("flujos de base de datos para Personal > Colaboradores (CEO vs Coordinación)", async () => {
+    const { mkdtempSync } = await import("node:fs");
+    const { tmpdir } = await import("node:os");
+    const { join } = await import("node:path");
+    const { execFileSync } = await import("node:child_process");
+    const dir = mkdtempSync(join(tmpdir(), "sygos-personnel-"));
+    const dbUrl = `file:${join(dir, "test.db")}`;
+    process.env.DATABASE_URL = dbUrl;
+    execFileSync("./node_modules/.bin/prisma", ["db", "push", "--skip-generate"], {
+      env: { ...process.env, DATABASE_URL: dbUrl },
+      stdio: "ignore",
+    });
+
+    const { prisma } = await import("./db");
+    const {
+      registerCollaborator,
+      updatePersonalDataSection,
+      updateCommissionSection,
+      updateActivitiesSection,
+      updateBonusesSection,
+      toggleCollaboratorActiveStatus,
+      registerAttendanceIncidence,
+      decideAttendanceJustification,
+      registerManualEntry,
+      registerManualExit,
+      requestOvertimeByHours,
+      reviewOvertime,
+      requestCompensation,
+      decideCompensation,
+      requestLeavePermission,
+      decideLeavePermission,
+      addLaborDocument,
+    } = await import("./personnel");
+
+    const company = await prisma.company.create({ data: { code: "SYSTRON", name: "SYSTRON" } });
+    const ceoUser = await prisma.user.create({
+      data: { username: "ceo_test", name: "CEO Test", passwordHash: "x", role: "CEO" },
+    });
+    const coordUser = await prisma.user.create({
+      data: { username: "coord_test", name: "Coord Test", passwordHash: "x", role: "COORDINACION_ADMINISTRACION" },
+    });
+    const empUser = await prisma.user.create({
+      data: { username: "emp_test", name: "Empleado Original", passwordHash: "x", role: "VENTAS", companyId: company.id },
+    });
+
+    const ceoActor = { userId: ceoUser.id, role: "CEO" as const, activeCompanyId: company.id, activeCompanyCode: "SYSTRON" };
+    const coordActor = {
+      userId: coordUser.id,
+      role: "COORDINACION_ADMINISTRACION" as const,
+      activeCompanyId: company.id,
+      activeCompanyCode: "SYSTRON",
+    };
+
+    // Coordinación no puede dar de alta colaborador
+    await assert.rejects(
+      () =>
+        registerCollaborator(coordActor, {
+          userId: empUser.id,
+          hireKind: "NUEVO",
+          hiredAt: "2026-01-15",
+          bossUserId: ceoUser.id,
+          dailyStamped: 500,
+          dailyCash: 0,
+          vacationBalance: 12,
+          rfc: "XAXX010101000",
+          overtimeRate: 100,
+        }),
+      /CEO/,
+    );
+
+    // CEO da de alta colaborador
+    const collab = await registerCollaborator(ceoActor, {
+      userId: empUser.id,
+      hireKind: "MIGRADO",
+      hiredAt: "2026-01-15",
+      bossUserId: ceoUser.id,
+      dailyStamped: 500,
+      dailyCash: 0,
+      vacationBalance: 12,
+      rfc: "XAXX010101000",
+      overtimeRate: 100,
+      jobTitle: "Ejecutivo Comercial",
+    });
+
+    // CEO edita secciones de Datos
+    await updatePersonalDataSection(ceoActor, collab.id, 1, {
+      name: "Empleado Actualizado",
+      birthDate: "1992-05-10",
+      phone: "5512345678",
+      email: "emp@systron.mx",
+      address: "Calle 1",
+      emergencyContact: "María 5599999999",
+    });
+    await updateCommissionSection(ceoActor, collab.id, 2, true, [
+      { targetAmount: 200000, kind: "PORCENTAJE", value: 3 },
+      { targetAmount: 50000, kind: "PORCENTAJE", value: 0 },
+    ]);
+    await updateActivitiesSection(ceoActor, collab.id, 3, true, [{ name: "Visitas", targetCount: 20 }]);
+    await updateBonusesSection(ceoActor, collab.id, 4, {
+      bonusesEnabled: true,
+      punctualityBonusEnabled: true,
+      punctualityBonus: 1000,
+      productivityBonusEnabled: false,
+      productivityBonus: 0,
+    });
+
+    // Asistencia: salida sin entrada previa rechaza
+    await assert.rejects(() => registerManualExit(coordActor, collab.id, "2026-10-20", "18:00"), /entrada previa/);
+    await registerManualEntry(coordActor, collab.id, "2026-10-20", "09:00");
+    await registerManualExit(coordActor, collab.id, "2026-10-20", "18:00");
+
+    // Falta con justificación Sí -> PENDIENTE_VALIDACION_CEO -> CEO valida
+    await registerAttendanceIncidence(coordActor, collab.id, "2026-10-21", "AUSENCIA", "Cita médica", true);
+    const attPending = await prisma.attendanceDay.findUniqueOrThrow({
+      where: { collaboratorId_workDate: { collaboratorId: collab.id, workDate: "2026-10-21" } },
+    });
+    assert.equal(attPending.justificationStatus, "PENDIENTE_VALIDACION_CEO");
+    assert.equal(attPending.justified, false);
+    await decideAttendanceJustification(ceoActor, attPending.id, attPending.version, true);
+    const attValidated = await prisma.attendanceDay.findUniqueOrThrow({ where: { id: attPending.id } });
+    assert.equal(attValidated.justificationStatus, "JUSTIFICADA");
+    assert.equal(attValidated.justified, true);
+
+    // Horas extra con ajuste de horas autorizadas por CEO (conserva horas solicitadas)
+    const ot = await requestOvertimeByHours(coordActor, collab.id, "2026-10-22", 4, "Cierre de proyecto");
+    await reviewOvertime(ceoActor, ot.id, ot.version, true, 3);
+    const otAfter = await prisma.overtimeRequest.findUniqueOrThrow({ where: { id: ot.id } });
+    assert.equal(otAfter.hours, 4);
+    assert.equal(otAfter.authorizedHours, 3);
+    assert.equal(otAfter.status, "AUTORIZADA");
+
+    // Compensación por evento con ajuste de monto autorizado (conserva monto solicitado)
+    const comp = await requestCompensation(coordActor, collab.id, "Apoyo traslado foráneo", 1500, "Viaje Querétaro");
+    await decideCompensation(ceoActor, comp.id, comp.version, true, 1200);
+    const compAfter = await prisma.compensationRequest.findUniqueOrThrow({ where: { id: comp.id } });
+    assert.equal(compAfter.requestedAmount, 1500);
+    assert.equal(compAfter.authorizedAmount, 1200);
+    assert.equal(compAfter.status, "AUTORIZADA");
+
+    // Permiso de falta autorizado -> reconoce automáticamente como justificada en Asistencia
+    const perm = await requestLeavePermission(coordActor, collab.id, "2026-10-23", "2026-10-23", "Trámite personal", null);
+    await decideLeavePermission(ceoActor, perm.id, perm.version, true);
+    const permAtt = await prisma.attendanceDay.findUniqueOrThrow({
+      where: { collaboratorId_workDate: { collaboratorId: collab.id, workDate: "2026-10-23" } },
+    });
+    assert.equal(permAtt.status, "PERMISO");
+    assert.equal(permAtt.justified, true);
+    assert.equal(permAtt.justificationStatus, "JUSTIFICADA");
+
+    // Documentos: subir documento
+    const doc = await addLaborDocument(coordActor, collab.id, "GENERAL", "Contrato firmado", "", null, {
+      fileName: "contrato.pdf",
+      mimeType: "application/pdf",
+      fileDataUrl: "data:application/pdf;base64,JVBERi0xLjQ=",
+    });
+    assert.equal(doc.title, "Contrato firmado");
+
+    // Deshabilitar y habilitar colaborador conservando historial
+    const freshCollab = await prisma.collaborator.findUniqueOrThrow({ where: { id: collab.id } });
+    await toggleCollaboratorActiveStatus(ceoActor, collab.id, freshCollab.version, false);
+    const disabledCollab = await prisma.collaborator.findUniqueOrThrow({ where: { id: collab.id } });
+    assert.equal(disabledCollab.status, "INACTIVO");
+    await toggleCollaboratorActiveStatus(ceoActor, collab.id, disabledCollab.version, true);
+    const reenabledCollab = await prisma.collaborator.findUniqueOrThrow({ where: { id: collab.id } });
+    assert.equal(reenabledCollab.status, "ACTIVO");
   });
 });
