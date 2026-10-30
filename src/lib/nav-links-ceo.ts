@@ -26,6 +26,25 @@ export const CEO_NAV_GROUPS: NavGroupDef[] = [
     ],
   },
   {
+    title: "Administración",
+    links: [
+      { href: "/facturacion", label: "Facturación", show: showCeo },
+      { href: "/compras", label: "Compras", show: showCeo },
+      { href: "/compras?vista=oc", label: "Órdenes de compra", show: showCeo },
+      { href: "/proveedores", label: "Proveedores", show: showCeo },
+    ],
+  },
+  {
+    title: "Comercial",
+    links: [
+      { href: "/prospectos", label: "Prospectos", show: showCeo },
+      { href: "/clientes", label: "Clientes", show: showCeo },
+      { href: "/equipos", label: "Equipos", show: showCeo },
+      { href: "/cotizaciones", label: "Cotizaciones", show: showCeo },
+      { href: "/ventas", label: "Venta de equipos", show: showCeo },
+    ],
+  },
+  {
     title: "Configuración",
     links: [
       { href: "/configuracion#identidad", label: "Configuración general", show: showCeo },
