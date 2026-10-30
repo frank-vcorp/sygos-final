@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { setFlash } from "@/lib/flash";
 import { optionalText, parseVersion, requiredText } from "@/lib/form";
-import { optionalMoneyFromForm } from "@/lib/money";
+import { moneyFromForm, optionalMoneyFromForm } from "@/lib/money";
 import { can, type Action } from "@/lib/permissions";
 import {
   addLaborDocument,
@@ -130,7 +130,8 @@ export async function hireAction(formData: FormData) {
         rfc: requiredText(formData.get("rfc"), "RFC"),
         curp: requiredText(formData.get("curp"), "CURP"),
         nss: requiredText(formData.get("nss"), "NSS"),
-        sueldoVigente: optionalMoneyFromForm(formData.get("sueldoVigente")) ?? -1,
+        dailyStamped: moneyFromForm(formData.get("dailyStamped"), "Sueldo diario timbrado"),
+        dailyCash: moneyFromForm(formData.get("dailyCash"), "Sueldo diario sin timbrar"),
         bankName: requiredText(formData.get("bankName"), "Banco"),
         bankAccount: requiredText(formData.get("bankAccount"), "Cuenta / CLABE"),
         commissionEnabled: formData.get("commissionEnabled") === "1",
@@ -178,8 +179,8 @@ export async function hireAction(formData: FormData) {
       hireKind: formData.get("hireKind") === "MIGRADO" ? "MIGRADO" : "NUEVO",
       hiredAt: requiredText(formData.get("hiredAt"), "Fecha de ingreso"),
       bossUserId: optionalText(formData.get("bossUserId")),
-      dailyStamped: optionalMoneyFromForm(formData.get("dailyStamped")) ?? 0,
-      dailyCash: optionalMoneyFromForm(formData.get("dailyCash")) ?? 0,
+      dailyStamped: moneyFromForm(formData.get("dailyStamped"), "Sueldo diario timbrado"),
+      dailyCash: moneyFromForm(formData.get("dailyCash"), "Sueldo diario sin timbrar"),
       vacationBalance: Number(formData.get("vacationBalance") || 0),
       rfc: optionalText(formData.get("rfc")),
       overtimeRate: optionalMoneyFromForm(formData.get("overtimeRate")) ?? 0,
@@ -412,18 +413,11 @@ export async function salaryAction(formData: FormData) {
   const id = requiredText(formData.get("collaboratorId"), "Colaborador");
   try {
     const session = await guard("personnel.authorize");
-    const singleSalary = optionalMoneyFromForm(formData.get("sueldoVigente"));
-    const dailyStamped =
-      singleSalary != null
-        ? singleSalary
-        : (optionalMoneyFromForm(formData.get("dailyStamped")) ?? 0);
-    const dailyCash =
-      singleSalary != null
-        ? (optionalMoneyFromForm(formData.get("dailyCash")) ?? 0)
-        : (optionalMoneyFromForm(formData.get("dailyCash")) ?? 0);
+    const dailyStamped = moneyFromForm(formData.get("dailyStamped"), "Sueldo diario timbrado");
+    const dailyCash = moneyFromForm(formData.get("dailyCash"), "Sueldo diario sin timbrar");
     const overtimeRate = optionalMoneyFromForm(formData.get("overtimeRate")) ?? 0;
     await changeSalary(session, id, parseVersion(formData.get("version")), dailyStamped, dailyCash, overtimeRate);
-    await setFlash({ tone: "ok", message: "Sueldo vigente actualizado." });
+    await setFlash({ tone: "ok", message: "Sueldos diarios actualizados." });
   } catch (error) {
     await setFlash({ tone: "error", message: bubble(error) });
   }

@@ -147,7 +147,6 @@ export function CollaboratorDatosTab({
   const [credSuggestedPass, setCredSuggestedPass] = useState(() => generateCollaboratorPassword(4021));
   const [copied, setCopied] = useState(false);
 
-  const sueldoVigente = collaborator.dailyStamped + collaborator.dailyCash;
   const activePasswordPreview = collaborator.credentialPasswordPreview || "(sin contraseña visible; regenera para compartir)";
 
   const waUrl = useMemo(
@@ -331,8 +330,9 @@ export function CollaboratorDatosTab({
       {/* 4. Sueldo */}
       <Card className="p-5">
         <SectionHeader title="Sueldo" isCeo={isCeo} onEdit={() => setModal("sueldo")} />
-        <dl className="grid gap-4 sm:grid-cols-3">
-          <DataItem label="Sueldo vigente" value={money(sueldoVigente)} />
+        <dl className="grid gap-4 sm:grid-cols-2">
+          <DataItem label="Sueldo diario timbrado" value={money(collaborator.dailyStamped)} />
+          <DataItem label="Sueldo diario sin timbrar" value={money(collaborator.dailyCash)} />
         </dl>
       </Card>
 
@@ -715,7 +715,7 @@ export function CollaboratorDatosTab({
       <FormOverlayDialog
         open={modal === "sueldo"}
         onClose={() => setModal(null)}
-        title="Editar sueldo vigente"
+        title="Editar sueldo"
         titleId="edit-sueldo-dialog"
       >
         <form action={salaryAction} className="space-y-4">
@@ -723,12 +723,14 @@ export function CollaboratorDatosTab({
           <input type="hidden" name="version" value={collaborator.version} />
           <input type="hidden" name="tab" value="datos" />
           <input type="hidden" name="overtimeRate" value={collaborator.overtimeRate} />
-          <input type="hidden" name="dailyCash" value={0} />
           <p className="text-xs text-slate-500">
             El cambio aplica hacia adelante sin modificar nóminas o procesos históricos ya cerrados.
           </p>
-          <Field label="Sueldo vigente">
-            <MoneyInput name="sueldoVigente" defaultValue={sueldoVigente} min="0" />
+          <Field label="Sueldo diario timbrado">
+            <MoneyInput name="dailyStamped" required defaultValue={collaborator.dailyStamped} min="0" />
+          </Field>
+          <Field label="Sueldo diario sin timbrar">
+            <MoneyInput name="dailyCash" required defaultValue={collaborator.dailyCash} min="0" />
           </Field>
           <div className="flex justify-end gap-2 border-t border-slate-200 pt-4">
             <Button type="button" tone="ghost" onClick={() => setModal(null)}>

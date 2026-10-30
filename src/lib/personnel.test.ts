@@ -357,7 +357,8 @@ describe("personal y nómina", () => {
       rfc: "PELJ950320AAA",
       curp: "PELJ950320HDFRRL01",
       nss: "12345678901",
-      sueldoVigente: 18500,
+      dailyStamped: 400,
+      dailyCash: 150,
       bankName: "BBVA",
       bankAccount: "012180001234567890",
       commissionEnabled: true,
@@ -370,6 +371,8 @@ describe("personal y nómina", () => {
       productivityBonusEnabled: false,
       productivityBonus: 0,
     });
+    assert.equal(integratedCollab.dailyStamped, 400);
+    assert.equal(integratedCollab.dailyCash, 150);
     assert.equal(integratedCollab.bankName, "BBVA");
     assert.equal(integratedCollab.bankAccount, "012180001234567890");
     assert.equal(integratedCollab.credentialPasswordPreview, "Sygos-2026!abc");
@@ -426,8 +429,11 @@ describe("personal y nómina", () => {
     assert.equal(periodRow.lines.length, 2);
 
     const juanLine = periodRow.lines.find((l) => l.collaboratorId === integratedCollab.id)!;
-    assert.equal(juanLine.calcSueldo, 18500);
-    assert.equal(juanLine.sueldo, 18500);
+    // Semana ISO lunes a domingo: (400 + 150) × 7 días.
+    assert.equal(juanLine.calcSueldo, 3850);
+    assert.equal(juanLine.sueldo, 3850);
+    assert.equal(juanLine.stampedBase, 2800);
+    assert.equal(juanLine.cashBase, 1050);
     assert.equal(juanLine.calcBonos, 1200);
     assert.equal(juanLine.bonos, 1200);
 

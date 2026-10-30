@@ -108,6 +108,15 @@ export function splitBySalary(amount: number, dailyStamped: number, dailyCash: n
   return { stamped: roundMoney(amount * (dailyStamped / total)), cash: roundMoney(amount * (dailyCash / total)) };
 }
 
+/** Both daily rates are required on alta and on salary edits. Zero is allowed; a missing or negative amount is not. */
+export function requireDailySalaries(dailyStamped: number, dailyCash: number) {
+  const stamped = roundMoney(Number(dailyStamped));
+  const cash = roundMoney(Number(dailyCash));
+  if (!Number.isFinite(stamped) || stamped < 0) throw new Error("El sueldo diario timbrado es obligatorio.");
+  if (!Number.isFinite(cash) || cash < 0) throw new Error("El sueldo diario sin timbrar es obligatorio.");
+  return { dailyStamped: stamped, dailyCash: cash };
+}
+
 export function bracketRate(amount: number, brackets: Array<{ upTo: number | null; rate: number }>) {
   const ordered = [...brackets].sort((a, b) => (a.upTo ?? Number.POSITIVE_INFINITY) - (b.upTo ?? Number.POSITIVE_INFINITY));
   return ordered.find((row) => row.upTo == null || amount <= row.upTo)?.rate ?? 0;
@@ -240,6 +249,7 @@ export async function registerCollaborator(
   }
   const existing = await prisma.collaborator.findUnique({ where: { userId: user.id } });
   if (existing) throw new Error("Ese usuario ya tiene ficha de colaborador.");
+  const salaries = requireDailySalaries(input.dailyStamped, input.dailyCash);
   const row = await prisma.collaborator.create({
     data: {
       companyId: actor.activeCompanyId,
@@ -249,8 +259,8 @@ export async function registerCollaborator(
       status: "ACTIVO",
       hiredAt: noonUtc(input.hiredAt),
       vacationBalance: input.hireKind === "MIGRADO" ? input.vacationBalance : 0,
-      dailyStamped: input.dailyStamped,
-      dailyCash: input.dailyCash,
+      dailyStamped: salaries.dailyStamped,
+      dailyCash: salaries.dailyCash,
       overtimeRate: profile.exempt ? 0 : input.overtimeRate,
       rfc: input.rfc,
       curp: input.curp ?? null,
@@ -299,8 +309,9 @@ export async function createCollaboratorComplete(
     rfc: string;
     curp: string;
     nss: string;
-    // 5. Sueldo
-    sueldoVigente: number;
+    // 5. Sueldo diario (timbrado y sin timbrar)
+    dailyStamped: number;
+    dailyCash: number;
     // 6. Cuenta bancaria
     bankName: string;
     bankAccount: string;
@@ -342,8 +353,7 @@ export async function createCollaboratorComplete(
   if (!cleanCurp) throw new Error("La CURP es obligatoria.");
   const cleanNss = input.nss.trim();
   if (!cleanNss) throw new Error("El NSS es obligatorio.");
-  const sueldo = roundMoney(Number(input.sueldoVigente));
-  if (!Number.isFinite(sueldo) || sueldo < 0) throw new Error("El sueldo vigente es obligatorio.");
+  const salaries = requireDailySalaries(input.dailyStamped, input.dailyCash);
   const cleanBankName = input.bankName.trim();
   if (!cleanBankName) throw new Error("El banco es obligatorio.");
   const cleanBankAccount = input.bankAccount.trim();
@@ -399,8 +409,8 @@ export async function createCollaboratorComplete(
       rfc: cleanRfc,
       curp: cleanCurp,
       nss: cleanNss,
-      dailyStamped: sueldo,
-      dailyCash: 0,
+      dailyStamped: salaries.dailyStamped,
+      dailyCash: salaries.dailyCash,
       overtimeRate: 0,
       bankName: cleanBankName,
       bankAccount: cleanBankAccount,
@@ -763,11 +773,12 @@ export async function changeBoss(actor: Actor, collaboratorId: string, version: 
 
 export async function changeSalary(actor: Actor, collaboratorId: string, version: number, dailyStamped: number, dailyCash: number, overtimeRate: number) {
   assertCeo(actor);
+  const salaries = requireDailySalaries(dailyStamped, dailyCash);
   const row = await prisma.collaborator.findFirst({ where: { id: collaboratorId, companyId: actor.activeCompanyId }, include: { user: true } });
   if (!row) throw new Error("Esa ficha no es de esta empresa.");
   const updated = await prisma.collaborator.updateMany({
     where: { id: row.id, version },
-    data: { dailyStamped, dailyCash, overtimeRate: row.exemptBenefits ? 0 : overtimeRate, version: { increment: 1 } },
+    data: { dailyStamped: salaries.dailyStamped, dailyCash: salaries.dailyCash, overtimeRate: row.exemptBenefits ? 0 : overtimeRate, version: { increment: 1 } },
   });
   if (updated.count === 0) throw new ConcurrencyError();
   await recordHistory({ companyId: actor.activeCompanyId, entityType: "COLABORADOR", entityId: row.id, action: "SALARIO", summary: `Cambió el salario de ${row.user.name}. El anterior era $${row.dailyStamped} timbrado y $${row.dailyCash} efectivo.`, authorUserId: actor.userId });

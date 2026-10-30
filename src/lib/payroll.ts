@@ -7,6 +7,7 @@ import {
   mexicoToday,
   noonUtc,
   parseCommissionTiers,
+  splitBySalary,
   weekdaysBetween,
   weekRange,
 } from "./personnel";
@@ -160,7 +161,7 @@ export type PayrollConceptOrigins = {
 
 export function parsePayrollOrigins(json: string | null | undefined): PayrollConceptOrigins {
   const fallback: PayrollConceptOrigins = {
-    sueldo: "Sueldo vigente configurado en la ficha del colaborador.",
+    sueldo: "Suma del sueldo diario timbrado y el sueldo diario sin timbrar por los días del periodo.",
     horasExtra: "Sin horas extra autorizadas en el periodo.",
     bonos: "Sin bonos aplicados en el periodo.",
     comision: "Sin comisión por facturación en el periodo.",
@@ -386,9 +387,12 @@ export async function generateOrOpenWeeklyPayroll(
   });
 
   for (const person of people) {
-    const baseSalary = roundMoney(person.dailyStamped + person.dailyCash);
-    const calcSueldo = baseSalary;
-    const sueldoOrigin = `Sueldo vigente configurado en la ficha del colaborador (${money(calcSueldo)}).`;
+    const periodDays = eachDate(parsed.periodStart, parsed.periodEnd).length;
+    const dailyTotal = roundMoney(person.dailyStamped + person.dailyCash);
+    const stampedBase = roundMoney(person.dailyStamped * periodDays);
+    const cashBase = roundMoney(person.dailyCash * periodDays);
+    const calcSueldo = roundMoney(stampedBase + cashBase);
+    const sueldoOrigin = `Sueldo diario timbrado ${money(person.dailyStamped)} + sueldo diario sin timbrar ${money(person.dailyCash)} × ${periodDays} días del periodo (${money(calcSueldo)}).`;
 
     // Horas extra autorizadas en el periodo
     const overtimeRows = await prisma.overtimeRequest.findMany({
@@ -402,7 +406,7 @@ export async function generateOrOpenWeeklyPayroll(
       (sum, row) => sum + (row.authorizedHours ?? row.hours),
       0,
     );
-    const hourlyRate = person.overtimeRate > 0 ? person.overtimeRate : baseSalary > 0 ? roundMoney(baseSalary / 7 / 8) : 0;
+    const hourlyRate = person.overtimeRate > 0 ? person.overtimeRate : dailyTotal > 0 ? roundMoney(dailyTotal / 8) : 0;
     const calcHorasExtra = roundMoney(
       overtimeRows.reduce((sum, row) => {
         const stored = row.amountStamped + row.amountCash;
@@ -524,8 +528,9 @@ export async function generateOrOpenWeeklyPayroll(
       const vDays = weekdaysBetween(v.startDate, v.endDate).filter((d) => periodWeekdays.has(d));
       vacDaysInPeriod += vDays.length;
     }
-    const dailyEquivalent = baseSalary > 0 ? baseSalary / 7 : 0;
+    const dailyEquivalent = dailyTotal;
     const calcPrimaVacacional = roundMoney(vacDaysInPeriod * dailyEquivalent * 0.25);
+    const primaSplit = splitBySalary(calcPrimaVacacional, person.dailyStamped, person.dailyCash);
     const primaOrigin =
       vacDaysInPeriod > 0
         ? `${vacDaysInPeriod} día(s) de vacaciones autorizadas en el periodo (25% prima vacacional).`
@@ -537,6 +542,7 @@ export async function generateOrOpenWeeklyPayroll(
 
     // Descuentos por faltas no justificadas
     const calcDescuentos = roundMoney(unjustifiedAbsences.length * dailyEquivalent);
+    const discountSplit = splitBySalary(calcDescuentos, person.dailyStamped, person.dailyCash);
     const descuentosOrigin =
       unjustifiedAbsences.length > 0
         ? `${unjustifiedAbsences.length} falta(s) no justificada(s) en el periodo (${unjustifiedAbsences
@@ -570,19 +576,19 @@ export async function generateOrOpenWeeklyPayroll(
       data: {
         periodId: period.id,
         collaboratorId: person.id,
-        stampedBase: calcSueldo,
-        cashBase: 0,
-        discountStamped: calcDescuentos,
-        discountCash: 0,
+        stampedBase,
+        cashBase,
+        discountStamped: discountSplit.stamped,
+        discountCash: discountSplit.cash,
         overtimeStamped: calcHorasExtra,
         overtimeCash: 0,
-        primaStamped: calcPrimaVacacional,
-        primaCash: 0,
+        primaStamped: primaSplit.stamped,
+        primaCash: primaSplit.cash,
         bonus: calcBonos,
         extraStamped: roundMoney(calcComision + calcCompensaciones + calcOtrosConceptos),
         extraCash: 0,
-        transferTotal: totals.totalPagar,
-        cashTotal: 0,
+        transferTotal: roundMoney(totals.totalPagar - (cashBase - discountSplit.cash + primaSplit.cash)),
+        cashTotal: roundMoney(cashBase - discountSplit.cash + primaSplit.cash),
         calcSueldo,
         calcHorasExtra,
         calcBonos,
@@ -661,6 +667,10 @@ export async function updatePayrollLineAppliedAmounts(
   };
 
   const totals = computeLineTotals(clean);
+  const salarySplit = splitBySalary(clean.sueldo, line.collaborator.dailyStamped, line.collaborator.dailyCash);
+  const discountApplied = splitBySalary(clean.descuentos, line.collaborator.dailyStamped, line.collaborator.dailyCash);
+  const primaApplied = splitBySalary(clean.primaVacacional, line.collaborator.dailyStamped, line.collaborator.dailyCash);
+  const cashTotal = roundMoney(salarySplit.cash - discountApplied.cash + primaApplied.cash);
 
   await prisma.payrollLine.update({
     where: { id: line.id },
@@ -668,14 +678,17 @@ export async function updatePayrollLineAppliedAmounts(
       ...clean,
       totalPercepciones: totals.totalPercepciones,
       totalPagar: totals.totalPagar,
-      stampedBase: clean.sueldo,
+      stampedBase: salarySplit.stamped,
+      cashBase: salarySplit.cash,
       overtimeStamped: clean.horasExtra,
       bonus: clean.bonos,
-      primaStamped: clean.primaVacacional,
+      primaStamped: primaApplied.stamped,
+      primaCash: primaApplied.cash,
       extraStamped: roundMoney(clean.comision + clean.compensaciones + clean.otrosConceptos),
-      discountStamped: clean.descuentos,
-      transferTotal: totals.totalPagar,
-      cashTotal: 0,
+      discountStamped: discountApplied.stamped,
+      discountCash: discountApplied.cash,
+      transferTotal: roundMoney(totals.totalPagar - cashTotal),
+      cashTotal,
     },
   });
 

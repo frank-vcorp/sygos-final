@@ -364,11 +364,14 @@ export function NewCollaboratorForm({
       {/* 5. Sueldo */}
       <FormSection
         title="5. Sueldo"
-        description="Sueldo vigente del colaborador en pesos (MXN)."
+        description="Dos sueldos diarios en pesos (MXN). Ambos son obligatorios; usa 0 si uno no aplica."
         columns={2}
       >
-        <Field label="Sueldo vigente *">
-          <MoneyInput name="sueldoVigente" min="0" defaultValue="0" />
+        <Field label="Sueldo diario timbrado *">
+          <MoneyInput name="dailyStamped" required min="0" />
+        </Field>
+        <Field label="Sueldo diario sin timbrar *">
+          <MoneyInput name="dailyCash" required min="0" />
         </Field>
       </FormSection>
 
