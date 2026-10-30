@@ -211,6 +211,10 @@ export async function getSendGridSmtpConfig(
   };
 }
 
+const SMTP_CONNECTION_TIMEOUT_MS = 8000;
+const SMTP_GREETING_TIMEOUT_MS = 8000;
+const SMTP_SOCKET_TIMEOUT_MS = 12000;
+
 function createSmtpTransporter(config: {
   host: string;
   port: number;
@@ -230,10 +234,35 @@ function createSmtpTransporter(config: {
     tls: {
       rejectUnauthorized: false,
     },
-    connectionTimeout: 10000,
-    greetingTimeout: 10000,
-    socketTimeout: 15000,
+    connectionTimeout: SMTP_CONNECTION_TIMEOUT_MS,
+    greetingTimeout: SMTP_GREETING_TIMEOUT_MS,
+    socketTimeout: SMTP_SOCKET_TIMEOUT_MS,
   });
+}
+
+export function isSendGridHost(host: string) {
+  const clean = host.trim().toLowerCase();
+  return clean === DEFAULT_SMTP_HOST || clean.endsWith(".sendgrid.net") || clean === "sendgrid.net";
+}
+
+export function isSmtpTransportError(message: string) {
+  return /ETIMEDOUT|ECONNREFUSED|EHOSTUNREACH|ENETUNREACH|ESOCKET|ECONNRESET|ENOTFOUND|EAI_AGAIN|timed out|timeout|greeting never|socket closed|connect E/i.test(message);
+}
+
+export function parseSendGridErrorBody(status: number, raw: string) {
+  const text = raw.trim();
+  try {
+    const json = JSON.parse(text) as { errors?: Array<{ message?: string; field?: string; help?: string }> };
+    if (json.errors?.length) {
+      const detail = json.errors
+        .map((item) => [item.field, item.message, item.help].filter(Boolean).join(": "))
+        .join(" | ");
+      return `SendGrid API ${status}: ${detail}`;
+    }
+  } catch {
+    // Body is not JSON.
+  }
+  return text ? `SendGrid API ${status}: ${text.slice(0, 500)}` : `SendGrid API ${status} sin detalle.`;
 }
 
 export async function verifySendGrid(
@@ -283,106 +312,199 @@ export async function verifySendGrid(
   }
 }
 
+export type SendEmailOverrides = {
+  host?: string | null;
+  port?: number | null;
+  username?: string | null;
+  secret?: string | null;
+  fromEmail?: string | null;
+  fromName?: string | null;
+};
+
+export type SendEmailResult = {
+  ok: boolean;
+  message: string;
+  channel?: "smtp" | "api";
+  messageId?: string | null;
+  response?: string | null;
+};
+
+async function sendViaSmtp(input: {
+  host: string;
+  port: number;
+  username: string;
+  secret: string;
+  fromEmail: string;
+  fromName: string;
+  to: string;
+  subject: string;
+  text: string;
+  html?: string;
+}): Promise<SendEmailResult> {
+  const transporter = createSmtpTransporter(input);
+  const info = await transporter.sendMail({
+    from: formatFromHeader(input.fromEmail, input.fromName),
+    to: input.to,
+    subject: input.subject,
+    text: input.text,
+    ...(input.html ? { html: input.html } : {}),
+  });
+  const rejected = Array.isArray(info.rejected) ? info.rejected.map(String).filter(Boolean) : [];
+  const response = typeof info.response === "string" ? info.response : "";
+  const messageId = typeof info.messageId === "string" ? info.messageId : null;
+  if (rejected.length > 0) {
+    return {
+      ok: false,
+      channel: "smtp",
+      messageId,
+      response,
+      message: `SMTP rechazó el correo (${input.host}:${input.port}). Destinatarios rechazados: ${rejected.join(", ")}. Respuesta: ${response || "sin respuesta del servidor"}.`,
+    };
+  }
+  return {
+    ok: true,
+    channel: "smtp",
+    messageId,
+    response,
+    message: `SendGrid SMTP aceptó el correo para ${input.to} (${input.host}:${input.port}). Respuesta: ${response || "250 Ok"}.${messageId ? ` Message-ID: ${messageId}.` : ""} Si no llega, revisa spam y que ${input.fromEmail} sea un Sender Identity verificado en SendGrid.`,
+  };
+}
+
+async function sendViaSendGridApi(input: {
+  secret: string;
+  fromEmail: string;
+  fromName: string;
+  to: string;
+  subject: string;
+  text: string;
+  html?: string;
+}): Promise<SendEmailResult> {
+  const payload = sendgridBody({
+    from: input.fromEmail,
+    fromName: input.fromName,
+    to: input.to,
+    subject: input.subject,
+    text: input.text,
+    html: input.html,
+  });
+  if ("error" in payload && payload.error) {
+    return { ok: false, channel: "api", message: payload.error };
+  }
+  const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${input.secret}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(payload.body),
+  });
+  const messageId = response.headers.get("x-message-id");
+  if (response.status === 202 || response.ok) {
+    return {
+      ok: true,
+      channel: "api",
+      messageId,
+      response: `HTTP ${response.status}`,
+      message: `SendGrid API aceptó el correo para ${input.to} (HTTP ${response.status}).${messageId ? ` x-message-id: ${messageId}.` : ""} Revisa la bandeja y spam. El remitente ${input.fromEmail} debe ser un Sender Identity verificado.`,
+    };
+  }
+  const detail = await response.text();
+  return {
+    ok: false,
+    channel: "api",
+    messageId,
+    response: `HTTP ${response.status}`,
+    message: parseSendGridErrorBody(response.status, detail),
+  };
+}
+
 export async function sendSystemEmail(input: {
   companyId?: string | null;
   to: string;
   subject: string;
   text: string;
   html?: string;
-}): Promise<{ ok: boolean; message: string }> {
+  ignoreEnabled?: boolean;
+  overrides?: SendEmailOverrides;
+}): Promise<SendEmailResult> {
   if (await inSandbox()) {
-    return { ok: false, message: "PRUEBA / SIN VALIDEZ. No se envió correo." };
+    return { ok: false, message: "PRUEBA / SIN VALIDEZ. No se envió correo porque la sesión está en modo de pruebas." };
   }
   const to = input.to.trim();
   if (!to) {
     return { ok: false, message: "El destinatario no tiene correo electrónico." };
   }
-  const config = await getSendGridSmtpConfig(input.companyId);
-  if (config.source === "none" || (!config.secret && !config.fromEmail)) {
+  const stored = await getSendGridSmtpConfig(input.companyId);
+  const overrides = input.overrides ?? {};
+  const host = overrides.host?.trim() || stored.host || DEFAULT_SMTP_HOST;
+  const port = overrides.port ? normalizeSmtpPort(overrides.port) : stored.port;
+  const username = overrides.username?.trim() || stored.username || DEFAULT_SMTP_USERNAME;
+  const secret = overrides.secret?.trim() || stored.secret || "";
+  const fromEmail = overrides.fromEmail?.trim() || stored.fromEmail;
+  const fromName = overrides.fromName?.trim() || stored.fromName;
+
+  if (!secret) {
     return {
       ok: false,
-      message: "SendGrid SMTP no está configurado. Configúralo en Configuración > Integraciones.",
+      message: "No hay API Key / contraseña SMTP guardada. Guarda primero la configuración de SendGrid.",
     };
   }
-  if (!config.enabled) {
+  if (!fromEmail) {
     return {
       ok: false,
-      message: "El envío de correo (SendGrid SMTP) está deshabilitado en Configuración.",
+      message: "Falta el correo remitente. Captúralo en el formulario de SendGrid SMTP y vuelve a intentar.",
     };
   }
-  if (!config.fromEmail) {
+  if (!stored.enabled && !input.ignoreEnabled) {
     return {
       ok: false,
-      message: "Falta el correo remitente verificado en la configuración de SendGrid SMTP.",
+      message: "El envío de correo (SendGrid SMTP) está Deshabilitado en Configuración. Cámbialo a Habilitado y guarda.",
     };
   }
-  if (!config.secret) {
-    return {
-      ok: false,
-      message: "Falta la contraseña / API Key en la configuración de SendGrid SMTP.",
-    };
+
+  const mail = { host, port, username, secret, fromEmail, fromName, to, subject: input.subject, text: input.text, html: input.html };
+  let smtpFailure = "";
+  try {
+    const smtp = await sendViaSmtp(mail);
+    if (smtp.ok) {
+      return input.ignoreEnabled && !stored.enabled
+        ? { ...smtp, message: `${smtp.message} El servicio está Deshabilitado para envíos normales; esta prueba se envió igual.` }
+        : smtp;
+    }
+    smtpFailure = smtp.message;
+  } catch (error) {
+    const smtpMsg = error instanceof Error ? error.message : String(error);
+    smtpFailure = `SMTP ${host}:${port} falló: ${smtpMsg}`;
+  }
+
+  const canUseApi = secret.startsWith("SG.") && isSendGridHost(host);
+  if (!canUseApi) {
+    return { ok: false, channel: "smtp", message: smtpFailure };
   }
 
   try {
-    const transporter = createSmtpTransporter({
-      host: config.host,
-      port: config.port,
-      username: config.username,
-      secret: config.secret,
-    });
-    await transporter.sendMail({
-      from: formatFromHeader(config.fromEmail, config.fromName),
-      to,
-      subject: input.subject,
-      text: input.text,
-      ...(input.html ? { html: input.html } : {}),
-    });
-    return {
-      ok: true,
-      message: `Correo enviado a ${to} vía ${config.host}:${config.port}.`,
-    };
-  } catch (smtpError) {
-    const smtpMsg = smtpError instanceof Error ? smtpError.message : String(smtpError);
-    const isNetworkBlock =
-      /ETIMEDOUT|ECONNREFUSED|EHOSTUNREACH|ENETUNREACH|ESOCKET/i.test(smtpMsg);
-
-    if (isNetworkBlock && config.host === DEFAULT_SMTP_HOST && config.secret.startsWith("SG.")) {
-      const payload = sendgridBody({
-        from: config.fromEmail,
-        fromName: config.fromName,
-        to,
-        subject: input.subject,
-        text: input.text,
-        html: input.html,
-      });
-      if ("error" in payload && payload.error) {
-        return { ok: false, message: payload.error };
-      }
-      try {
-        const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
-          method: "POST",
-          headers: {
-            Authorization: `Bearer ${config.secret}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload.body),
-        });
-        if (response.status === 202 || response.ok) {
-          return { ok: true, message: `Correo enviado a ${to} vía SendGrid.` };
-        }
-        const detail = await response.text();
-        return {
-          ok: false,
-          message: detail || `SendGrid rechazó el envío (${response.status}).`,
-        };
-      } catch {
-        // Fall through to report SMTP error
-      }
+    const api = await sendViaSendGridApi(mail);
+    if (api.ok) {
+      const note = isSmtpTransportError(smtpFailure)
+        ? ` El puerto SMTP ${port} no respondió (${smtpFailure}), así que se usó la API Web de SendGrid.`
+        : ` SMTP no entregó el correo (${smtpFailure}).`;
+      return {
+        ...api,
+        message: `${api.message}${note}`,
+      };
     }
-
     return {
       ok: false,
-      message: `No se pudo enviar el correo por SMTP (${config.host}:${config.port}): ${smtpMsg}`,
+      channel: "api",
+      message: `${smtpFailure} · ${api.message}`,
+      messageId: api.messageId,
+      response: api.response,
+    };
+  } catch (error) {
+    const apiMsg = error instanceof Error ? error.message : String(error);
+    return {
+      ok: false,
+      message: `${smtpFailure} · SendGrid API no respondió: ${apiMsg}`,
     };
   }
 }

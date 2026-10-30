@@ -27,6 +27,18 @@ function safeReturnUrl(formData?: FormData, fallback = "/configuracion") {
   return fallback;
 }
 
+function redirectWithNotice(target: string, tone: "ok" | "error", message: string): never {
+  const hashIdx = target.indexOf("#");
+  const hash = hashIdx >= 0 ? target.slice(hashIdx) : "";
+  const path = hashIdx >= 0 ? target.slice(0, hashIdx) : target;
+  const [pathname, existingQuery] = path.split("?", 2);
+  const params = new URLSearchParams(existingQuery ?? "");
+  params.set("sg", tone);
+  params.set("sgm", message.replace(/\s+/g, " ").slice(0, 700));
+  const next = `${pathname}?${params.toString()}${hash}`;
+  redirect(next);
+}
+
 export async function updateCompanyAction(formData: FormData) {
   "use server";
   const session = await requireCompany();
@@ -134,11 +146,9 @@ export async function saveSendgridAction(formData: FormData) {
   const fromName = optionalText(formData.get("fromName")) ?? session.activeCompanyName;
 
   if (enabled && !fromEmail) {
-    await setFlash({
-      tone: "error",
-      message: "SendGrid SMTP necesita el correo remitente verificado.",
-    });
-    redirect(back);
+    const message = "SendGrid SMTP necesita el correo remitente verificado.";
+    await setFlash({ tone: "error", message });
+    redirectWithNotice(back, "error", message);
   }
 
   const existingCompany = await prisma.integrationSetting.findFirst({
@@ -152,11 +162,9 @@ export async function saveSendgridAction(formData: FormData) {
   const savedSecretHint = existingCompany?.secretHint ?? existingGlobal?.secretHint ?? null;
 
   if (enabled && !secret && !savedSecretEnc) {
-    await setFlash({
-      tone: "error",
-      message: "Falta la contraseña / API Key de SendGrid SMTP (ej. SG.xxxx).",
-    });
-    redirect(back);
+    const message = "No hay API Key / contraseña SMTP guardada. Guarda primero la configuración de SendGrid.";
+    await setFlash({ tone: "error", message });
+    redirectWithNotice(back, "error", message);
   }
 
   const nextSecretEnc = secret ? encryptSecret(secret) : savedSecretEnc;
@@ -201,13 +209,11 @@ export async function saveSendgridAction(formData: FormData) {
     authorUserId: session.userId,
   });
 
-  await setFlash({
-    tone: "ok",
-    message: secret
-      ? `SendGrid SMTP (${host}:${port}) y nueva API Key guardados.`
-      : `Configuración SendGrid SMTP (${host}:${port}) guardada conservando la API Key existente.`,
-  });
-  redirect(back);
+  const message = secret
+    ? `SendGrid SMTP (${host}:${port}) y nueva API Key guardados.`
+    : `Configuración SendGrid SMTP (${host}:${port}) guardada conservando la API Key existente.`;
+  await setFlash({ tone: "ok", message });
+  redirectWithNotice(back, "ok", message);
 }
 
 export async function verifySendgridAction(formData: FormData) {
@@ -220,20 +226,24 @@ export async function verifySendgridAction(formData: FormData) {
   const secret = secretInput ?? stored.secret;
 
   if (!secret) {
-    await setFlash({
-      tone: "error",
-      message: "SendGrid SMTP no tiene API Key guardada. Captúrala y guarda antes de verificar.",
-    });
-    redirect(back);
+    const message = "No hay API Key / contraseña SMTP guardada. Guarda primero la configuración de SendGrid.";
+    await setFlash({ tone: "error", message });
+    redirectWithNotice(back, "error", message);
   }
 
   const host = optionalText(formData.get("host")) || stored.host || DEFAULT_SMTP_HOST;
   const port = formData.get("port") ? normalizeSmtpPort(formData.get("port")) : stored.port;
   const username = optionalText(formData.get("username")) || stored.username || DEFAULT_SMTP_USERNAME;
 
-  const result = await verifySendGrid(secret, { host, port, username });
-  await setFlash({ tone: result.ok ? "ok" : "error", message: result.message });
-  redirect(back);
+  try {
+    const result = await verifySendGrid(secret, { host, port, username });
+    await setFlash({ tone: result.ok ? "ok" : "error", message: result.message });
+    redirectWithNotice(back, result.ok ? "ok" : "error", result.message);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "No se pudo verificar SendGrid SMTP.";
+    await setFlash({ tone: "error", message });
+    redirectWithNotice(back, "error", message);
+  }
 }
 
 export async function sendTestEmailAction(formData: FormData) {
@@ -243,39 +253,49 @@ export async function sendTestEmailAction(formData: FormData) {
 
   const toEmail = optionalText(formData.get("toEmail"));
   if (!toEmail) {
-    await setFlash({
-      tone: "error",
-      message: "Ingresa un correo destinatario para enviar el correo de prueba.",
-    });
-    redirect(back);
+    const message = "Ingresa un correo destinatario para enviar el correo de prueba.";
+    await setFlash({ tone: "error", message });
+    redirectWithNotice(back, "error", message);
   }
 
-  const stored = await getSendGridSmtpConfig(session.activeCompanyId, session.activeCompanyName);
+  const host = optionalText(formData.get("host")) || DEFAULT_SMTP_HOST;
+  const port = normalizeSmtpPort(formData.get("port"));
+  const username = optionalText(formData.get("username")) || DEFAULT_SMTP_USERNAME;
+  const secret = optionalText(formData.get("secret"));
+  const fromEmail = optionalText(formData.get("fromEmail")) ?? "";
+  const fromName = optionalText(formData.get("fromName")) ?? session.activeCompanyName;
   const subject =
     optionalText(formData.get("testSubject")) ||
     `Correo de prueba SMTP · ${session.activeCompanyName} (SYGOS 3.0)`;
   const bodyText =
     optionalText(formData.get("testBody")) ||
     [
-      `Hola,`,
-      ``,
-      `Este es un correo de prueba enviado desde SYGOS 3.0 (${session.activeCompanyName}) a través de SendGrid SMTP Relay.`,
-      `• Servidor SMTP: ${stored.host}:${stored.port}`,
-      `• Usuario SMTP: ${stored.username}`,
-      `• Remitente: ${stored.fromName ? `${stored.fromName} <${stored.fromEmail}>` : stored.fromEmail}`,
-      ``,
-      `Si recibes este mensaje, la integración SMTP está funcionando correctamente.`,
+      "Hola,",
+      "",
+      `Este es un correo de prueba enviado desde SYGOS 3.0 (${session.activeCompanyName}) a través de SendGrid.`,
+      `Servidor SMTP: ${host}:${port}`,
+      `Usuario SMTP: ${username}`,
+      `Remitente: ${fromName ? `${fromName} <${fromEmail || "sin correo"}> ` : fromEmail || "sin correo"}`,
+      "",
+      "Si recibes este mensaje, la integración está funcionando.",
     ].join("\n");
 
-  const result = await sendSystemEmail({
-    companyId: session.activeCompanyId,
-    to: toEmail,
-    subject,
-    text: bodyText,
-  });
-
-  await setFlash({ tone: result.ok ? "ok" : "error", message: result.message });
-  redirect(back);
+  try {
+    const result = await sendSystemEmail({
+      companyId: session.activeCompanyId,
+      to: toEmail,
+      subject,
+      text: bodyText,
+      ignoreEnabled: true,
+      overrides: { host, port, username, secret, fromEmail, fromName },
+    });
+    await setFlash({ tone: result.ok ? "ok" : "error", message: result.message });
+    redirectWithNotice(back, result.ok ? "ok" : "error", result.message);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "No se pudo enviar el correo de prueba.";
+    await setFlash({ tone: "error", message });
+    redirectWithNotice(back, "error", message);
+  }
 }
 
 export async function toggleInventoryAction(formData: FormData) {

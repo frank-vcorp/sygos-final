@@ -7,7 +7,9 @@ import {
   DEFAULT_SMTP_PORT,
   DEFAULT_SMTP_USERNAME,
   formatFromHeader,
+  isSmtpTransportError,
   normalizeSmtpPort,
+  parseSendGridErrorBody,
   parseSendGridExtra,
   sendgridBody,
   serializeSendGridExtra,
@@ -97,6 +99,18 @@ describe("integraciones", () => {
     assert.equal(parsed.fromEmail, "avisos@systron.mx");
     assert.equal(parsed.fromName, "SYSTRON Alertas");
     assert.equal(formatFromHeader("avisos@systron.mx", "SYSTRON Alertas"), '"SYSTRON Alertas" <avisos@systron.mx>');
+  });
+
+  it("expone el error exacto de SendGrid y distingue un puerto SMTP bloqueado", () => {
+    const unverified = parseSendGridErrorBody(
+      403,
+      JSON.stringify({
+        errors: [{ field: "from", message: "The from address does not match a verified Sender Identity." }],
+      }),
+    );
+    assert.match(unverified, /verified Sender Identity/);
+    assert.equal(isSmtpTransportError("connect ETIMEDOUT 167.89.118.52:587"), true);
+    assert.equal(isSmtpTransportError("Invalid login: 535 Authentication failed"), false);
   });
 
   it("normaliza teléfonos, JIDs y enlaces de respaldo para WhatsApp (Baileys)", () => {
