@@ -784,9 +784,30 @@ export async function overtimeAction(formData: FormData) {
   "use server";
   try {
     const session = await requireCompany();
-    if (!can(session.role, "overtime.capture", session.activeCompanyCode) && session.role !== "CEO" && session.role !== "ADMINISTRADOR") throw new Error("No tienes permiso para esta acción.");
-    await requestOvertime(session, requiredText(formData.get("collaboratorId"), "Colaborador"), requiredText(formData.get("workDate"), "Fecha"), requiredText(formData.get("startedAt"), "Inicio"), requiredText(formData.get("endedAt"), "Fin"), requiredText(formData.get("reason"), "Motivo"));
-    await setFlash({ tone: "ok", message: "Horas extra registradas. El tipo lo calcula la autorización." });
+    const canCapture =
+      can(session.role, "overtime.capture", session.activeCompanyCode) ||
+      can(session.role, "personnel.manage") ||
+      can(session.role, "personnel.authorize");
+    if (!canCapture) throw new Error("No tienes permiso para esta acción.");
+
+    const collaboratorId = requiredText(formData.get("collaboratorId"), "Colaborador");
+    const workDate = requiredText(formData.get("workDate"), "Fecha");
+    const reason = requiredText(formData.get("reason"), "Motivo");
+    const rawHours = optionalText(formData.get("hours"));
+
+    if (rawHours != null) {
+      await requestOvertimeByHours(session, collaboratorId, workDate, Number(rawHours), reason);
+    } else {
+      await requestOvertime(
+        session,
+        collaboratorId,
+        workDate,
+        requiredText(formData.get("startedAt"), "Inicio"),
+        requiredText(formData.get("endedAt"), "Fin"),
+        reason,
+      );
+    }
+    await setFlash({ tone: "ok", message: "Solicitud de horas extra registrada." });
   } catch (error) {
     await setFlash({ tone: "error", message: bubble(error) });
   }
@@ -796,9 +817,18 @@ export async function overtimeAction(formData: FormData) {
 export async function overtimeReviewAction(formData: FormData) {
   "use server";
   try {
-    const session = await requireCompany();
-    await reviewOvertime(session, requiredText(formData.get("overtimeId"), "Solicitud"), parseVersion(formData.get("version")), formData.get("decision") === "si");
-    await setFlash({ tone: "ok", message: "Decisión registrada." });
+    const session = await guard("personnel.authorize");
+    const approved = formData.get("decision") === "si";
+    const rawAuthHours = optionalText(formData.get("authorizedHours"));
+    const authHours = rawAuthHours != null ? Number(rawAuthHours) : undefined;
+    await reviewOvertime(
+      session,
+      requiredText(formData.get("overtimeId"), "Solicitud"),
+      parseVersion(formData.get("version")),
+      approved,
+      authHours,
+    );
+    await setFlash({ tone: "ok", message: approved ? "Horas extra autorizadas." : "Horas extra rechazadas." });
   } catch (error) {
     await setFlash({ tone: "error", message: bubble(error) });
   }

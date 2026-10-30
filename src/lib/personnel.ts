@@ -1098,22 +1098,19 @@ function hoursBetween(start: string, end: string) {
   return roundMoney(hours);
 }
 
-export async function requestOvertime(actor: Actor, collaboratorId: string, workDate: string, startedAt: string, endedAt: string, reason: string) {
-  const row = await prisma.collaborator.findFirst({ where: { id: collaboratorId, companyId: actor.activeCompanyId, status: "ACTIVO" }, include: { user: true } });
-  if (!row || row.exemptBenefits) throw new Error("Ese colaborador no genera horas extra.");
-  const profile = laborProfile(row.user.role as Role);
-  if (profile.overtimeByManager) {
-    if (actor.role !== "GERENTE_OPERATIVO_SERVOMOTORES" && actor.role !== "CEO" && actor.role !== "ADMINISTRADOR") throw new Error("Las horas extra del ayudante las registra su gerente.");
-  } else if (actor.userId !== row.userId && actor.role !== "CEO" && actor.role !== "ADMINISTRADOR") {
-    throw new Error("El empleado registra sus propias horas extra.");
+export async function requestOvertime(
+  actor: Actor,
+  collaboratorId: string,
+  workDate: string,
+  startedAtOrHours: string | number,
+  endedAtOrReason: string,
+  maybeReason?: string,
+) {
+  if (typeof startedAtOrHours === "number" || maybeReason === undefined) {
+    return requestOvertimeByHours(actor, collaboratorId, workDate, Number(startedAtOrHours), endedAtOrReason);
   }
-  const hours = hoursBetween(startedAt, endedAt);
-  const pendingCeo = profile.overtimeByManager || row.bossUserId === actor.userId && (actor.role === "CEO" || actor.role === "ADMINISTRADOR");
-  const overtime = await prisma.overtimeRequest.create({
-    data: { collaboratorId: row.id, workDate, startedAt, endedAt, hours, reason: reason.trim(), status: pendingCeo ? "PENDIENTE_CEO" : "PENDIENTE_JEFE", requestedByUserId: actor.userId },
-  });
-  await recordHistory({ companyId: actor.activeCompanyId, entityType: "HORAS", entityId: overtime.id, action: "ALTA", summary: `${row.user.name} tiene ${hours} h pendientes de autorización.`, authorUserId: actor.userId });
-  return overtime;
+  const hours = hoursBetween(startedAtOrHours, endedAtOrReason);
+  return requestOvertimeByHours(actor, collaboratorId, workDate, hours, maybeReason);
 }
 
 export async function requestOvertimeByHours(
@@ -1123,9 +1120,23 @@ export async function requestOvertimeByHours(
   hoursInput: number,
   reason: string,
 ) {
-  assertHr(actor);
   const row = await prisma.collaborator.findFirst({ where: { id: collaboratorId, companyId: actor.activeCompanyId }, include: { user: true } });
   if (!row) throw new Error("Esa ficha no es de esta empresa.");
+  if (row.exemptBenefits) throw new Error("Ese colaborador no genera horas extra.");
+  const isHrOrCeo =
+    actor.role === "ADMINISTRADOR" ||
+    actor.role === "CEO" ||
+    actor.role === "COORDINACION_ADMINISTRACION";
+  if (!isHrOrCeo) {
+    const profile = laborProfile(row.user.role as Role);
+    if (profile.overtimeByManager) {
+      if (actor.role !== "GERENTE_OPERATIVO_SERVOMOTORES") {
+        throw new Error("Las horas extra del ayudante las registra su gerente.");
+      }
+    } else if (actor.userId !== row.userId && row.bossUserId !== actor.userId) {
+      throw new Error("El empleado o su jefe directo registra sus horas extra.");
+    }
+  }
   const hours = roundMoney(Number(hoursInput));
   if (!Number.isFinite(hours) || hours <= 0) throw new Error("La cantidad de horas debe ser mayor a cero.");
   const cleanReason = reason.trim();
