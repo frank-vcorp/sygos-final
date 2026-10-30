@@ -44,6 +44,7 @@ import {
 } from "@/lib/personnel";
 import { formatCollaboratorCredentialsMessage, normalizeWhatsAppPhone } from "@/lib/collaborator-credentials";
 import { ROLE_LABEL, isRole } from "@/lib/roles";
+import { sendSystemEmail } from "@/lib/sendgrid";
 import { requireCompany } from "@/lib/session";
 import { sendWhatsAppTextIfLinked } from "@/lib/whatsapp";
 import { prisma } from "@/lib/db";
@@ -152,7 +153,16 @@ export async function hireAction(formData: FormData) {
         roleLabel,
         companyName: session.activeCompanyName,
       });
-      const sentViaBaileys = await sendWhatsAppTextIfLinked(digits, msg);
+      const sentViaBaileys = await sendWhatsAppTextIfLinked(digits, msg, session.activeCompanyId);
+      const collabEmail = optionalText(formData.get("email"));
+      if (collabEmail) {
+        await sendSystemEmail({
+          companyId: session.activeCompanyId,
+          to: collabEmail,
+          subject: `Tus credenciales de acceso a SYGOS 3.0 · ${session.activeCompanyName}`,
+          text: msg,
+        }).catch(() => undefined);
+      }
 
       await setFlash({
         tone: "ok",

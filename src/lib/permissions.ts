@@ -69,7 +69,7 @@ export function can(role: Role, action: Action, companyCode?: string | null): bo
     case "config.company":
       return admin || ceo;
     case "config.integrations":
-      return admin;
+      return admin || ceo;
     case "client.reassign":
       return admin || ceo;
     case "client.inactivate":

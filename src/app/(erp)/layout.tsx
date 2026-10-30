@@ -58,6 +58,8 @@ const LABELS: Record<string, string | ((code: string | null) => string)> = {
   "/proveedores": "Proveedores",
   "/usuarios": "Usuarios",
   "/configuracion": "Configuración",
+  "/configuracion/integraciones": "WhatsApp y correo (SMTP)",
+  "/configuracion/comunicaciones": "Comunicaciones",
   "/pruebas": "Modo de pruebas",
 };
 

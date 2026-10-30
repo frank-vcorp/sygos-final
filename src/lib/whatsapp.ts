@@ -1,85 +1,537 @@
-import { mkdirSync, rmSync } from "fs";
+import { existsSync, mkdirSync, readdirSync, rmSync } from "fs";
 import { dirname, join } from "path";
-import { inSandbox, productionDatabasePath } from "./db";
+import { inSandbox, prismaProd, productionDatabasePath } from "./db";
 
 export type WhatsAppState = {
   state: "desconectado" | "esperando" | "vinculado" | "error";
+  statusLabel: "Desconectado" | "Esperando escaneo QR" | "QR listo para escanear" | "Conectado" | "Error de conexión";
   qr: string | null;
   detail: string;
+  linkedPhone: string | null;
+  linkedName: string | null;
+  enabled: boolean;
+  defaultCountryCode: string;
+  hasSavedSession: boolean;
+  updatedAt: string;
 };
 
-let current: WhatsAppState = { state: "desconectado", qr: null, detail: "Sin vincular. Baileys no pide una contraseña: el teléfono se enlaza con el QR." };
-let socket: {
+export type WhatsAppExtraConfig = {
+  enabled: boolean;
+  defaultCountryCode: string;
+  linkedPhone?: string | null;
+  linkedName?: string | null;
+  lastConnectedAt?: string | null;
+};
+
+type BaileysSocketLike = {
+  user?: { id?: string; name?: string; verifiedName?: string; notify?: string };
   logout?: () => Promise<void>;
   end?: (error?: Error) => void;
   sendMessage?: (jid: string, content: { text: string }) => Promise<unknown>;
+  onWhatsApp?: (...jids: string[]) => Promise<Array<{ jid: string; exists: boolean }> | undefined>;
   ev: { on: (event: string, handler: (...args: never[]) => void) => void };
-} | null = null;
-let starting: Promise<void> | null = null;
+};
+
+type WhatsAppRuntime = {
+  current: WhatsAppState;
+  socket: BaileysSocketLike | null;
+  starting: Promise<void> | null;
+};
+
+const globalForWhatsApp = globalThis as unknown as {
+  __sygosWhatsApp?: WhatsAppRuntime;
+};
 
 function authDir() {
   return join(dirname(productionDatabasePath()), "wa-auth");
 }
 
-export function whatsAppStatus() {
-  return current;
+function hasSavedAuthFiles(): boolean {
+  try {
+    const dir = authDir();
+    if (!existsSync(dir)) return false;
+    return readdirSync(dir).some((f) => f === "creds.json");
+  } catch {
+    return false;
+  }
+}
+
+function createInitialState(): WhatsAppState {
+  const saved = hasSavedAuthFiles();
+  return {
+    state: "desconectado",
+    statusLabel: "Desconectado",
+    qr: null,
+    detail: saved
+      ? "Sesión guardada en servidor. Haz clic en Reconectar o Generar QR para activar la conexión."
+      : "Sin vincular. Haz clic en «Iniciar vinculación / Generar QR» y escanea el código desde WhatsApp > Dispositivos vinculados.",
+    linkedPhone: null,
+    linkedName: null,
+    enabled: true,
+    defaultCountryCode: "52",
+    hasSavedSession: saved,
+    updatedAt: new Date().toISOString(),
+  };
+}
+
+function runtime(): WhatsAppRuntime {
+  if (!globalForWhatsApp.__sygosWhatsApp) {
+    globalForWhatsApp.__sygosWhatsApp = {
+      current: createInitialState(),
+      socket: null,
+      starting: null,
+    };
+  }
+  return globalForWhatsApp.__sygosWhatsApp;
+}
+
+export function extractPhoneFromJid(jid: string | null | undefined): string | null {
+  if (!jid) return null;
+  const userPart = jid.split("@")[0] ?? "";
+  const phoneDigits = (userPart.split(":")[0] ?? "").replace(/\D/g, "");
+  return phoneDigits ? `+${phoneDigits}` : null;
+}
+
+export function formatWhatsAppPhone(
+  phone: string | null | undefined,
+  defaultCountryCode = "52",
+): string {
+  const digits = String(phone ?? "").replace(/\D/g, "");
+  if (!digits) return "";
+  const cc = defaultCountryCode.replace(/\D/g, "") || "52";
+  if (digits.length === 10) return `${cc}${digits}`;
+  return digits;
+}
+
+export function buildWhatsAppFallbackUrl(
+  phone: string | null | undefined,
+  text: string,
+  defaultCountryCode = "52",
+): string {
+  const digits = formatWhatsAppPhone(phone, defaultCountryCode);
+  const encoded = encodeURIComponent(text);
+  return digits ? `https://wa.me/${digits}?text=${encoded}` : `https://wa.me/?text=${encoded}`;
+}
+
+export function parseWhatsAppExtra(raw: string | null | undefined): WhatsAppExtraConfig {
+  if (!raw) {
+    return { enabled: true, defaultCountryCode: "52", linkedPhone: null, linkedName: null, lastConnectedAt: null };
+  }
+  try {
+    const parsed = JSON.parse(raw) as Partial<WhatsAppExtraConfig>;
+    return {
+      enabled: parsed.enabled !== false,
+      defaultCountryCode: (parsed.defaultCountryCode ?? "52").replace(/\D/g, "") || "52",
+      linkedPhone: parsed.linkedPhone ?? null,
+      linkedName: parsed.linkedName ?? null,
+      lastConnectedAt: parsed.lastConnectedAt ?? null,
+    };
+  } catch {
+    return { enabled: true, defaultCountryCode: "52", linkedPhone: null, linkedName: null, lastConnectedAt: null };
+  }
+}
+
+async function persistWhatsAppMeta(patch: Partial<WhatsAppExtraConfig>, companyId?: string | null) {
+  try {
+    const existing = await prismaProd.integrationSetting.findFirst({
+      where: { provider: "WHATSAPP", companyId: companyId ?? null },
+    });
+    const currentExtra = parseWhatsAppExtra(existing?.extra);
+    const nextExtra: WhatsAppExtraConfig = {
+      ...currentExtra,
+      ...patch,
+    };
+    const extraJson = JSON.stringify(nextExtra);
+    if (existing) {
+      await prismaProd.integrationSetting.update({
+        where: { id: existing.id },
+        data: { extra: extraJson, secretHint: nextExtra.linkedPhone ?? existing.secretHint },
+      });
+    } else {
+      await prismaProd.integrationSetting.create({
+        data: {
+          provider: "WHATSAPP",
+          companyId: companyId ?? null,
+          secretHint: nextExtra.linkedPhone ?? null,
+          extra: extraJson,
+        },
+      });
+    }
+  } catch {
+    // Non-fatal metadata persistence
+  }
+}
+
+export async function saveWhatsAppSettings(
+  input: { enabled: boolean; defaultCountryCode: string },
+  companyId?: string | null,
+): Promise<WhatsAppState> {
+  const cleanCc = input.defaultCountryCode.replace(/\D/g, "") || "52";
+  const rt = runtime();
+  rt.current = {
+    ...rt.current,
+    enabled: input.enabled,
+    defaultCountryCode: cleanCc,
+    updatedAt: new Date().toISOString(),
+  };
+  await persistWhatsAppMeta({ enabled: input.enabled, defaultCountryCode: cleanCc }, companyId);
+  await persistWhatsAppMeta({ enabled: input.enabled, defaultCountryCode: cleanCc }, null);
+  return whatsAppStatus();
+}
+
+export function whatsAppStatus(): WhatsAppState {
+  const rt = runtime();
+  rt.current.hasSavedSession = hasSavedAuthFiles();
+  return rt.current;
+}
+
+export async function getWhatsAppFullStatus(companyId?: string | null): Promise<WhatsAppState> {
+  const rt = runtime();
+  try {
+    const rows = await prismaProd.integrationSetting.findMany({
+      where: {
+        provider: "WHATSAPP",
+        ...(companyId ? { OR: [{ companyId }, { companyId: null }] } : {}),
+      },
+      orderBy: { updatedAt: "desc" },
+    });
+    const row = (companyId ? rows.find((r) => r.companyId === companyId) : undefined) ?? rows.find((r) => r.companyId === null) ?? rows[0];
+    if (row) {
+      const extra = parseWhatsAppExtra(row.extra);
+      rt.current.enabled = extra.enabled;
+      rt.current.defaultCountryCode = extra.defaultCountryCode;
+      if (rt.current.state === "vinculado") {
+        rt.current.linkedPhone = rt.current.linkedPhone ?? extra.linkedPhone ?? null;
+        rt.current.linkedName = rt.current.linkedName ?? extra.linkedName ?? null;
+      }
+    }
+  } catch {
+    // Ignore DB lookup errors
+  }
+  rt.current.hasSavedSession = hasSavedAuthFiles();
+  return rt.current;
 }
 
 async function connect(fresh: boolean) {
   if (await inSandbox()) throw new Error("En modo de pruebas no se vincula WhatsApp.");
+  const rt = runtime();
+
   if (fresh) {
-    if (socket?.logout) await socket.logout().catch(() => undefined);
-    socket?.end?.();
-    socket = null;
+    if (rt.socket?.logout) await rt.socket.logout().catch(() => undefined);
+    rt.socket?.end?.();
+    rt.socket = null;
     rmSync(authDir(), { recursive: true, force: true });
+    rt.current = {
+      ...rt.current,
+      state: "esperando",
+      statusLabel: "Esperando escaneo QR",
+      qr: null,
+      linkedPhone: null,
+      linkedName: null,
+      detail: "Generando código QR de vinculación con WhatsApp…",
+      hasSavedSession: false,
+      updatedAt: new Date().toISOString(),
+    };
   }
+
   mkdirSync(authDir(), { recursive: true });
   const baileys = await import("@whiskeysockets/baileys");
-  const qrcode = await import("qrcode") as { toDataURL: (value: string) => Promise<string> };
-  const makeSocket = baileys.default;
+  const qrcode = (await import("qrcode")) as { toDataURL: (value: string, opts?: unknown) => Promise<string> };
+  const makeSocket = baileys.default ?? baileys.makeWASocket;
   const { state, saveCreds } = await baileys.useMultiFileAuthState(authDir());
-  const sock = makeSocket({ auth: state }) as unknown as NonNullable<typeof socket>;
-  socket = sock;
-  sock.ev.on("creds.update", saveCreds);
-  sock.ev.on("connection.update", (update: { connection?: string; qr?: string; lastDisconnect?: { error?: { output?: { statusCode?: number } } } }) => {
-    if (update.qr) {
-      void qrcode.toDataURL(update.qr).then((url: string) => {
-        current = { state: "esperando", qr: url, detail: "En el teléfono: Ajustes, Dispositivos vinculados, Vincular un dispositivo." };
-      });
-    }
-    if (update.connection === "open") current = { state: "vinculado", qr: null, detail: "WhatsApp vinculado. La sesión queda en el servidor." };
-    if (update.connection === "close") {
-      const loggedOut = update.lastDisconnect?.error?.output?.statusCode === 401;
-      current = loggedOut
-        ? { state: "desconectado", qr: null, detail: "La sesión se cerró desde el teléfono. Hay que volver a vincular." }
-        : { state: "error", qr: null, detail: "Se cortó la conexión. Puedes reconectar sin un QR nuevo si la sesión sigue guardada." };
-      socket = null;
-    }
-  });
+
+  if (rt.socket && !fresh) {
+    rt.socket.end?.();
+    rt.socket = null;
+  }
+
+  const silentLogger = {
+    level: "silent",
+    trace: () => undefined,
+    debug: () => undefined,
+    info: () => undefined,
+    warn: () => undefined,
+    error: () => undefined,
+    fatal: () => undefined,
+    child: () => silentLogger,
+  };
+
+  const sock = makeSocket({
+    auth: state,
+    printQRInTerminal: false,
+    logger: silentLogger as never,
+    browser: ["SYGOS 3.0 ERP", "Chrome", "1.0.0"],
+  }) as unknown as BaileysSocketLike;
+
+  rt.socket = sock;
+
+  const meFromCreds = (state.creds as { me?: { id?: string; name?: string } } | undefined)?.me;
+  if (meFromCreds?.id) {
+    rt.current.linkedPhone = extractPhoneFromJid(meFromCreds.id);
+    rt.current.linkedName = meFromCreds.name ?? rt.current.linkedName;
+  }
+
+  sock.ev.on("creds.update", saveCreds as never);
+  sock.ev.on(
+    "connection.update",
+    (update: {
+      connection?: string;
+      qr?: string;
+      lastDisconnect?: { error?: { output?: { statusCode?: number }; message?: string } };
+    }) => {
+      if (update.qr) {
+        void qrcode
+          .toDataURL(update.qr, { margin: 2, width: 280 })
+          .then((url: string) => {
+            rt.current = {
+              ...rt.current,
+              state: "esperando",
+              statusLabel: "QR listo para escanear",
+              qr: url,
+              detail:
+                "Abre WhatsApp en tu teléfono → Configuración / Menú → Dispositivos vinculados → Vincular un dispositivo y escanea este código QR.",
+              hasSavedSession: hasSavedAuthFiles(),
+              updatedAt: new Date().toISOString(),
+            };
+          });
+      }
+
+      if (update.connection === "open") {
+        const me = (sock.user ?? (state.creds as { me?: { id?: string; name?: string } } | undefined)?.me) as
+          | { id?: string; name?: string; verifiedName?: string; notify?: string }
+          | undefined;
+        const linkedPhone = extractPhoneFromJid(me?.id) ?? rt.current.linkedPhone;
+        const linkedName = me?.name ?? me?.verifiedName ?? me?.notify ?? rt.current.linkedName ?? "Cuenta vinculada";
+        rt.current = {
+          ...rt.current,
+          state: "vinculado",
+          statusLabel: "Conectado",
+          qr: null,
+          linkedPhone,
+          linkedName,
+          detail: linkedPhone
+            ? `WhatsApp conectado (${linkedPhone}${linkedName ? ` · ${linkedName}` : ""}). La sesión está activa en el servidor.`
+            : "WhatsApp conectado. La sesión está activa en el servidor.",
+          hasSavedSession: true,
+          updatedAt: new Date().toISOString(),
+        };
+        void persistWhatsAppMeta({
+          linkedPhone,
+          linkedName,
+          lastConnectedAt: new Date().toISOString(),
+        });
+      }
+
+      if (update.connection === "close") {
+        const statusCode = update.lastDisconnect?.error?.output?.statusCode;
+        const loggedOut = statusCode === 401;
+        const restartRequired = statusCode === 515;
+
+        if (restartRequired) {
+          rt.socket = null;
+          void connect(false).catch(() => undefined);
+          return;
+        }
+
+        if (loggedOut) {
+          rt.socket = null;
+          rmSync(authDir(), { recursive: true, force: true });
+          rt.current = {
+            ...rt.current,
+            state: "desconectado",
+            statusLabel: "Desconectado",
+            qr: null,
+            linkedPhone: null,
+            linkedName: null,
+            hasSavedSession: false,
+            detail: "La sesión se cerró desde el teléfono. Haz clic en «Iniciar vinculación / Generar QR» para vincular de nuevo.",
+            updatedAt: new Date().toISOString(),
+          };
+          void persistWhatsAppMeta({ linkedPhone: null, linkedName: null });
+          return;
+        }
+
+        rt.socket = null;
+        rt.current = {
+          ...rt.current,
+          state: "error",
+          statusLabel: "Error de conexión",
+          qr: null,
+          hasSavedSession: hasSavedAuthFiles(),
+          detail:
+            "Se interrumpió la conexión con WhatsApp. Puedes hacer clic en «Reconectar» si la sesión sigue guardada o generar un QR nuevo.",
+          updatedAt: new Date().toISOString(),
+        };
+      }
+    },
+  );
 }
 
-export async function linkWhatsApp(fresh = false) {
-  if (starting) return current;
-  starting = connect(fresh).finally(() => {
-    starting = null;
-  });
-  await starting;
-  if (current.state === "desconectado") current = { ...current, state: "esperando", detail: "Esperando el código QR de Baileys." };
-  return current;
+async function waitForQrOrOpen(timeoutMs = 3500): Promise<void> {
+  const rt = runtime();
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    if (rt.current.qr || rt.current.state === "vinculado") return;
+    await new Promise((resolve) => setTimeout(resolve, 150));
+  }
 }
 
-export async function reconnectWhatsApp() {
-  if (current.state === "desconectado") return linkWhatsApp(true);
+export async function linkWhatsApp(fresh = false): Promise<WhatsAppState> {
+  const rt = runtime();
+  if (rt.starting) {
+    await rt.starting;
+    return whatsAppStatus();
+  }
+  rt.starting = connect(fresh).finally(() => {
+    rt.starting = null;
+  });
+  await rt.starting;
+  if (rt.current.state === "desconectado") {
+    rt.current = {
+      ...rt.current,
+      state: "esperando",
+      statusLabel: "Esperando escaneo QR",
+      detail: "Generando el código QR de Baileys…",
+      updatedAt: new Date().toISOString(),
+    };
+  }
+  await waitForQrOrOpen(3000);
+  return whatsAppStatus();
+}
+
+export async function reconnectWhatsApp(): Promise<WhatsAppState> {
+  const rt = runtime();
+  if (rt.current.state === "desconectado" && !hasSavedAuthFiles()) {
+    return linkWhatsApp(true);
+  }
   return linkWhatsApp(false);
 }
 
-export async function unlinkWhatsApp() {
-  if (socket?.logout) await socket.logout().catch(() => undefined);
-  socket?.end?.();
-  socket = null;
+export async function unlinkWhatsApp(): Promise<WhatsAppState> {
+  const rt = runtime();
+  if (rt.socket?.logout) await rt.socket.logout().catch(() => undefined);
+  rt.socket?.end?.();
+  rt.socket = null;
   rmSync(authDir(), { recursive: true, force: true });
-  current = { state: "desconectado", qr: null, detail: "Sesión borrada. Para usarlo otra vez hay que escanear un QR nuevo." };
-  return current;
+  rt.current = {
+    ...rt.current,
+    state: "desconectado",
+    statusLabel: "Desconectado",
+    qr: null,
+    linkedPhone: null,
+    linkedName: null,
+    hasSavedSession: false,
+    detail: "Sesión desvinculada y eliminada. Para usar WhatsApp nuevamente, genera y escanea un código QR nuevo.",
+    updatedAt: new Date().toISOString(),
+  };
+  await persistWhatsAppMeta({ linkedPhone: null, linkedName: null });
+  return whatsAppStatus();
+}
+
+export type SendWhatsAppMessageInput = {
+  companyId?: string | null;
+  phone: string;
+  text: string;
+};
+
+export type SendWhatsAppMessageResult = {
+  ok: boolean;
+  sentViaBaileys: boolean;
+  message: string;
+  fallbackUrl: string | null;
+  jid?: string;
+};
+
+/**
+ * Envía un mensaje de WhatsApp directamente a través del socket activo de Baileys.
+ * Si WhatsApp no está vinculado o está en modo sandbox, informa el estado y devuelve
+ * `fallbackUrl` (wa.me) para envío manual si se requiere.
+ */
+export async function sendWhatsAppMessage(
+  input: SendWhatsAppMessageInput,
+): Promise<SendWhatsAppMessageResult> {
+  const status = await getWhatsAppFullStatus(input.companyId);
+  const digits = formatWhatsAppPhone(input.phone, status.defaultCountryCode);
+  const text = input.text.trim();
+
+  if (!digits || digits.length < 10) {
+    return {
+      ok: false,
+      sentViaBaileys: false,
+      message: "El número de teléfono de WhatsApp debe tener al menos 10 dígitos.",
+      fallbackUrl: null,
+    };
+  }
+
+  if (!text) {
+    return {
+      ok: false,
+      sentViaBaileys: false,
+      message: "El mensaje de WhatsApp no puede estar vacío.",
+      fallbackUrl: null,
+    };
+  }
+
+  const fallbackUrl = buildWhatsAppFallbackUrl(digits, text, status.defaultCountryCode);
+
+  if (await inSandbox()) {
+    return {
+      ok: false,
+      sentViaBaileys: false,
+      message: "PRUEBA / SIN VALIDEZ. En modo de pruebas no se envían mensajes de WhatsApp.",
+      fallbackUrl,
+    };
+  }
+
+  if (!status.enabled) {
+    return {
+      ok: false,
+      sentViaBaileys: false,
+      message: "La integración de WhatsApp (Baileys) está deshabilitada en Configuración.",
+      fallbackUrl,
+    };
+  }
+
+  const rt = runtime();
+  if (rt.current.state !== "vinculado" || !rt.socket?.sendMessage) {
+    return {
+      ok: false,
+      sentViaBaileys: false,
+      message:
+        "WhatsApp (Baileys) no está conectado en este momento. Vincúlalo escaneando el código QR en Configuración > Integraciones.",
+      fallbackUrl,
+    };
+  }
+
+  try {
+    let targetJid = `${digits}@s.whatsapp.net`;
+    if (typeof rt.socket.onWhatsApp === "function") {
+      try {
+        const lookup = await rt.socket.onWhatsApp(targetJid);
+        if (lookup && lookup[0]?.exists && lookup[0].jid) {
+          targetJid = lookup[0].jid;
+        }
+      } catch {
+        // Fallback to constructed JID
+      }
+    }
+    await rt.socket.sendMessage(targetJid, { text });
+    return {
+      ok: true,
+      sentViaBaileys: true,
+      message: `Mensaje de WhatsApp enviado correctamente a +${digits}.`,
+      fallbackUrl,
+      jid: targetJid,
+    };
+  } catch (error) {
+    const errMsg = error instanceof Error ? error.message : "Error al enviar por Baileys.";
+    return {
+      ok: false,
+      sentViaBaileys: false,
+      message: `No se pudo enviar el WhatsApp vía Baileys: ${errMsg}`,
+      fallbackUrl,
+    };
+  }
 }
 
 /**
@@ -87,14 +539,15 @@ export async function unlinkWhatsApp() {
  * envía el mensaje directamente vía Baileys; en caso contrario retorna false para
  * que la interfaz utilice el enlace directo wa.me.
  */
-export async function sendWhatsAppTextIfLinked(phoneDigits: string, text: string): Promise<boolean> {
-  if (await inSandbox()) return false;
-  if (current.state !== "vinculado" || !socket?.sendMessage || !phoneDigits) return false;
-  try {
-    await socket.sendMessage(`${phoneDigits}@s.whatsapp.net`, { text });
-    return true;
-  } catch {
-    return false;
-  }
+export async function sendWhatsAppTextIfLinked(
+  phoneDigits: string,
+  text: string,
+  companyId?: string | null,
+): Promise<boolean> {
+  const result = await sendWhatsAppMessage({
+    companyId,
+    phone: phoneDigits,
+    text,
+  });
+  return result.sentViaBaileys;
 }
-

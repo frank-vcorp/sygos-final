@@ -57,6 +57,7 @@ export const SYSTRON_NAV: Partial<Record<Role, readonly string[]>> = {
     "/personal",
     "/configuracion#identidad",
     "/configuracion#prioridades",
+    "/configuracion#integraciones",
     "/usuarios",
   ],
   COORDINACION_ADMINISTRACION: [

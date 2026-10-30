@@ -1,8 +1,18 @@
+"use server";
+
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { encryptSecret, secretHint } from "@/lib/crypto";
 import { verifyFacturapi } from "@/lib/facturapi";
-import { verifySendGrid } from "@/lib/sendgrid";
+import {
+  DEFAULT_SMTP_HOST,
+  DEFAULT_SMTP_USERNAME,
+  getSendGridSmtpConfig,
+  normalizeSmtpPort,
+  serializeSendGridExtra,
+  sendSystemEmail,
+  verifySendGrid,
+} from "@/lib/sendgrid";
 import { setFlash } from "@/lib/flash";
 import { ConcurrencyError, optionalInt, optionalText, parseVersion, requiredText } from "@/lib/form";
 import { optionalMoneyFromForm } from "@/lib/money";
@@ -10,6 +20,12 @@ import { recordHistory } from "@/lib/history";
 import { can } from "@/lib/permissions";
 import { parseRegimen } from "@/lib/sat-regimen";
 import { requireCompany } from "@/lib/session";
+
+function safeReturnUrl(formData?: FormData, fallback = "/configuracion") {
+  const custom = formData ? optionalText(formData.get("returnTo")) : null;
+  if (custom && custom.startsWith("/configuracion")) return custom;
+  return fallback;
+}
 
 export async function updateCompanyAction(formData: FormData) {
   "use server";
@@ -50,18 +66,19 @@ export async function updateCompanyAction(formData: FormData) {
   redirect("/configuracion");
 }
 
-async function requireIntegrations() {
+async function requireIntegrations(returnUrl = "/configuracion") {
   const session = await requireCompany();
   if (!can(session.role, "config.integrations")) {
-    await setFlash({ tone: "error", message: "Solo el Administrador configura integraciones." });
-    redirect("/configuracion");
+    await setFlash({ tone: "error", message: "Solo el CEO o el Administrador pueden configurar integraciones." });
+    redirect(returnUrl);
   }
   return session;
 }
 
 export async function saveFacturapiAction(formData: FormData) {
   "use server";
-  const session = await requireIntegrations();
+  const back = safeReturnUrl(formData, "/configuracion#integraciones");
+  const session = await requireIntegrations(back);
   const secret = optionalText(formData.get("secret"));
   const extra = JSON.stringify({
     registroPatronal: optionalText(formData.get("registroPatronal")),
@@ -85,57 +102,180 @@ export async function saveFacturapiAction(formData: FormData) {
     await prisma.integrationSetting.update({ where: { id: existing.id }, data: { extra } });
   }
   await setFlash({ tone: "ok", message: secret ? "Llave de Facturapi guardada. El certificado de sello sigue en Facturapi, no aquí." : "Datos de nómina guardados. La llave no cambió." });
-  redirect("/configuracion");
+  redirect(back);
 }
 
-export async function verifyFacturapiAction() {
+export async function verifyFacturapiAction(formData: FormData) {
   "use server";
-  const session = await requireIntegrations();
+  const back = safeReturnUrl(formData, "/configuracion#integraciones");
+  const session = await requireIntegrations(back);
   const row = await prisma.integrationSetting.findFirst({ where: { provider: "FACTURAPI", companyId: session.activeCompanyId } });
   if (!row?.secretEnc) {
     await setFlash({ tone: "error", message: "Esta empresa no tiene llave de Facturapi." });
-    redirect("/configuracion");
+    redirect(back);
   }
   const { decryptSecret } = await import("@/lib/crypto");
   const result = await verifyFacturapi(decryptSecret(row.secretEnc));
   await setFlash({ tone: result.ok ? "ok" : "error", message: result.message });
-  redirect("/configuracion");
+  redirect(back);
 }
 
 export async function saveSendgridAction(formData: FormData) {
   "use server";
-  await requireIntegrations();
+  const back = safeReturnUrl(formData, "/configuracion#integraciones");
+  const session = await requireIntegrations(back);
+
+  const enabled = formData.get("enabled") !== "no";
+  const host = optionalText(formData.get("host")) || DEFAULT_SMTP_HOST;
+  const port = normalizeSmtpPort(formData.get("port"));
+  const username = optionalText(formData.get("username")) || DEFAULT_SMTP_USERNAME;
   const secret = optionalText(formData.get("secret"));
-  const fromEmail = optionalText(formData.get("fromEmail"));
-  if (!fromEmail) {
-    await setFlash({ tone: "error", message: "SendGrid necesita el correo remitente verificado, además de la llave." });
-    redirect("/configuracion");
+  const fromEmail = optionalText(formData.get("fromEmail")) ?? "";
+  const fromName = optionalText(formData.get("fromName")) ?? session.activeCompanyName;
+
+  if (enabled && !fromEmail) {
+    await setFlash({
+      tone: "error",
+      message: "SendGrid SMTP necesita el correo remitente verificado.",
+    });
+    redirect(back);
   }
-  const existing = await prisma.integrationSetting.findFirst({ where: { provider: "SENDGRID", companyId: null } });
-  const extra = JSON.stringify({ fromEmail });
-  if (!secret && !existing?.secretEnc) {
-    await setFlash({ tone: "error", message: "Falta la llave de SendGrid. Empieza con SG." });
-    redirect("/configuracion");
+
+  const existingCompany = await prisma.integrationSetting.findFirst({
+    where: { provider: "SENDGRID", companyId: session.activeCompanyId },
+  });
+  const existingGlobal = await prisma.integrationSetting.findFirst({
+    where: { provider: "SENDGRID", companyId: null },
+  });
+
+  const savedSecretEnc = existingCompany?.secretEnc ?? existingGlobal?.secretEnc ?? null;
+  const savedSecretHint = existingCompany?.secretHint ?? existingGlobal?.secretHint ?? null;
+
+  if (enabled && !secret && !savedSecretEnc) {
+    await setFlash({
+      tone: "error",
+      message: "Falta la contraseña / API Key de SendGrid SMTP (ej. SG.xxxx).",
+    });
+    redirect(back);
   }
-  const data = { extra, ...(secret ? { secretEnc: encryptSecret(secret), secretHint: secretHint(secret) } : {}) };
-  if (existing) await prisma.integrationSetting.update({ where: { id: existing.id }, data });
-  else await prisma.integrationSetting.create({ data: { provider: "SENDGRID", companyId: null, secretEnc: encryptSecret(secret!), secretHint: secretHint(secret!), extra } });
-  await setFlash({ tone: "ok", message: "SendGrid guardado. No se envió un correo de prueba." });
-  redirect("/configuracion");
+
+  const nextSecretEnc = secret ? encryptSecret(secret) : savedSecretEnc;
+  const nextSecretHint = secret ? secretHint(secret) : savedSecretHint;
+  const extra = serializeSendGridExtra({
+    enabled,
+    host,
+    port,
+    username,
+    fromEmail,
+    fromName,
+  });
+
+  const payload = {
+    extra,
+    secretEnc: nextSecretEnc,
+    secretHint: nextSecretHint,
+  };
+
+  if (existingCompany) {
+    await prisma.integrationSetting.update({ where: { id: existingCompany.id }, data: payload });
+  } else {
+    await prisma.integrationSetting.create({
+      data: { provider: "SENDGRID", companyId: session.activeCompanyId, ...payload },
+    });
+  }
+
+  if (existingGlobal) {
+    await prisma.integrationSetting.update({ where: { id: existingGlobal.id }, data: payload });
+  } else {
+    await prisma.integrationSetting.create({
+      data: { provider: "SENDGRID", companyId: null, ...payload },
+    });
+  }
+
+  await recordHistory({
+    companyId: session.activeCompanyId,
+    entityType: "EMPRESA",
+    entityId: session.activeCompanyId,
+    action: "SENDGRID_SMTP",
+    summary: `Configuración SendGrid SMTP Relay actualizada (${host}:${port}, usuario ${username}, estado ${enabled ? "Habilitado" : "Deshabilitado"}).`,
+    authorUserId: session.userId,
+  });
+
+  await setFlash({
+    tone: "ok",
+    message: secret
+      ? `SendGrid SMTP (${host}:${port}) y nueva API Key guardados.`
+      : `Configuración SendGrid SMTP (${host}:${port}) guardada conservando la API Key existente.`,
+  });
+  redirect(back);
 }
 
-export async function verifySendgridAction() {
+export async function verifySendgridAction(formData: FormData) {
   "use server";
-  await requireIntegrations();
-  const row = await prisma.integrationSetting.findFirst({ where: { provider: "SENDGRID", companyId: null } });
-  if (!row?.secretEnc) {
-    await setFlash({ tone: "error", message: "SendGrid no tiene llave." });
-    redirect("/configuracion");
+  const back = safeReturnUrl(formData, "/configuracion#integraciones");
+  const session = await requireIntegrations(back);
+
+  const stored = await getSendGridSmtpConfig(session.activeCompanyId, session.activeCompanyName);
+  const secretInput = optionalText(formData.get("secret"));
+  const secret = secretInput ?? stored.secret;
+
+  if (!secret) {
+    await setFlash({
+      tone: "error",
+      message: "SendGrid SMTP no tiene API Key guardada. Captúrala y guarda antes de verificar.",
+    });
+    redirect(back);
   }
-  const { decryptSecret } = await import("@/lib/crypto");
-  const result = await verifySendGrid(decryptSecret(row.secretEnc));
+
+  const host = optionalText(formData.get("host")) || stored.host || DEFAULT_SMTP_HOST;
+  const port = formData.get("port") ? normalizeSmtpPort(formData.get("port")) : stored.port;
+  const username = optionalText(formData.get("username")) || stored.username || DEFAULT_SMTP_USERNAME;
+
+  const result = await verifySendGrid(secret, { host, port, username });
   await setFlash({ tone: result.ok ? "ok" : "error", message: result.message });
-  redirect("/configuracion");
+  redirect(back);
+}
+
+export async function sendTestEmailAction(formData: FormData) {
+  "use server";
+  const back = safeReturnUrl(formData, "/configuracion#integraciones");
+  const session = await requireIntegrations(back);
+
+  const toEmail = optionalText(formData.get("toEmail"));
+  if (!toEmail) {
+    await setFlash({
+      tone: "error",
+      message: "Ingresa un correo destinatario para enviar el correo de prueba.",
+    });
+    redirect(back);
+  }
+
+  const stored = await getSendGridSmtpConfig(session.activeCompanyId, session.activeCompanyName);
+  const subject =
+    optionalText(formData.get("testSubject")) ||
+    `Correo de prueba SMTP · ${session.activeCompanyName} (SYGOS 3.0)`;
+  const bodyText =
+    optionalText(formData.get("testBody")) ||
+    [
+      `Hola,`,
+      ``,
+      `Este es un correo de prueba enviado desde SYGOS 3.0 (${session.activeCompanyName}) a través de SendGrid SMTP Relay.`,
+      `• Servidor SMTP: ${stored.host}:${stored.port}`,
+      `• Usuario SMTP: ${stored.username}`,
+      `• Remitente: ${stored.fromName ? `${stored.fromName} <${stored.fromEmail}>` : stored.fromEmail}`,
+      ``,
+      `Si recibes este mensaje, la integración SMTP está funcionando correctamente.`,
+    ].join("\n");
+
+  const result = await sendSystemEmail({
+    companyId: session.activeCompanyId,
+    to: toEmail,
+    subject,
+    text: bodyText,
+  });
+
+  await setFlash({ tone: result.ok ? "ok" : "error", message: result.message });
+  redirect(back);
 }
 
 export async function toggleInventoryAction(formData: FormData) {

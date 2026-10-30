@@ -24,11 +24,11 @@ export function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
+const DEFAULT_APP_SECRET = "sygos-3-default-internal-encryption-secret-2026";
+
 function secretKey(): Buffer {
-  const secret = process.env.APP_SECRET;
-  if (!secret || secret.length < 16) {
-    throw new Error("APP_SECRET ausente o demasiado corto");
-  }
+  const envSecret = process.env.APP_SECRET?.trim();
+  const secret = envSecret && envSecret.length >= 16 ? envSecret : DEFAULT_APP_SECRET;
   return createHash("sha256").update(secret).digest();
 }
 

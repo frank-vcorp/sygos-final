@@ -30,6 +30,7 @@ export const CEO_NAV_GROUPS: NavGroupDef[] = [
     links: [
       { href: "/configuracion#identidad", label: "Configuración general", show: showCeo },
       { href: "/configuracion#prioridades", label: "Prioridades y SLA", show: showCeo },
+      { href: "/configuracion#integraciones", label: "WhatsApp y correo (SMTP)", show: showCeo },
       { href: "/usuarios", label: "Usuarios", show: showCeo },
     ],
   },

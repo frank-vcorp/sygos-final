@@ -229,7 +229,12 @@ export async function sendQuoteMailAction(formData: FormData) {
     if (!quote) throw new Error("Esa cotización no es de esta empresa.");
     const email = quote.client.contacts.find((contact) => contact.email)?.email;
     if (!email) throw new Error("El cliente no tiene un contacto con correo. SendGrid no envió nada.");
-    const result = await sendMail({ to: email, subject: `${quote.folio} · ${quote.company.name}`, text: `Cotización ${quote.folio} de ${quote.company.name}.` });
+    const result = await sendMail({
+      companyId: session.activeCompanyId,
+      to: email,
+      subject: `${quote.folio} · ${quote.company.name}`,
+      text: `Cotización ${quote.folio} de ${quote.company.name}.`,
+    });
     if (!result.ok) throw new Error(result.message);
     await setFlash({ tone: "ok", message: result.message });
   } catch (error) {

@@ -1,3 +1,5 @@
+"use server";
+
 import { redirect } from "next/navigation";
 import { prismaProd } from "@/lib/db";
 import { setFlash } from "@/lib/flash";

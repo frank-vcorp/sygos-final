@@ -20,7 +20,8 @@ describe("permisos de fase 1", () => {
     assert.equal(canSeeUser("ADMINISTRADOR", "ADMINISTRADOR"), true);
     assert.equal(can("CEO", "user.manageAdmins"), false);
     assert.equal(can("ADMINISTRADOR", "config.integrations"), true);
-    assert.equal(can("CEO", "config.integrations"), false);
+    assert.equal(can("CEO", "config.integrations"), true);
+    assert.equal(can("COORDINACION_ADMINISTRACION", "config.integrations"), false);
   });
 
   it("separa equipos, motores, almacén e inventario", () => {

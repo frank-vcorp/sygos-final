@@ -1,26 +1,89 @@
 import { NextResponse } from "next/server";
+import { can } from "@/lib/permissions";
 import { getSession } from "@/lib/session";
-import { linkWhatsApp, reconnectWhatsApp, whatsAppStatus } from "@/lib/whatsapp";
+import {
+  getWhatsAppFullStatus,
+  linkWhatsApp,
+  reconnectWhatsApp,
+  saveWhatsAppSettings,
+  sendWhatsAppMessage,
+  unlinkWhatsApp,
+} from "@/lib/whatsapp";
 
-async function admin() {
+async function requireIntegrationsActor() {
   const session = await getSession();
-  if (!session || session.realRole !== "ADMINISTRADOR" || session.impersonating) return null;
+  if (!session || !can(session.role, "config.integrations")) return null;
   return session;
 }
 
 export async function GET() {
-  if (!(await admin())) return NextResponse.json({ message: "Solo el administrador vincula WhatsApp." }, { status: 403 });
-  return NextResponse.json(whatsAppStatus());
+  const session = await requireIntegrationsActor();
+  if (!session) {
+    return NextResponse.json(
+      { message: "Solo el CEO o el Administrador pueden administrar WhatsApp." },
+      { status: 403 },
+    );
+  }
+  return NextResponse.json(await getWhatsAppFullStatus(session.activeCompanyId));
 }
 
 export async function POST(request: Request) {
-  if (!(await admin())) return NextResponse.json({ message: "Solo el administrador vincula WhatsApp." }, { status: 403 });
-  const body = await request.json() as { action?: string };
+  const session = await requireIntegrationsActor();
+  if (!session) {
+    return NextResponse.json(
+      { message: "Solo el CEO o el Administrador pueden administrar WhatsApp." },
+      { status: 403 },
+    );
+  }
+
+  const body = (await request.json().catch(() => ({}))) as {
+    action?: string;
+    fresh?: boolean;
+    phone?: string;
+    text?: string;
+    enabled?: boolean;
+    defaultCountryCode?: string;
+  };
+
   try {
-    if (body.action === "unlink") return NextResponse.json(await linkWhatsApp(true));
-    if (body.action === "reconnect") return NextResponse.json(await reconnectWhatsApp());
-    return NextResponse.json(await linkWhatsApp(false));
+    if (body.action === "unlink" || body.action === "logout") {
+      return NextResponse.json(await unlinkWhatsApp());
+    }
+    if (body.action === "reconnect") {
+      return NextResponse.json(await reconnectWhatsApp());
+    }
+    if (body.action === "settings") {
+      const updated = await saveWhatsAppSettings(
+        {
+          enabled: body.enabled !== false,
+          defaultCountryCode: body.defaultCountryCode ?? "52",
+        },
+        session.activeCompanyId,
+      );
+      return NextResponse.json(updated);
+    }
+    if (body.action === "send" || body.action === "test") {
+      const result = await sendWhatsAppMessage({
+        companyId: session.activeCompanyId,
+        phone: String(body.phone ?? ""),
+        text: String(body.text ?? ""),
+      });
+      const status = await getWhatsAppFullStatus(session.activeCompanyId);
+      return NextResponse.json(
+        {
+          ...status,
+          sendResult: result,
+          message: result.message,
+        },
+        { status: result.ok ? 200 : 400 },
+      );
+    }
+    const fresh = body.action === "fresh" || body.fresh === true;
+    return NextResponse.json(await linkWhatsApp(fresh));
   } catch (error) {
-    return NextResponse.json({ message: error instanceof Error ? error.message : "WhatsApp no respondió." }, { status: 400 });
+    return NextResponse.json(
+      { message: error instanceof Error ? error.message : "WhatsApp no respondió." },
+      { status: 400 },
+    );
   }
 }

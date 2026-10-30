@@ -141,7 +141,11 @@ export function SideNav({
             </div>
           );
         }
-        const groupActive = group.links.some((link) => link.href === globalActiveHref);
+        const groupActive = group.links.some((link) => {
+          if (link.href === globalActiveHref) return true;
+          const base = link.href.split("?")[0]!.split("#")[0]!;
+          return Boolean(base && base !== "/" && (path === base || path.startsWith(`${base}/`)));
+        });
         const links = group.links.map((link) => {
             const active = link.href === globalActiveHref;
             return (

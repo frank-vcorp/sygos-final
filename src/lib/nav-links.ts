@@ -117,6 +117,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
       { href: "/proveedores", show: (role, code) => notVentas(role) && can(role, "supplier.operate", code) },
       { href: "/usuarios", show: (role) => notVentas(role) && can(role, "user.manage") },
       { href: "/configuracion", show: (role) => notVentas(role) && (can(role, "config.company") || can(role, "config.integrations")) },
+      { href: "/configuracion#integraciones", label: "WhatsApp y correo (SMTP)", show: (role) => notVentas(role) && can(role, "config.integrations") },
       { href: "/pruebas", show: (role) => role === "ADMINISTRADOR" },
     ],
   },
