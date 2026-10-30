@@ -1051,6 +1051,9 @@ model Collaborator {
   bonusesEnabled      Boolean  @default(false)
   punctualityBonusEnabled Boolean @default(false)
   productivityBonusEnabled Boolean @default(false)
+  bankName            String?
+  bankAccount         String?
+  credentialPasswordPreview String?
   vacationBalance     Float    @default(0)
   dailyStamped        Float    @default(0)
   dailyCash           Float    @default(0)

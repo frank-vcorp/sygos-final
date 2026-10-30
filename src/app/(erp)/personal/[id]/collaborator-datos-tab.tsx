@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import {
   activitiesSectionAction,
+  bankAccountSectionAction,
   bonusesSectionAction,
+  collaboratorCredentialsSectionAction,
   commissionSectionAction,
   fiscalDataSectionAction,
   laborDataSectionAction,
@@ -12,15 +14,27 @@ import {
 } from "../actions";
 import { FormOverlayDialog } from "@/components/overlay-dialog";
 import { Badge, Button, Card, controlClass, Field, MoneyInput, Table, Td, Th } from "@/components/ui";
+import {
+  buildCollaboratorWhatsAppUrl,
+  formatCollaboratorCredentialsMessage,
+  generateCollaboratorPassword,
+  suggestCollaboratorUsername,
+} from "@/lib/collaborator-credentials";
 import { money } from "@/lib/money";
 import type { CollaboratorActivity, CommissionTier } from "@/lib/personnel";
 
 type CollaboratorDatosProps = {
   isCeo: boolean;
+  companyName: string;
+  justCreated?: boolean;
   collaborator: {
     id: string;
     version: number;
     name: string;
+    username: string;
+    role: string;
+    roleLabel: string;
+    credentialPasswordPreview: string | null;
     birthDate: string | null;
     phone: string | null;
     email: string | null;
@@ -40,6 +54,8 @@ type CollaboratorDatosProps = {
     dailyStamped: number;
     dailyCash: number;
     overtimeRate: number;
+    bankName: string | null;
+    bankAccount: string | null;
     commissionEnabled: boolean;
     commissionTiers: CommissionTier[];
     activitiesEnabled: boolean;
@@ -51,23 +67,26 @@ type CollaboratorDatosProps = {
     productivityBonus: number;
   };
   bosses: Array<{ id: string; name: string }>;
+  roles: Array<{ value: string; label: string }>;
 };
 
 function SectionHeader({
   title,
   isCeo,
   onEdit,
+  editLabel = "Editar",
 }: {
   title: string;
   isCeo: boolean;
   onEdit: () => void;
+  editLabel?: string;
 }) {
   return (
     <div className="mb-4 flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
       <h2 className="text-base font-bold tracking-tight text-slate-900">{title}</h2>
       {isCeo ? (
         <Button type="button" tone="ghost" className="min-h-8 px-3 py-1 text-xs" onClick={onEdit}>
-          Editar
+          {editLabel}
         </Button>
       ) : null}
     </div>
@@ -83,13 +102,22 @@ function DataItem({ label, value }: { label: string; value: React.ReactNode }) {
   );
 }
 
-export function CollaboratorDatosTab({ isCeo, collaborator, bosses }: CollaboratorDatosProps) {
+export function CollaboratorDatosTab({
+  isCeo,
+  companyName,
+  justCreated = false,
+  collaborator,
+  bosses,
+  roles,
+}: CollaboratorDatosProps) {
   const [modal, setModal] = useState<
     | null
     | "personales"
+    | "credenciales"
     | "laborales"
     | "fiscales"
     | "sueldo"
+    | "banco"
     | "comision"
     | "actividades"
     | "bonos"
@@ -113,10 +141,100 @@ export function CollaboratorDatosTab({ isCeo, collaborator, bosses }: Collaborat
   const [punctualityEnabledDraft, setPunctualityEnabledDraft] = useState(collaborator.punctualityBonusEnabled);
   const [productivityEnabledDraft, setProductivityEnabledDraft] = useState(collaborator.productivityBonusEnabled);
 
+  const [credUsername, setCredUsername] = useState(collaborator.username);
+  const [credRole, setCredRole] = useState(collaborator.role);
+  const [credNewPassword, setCredNewPassword] = useState(collaborator.credentialPasswordPreview ?? "");
+  const [credSuggestedPass, setCredSuggestedPass] = useState(() => generateCollaboratorPassword(4021));
+  const [copied, setCopied] = useState(false);
+
   const sueldoVigente = collaborator.dailyStamped + collaborator.dailyCash;
+  const activePasswordPreview = collaborator.credentialPasswordPreview || "(sin contraseña visible; regenera para compartir)";
+
+  const waUrl = useMemo(
+    () =>
+      buildCollaboratorWhatsAppUrl({
+        phone: collaborator.phone,
+        name: collaborator.name,
+        username: collaborator.username,
+        password: collaborator.credentialPasswordPreview || "Solicita cambio al administrador",
+        roleLabel: collaborator.roleLabel,
+        companyName,
+      }),
+    [
+      collaborator.phone,
+      collaborator.name,
+      collaborator.username,
+      collaborator.credentialPasswordPreview,
+      collaborator.roleLabel,
+      companyName,
+    ],
+  );
+
+  const credentialsText = useMemo(
+    () =>
+      formatCollaboratorCredentialsMessage({
+        name: collaborator.name,
+        username: collaborator.username,
+        password: collaborator.credentialPasswordPreview || "Solicita cambio al administrador",
+        roleLabel: collaborator.roleLabel,
+        companyName,
+      }),
+    [
+      collaborator.name,
+      collaborator.username,
+      collaborator.credentialPasswordPreview,
+      collaborator.roleLabel,
+      companyName,
+    ],
+  );
+
+  const handleCopyCredentials = async () => {
+    try {
+      await navigator.clipboard.writeText(credentialsText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setCopied(false);
+    }
+  };
+
+  const usernameSuggestion = useMemo(
+    () => suggestCollaboratorUsername(collaborator.name),
+    [collaborator.name],
+  );
 
   return (
     <div className="space-y-4">
+      {isCeo && justCreated && collaborator.credentialPasswordPreview ? (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50/70 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-bold text-emerald-950">
+                Colaborador creado — Credenciales listas para compartir
+              </p>
+              <p className="mt-0.5 text-xs text-emerald-800">
+                Usuario: <strong className="font-mono">{collaborator.username}</strong> · Contraseña:{" "}
+                <strong className="font-mono">{collaborator.credentialPasswordPreview}</strong> · Teléfono:{" "}
+                <strong>{collaborator.phone ?? "—"}</strong>
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button type="button" tone="ghost" className="min-h-8 px-3 py-1 text-xs" onClick={handleCopyCredentials}>
+                {copied ? "Copiado" : "Copiar credenciales"}
+              </Button>
+              <a
+                href={waUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex min-h-8 items-center justify-center rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white shadow-2xs hover:bg-emerald-700"
+              >
+                Enviar por WhatsApp
+              </a>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
       {/* 1. Datos personales */}
       <Card className="p-5">
         <SectionHeader title="Datos personales" isCeo={isCeo} onEdit={() => setModal("personales")} />
@@ -127,6 +245,53 @@ export function CollaboratorDatosTab({ isCeo, collaborator, bosses }: Collaborat
           <DataItem label="Correo" value={collaborator.email} />
           <DataItem label="Dirección" value={collaborator.address} />
           <DataItem label="Contacto de emergencia" value={collaborator.emergencyContact} />
+        </dl>
+      </Card>
+
+      {/* Acceso al sistema y credenciales */}
+      <Card className="p-5">
+        <SectionHeader
+          title="Acceso al sistema y credenciales"
+          isCeo={isCeo}
+          onEdit={() => {
+            setCredUsername(collaborator.username);
+            setCredRole(collaborator.role);
+            setCredNewPassword(collaborator.credentialPasswordPreview ?? generateCollaboratorPassword());
+            setModal("credenciales");
+          }}
+        />
+        <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <DataItem label="Usuario (login)" value={<span className="font-mono">{collaborator.username}</span>} />
+          <DataItem label="Rol en el sistema" value={collaborator.roleLabel} />
+          {isCeo ? (
+            <DataItem
+              label="Contraseña"
+              value={<span className="font-mono">{activePasswordPreview}</span>}
+            />
+          ) : null}
+          {isCeo ? (
+            <div>
+              <dt className="text-xs font-medium text-slate-400">Compartir acceso</dt>
+              <dd className="mt-1 flex flex-wrap gap-2">
+                <Button
+                  type="button"
+                  tone="ghost"
+                  className="min-h-8 px-2.5 py-1 text-xs"
+                  onClick={handleCopyCredentials}
+                >
+                  {copied ? "Copiado" : "Copiar credenciales"}
+                </Button>
+                <a
+                  href={waUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex min-h-8 items-center justify-center rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white shadow-2xs hover:bg-emerald-700"
+                >
+                  Enviar por WhatsApp
+                </a>
+              </dd>
+            </div>
+          ) : null}
         </dl>
       </Card>
 
@@ -171,7 +336,16 @@ export function CollaboratorDatosTab({ isCeo, collaborator, bosses }: Collaborat
         </dl>
       </Card>
 
-      {/* 5. Comisión por facturación */}
+      {/* 5. Cuenta bancaria */}
+      <Card className="p-5">
+        <SectionHeader title="Cuenta bancaria" isCeo={isCeo} onEdit={() => setModal("banco")} />
+        <dl className="grid gap-4 sm:grid-cols-2">
+          <DataItem label="Banco" value={collaborator.bankName} />
+          <DataItem label="Cuenta / CLABE" value={collaborator.bankAccount} />
+        </dl>
+      </Card>
+
+      {/* 6. Comisión por facturación */}
       <Card className="p-5">
         <SectionHeader
           title="Comisión por facturación"
@@ -216,7 +390,7 @@ export function CollaboratorDatosTab({ isCeo, collaborator, bosses }: Collaborat
         )}
       </Card>
 
-      {/* 6. Actividades */}
+      {/* 7. Actividades */}
       <Card className="p-5">
         <SectionHeader
           title="Actividades"
@@ -259,7 +433,7 @@ export function CollaboratorDatosTab({ isCeo, collaborator, bosses }: Collaborat
         )}
       </Card>
 
-      {/* 7. Bonos */}
+      {/* 8. Bonos */}
       <Card className="p-5">
         <SectionHeader
           title="Bonos"
@@ -309,7 +483,7 @@ export function CollaboratorDatosTab({ isCeo, collaborator, bosses }: Collaborat
       </Card>
 
       {/* MODALS FOR CEO */}
-      {/* Modal 1: Datos personales */}
+      {/* Modal: Datos personales */}
       <FormOverlayDialog
         open={modal === "personales"}
         onClose={() => setModal(null)}
@@ -329,7 +503,7 @@ export function CollaboratorDatosTab({ isCeo, collaborator, bosses }: Collaborat
               <input name="birthDate" type="date" defaultValue={collaborator.birthDate ?? ""} className={controlClass} />
             </Field>
             <Field label="Teléfono">
-              <input name="phone" defaultValue={collaborator.phone ?? ""} className={controlClass} />
+              <input name="phone" required defaultValue={collaborator.phone ?? ""} className={controlClass} />
             </Field>
             <Field label="Correo">
               <input name="email" type="email" defaultValue={collaborator.email ?? ""} className={controlClass} />
@@ -350,7 +524,107 @@ export function CollaboratorDatosTab({ isCeo, collaborator, bosses }: Collaborat
         </form>
       </FormOverlayDialog>
 
-      {/* Modal 2: Datos laborales */}
+      {/* Modal: Credenciales de acceso */}
+      <FormOverlayDialog
+        open={modal === "credenciales"}
+        onClose={() => setModal(null)}
+        title="Editar credenciales de acceso"
+        titleId="edit-credenciales-dialog"
+        wide
+      >
+        <form action={collaboratorCredentialsSectionAction} className="space-y-4">
+          <input type="hidden" name="collaboratorId" value={collaborator.id} />
+          <input type="hidden" name="version" value={collaborator.version} />
+          <input type="hidden" name="tab" value="datos" />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Rol en el sistema">
+              <select
+                name="role"
+                value={credRole}
+                onChange={(e) => setCredRole(e.target.value)}
+                className={controlClass}
+              >
+                {roles.map((r) => (
+                  <option key={r.value} value={r.value}>
+                    {r.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
+            <Field
+              label="Usuario (login)"
+              hint={usernameSuggestion ? `Sugerencia: ${usernameSuggestion}` : undefined}
+            >
+              <div className="flex gap-2">
+                <input
+                  name="username"
+                  required
+                  value={credUsername}
+                  onChange={(e) => setCredUsername(e.target.value)}
+                  className={controlClass}
+                />
+                {usernameSuggestion && credUsername !== usernameSuggestion ? (
+                  <Button
+                    type="button"
+                    tone="ghost"
+                    className="shrink-0 text-xs"
+                    onClick={() => setCredUsername(usernameSuggestion)}
+                  >
+                    Aceptar sugerencia
+                  </Button>
+                ) : null}
+              </div>
+            </Field>
+            <Field
+              label="Contraseña (visible para enviar al colaborador)"
+              hint={`Sugerencia disponible: ${credSuggestedPass}`}
+              className="sm:col-span-2"
+            >
+              <div className="flex flex-wrap gap-2">
+                <input
+                  name="newPassword"
+                  type="text"
+                  value={credNewPassword}
+                  onChange={(e) => setCredNewPassword(e.target.value)}
+                  placeholder="Escribe o genera una nueva contraseña"
+                  className={`${controlClass} flex-1 font-mono`}
+                />
+                <Button
+                  type="button"
+                  tone="ghost"
+                  className="shrink-0 text-xs"
+                  onClick={() => {
+                    setCredNewPassword(credSuggestedPass);
+                    setCredSuggestedPass(generateCollaboratorPassword());
+                  }}
+                >
+                  Aceptar sugerencia ({credSuggestedPass})
+                </Button>
+                <Button
+                  type="button"
+                  tone="ghost"
+                  className="shrink-0 text-xs"
+                  onClick={() => {
+                    const fresh = generateCollaboratorPassword();
+                    setCredNewPassword(fresh);
+                    setCredSuggestedPass(generateCollaboratorPassword());
+                  }}
+                >
+                  Sugerir contraseña
+                </Button>
+              </div>
+            </Field>
+          </div>
+          <div className="flex justify-end gap-2 border-t border-slate-200 pt-4">
+            <Button type="button" tone="ghost" onClick={() => setModal(null)}>
+              Cancelar
+            </Button>
+            <Button type="submit">Guardar credenciales</Button>
+          </div>
+        </form>
+      </FormOverlayDialog>
+
+      {/* Modal: Datos laborales */}
       <FormOverlayDialog
         open={modal === "laborales"}
         onClose={() => setModal(null)}
@@ -364,7 +638,7 @@ export function CollaboratorDatosTab({ isCeo, collaborator, bosses }: Collaborat
           <input type="hidden" name="tab" value="datos" />
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Puesto">
-              <input name="jobTitle" defaultValue={collaborator.jobTitle} className={controlClass} />
+              <input name="jobTitle" required defaultValue={collaborator.jobTitle} className={controlClass} />
             </Field>
             <Field label="Jefe directo">
               <select name="bossUserId" defaultValue={collaborator.bossUserId ?? ""} className={controlClass}>
@@ -406,7 +680,7 @@ export function CollaboratorDatosTab({ isCeo, collaborator, bosses }: Collaborat
         </form>
       </FormOverlayDialog>
 
-      {/* Modal 3: Datos fiscales y de seguridad social */}
+      {/* Modal: Datos fiscales y de seguridad social */}
       <FormOverlayDialog
         open={modal === "fiscales"}
         onClose={() => setModal(null)}
@@ -419,13 +693,13 @@ export function CollaboratorDatosTab({ isCeo, collaborator, bosses }: Collaborat
           <input type="hidden" name="tab" value="datos" />
           <div className="grid gap-4">
             <Field label="RFC">
-              <input name="rfc" defaultValue={collaborator.rfc ?? ""} className={controlClass} />
+              <input name="rfc" required defaultValue={collaborator.rfc ?? ""} className={controlClass} />
             </Field>
             <Field label="CURP">
-              <input name="curp" defaultValue={collaborator.curp ?? ""} className={controlClass} />
+              <input name="curp" required defaultValue={collaborator.curp ?? ""} className={controlClass} />
             </Field>
             <Field label="NSS">
-              <input name="nss" defaultValue={collaborator.nss ?? ""} className={controlClass} />
+              <input name="nss" required defaultValue={collaborator.nss ?? ""} className={controlClass} />
             </Field>
           </div>
           <div className="flex justify-end gap-2 border-t border-slate-200 pt-4">
@@ -437,7 +711,7 @@ export function CollaboratorDatosTab({ isCeo, collaborator, bosses }: Collaborat
         </form>
       </FormOverlayDialog>
 
-      {/* Modal 4: Sueldo */}
+      {/* Modal: Sueldo */}
       <FormOverlayDialog
         open={modal === "sueldo"}
         onClose={() => setModal(null)}
@@ -465,7 +739,45 @@ export function CollaboratorDatosTab({ isCeo, collaborator, bosses }: Collaborat
         </form>
       </FormOverlayDialog>
 
-      {/* Modal 5: Comisión por facturación */}
+      {/* Modal: Cuenta bancaria */}
+      <FormOverlayDialog
+        open={modal === "banco"}
+        onClose={() => setModal(null)}
+        title="Editar cuenta bancaria"
+        titleId="edit-banco-dialog"
+      >
+        <form action={bankAccountSectionAction} className="space-y-4">
+          <input type="hidden" name="collaboratorId" value={collaborator.id} />
+          <input type="hidden" name="version" value={collaborator.version} />
+          <input type="hidden" name="tab" value="datos" />
+          <Field label="Banco">
+            <input
+              name="bankName"
+              required
+              defaultValue={collaborator.bankName ?? ""}
+              placeholder="Ej. BBVA, Banorte, Santander"
+              className={controlClass}
+            />
+          </Field>
+          <Field label="Cuenta / CLABE">
+            <input
+              name="bankAccount"
+              required
+              defaultValue={collaborator.bankAccount ?? ""}
+              placeholder="18 dígitos CLABE o número de cuenta"
+              className={controlClass}
+            />
+          </Field>
+          <div className="flex justify-end gap-2 border-t border-slate-200 pt-4">
+            <Button type="button" tone="ghost" onClick={() => setModal(null)}>
+              Cancelar
+            </Button>
+            <Button type="submit">Guardar cuenta bancaria</Button>
+          </div>
+        </form>
+      </FormOverlayDialog>
+
+      {/* Modal: Comisión por facturación */}
       <FormOverlayDialog
         open={modal === "comision"}
         onClose={() => setModal(null)}
@@ -571,7 +883,7 @@ export function CollaboratorDatosTab({ isCeo, collaborator, bosses }: Collaborat
         </form>
       </FormOverlayDialog>
 
-      {/* Modal 6: Actividades */}
+      {/* Modal: Actividades */}
       <FormOverlayDialog
         open={modal === "actividades"}
         onClose={() => setModal(null)}
@@ -654,7 +966,7 @@ export function CollaboratorDatosTab({ isCeo, collaborator, bosses }: Collaborat
         </form>
       </FormOverlayDialog>
 
-      {/* Modal 7: Bonos */}
+      {/* Modal: Bonos */}
       <FormOverlayDialog
         open={modal === "bonos"}
         onClose={() => setModal(null)}

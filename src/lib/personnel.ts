@@ -1,10 +1,18 @@
+import { hashPassword } from "./crypto";
 import { prisma } from "./db";
 import { allocateFolio } from "./folios";
 import { ConcurrencyError } from "./form";
 import { recordHistory } from "./history";
 import { stampPayrollPeriod } from "./facturapi";
 import { roundMoney } from "./money";
-import type { Role } from "./roles";
+import {
+  companiesForRole,
+  DEFAULT_MONTHLY_PURCHASE,
+  DEFAULT_PURCHASE_LIMIT,
+  isPurchaseManager,
+  isRole,
+  type Role,
+} from "./roles";
 
 type Actor = { userId: string; role: Role; activeCompanyId: string; activeCompanyCode: string };
 
@@ -266,6 +274,239 @@ export async function registerCollaborator(
     authorUserId: actor.userId,
   });
   return row;
+}
+
+export async function createCollaboratorComplete(
+  actor: Actor,
+  input: {
+    // 1. Datos personales
+    name: string;
+    phone: string;
+    birthDate?: string | null;
+    email?: string | null;
+    address?: string | null;
+    emergencyContact?: string | null;
+    // 2. Acceso al sistema y credenciales
+    role: string;
+    username: string;
+    password: string;
+    // 3. Datos laborales
+    jobTitle: string;
+    bossUserId?: string | null;
+    hiredAt: string;
+    workSchedule: string;
+    // 4. Datos fiscales y de seguridad social
+    rfc: string;
+    curp: string;
+    nss: string;
+    // 5. Sueldo
+    sueldoVigente: number;
+    // 6. Cuenta bancaria
+    bankName: string;
+    bankAccount: string;
+    // 7. Comisión por facturación (opcional)
+    commissionEnabled?: boolean;
+    commissionTiers?: CommissionTier[];
+    // 8. Actividades (opcional)
+    activitiesEnabled?: boolean;
+    activities?: CollaboratorActivity[];
+    // 9. Bonos (opcional)
+    bonusesEnabled?: boolean;
+    punctualityBonusEnabled?: boolean;
+    punctualityBonus?: number;
+    productivityBonusEnabled?: boolean;
+    productivityBonus?: number;
+  },
+) {
+  assertCeo(actor);
+  const cleanName = input.name.trim();
+  if (!cleanName) throw new Error("El nombre completo es obligatorio.");
+  const cleanPhone = input.phone.trim();
+  if (!cleanPhone) throw new Error("El teléfono es obligatorio.");
+  if (!isRole(input.role) || input.role === "ADMINISTRADOR" || input.role === "CEO") {
+    throw new Error("Selecciona un rol válido para el colaborador.");
+  }
+  const cleanUsername = input.username.trim();
+  if (!cleanUsername) throw new Error("El usuario de acceso es obligatorio.");
+  const cleanPassword = input.password.trim();
+  if (!cleanPassword) throw new Error("La contraseña es obligatoria.");
+  const cleanJobTitle = input.jobTitle.trim();
+  if (!cleanJobTitle) throw new Error("El puesto es obligatorio.");
+  const cleanHiredAt = input.hiredAt.trim();
+  if (!cleanHiredAt) throw new Error("La fecha de ingreso es obligatoria.");
+  const cleanSchedule = input.workSchedule.trim();
+  if (!cleanSchedule) throw new Error("El horario o jornada es obligatorio.");
+  const cleanRfc = input.rfc.trim().toUpperCase();
+  if (!cleanRfc) throw new Error("El RFC es obligatorio.");
+  const cleanCurp = input.curp.trim().toUpperCase();
+  if (!cleanCurp) throw new Error("La CURP es obligatoria.");
+  const cleanNss = input.nss.trim();
+  if (!cleanNss) throw new Error("El NSS es obligatorio.");
+  const sueldo = roundMoney(Number(input.sueldoVigente));
+  if (!Number.isFinite(sueldo) || sueldo < 0) throw new Error("El sueldo vigente es obligatorio.");
+  const cleanBankName = input.bankName.trim();
+  if (!cleanBankName) throw new Error("El banco es obligatorio.");
+  const cleanBankAccount = input.bankAccount.trim();
+  if (!cleanBankAccount) throw new Error("La cuenta o CLABE es obligatoria.");
+
+  const profile = laborProfile(input.role);
+  const bossUserId = input.bossUserId?.trim() || null;
+  if (!profile.exempt && !bossUserId) {
+    throw new Error("El jefe directo es obligatorio.");
+  }
+  if (bossUserId) {
+    const boss = await prisma.user.findFirst({ where: { id: bossUserId, active: true } });
+    if (!boss) throw new Error("El jefe directo seleccionado no existe.");
+  }
+
+  const existingUser = await prisma.user.findUnique({ where: { username: cleanUsername } });
+  if (existingUser) {
+    throw new Error(`El usuario "${cleanUsername}" ya está registrado. Elige otro identificador.`);
+  }
+
+  const sortedTiers = normalizeCommissionTiers(input.commissionTiers ?? []);
+  const normalizedActs = normalizeActivities(input.activities ?? []);
+
+  const user = await prisma.user.create({
+    data: {
+      username: cleanUsername,
+      name: cleanName,
+      passwordHash: hashPassword(cleanPassword),
+      role: input.role,
+      companyId: companiesForRole(input.role) === "both" ? null : actor.activeCompanyId,
+      active: true,
+      monthlyPurchaseBudget: isPurchaseManager(input.role) ? DEFAULT_MONTHLY_PURCHASE : null,
+      purchaseLimit: isPurchaseManager(input.role) ? DEFAULT_PURCHASE_LIMIT : null,
+      discountLimitPct: input.role === "VENTAS" ? 15 : null,
+    },
+  });
+
+  const row = await prisma.collaborator.create({
+    data: {
+      companyId: actor.activeCompanyId,
+      userId: user.id,
+      bossUserId,
+      hireKind: "NUEVO",
+      status: "ACTIVO",
+      hiredAt: noonUtc(cleanHiredAt),
+      birthDate: input.birthDate?.trim() || null,
+      phone: cleanPhone,
+      email: input.email?.trim() || null,
+      address: input.address?.trim() || null,
+      emergencyContact: input.emergencyContact?.trim() || null,
+      jobTitle: cleanJobTitle,
+      workSchedule: cleanSchedule,
+      rfc: cleanRfc,
+      curp: cleanCurp,
+      nss: cleanNss,
+      dailyStamped: sueldo,
+      dailyCash: 0,
+      overtimeRate: 0,
+      bankName: cleanBankName,
+      bankAccount: cleanBankAccount,
+      credentialPasswordPreview: cleanPassword,
+      commissionEnabled: Boolean(input.commissionEnabled),
+      commissionTiersJson: JSON.stringify(sortedTiers),
+      activitiesEnabled: Boolean(input.activitiesEnabled),
+      activitiesJson: JSON.stringify(normalizedActs),
+      bonusesEnabled: Boolean(input.bonusesEnabled),
+      punctualityBonusEnabled: Boolean(input.punctualityBonusEnabled),
+      punctualityBonus: roundMoney(Math.max(0, Number(input.punctualityBonus) || 0)),
+      productivityBonusEnabled: Boolean(input.productivityBonusEnabled),
+      productivityBonus: roundMoney(Math.max(0, Number(input.productivityBonus) || 0)),
+      exemptBenefits: profile.exempt,
+    },
+  });
+
+  await recordHistory({
+    companyId: actor.activeCompanyId,
+    entityType: "COLABORADOR",
+    entityId: row.id,
+    action: "ALTA",
+    summary: `Alta de colaborador ${cleanName} (${cleanJobTitle}) con usuario ${cleanUsername}.`,
+    authorUserId: actor.userId,
+  });
+
+  return row;
+}
+
+export async function updateBankAccountSection(
+  actor: Actor,
+  collaboratorId: string,
+  version: number,
+  input: { bankName: string; bankAccount: string },
+) {
+  assertCeo(actor);
+  const row = await prisma.collaborator.findFirst({ where: { id: collaboratorId, companyId: actor.activeCompanyId }, include: { user: true } });
+  if (!row) throw new Error("Esa ficha no es de esta empresa.");
+  const cleanBank = input.bankName.trim();
+  const cleanAccount = input.bankAccount.trim();
+  if (!cleanBank) throw new Error("El banco es obligatorio.");
+  if (!cleanAccount) throw new Error("La cuenta o CLABE es obligatoria.");
+  const updated = await prisma.collaborator.updateMany({
+    where: { id: row.id, version },
+    data: {
+      bankName: cleanBank,
+      bankAccount: cleanAccount,
+      version: { increment: 1 },
+    },
+  });
+  if (updated.count === 0) throw new ConcurrencyError();
+  await recordHistory({
+    companyId: actor.activeCompanyId,
+    entityType: "COLABORADOR",
+    entityId: row.id,
+    action: "CUENTA_BANCARIA",
+    summary: `Actualizó cuenta bancaria de ${row.user.name} (${cleanBank}).`,
+    authorUserId: actor.userId,
+  });
+}
+
+export async function updateCollaboratorCredentialsSection(
+  actor: Actor,
+  collaboratorId: string,
+  version: number,
+  input: { username: string; role: string; newPassword?: string | null },
+) {
+  assertCeo(actor);
+  const row = await prisma.collaborator.findFirst({ where: { id: collaboratorId, companyId: actor.activeCompanyId }, include: { user: true } });
+  if (!row) throw new Error("Esa ficha no es de esta empresa.");
+  const cleanUsername = input.username.trim();
+  if (!cleanUsername) throw new Error("El usuario es obligatorio.");
+  if (!isRole(input.role) || input.role === "ADMINISTRADOR") {
+    throw new Error("Selecciona un rol válido.");
+  }
+  if (cleanUsername !== row.user.username) {
+    const duplicate = await prisma.user.findUnique({ where: { username: cleanUsername } });
+    if (duplicate && duplicate.id !== row.userId) {
+      throw new Error(`El usuario "${cleanUsername}" ya está en uso.`);
+    }
+  }
+  const cleanPassword = input.newPassword?.trim() || null;
+  await prisma.user.update({
+    where: { id: row.userId },
+    data: {
+      username: cleanUsername,
+      role: input.role,
+      ...(cleanPassword ? { passwordHash: hashPassword(cleanPassword) } : {}),
+    },
+  });
+  const updated = await prisma.collaborator.updateMany({
+    where: { id: row.id, version },
+    data: {
+      ...(cleanPassword ? { credentialPasswordPreview: cleanPassword } : {}),
+      version: { increment: 1 },
+    },
+  });
+  if (updated.count === 0) throw new ConcurrencyError();
+  await recordHistory({
+    companyId: actor.activeCompanyId,
+    entityType: "COLABORADOR",
+    entityId: row.id,
+    action: "CREDENCIALES",
+    summary: `Actualizó credenciales de acceso de ${row.user.name} (usuario: ${cleanUsername}).`,
+    authorUserId: actor.userId,
+  });
 }
 
 export async function updatePersonalDataSection(

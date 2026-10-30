@@ -10,6 +10,7 @@ import {
   adjustVacationBalance,
   changeBoss,
   changeSalary,
+  createCollaboratorComplete,
   deactivateCollaborator,
   decideAttendanceJustification,
   decideCompensation,
@@ -30,7 +31,9 @@ import {
   toggleCollaboratorActiveStatus,
   updateActivitiesSection,
   updateAttendanceMode,
+  updateBankAccountSection,
   updateBonusesSection,
+  updateCollaboratorCredentialsSection,
   updateCommissionSection,
   updateFiscalDataSection,
   updateLaborDataSection,
@@ -39,7 +42,10 @@ import {
   type CollaboratorActivity,
   type CommissionTier,
 } from "@/lib/personnel";
+import { formatCollaboratorCredentialsMessage, normalizeWhatsAppPhone } from "@/lib/collaborator-credentials";
+import { ROLE_LABEL, isRole } from "@/lib/roles";
 import { requireCompany } from "@/lib/session";
+import { sendWhatsAppTextIfLinked } from "@/lib/whatsapp";
 import { prisma } from "@/lib/db";
 
 async function guard(action: Action) {
@@ -70,6 +76,93 @@ export async function hireAction(formData: FormData) {
   "use server";
   try {
     const session = await guard("personnel.authorize");
+    const hasIntegratedUser = Boolean(optionalText(formData.get("username")) || optionalText(formData.get("name")));
+
+    if (hasIntegratedUser) {
+      const targets = formData.getAll("tierTargetAmount");
+      const kinds = formData.getAll("tierKind");
+      const values = formData.getAll("tierValue");
+      const tiers: CommissionTier[] = [];
+      for (let i = 0; i < targets.length; i++) {
+        const rawTarget = String(targets[i] ?? "").trim();
+        const rawValue = String(values[i] ?? "").trim();
+        if (rawTarget === "" && rawValue === "") continue;
+        tiers.push({
+          targetAmount: Number(rawTarget.replace(/,/g, "")) || 0,
+          kind: String(kinds[i] ?? "PORCENTAJE") === "MONTO" ? "MONTO" : "PORCENTAJE",
+          value: Number(rawValue.replace(/,/g, "")) || 0,
+        });
+      }
+
+      const actNames = formData.getAll("activityName");
+      const actCounts = formData.getAll("activityTarget");
+      const activities: CollaboratorActivity[] = [];
+      for (let i = 0; i < actNames.length; i++) {
+        const name = String(actNames[i] ?? "").trim();
+        if (!name) continue;
+        activities.push({
+          name,
+          targetCount: Number(actCounts[i] ?? 0) || 0,
+        });
+      }
+
+      const name = requiredText(formData.get("name"), "Nombre completo");
+      const phone = requiredText(formData.get("phone"), "Teléfono");
+      const role = requiredText(formData.get("role"), "Rol en el sistema");
+      const username = requiredText(formData.get("username"), "Usuario");
+      const password = requiredText(formData.get("password"), "Contraseña");
+
+      const row = await createCollaboratorComplete(session, {
+        name,
+        phone,
+        birthDate: optionalText(formData.get("birthDate")),
+        email: optionalText(formData.get("email")),
+        address: optionalText(formData.get("address")),
+        emergencyContact: optionalText(formData.get("emergencyContact")),
+        role,
+        username,
+        password,
+        jobTitle: requiredText(formData.get("jobTitle"), "Puesto"),
+        bossUserId: optionalText(formData.get("bossUserId")),
+        hiredAt: requiredText(formData.get("hiredAt"), "Fecha de ingreso"),
+        workSchedule: requiredText(formData.get("workSchedule"), "Horario / jornada"),
+        rfc: requiredText(formData.get("rfc"), "RFC"),
+        curp: requiredText(formData.get("curp"), "CURP"),
+        nss: requiredText(formData.get("nss"), "NSS"),
+        sueldoVigente: optionalMoneyFromForm(formData.get("sueldoVigente")) ?? -1,
+        bankName: requiredText(formData.get("bankName"), "Banco"),
+        bankAccount: requiredText(formData.get("bankAccount"), "Cuenta / CLABE"),
+        commissionEnabled: formData.get("commissionEnabled") === "1",
+        commissionTiers: tiers,
+        activitiesEnabled: formData.get("activitiesEnabled") === "1",
+        activities,
+        bonusesEnabled: formData.get("bonusesEnabled") === "1",
+        punctualityBonusEnabled: formData.get("punctualityBonusEnabled") === "1",
+        punctualityBonus: optionalMoneyFromForm(formData.get("punctualityBonus")) ?? 0,
+        productivityBonusEnabled: formData.get("productivityBonusEnabled") === "1",
+        productivityBonus: optionalMoneyFromForm(formData.get("productivityBonus")) ?? 0,
+      });
+
+      const digits = normalizeWhatsAppPhone(phone);
+      const roleLabel = isRole(role) ? ROLE_LABEL[role] : role;
+      const msg = formatCollaboratorCredentialsMessage({
+        name,
+        username,
+        password,
+        roleLabel,
+        companyName: session.activeCompanyName,
+      });
+      const sentViaBaileys = await sendWhatsAppTextIfLinked(digits, msg);
+
+      await setFlash({
+        tone: "ok",
+        message: sentViaBaileys
+          ? "Colaborador registrado y credenciales enviadas por WhatsApp."
+          : "Colaborador registrado. Sus credenciales están listas para enviar por WhatsApp.",
+      });
+      redirect(`/personal/colaboradores/${row.id}?creado=1`);
+    }
+
     const row = await registerCollaborator(session, {
       userId: requiredText(formData.get("userId"), "Usuario"),
       hireKind: formData.get("hireKind") === "MIGRADO" ? "MIGRADO" : "NUEVO",
@@ -94,8 +187,41 @@ export async function hireAction(formData: FormData) {
     redirect(`/personal/colaboradores/${row.id}`);
   } catch (error) {
     await setFlash({ tone: "error", message: bubble(error) });
-    redirect("/personal");
+    redirect("/personal/nuevo");
   }
+}
+
+export async function bankAccountSectionAction(formData: FormData) {
+  "use server";
+  const id = requiredText(formData.get("collaboratorId"), "Colaborador");
+  try {
+    const session = await guard("personnel.authorize");
+    await updateBankAccountSection(session, id, parseVersion(formData.get("version")), {
+      bankName: requiredText(formData.get("bankName"), "Banco"),
+      bankAccount: requiredText(formData.get("bankAccount"), "Cuenta / CLABE"),
+    });
+    await setFlash({ tone: "ok", message: "Cuenta bancaria actualizada." });
+  } catch (error) {
+    await setFlash({ tone: "error", message: bubble(error) });
+  }
+  redirect(backUrl(formData, id));
+}
+
+export async function collaboratorCredentialsSectionAction(formData: FormData) {
+  "use server";
+  const id = requiredText(formData.get("collaboratorId"), "Colaborador");
+  try {
+    const session = await guard("personnel.authorize");
+    await updateCollaboratorCredentialsSection(session, id, parseVersion(formData.get("version")), {
+      username: requiredText(formData.get("username"), "Usuario"),
+      role: requiredText(formData.get("role"), "Rol"),
+      newPassword: optionalText(formData.get("newPassword")),
+    });
+    await setFlash({ tone: "ok", message: "Credenciales de acceso actualizadas." });
+  } catch (error) {
+    await setFlash({ tone: "error", message: bubble(error) });
+  }
+  redirect(backUrl(formData, id));
 }
 
 export async function toggleCollaboratorStatusAction(formData: FormData) {

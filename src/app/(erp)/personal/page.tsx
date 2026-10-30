@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
-import { NewCollaboratorModal } from "./new-collaborator-modal";
 import {
+  ActionLink,
   ActiveFilters,
   Badge,
   Button,
@@ -19,7 +19,7 @@ import { formatWhen } from "@/lib/form";
 import { listHref } from "@/lib/list-url";
 import { coordPageSubtitle, coordPageTitle, coordUsesSidebarNav } from "@/lib/coordination-ui";
 import { can } from "@/lib/permissions";
-import { collaboratorDisplayStatus, filterCollaborators, mexicoToday } from "@/lib/personnel";
+import { collaboratorDisplayStatus, filterCollaborators } from "@/lib/personnel";
 import { ROLE_LABEL, isRole } from "@/lib/roles";
 import { requireCompany } from "@/lib/session";
 
@@ -38,47 +38,19 @@ export default async function PersonalPage({
     redirect("/inicio");
   }
   const params = await searchParams;
+  const isCeo = can(session.role, "personnel.authorize");
+  if (params.nuevo === "1" && isCeo) {
+    redirect("/personal/nuevo");
+  }
   const q = (params.q ?? "").trim();
   const estado = (params.estado ?? "ACTIVOS").toUpperCase();
   const puesto = (params.puesto ?? "").trim();
-  const isCeo = can(session.role, "personnel.authorize");
 
-  const [allRows, availableUsers, bosses] = await Promise.all([
-    prisma.collaborator.findMany({
-      where: { companyId: session.activeCompanyId },
-      include: { user: true, boss: true },
-      orderBy: { user: { name: "asc" } },
-    }),
-    isCeo
-      ? prisma.user.findMany({
-          where: {
-            companyId: session.activeCompanyId,
-            active: true,
-            collaborator: null,
-            role: { not: "KIOSCO_ASISTENCIA" },
-          },
-          orderBy: { name: "asc" },
-        })
-      : Promise.resolve([]),
-    isCeo
-      ? prisma.user.findMany({
-          where: {
-            active: true,
-            OR: [{ companyId: session.activeCompanyId }, { companyId: null }],
-            role: {
-              in: [
-                "CEO",
-                "GERENTE_OPERATIVO_SYSTRON",
-                "GERENTE_OPERATIVO_SERVOMOTORES",
-                "SUPERVISOR_TECNICO",
-                "COORDINACION_ADMINISTRACION",
-              ],
-            },
-          },
-          orderBy: { name: "asc" },
-        })
-      : Promise.resolve([]),
-  ]);
+  const allRows = await prisma.collaborator.findMany({
+    where: { companyId: session.activeCompanyId },
+    include: { user: true, boss: true },
+    orderBy: { user: { name: "asc" } },
+  });
 
   const puestos = Array.from(
     new Set(allRows.map((row) => formatCollaboratorJob(row.jobTitle, row.user.role))),
@@ -125,12 +97,7 @@ export default async function PersonalPage({
         )}
         action={
           isCeo ? (
-            <NewCollaboratorModal
-              users={availableUsers}
-              bosses={bosses}
-              defaultOpen={params.nuevo === "1"}
-              today={mexicoToday()}
-            />
+            <ActionLink href="/personal/nuevo">Nuevo colaborador</ActionLink>
           ) : null
         }
       />

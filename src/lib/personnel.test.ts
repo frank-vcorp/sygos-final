@@ -17,6 +17,13 @@ import {
   vacationDaysForSeniority,
   weekdaysBetween,
 } from "./personnel";
+import {
+  buildCollaboratorWhatsAppUrl,
+  formatCollaboratorCredentialsMessage,
+  generateCollaboratorPassword,
+  normalizeWhatsAppPhone,
+  suggestCollaboratorUsername,
+} from "./collaborator-credentials";
 
 describe("personal y nómina", () => {
   it("cuenta solo lunes a viernes y reparte la prima del 25% por semana", () => {
@@ -98,6 +105,33 @@ describe("personal y nómina", () => {
     assert.equal(filterCollaborators(sample, { estado: "TODOS", q: "carlos" }).length, 1);
   });
 
+  it("genera sugerencia de usuario, contraseña y enlace de WhatsApp para credenciales", () => {
+    assert.equal(suggestCollaboratorUsername("Juan Pérez"), "juan.perez");
+    assert.equal(suggestCollaboratorUsername("María Fernanda Gómez Ruiz"), "maria.gomez");
+    assert.equal(suggestCollaboratorUsername("Carlos Alberto Díaz"), "carlos.alberto");
+    const pass = generateCollaboratorPassword(42);
+    assert.equal(pass.length >= 10, true);
+    assert.equal(normalizeWhatsAppPhone("55 1234 5678"), "525512345678");
+    const msg = formatCollaboratorCredentialsMessage({
+      name: "Juan Pérez",
+      username: "juan.perez",
+      password: pass,
+      roleLabel: "Ventas",
+      companyName: "SYSTRON",
+    });
+    assert.equal(msg.includes("juan.perez"), true);
+    assert.equal(msg.includes(pass), true);
+    const waUrl = buildCollaboratorWhatsAppUrl({
+      phone: "55 1234 5678",
+      name: "Juan Pérez",
+      username: "juan.perez",
+      password: pass,
+      roleLabel: "Ventas",
+      companyName: "SYSTRON",
+    });
+    assert.equal(waUrl.startsWith("https://wa.me/525512345678?text="), true);
+  });
+
   it("flujos de base de datos para Personal > Colaboradores (CEO vs Coordinación)", async () => {
     const { mkdtempSync } = await import("node:fs");
     const { tmpdir } = await import("node:os");
@@ -113,8 +147,11 @@ describe("personal y nómina", () => {
 
     const { prisma } = await import("./db");
     const {
+      createCollaboratorComplete,
       registerCollaborator,
       updatePersonalDataSection,
+      updateBankAccountSection,
+      updateCollaboratorCredentialsSection,
       updateCommissionSection,
       updateActivitiesSection,
       updateBonusesSection,
@@ -131,6 +168,7 @@ describe("personal y nómina", () => {
       decideLeavePermission,
       addLaborDocument,
     } = await import("./personnel");
+    const { verifyPassword } = await import("./crypto");
 
     const company = await prisma.company.create({ data: { code: "SYSTRON", name: "SYSTRON" } });
     const ceoUser = await prisma.user.create({
@@ -263,5 +301,63 @@ describe("personal y nómina", () => {
     await toggleCollaboratorActiveStatus(ceoActor, collab.id, disabledCollab.version, true);
     const reenabledCollab = await prisma.collaborator.findUniqueOrThrow({ where: { id: collab.id } });
     assert.equal(reenabledCollab.status, "ACTIVO");
+
+    // Alta completa integrada (createCollaboratorComplete) con usuario, credenciales, banco, sueldo, RFC/CURP/NSS
+    const integratedCollab = await createCollaboratorComplete(ceoActor, {
+      name: "Juan Pérez",
+      phone: "5511223344",
+      birthDate: "1995-03-20",
+      email: "juan.perez@systron.mx",
+      address: "Av. Reforma 100",
+      emergencyContact: "Laura Pérez 5599887766",
+      role: "VENTAS",
+      username: "juan.perez",
+      password: "Sygos-2026!abc",
+      jobTitle: "Ejecutivo de Ventas",
+      bossUserId: ceoUser.id,
+      hiredAt: "2026-10-30",
+      workSchedule: "Lunes a viernes 09:00 a 18:00",
+      rfc: "PELJ950320AAA",
+      curp: "PELJ950320HDFRRL01",
+      nss: "12345678901",
+      sueldoVigente: 18500,
+      bankName: "BBVA",
+      bankAccount: "012180001234567890",
+      commissionEnabled: true,
+      commissionTiers: [{ targetAmount: 100000, kind: "PORCENTAJE", value: 2 }],
+      activitiesEnabled: true,
+      activities: [{ name: "Visitas", targetCount: 15 }],
+      bonusesEnabled: true,
+      punctualityBonusEnabled: true,
+      punctualityBonus: 1200,
+      productivityBonusEnabled: false,
+      productivityBonus: 0,
+    });
+    assert.equal(integratedCollab.bankName, "BBVA");
+    assert.equal(integratedCollab.bankAccount, "012180001234567890");
+    assert.equal(integratedCollab.credentialPasswordPreview, "Sygos-2026!abc");
+    const createdUser = await prisma.user.findUniqueOrThrow({ where: { id: integratedCollab.userId } });
+    assert.equal(createdUser.username, "juan.perez");
+    assert.equal(verifyPassword("Sygos-2026!abc", createdUser.passwordHash), true);
+
+    // Edición de cuenta bancaria y credenciales por CEO
+    await updateBankAccountSection(ceoActor, integratedCollab.id, integratedCollab.version, {
+      bankName: "Banorte",
+      bankAccount: "072180009876543210",
+    });
+    const afterBank = await prisma.collaborator.findUniqueOrThrow({ where: { id: integratedCollab.id } });
+    assert.equal(afterBank.bankName, "Banorte");
+    assert.equal(afterBank.bankAccount, "072180009876543210");
+
+    await updateCollaboratorCredentialsSection(ceoActor, integratedCollab.id, afterBank.version, {
+      username: "j.perez",
+      role: "VENTAS",
+      newPassword: "Clave-9988!xyz",
+    });
+    const afterCredsCollab = await prisma.collaborator.findUniqueOrThrow({ where: { id: integratedCollab.id } });
+    const afterCredsUser = await prisma.user.findUniqueOrThrow({ where: { id: integratedCollab.userId } });
+    assert.equal(afterCredsUser.username, "j.perez");
+    assert.equal(afterCredsCollab.credentialPasswordPreview, "Clave-9988!xyz");
+    assert.equal(verifyPassword("Clave-9988!xyz", afterCredsUser.passwordHash), true);
   });
 });

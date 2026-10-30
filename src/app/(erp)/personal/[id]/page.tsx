@@ -15,7 +15,7 @@ import {
   parseCommissionTiers,
   weekdaysBetween,
 } from "@/lib/personnel";
-import { ROLE_LABEL, isRole } from "@/lib/roles";
+import { companiesForRole, ROLE_LABEL, ROLES, isRole, type Role } from "@/lib/roles";
 import { requireCompany } from "@/lib/session";
 
 function formatTimeMexico(date: Date | null): string | null {
@@ -33,12 +33,19 @@ function formatCollaboratorJob(jobTitle: string | null, role: string): string {
   return isRole(role) ? ROLE_LABEL[role] : role;
 }
 
+function roleAvailableForCollaborator(role: Role, companyCode: string): boolean {
+  if (role === "ADMINISTRADOR" || role === "CEO" || role === "KIOSCO_ASISTENCIA") return false;
+  const allowed = companiesForRole(role);
+  if (allowed === "both") return true;
+  return allowed.includes(companyCode as "SYSTRON" | "SERVOMOTORES");
+}
+
 export default async function ColaboradorPage({
   params,
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ tab?: string; subtab?: string }>;
+  searchParams: Promise<{ tab?: string; subtab?: string; creado?: string }>;
 }) {
   const session = await requireCompany();
   if (!can(session.role, "personnel.manage") && !can(session.role, "personnel.authorize")) {
@@ -103,9 +110,14 @@ export default async function ColaboradorPage({
   const isCeo = can(session.role, "personnel.authorize");
   const isActive = collaboratorDisplayStatus(row.status) === "ACTIVO";
   const jobLabel = formatCollaboratorJob(row.jobTitle, row.user.role);
+  const roleLabel = isRole(row.user.role) ? ROLE_LABEL[row.user.role] : row.user.role;
   const today = mexicoToday();
   const currentTime = formatTimeMexico(new Date()) ?? "09:00";
   const hasClosedProcesses = row.payrollLines.some((line) => line.period.status === "AUTORIZADA");
+
+  const availableRoles = ROLES.filter((r) =>
+    roleAvailableForCollaborator(r, session.activeCompanyCode),
+  ).map((r) => ({ value: r, label: ROLE_LABEL[r] }));
 
   const baseHref = `/personal/colaboradores/${row.id}`;
 
@@ -140,11 +152,18 @@ export default async function ColaboradorPage({
       {activeTab === "datos" ? (
         <CollaboratorDatosTab
           isCeo={isCeo}
+          companyName={session.activeCompanyName}
+          justCreated={query.creado === "1"}
           bosses={bosses.map((b) => ({ id: b.id, name: b.name }))}
+          roles={availableRoles}
           collaborator={{
             id: row.id,
             version: row.version,
             name: row.user.name,
+            username: row.user.username,
+            role: row.user.role,
+            roleLabel,
+            credentialPasswordPreview: row.credentialPasswordPreview,
             birthDate: row.birthDate,
             phone: row.phone,
             email: row.email,
@@ -164,6 +183,8 @@ export default async function ColaboradorPage({
             dailyStamped: row.dailyStamped,
             dailyCash: row.dailyCash,
             overtimeRate: row.overtimeRate,
+            bankName: row.bankName,
+            bankAccount: row.bankAccount,
             commissionEnabled: row.commissionEnabled,
             commissionTiers: parseCommissionTiers(row.commissionTiersJson),
             activitiesEnabled: row.activitiesEnabled,

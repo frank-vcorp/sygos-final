@@ -9,7 +9,12 @@ export type WhatsAppState = {
 };
 
 let current: WhatsAppState = { state: "desconectado", qr: null, detail: "Sin vincular. Baileys no pide una contraseña: el teléfono se enlaza con el QR." };
-let socket: { logout?: () => Promise<void>; end?: (error?: Error) => void; ev: { on: (event: string, handler: (...args: never[]) => void) => void } } | null = null;
+let socket: {
+  logout?: () => Promise<void>;
+  end?: (error?: Error) => void;
+  sendMessage?: (jid: string, content: { text: string }) => Promise<unknown>;
+  ev: { on: (event: string, handler: (...args: never[]) => void) => void };
+} | null = null;
 let starting: Promise<void> | null = null;
 
 function authDir() {
@@ -76,3 +81,20 @@ export async function unlinkWhatsApp() {
   current = { state: "desconectado", qr: null, detail: "Sesión borrada. Para usarlo otra vez hay que escanear un QR nuevo." };
   return current;
 }
+
+/**
+ * Hook listo para Baileys: si la sesión de WhatsApp está vinculada en el servidor,
+ * envía el mensaje directamente vía Baileys; en caso contrario retorna false para
+ * que la interfaz utilice el enlace directo wa.me.
+ */
+export async function sendWhatsAppTextIfLinked(phoneDigits: string, text: string): Promise<boolean> {
+  if (await inSandbox()) return false;
+  if (current.state !== "vinculado" || !socket?.sendMessage || !phoneDigits) return false;
+  try {
+    await socket.sendMessage(`${phoneDigits}@s.whatsapp.net`, { text });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
