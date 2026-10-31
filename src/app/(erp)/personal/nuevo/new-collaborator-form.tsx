@@ -4,7 +4,6 @@ import { useMemo, useState } from "react";
 import { hireAction } from "../actions";
 import { ActionLink, Badge, Button, controlClass, Field, FormActions, FormPanel, FormSection, MoneyInput } from "@/components/ui";
 import {
-  buildCollaboratorWhatsAppUrl,
   formatCollaboratorCredentialsMessage,
   generateCollaboratorPassword,
   suggestCollaboratorUsername,
@@ -58,19 +57,6 @@ export function NewCollaboratorForm({
 
   const usernameSuggestion = useMemo(() => suggestCollaboratorUsername(name), [name]);
   const selectedRoleOption = roles.find((r) => r.value === role) ?? defaultRole;
-
-  const waUrl = useMemo(
-    () =>
-      buildCollaboratorWhatsAppUrl({
-        phone,
-        name: name || "Colaborador",
-        username: username || usernameSuggestion || "usuario",
-        password,
-        roleLabel: selectedRoleOption.label,
-        companyName,
-      }),
-    [phone, name, username, usernameSuggestion, password, selectedRoleOption.label, companyName],
-  );
 
   const credentialsText = useMemo(
     () =>
@@ -146,7 +132,7 @@ export function NewCollaboratorForm({
       {/* 2. Acceso al sistema y credenciales */}
       <FormSection
         title="2. Acceso al sistema y credenciales"
-        description="Creación integrada del usuario en SYGOS con credenciales listas para compartir por WhatsApp."
+        description="Al guardar, SYGOS envía usuario, contraseña, rol y nombre al teléfono del colaborador por la sesión de WhatsApp (Baileys)."
         columns={2}
       >
         <Field label="Rol en el sistema *">
@@ -254,16 +240,11 @@ export function NewCollaboratorForm({
               >
                 {copied ? "Copiado" : "Copiar credenciales"}
               </Button>
-              <a
-                href={waUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex min-h-8 items-center justify-center rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white shadow-2xs hover:bg-emerald-700"
-              >
-                Enviar por WhatsApp
-              </a>
             </div>
           </div>
+          <p className="mt-3 text-xs text-slate-600">
+            El envío ocurre al guardar el colaborador. Si WhatsApp no está vinculado, el alta sigue y puedes copiar las credenciales.
+          </p>
           <div className="mt-3 grid gap-2 text-xs text-slate-700 sm:grid-cols-5">
             <div>
               <span className="block text-[11px] font-medium text-slate-400">Nombre</span>

@@ -20,6 +20,7 @@ import {
   extractPhoneFromJid,
   formatWhatsAppPhone,
   parseWhatsAppExtra,
+  whatsAppMessageId,
 } from "./whatsapp";
 
 describe("integraciones", () => {
@@ -137,6 +138,9 @@ describe("integraciones", () => {
     assert.equal(waConfig.enabled, true);
     assert.equal(waConfig.defaultCountryCode, "52");
     assert.equal(waConfig.linkedPhone, "+528112345678");
+    assert.equal(whatsAppMessageId({ key: { id: "3EB0ABC" } }), "3EB0ABC");
+    assert.equal(whatsAppMessageId({ key: { id: "  " } }), null);
+    assert.equal(whatsAppMessageId(null), null);
   });
 
   it("cifra y descifra llaves de integraciones sin requerir secretos hardcodeados", () => {

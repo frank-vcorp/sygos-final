@@ -21,6 +21,9 @@ import {
 } from "./personnel";
 import {
   buildCollaboratorWhatsAppUrl,
+  credentialsWhatsAppNoticeFromQuery,
+  WHATSAPP_UNLINKED_MESSAGE,
+  withWhatsAppDeliveryQuery,
   formatCollaboratorCredentialsMessage,
   generateCollaboratorPassword,
   normalizeWhatsAppPhone,
@@ -148,6 +151,30 @@ describe("personal y nómina", () => {
       companyName: "SYSTRON",
     });
     assert.equal(waUrl.startsWith("https://wa.me/525512345678?text="), true);
+    assert.equal(msg.includes("Usuario:"), true);
+    assert.equal(msg.includes("Contraseña:"), true);
+    assert.equal(msg.includes("Rol: Ventas"), true);
+    assert.equal(msg.includes("Juan Pérez"), true);
+    assert.equal(
+      withWhatsAppDeliveryQuery("/personal/colaboradores/abc?creado=1", {
+        sentViaBaileys: true,
+        message: "Enviado por WhatsApp.",
+        messageId: "3EB0",
+      }),
+      "/personal/colaboradores/abc?creado=1&wa=enviado&waId=3EB0",
+    );
+    assert.equal(
+      withWhatsAppDeliveryQuery("/personal/colaboradores/abc", {
+        sentViaBaileys: false,
+        message: WHATSAPP_UNLINKED_MESSAGE,
+      }),
+      "/personal/colaboradores/abc?wa=sin-vincular",
+    );
+    assert.deepEqual(credentialsWhatsAppNoticeFromQuery({ wa: "sin-vincular" }), { kind: "unlinked" });
+    assert.deepEqual(credentialsWhatsAppNoticeFromQuery({ wa: "enviado", waId: "3EB0" }), {
+      kind: "sent",
+      messageId: "3EB0",
+    });
   });
 
   it("genera folio automático de nómina NOM-<EMPRESA>-<AÑO>-S<SEMANA> y parsea semanas ISO", () => {

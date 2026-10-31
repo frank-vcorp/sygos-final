@@ -18,7 +18,7 @@ type WhatsAppClientState = {
 type SendFeedback = {
   tone: "ok" | "error";
   message: string;
-  fallbackUrl?: string | null;
+  canCopy?: boolean;
 };
 
 export function WhatsAppPanel({
@@ -54,6 +54,7 @@ export function WhatsAppPanel({
     `Hola, este es un mensaje de prueba enviado desde SYGOS 3.0${companyName ? ` (${companyName})` : ""} vía WhatsApp (Baileys).`,
   );
   const [sendFeedback, setSendFeedback] = useState<SendFeedback | null>(null);
+  const [testCopied, setTestCopied] = useState(false);
 
   async function refresh() {
     try {
@@ -149,21 +150,21 @@ export function WhatsAppPanel({
       });
       const body = (await response.json()) as WhatsAppClientState & {
         message?: string;
-        sendResult?: { ok: boolean; sentViaBaileys: boolean; message: string; fallbackUrl: string | null };
+        sendResult?: { ok: boolean; sentViaBaileys: boolean; message: string; messageId?: string | null };
       };
       if (body.state) setStatus(body);
       const res = body.sendResult;
+      const message = res?.message || body.message || "No se pudo enviar el mensaje de prueba.";
       if (response.ok && res?.ok) {
         setSendFeedback({
           tone: "ok",
-          message: res.message,
-          fallbackUrl: res.fallbackUrl,
+          message: res.messageId ? `Enviado por WhatsApp (${res.messageId}).` : res.message,
         });
       } else {
         setSendFeedback({
           tone: "error",
-          message: res?.message || body.message || "No se pudo enviar el mensaje de prueba.",
-          fallbackUrl: res?.fallbackUrl ?? null,
+          message,
+          canCopy: message.includes("no está vinculado"),
         });
       }
     } catch {
@@ -391,16 +392,23 @@ export function WhatsAppPanel({
                 }`}
               >
                 <p>{sendFeedback.message}</p>
-                {sendFeedback.tone === "error" && sendFeedback.fallbackUrl ? (
+                {sendFeedback.canCopy ? (
                   <p className="mt-2">
-                    <a
-                      href={sendFeedback.fallbackUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 rounded-md bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-700"
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1 rounded-md border border-rose-300 bg-white px-2.5 py-1 text-xs font-semibold text-rose-900 hover:bg-rose-100"
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(testMessage);
+                          setTestCopied(true);
+                          setTimeout(() => setTestCopied(false), 2000);
+                        } catch {
+                          setTestCopied(false);
+                        }
+                      }}
                     >
-                      Abrir alternativa en WhatsApp Web (wa.me)
-                    </a>
+                      {testCopied ? "Copiado" : "Copiar mensaje"}
+                    </button>
                   </p>
                 ) : null}
               </div>

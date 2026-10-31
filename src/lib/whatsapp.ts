@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readdirSync, rmSync } from "fs";
 import { dirname, join } from "path";
+import { WHATSAPP_UNLINKED_MESSAGE } from "./collaborator-credentials";
 import { inSandbox, prismaProd, productionDatabasePath } from "./db";
 
 export type WhatsAppState = {
@@ -438,14 +439,36 @@ export type SendWhatsAppMessageResult = {
   ok: boolean;
   sentViaBaileys: boolean;
   message: string;
+  messageId: string | null;
+  /** Conservado por compatibilidad. No es la vía de entrega: el envío es solo Baileys. */
   fallbackUrl: string | null;
   jid?: string;
 };
 
+export function whatsAppMessageId(payload: unknown): string | null {
+  if (!payload || typeof payload !== "object") return null;
+  const key = (payload as { key?: { id?: unknown } }).key;
+  if (!key || typeof key.id !== "string") return null;
+  const id = key.id.trim();
+  return id || null;
+}
+
+function failedSend(
+  message: string,
+): SendWhatsAppMessageResult {
+  return {
+    ok: false,
+    sentViaBaileys: false,
+    message,
+    messageId: null,
+    fallbackUrl: null,
+  };
+}
+
 /**
- * Envía un mensaje de WhatsApp directamente a través del socket activo de Baileys.
- * Si WhatsApp no está vinculado o está en modo sandbox, informa el estado y devuelve
- * `fallbackUrl` (wa.me) para envío manual si se requiere.
+ * Envía un mensaje de WhatsApp por la sesión Baileys ya vinculada.
+ * Si no hay sesión, el alta u otra operación que llame esto debe continuar
+ * y mostrar `WhatsApp no está vinculado`. No abre wa.me.
  */
 export async function sendWhatsAppMessage(
   input: SendWhatsAppMessageInput,
@@ -455,52 +478,24 @@ export async function sendWhatsAppMessage(
   const text = input.text.trim();
 
   if (!digits || digits.length < 10) {
-    return {
-      ok: false,
-      sentViaBaileys: false,
-      message: "El número de teléfono de WhatsApp debe tener al menos 10 dígitos.",
-      fallbackUrl: null,
-    };
+    return failedSend("El número de teléfono de WhatsApp debe tener al menos 10 dígitos.");
   }
 
   if (!text) {
-    return {
-      ok: false,
-      sentViaBaileys: false,
-      message: "El mensaje de WhatsApp no puede estar vacío.",
-      fallbackUrl: null,
-    };
+    return failedSend("El mensaje de WhatsApp no puede estar vacío.");
   }
 
-  const fallbackUrl = buildWhatsAppFallbackUrl(digits, text, status.defaultCountryCode);
-
   if (await inSandbox()) {
-    return {
-      ok: false,
-      sentViaBaileys: false,
-      message: "PRUEBA / SIN VALIDEZ. En modo de pruebas no se envían mensajes de WhatsApp.",
-      fallbackUrl,
-    };
+    return failedSend("PRUEBA / SIN VALIDEZ. En modo de pruebas no se envían mensajes de WhatsApp.");
   }
 
   if (!status.enabled) {
-    return {
-      ok: false,
-      sentViaBaileys: false,
-      message: "La integración de WhatsApp (Baileys) está deshabilitada en Configuración.",
-      fallbackUrl,
-    };
+    return failedSend("La integración de WhatsApp (Baileys) está deshabilitada en Configuración.");
   }
 
   const rt = runtime();
   if (rt.current.state !== "vinculado" || !rt.socket?.sendMessage) {
-    return {
-      ok: false,
-      sentViaBaileys: false,
-      message:
-        "WhatsApp (Baileys) no está conectado en este momento. Vincúlalo escaneando el código QR en Configuración > Integraciones.",
-      fallbackUrl,
-    };
+    return failedSend(WHATSAPP_UNLINKED_MESSAGE);
   }
 
   try {
@@ -512,42 +507,38 @@ export async function sendWhatsAppMessage(
           targetJid = lookup[0].jid;
         }
       } catch {
-        // Fallback to constructed JID
+        // Sigue con el JID armado a partir del teléfono.
       }
     }
-    await rt.socket.sendMessage(targetJid, { text });
+    const sent = await rt.socket.sendMessage(targetJid, { text });
+    const messageId = whatsAppMessageId(sent);
     return {
       ok: true,
       sentViaBaileys: true,
-      message: `Mensaje de WhatsApp enviado correctamente a +${digits}.`,
-      fallbackUrl,
+      message: messageId ? `Enviado por WhatsApp (${messageId}).` : "Enviado por WhatsApp.",
+      messageId,
+      fallbackUrl: null,
       jid: targetJid,
     };
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : "Error al enviar por Baileys.";
-    return {
-      ok: false,
-      sentViaBaileys: false,
-      message: `No se pudo enviar el WhatsApp vía Baileys: ${errMsg}`,
-      fallbackUrl,
-    };
+    return failedSend(`No se pudo enviar el WhatsApp vía Baileys: ${errMsg}`);
   }
 }
 
 /**
- * Hook listo para Baileys: si la sesión de WhatsApp está vinculada en el servidor,
- * envía el mensaje directamente vía Baileys; en caso contrario retorna false para
- * que la interfaz utilice el enlace directo wa.me.
+ * Envía el texto por la sesión Baileys vinculada.
+ * Si no está vinculada, `sentViaBaileys` es false y `message` es
+ * "WhatsApp no está vinculado." La interfaz copia el texto; no abre wa.me.
  */
 export async function sendWhatsAppTextIfLinked(
   phoneDigits: string,
   text: string,
   companyId?: string | null,
-): Promise<boolean> {
-  const result = await sendWhatsAppMessage({
+): Promise<SendWhatsAppMessageResult> {
+  return sendWhatsAppMessage({
     companyId,
     phone: phoneDigits,
     text,
   });
-  return result.sentViaBaileys;
 }

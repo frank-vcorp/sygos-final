@@ -42,11 +42,15 @@ import {
   type CollaboratorActivity,
   type CommissionTier,
 } from "@/lib/personnel";
-import { formatCollaboratorCredentialsMessage, normalizeWhatsAppPhone } from "@/lib/collaborator-credentials";
+import {
+  formatCollaboratorCredentialsMessage,
+  WHATSAPP_UNLINKED_MESSAGE,
+  withWhatsAppDeliveryQuery,
+} from "@/lib/collaborator-credentials";
 import { ROLE_LABEL, isRole } from "@/lib/roles";
 import { sendSystemEmail } from "@/lib/sendgrid";
 import { requireCompany } from "@/lib/session";
-import { sendWhatsAppTextIfLinked } from "@/lib/whatsapp";
+import { sendWhatsAppMessage, type SendWhatsAppMessageResult } from "@/lib/whatsapp";
 import { prisma } from "@/lib/db";
 
 async function guard(action: Action) {
@@ -59,6 +63,51 @@ function bubble(error: unknown) {
   const redirecting = typeof error === "object" && error !== null && "digest" in error && String((error as { digest?: string }).digest).startsWith("NEXT_REDIRECT");
   if (redirecting) throw error;
   return error instanceof Error ? error.message : "No se pudo guardar.";
+}
+
+async function deliverCollaboratorCredentials(input: {
+  companyId: string;
+  companyName: string;
+  phone: string;
+  name: string;
+  username: string;
+  password: string;
+  roleLabel: string;
+}): Promise<SendWhatsAppMessageResult> {
+  const text = formatCollaboratorCredentialsMessage({
+    name: input.name,
+    username: input.username,
+    password: input.password,
+    roleLabel: input.roleLabel,
+    companyName: input.companyName,
+  });
+  try {
+    return await sendWhatsAppMessage({
+      companyId: input.companyId,
+      phone: input.phone,
+      text,
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      sentViaBaileys: false,
+      message: error instanceof Error ? error.message : "No se pudo enviar por WhatsApp.",
+      messageId: null,
+      fallbackUrl: null,
+    };
+  }
+}
+
+function credentialsFlash(registered: boolean, result: SendWhatsAppMessageResult): { tone: "ok" | "error"; message: string } {
+  const prefix = registered ? "Colaborador registrado. " : "";
+  if (result.sentViaBaileys) {
+    const sent = result.messageId ? `Enviado por WhatsApp (${result.messageId}).` : "Enviado por WhatsApp.";
+    return { tone: "ok", message: `${prefix}${sent}` };
+  }
+  if (result.message.includes("no está vinculado")) {
+    return { tone: "error", message: `${prefix}${WHATSAPP_UNLINKED_MESSAGE}` };
+  }
+  return { tone: "error", message: `${prefix}${result.message}` };
 }
 
 function backUrl(formData: FormData, collaboratorId: string, defaultTab = "datos") {
@@ -154,33 +203,35 @@ export async function hireAction(formData: FormData) {
         productivityBonus: optionalMoneyFromForm(formData.get("productivityBonus")) ?? 0,
       });
 
-      const digits = normalizeWhatsAppPhone(phone);
       const roleLabel = isRole(role) ? ROLE_LABEL[role] : role;
-      const msg = formatCollaboratorCredentialsMessage({
+      const waResult = await deliverCollaboratorCredentials({
+        companyId: session.activeCompanyId,
+        companyName: session.activeCompanyName,
+        phone,
         name,
         username,
         password,
         roleLabel,
-        companyName: session.activeCompanyName,
       });
-      const sentViaBaileys = await sendWhatsAppTextIfLinked(digits, msg, session.activeCompanyId);
       const collabEmail = optionalText(formData.get("email"));
       if (collabEmail) {
         await sendSystemEmail({
           companyId: session.activeCompanyId,
           to: collabEmail,
           subject: `Tus credenciales de acceso a SYGOS 3.0 · ${session.activeCompanyName}`,
-          text: msg,
+          text: formatCollaboratorCredentialsMessage({
+            name,
+            username,
+            password,
+            roleLabel,
+            companyName: session.activeCompanyName,
+          }),
         }).catch(() => undefined);
       }
 
-      await setFlash({
-        tone: "ok",
-        message: sentViaBaileys
-          ? "Colaborador registrado y credenciales enviadas por WhatsApp."
-          : "Colaborador registrado. Sus credenciales están listas para enviar por WhatsApp.",
-      });
-      redirect(`/personal/colaboradores/${row.id}?creado=1`);
+      const flash = credentialsFlash(true, waResult);
+      await setFlash(flash);
+      redirect(withWhatsAppDeliveryQuery(`/personal/colaboradores/${row.id}?creado=1`, waResult));
     }
 
     const legacyHireKind = formData.get("hireKind") === "MIGRADO" ? "MIGRADO" : "NUEVO";
@@ -213,6 +264,41 @@ export async function hireAction(formData: FormData) {
   } catch (error) {
     await setFlash({ tone: "error", message: bubble(error) });
     redirect("/personal/nuevo");
+  }
+}
+
+export async function sendCollaboratorCredentialsWhatsAppAction(formData: FormData) {
+  "use server";
+  const id = requiredText(formData.get("collaboratorId"), "Colaborador");
+  const target = backUrl(formData, id);
+  try {
+    const session = await guard("personnel.authorize");
+    const row = await prisma.collaborator.findFirst({
+      where: { id, companyId: session.activeCompanyId },
+      include: { user: true },
+    });
+    if (!row) throw new Error("Esa ficha no es de esta empresa.");
+    const phone = row.phone?.trim() ?? "";
+    if (!phone) throw new Error("El colaborador no tiene teléfono para enviar por WhatsApp.");
+    const password = row.credentialPasswordPreview?.trim() ?? "";
+    if (!password) {
+      throw new Error("No hay contraseña visible para enviar. Regenera la contraseña y vuelve a intentar.");
+    }
+    const roleLabel = isRole(row.user.role) ? ROLE_LABEL[row.user.role] : row.user.role;
+    const waResult = await deliverCollaboratorCredentials({
+      companyId: session.activeCompanyId,
+      companyName: session.activeCompanyName,
+      phone,
+      name: row.user.name,
+      username: row.user.username,
+      password,
+      roleLabel,
+    });
+    await setFlash(credentialsFlash(false, waResult));
+    redirect(withWhatsAppDeliveryQuery(target, waResult));
+  } catch (error) {
+    await setFlash({ tone: "error", message: bubble(error) });
+    redirect(target);
   }
 }
 

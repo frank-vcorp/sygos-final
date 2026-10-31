@@ -32,6 +32,52 @@ export function generateCollaboratorPassword(seed?: number): string {
   return `${prefix}-${digits}!${suffix}`;
 }
 
+export const WHATSAPP_UNLINKED_MESSAGE = "WhatsApp no está vinculado.";
+
+export type CredentialsWhatsAppNotice =
+  | { kind: "sent"; messageId: string | null }
+  | { kind: "unlinked" }
+  | { kind: "error"; message: string };
+
+export function credentialsWhatsAppNoticeFromQuery(query: {
+  wa?: string;
+  waId?: string;
+  waMsg?: string;
+}): CredentialsWhatsAppNotice | null {
+  if (query.wa === "enviado") return { kind: "sent", messageId: query.waId?.trim() || null };
+  if (query.wa === "sin-vincular") return { kind: "unlinked" };
+  if (query.wa === "error") {
+    return { kind: "error", message: query.waMsg?.trim() || "No se pudo enviar por WhatsApp." };
+  }
+  return null;
+}
+
+export function withWhatsAppDeliveryQuery(
+  path: string,
+  result: { sentViaBaileys: boolean; message: string; messageId?: string | null },
+): string {
+  const hashIndex = path.indexOf("#");
+  const hash = hashIndex >= 0 ? path.slice(hashIndex) : "";
+  const withoutHash = hashIndex >= 0 ? path.slice(0, hashIndex) : path;
+  const qIndex = withoutHash.indexOf("?");
+  const base = qIndex >= 0 ? withoutHash.slice(0, qIndex) : withoutHash;
+  const params = new URLSearchParams(qIndex >= 0 ? withoutHash.slice(qIndex + 1) : "");
+  params.delete("wa");
+  params.delete("waId");
+  params.delete("waMsg");
+  if (result.sentViaBaileys) {
+    params.set("wa", "enviado");
+    if (result.messageId) params.set("waId", result.messageId);
+  } else if (result.message.includes("no está vinculado")) {
+    params.set("wa", "sin-vincular");
+  } else {
+    params.set("wa", "error");
+    params.set("waMsg", result.message.slice(0, 180));
+  }
+  const qs = params.toString();
+  return `${base}${qs ? `?${qs}` : ""}${hash}`;
+}
+
 export function normalizeWhatsAppPhone(phone: string | null | undefined): string {
   const digits = String(phone ?? "").replace(/\D/g, "");
   if (!digits) return "";

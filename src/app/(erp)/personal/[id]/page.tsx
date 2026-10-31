@@ -16,6 +16,7 @@ import {
   parseCommissionTiers,
   weekdaysBetween,
 } from "@/lib/personnel";
+import { credentialsWhatsAppNoticeFromQuery } from "@/lib/collaborator-credentials";
 import { companiesForRole, ROLE_LABEL, ROLES, isRole, type Role } from "@/lib/roles";
 import { requireCompany } from "@/lib/session";
 
@@ -46,7 +47,7 @@ export default async function ColaboradorPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ tab?: string; subtab?: string; creado?: string }>;
+  searchParams: Promise<{ tab?: string; subtab?: string; creado?: string; wa?: string; waId?: string; waMsg?: string }>;
 }) {
   const session = await requireCompany();
   if (!can(session.role, "personnel.manage") && !can(session.role, "personnel.authorize")) {
@@ -157,6 +158,7 @@ export default async function ColaboradorPage({
           isCeo={isCeo}
           companyName={session.activeCompanyName}
           justCreated={query.creado === "1"}
+          whatsappNotice={credentialsWhatsAppNoticeFromQuery(query)}
           bosses={bosses.map((b) => ({ id: b.id, name: b.name }))}
           roles={availableRoles}
           collaborator={{

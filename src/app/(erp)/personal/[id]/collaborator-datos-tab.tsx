@@ -11,14 +11,16 @@ import {
   laborDataSectionAction,
   personalDataSectionAction,
   salaryAction,
+  sendCollaboratorCredentialsWhatsAppAction,
 } from "../actions";
 import { FormOverlayDialog } from "@/components/overlay-dialog";
 import { Badge, Button, Card, controlClass, Field, MoneyInput, Table, Td, Th } from "@/components/ui";
 import {
-  buildCollaboratorWhatsAppUrl,
   formatCollaboratorCredentialsMessage,
   generateCollaboratorPassword,
   suggestCollaboratorUsername,
+  WHATSAPP_UNLINKED_MESSAGE,
+  type CredentialsWhatsAppNotice,
 } from "@/lib/collaborator-credentials";
 import { money } from "@/lib/money";
 import type { CollaboratorActivity, CommissionTier } from "@/lib/personnel";
@@ -27,6 +29,7 @@ type CollaboratorDatosProps = {
   isCeo: boolean;
   companyName: string;
   justCreated?: boolean;
+  whatsappNotice?: CredentialsWhatsAppNotice | null;
   collaborator: {
     id: string;
     version: number;
@@ -94,6 +97,35 @@ function SectionHeader({
   );
 }
 
+function WhatsAppDeliveryStatus({ notice }: { notice: CredentialsWhatsAppNotice | null }) {
+  if (!notice) return null;
+  if (notice.kind === "sent") {
+    return (
+      <p className="text-xs font-semibold text-emerald-800">
+        Enviado por WhatsApp{notice.messageId ? ` (${notice.messageId})` : ""}.
+      </p>
+    );
+  }
+  if (notice.kind === "unlinked") {
+    return <p className="text-xs font-semibold text-rose-800">{WHATSAPP_UNLINKED_MESSAGE}</p>;
+  }
+  return <p className="text-xs font-semibold text-rose-800">{notice.message}</p>;
+}
+
+function SendCredentialsWhatsAppForm({ collaboratorId }: { collaboratorId: string }) {
+  return (
+    <form action={sendCollaboratorCredentialsWhatsAppAction}>
+      <input type="hidden" name="collaboratorId" value={collaboratorId} />
+      <button
+        type="submit"
+        className="inline-flex min-h-8 items-center justify-center rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white shadow-2xs hover:bg-emerald-700"
+      >
+        Enviar por WhatsApp
+      </button>
+    </form>
+  );
+}
+
 function DataItem({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div>
@@ -107,6 +139,7 @@ export function CollaboratorDatosTab({
   isCeo,
   companyName,
   justCreated = false,
+  whatsappNotice = null,
   collaborator,
   bosses,
   roles,
@@ -149,26 +182,6 @@ export function CollaboratorDatosTab({
   const [copied, setCopied] = useState(false);
 
   const activePasswordPreview = collaborator.credentialPasswordPreview || "(sin contraseña visible; regenera para compartir)";
-
-  const waUrl = useMemo(
-    () =>
-      buildCollaboratorWhatsAppUrl({
-        phone: collaborator.phone,
-        name: collaborator.name,
-        username: collaborator.username,
-        password: collaborator.credentialPasswordPreview || "Solicita cambio al administrador",
-        roleLabel: collaborator.roleLabel,
-        companyName,
-      }),
-    [
-      collaborator.phone,
-      collaborator.name,
-      collaborator.username,
-      collaborator.credentialPasswordPreview,
-      collaborator.roleLabel,
-      companyName,
-    ],
-  );
 
   const credentialsText = useMemo(
     () =>
@@ -218,18 +231,14 @@ export function CollaboratorDatosTab({
                 <strong>{collaborator.phone ?? "—"}</strong>
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
-              <Button type="button" tone="ghost" className="min-h-8 px-3 py-1 text-xs" onClick={handleCopyCredentials}>
-                {copied ? "Copiado" : "Copiar credenciales"}
-              </Button>
-              <a
-                href={waUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex min-h-8 items-center justify-center rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white shadow-2xs hover:bg-emerald-700"
-              >
-                Enviar por WhatsApp
-              </a>
+            <div className="flex flex-col items-end gap-2">
+              <WhatsAppDeliveryStatus notice={whatsappNotice} />
+              <div className="flex flex-wrap gap-2">
+                <Button type="button" tone="ghost" className="min-h-8 px-3 py-1 text-xs" onClick={handleCopyCredentials}>
+                  {copied ? "Copiado" : "Copiar credenciales"}
+                </Button>
+                <SendCredentialsWhatsAppForm collaboratorId={collaborator.id} />
+              </div>
             </div>
           </div>
         </div>
@@ -272,23 +281,19 @@ export function CollaboratorDatosTab({
           {isCeo ? (
             <div>
               <dt className="text-xs font-medium text-slate-400">Compartir acceso</dt>
-              <dd className="mt-1 flex flex-wrap gap-2">
-                <Button
-                  type="button"
-                  tone="ghost"
-                  className="min-h-8 px-2.5 py-1 text-xs"
-                  onClick={handleCopyCredentials}
-                >
-                  {copied ? "Copiado" : "Copiar credenciales"}
-                </Button>
-                <a
-                  href={waUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex min-h-8 items-center justify-center rounded-lg bg-emerald-600 px-3 py-1 text-xs font-semibold text-white shadow-2xs hover:bg-emerald-700"
-                >
-                  Enviar por WhatsApp
-                </a>
+              <dd className="mt-1 space-y-2">
+                <WhatsAppDeliveryStatus notice={justCreated ? null : whatsappNotice} />
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    tone="ghost"
+                    className="min-h-8 px-2.5 py-1 text-xs"
+                    onClick={handleCopyCredentials}
+                  >
+                    {copied ? "Copiado" : "Copiar credenciales"}
+                  </Button>
+                  <SendCredentialsWhatsAppForm collaboratorId={collaborator.id} />
+                </div>
               </dd>
             </div>
           ) : null}
