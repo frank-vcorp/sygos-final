@@ -130,7 +130,7 @@ export async function hireAction(formData: FormData) {
         role,
         username,
         password,
-        jobTitle: requiredText(formData.get("jobTitle"), "Puesto"),
+        jobTitle: isRole(role) ? ROLE_LABEL[role] : role,
         bossUserId: optionalText(formData.get("bossUserId")),
         hireKind,
         hiredAt: requiredText(formData.get("hiredAt"), "Fecha de ingreso"),

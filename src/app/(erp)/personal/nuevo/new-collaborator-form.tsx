@@ -33,8 +33,6 @@ export function NewCollaboratorForm({
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [role, setRole] = useState(defaultRole.value);
-  const [jobTitle, setJobTitle] = useState(defaultRole.label);
-  const [jobTitleCustomized, setJobTitleCustomized] = useState(false);
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState(() => generateCollaboratorPassword(2026));
@@ -156,14 +154,7 @@ export function NewCollaboratorForm({
             name="role"
             required
             value={role}
-            onChange={(e) => {
-              const nextRole = e.target.value;
-              setRole(nextRole);
-              const found = roles.find((r) => r.value === nextRole);
-              if (found && !jobTitleCustomized) {
-                setJobTitle(found.label);
-              }
-            }}
+            onChange={(e) => setRole(e.target.value)}
             className={controlClass}
           >
             {roles.map((r) => (
@@ -303,22 +294,9 @@ export function NewCollaboratorForm({
       {/* 3. Datos laborales */}
       <FormSection
         title="3. Datos laborales"
-        description="Puesto, tipo de ingreso, ubicación en la estructura y jornada operativa."
+        description="Tipo de ingreso, ubicación en la estructura y jornada operativa."
         columns={2}
       >
-        <Field label="Puesto *">
-          <input
-            name="jobTitle"
-            required
-            value={jobTitle}
-            onChange={(e) => {
-              setJobTitle(e.target.value);
-              setJobTitleCustomized(true);
-            }}
-            placeholder="Ej. Ejecutivo comercial"
-            className={controlClass}
-          />
-        </Field>
         <Field label={selectedRoleOption.exemptBoss ? "Jefe directo" : "Jefe directo *"}>
           <select
             name="bossUserId"
