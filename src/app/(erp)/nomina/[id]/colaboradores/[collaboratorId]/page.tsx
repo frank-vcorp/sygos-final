@@ -8,6 +8,7 @@ import {
   parsePayrollOrigins,
   payrollStatusLabel,
   payrollStatusTone,
+  visiblePayrollAmounts,
 } from "@/lib/payroll";
 import { can } from "@/lib/permissions";
 import { ROLE_LABEL, isRole } from "@/lib/roles";
@@ -46,17 +47,7 @@ export default async function NominaColaboradorDetallePage({
   const periodDisplay = period.periodLabel || `${period.periodStart} a ${period.periodEnd}`;
   const paymentDisplay = period.paymentDate || period.periodEnd;
 
-  const sueldo = line.sueldo !== 0 || line.calcSueldo !== 0 ? line.sueldo : line.stampedBase + line.cashBase;
-  const calcSueldo = line.calcSueldo !== 0 ? line.calcSueldo : sueldo;
-  const horasExtra = line.horasExtra !== 0 || line.calcHorasExtra !== 0 ? line.horasExtra : line.overtimeStamped + line.overtimeCash;
-  const calcHorasExtra = line.calcHorasExtra !== 0 ? line.calcHorasExtra : horasExtra;
-  const bonos = line.bonos !== 0 || line.calcBonos !== 0 ? line.bonos : line.bonus;
-  const calcBonos = line.calcBonos !== 0 ? line.calcBonos : bonos;
-  const descuentos = line.descuentos !== 0 || line.calcDescuentos !== 0 ? line.descuentos : line.discountStamped + line.discountCash;
-  const calcDescuentos = line.calcDescuentos !== 0 ? line.calcDescuentos : descuentos;
-  const totalPagar = line.totalPagar !== 0 || line.totalPercepciones !== 0 ? line.totalPagar : line.transferTotal + line.cashTotal;
-  const totalPercepciones =
-    line.totalPercepciones !== 0 ? line.totalPercepciones : totalPagar + descuentos;
+  const amounts = visiblePayrollAmounts(line);
 
   return (
     <>
@@ -77,7 +68,7 @@ export default async function NominaColaboradorDetallePage({
             <EntityMetaItem label="Nómina">{period.folio}</EntityMetaItem>
             <EntityMetaItem label="Periodo">{periodDisplay}</EntityMetaItem>
             <EntityMetaItem label="Fecha de pago">{paymentDisplay}</EntityMetaItem>
-            <EntityMetaItem label="Total aplicado">{money(totalPagar)}</EntityMetaItem>
+            <EntityMetaItem label="Total aplicado">{money(amounts.total)}</EntityMetaItem>
           </>
         }
       />
@@ -87,24 +78,18 @@ export default async function NominaColaboradorDetallePage({
           periodId: period.id,
           collaboratorId: line.collaboratorId,
           editable,
-          calcSueldo,
-          calcHorasExtra,
-          calcBonos,
-          calcComision: line.calcComision,
-          calcCompensaciones: line.calcCompensaciones,
-          calcPrimaVacacional: line.calcPrimaVacacional,
-          calcOtrosConceptos: line.calcOtrosConceptos,
-          calcDescuentos,
-          sueldo,
-          horasExtra,
-          bonos,
-          comision: line.comision,
-          compensaciones: line.compensaciones,
-          primaVacacional: line.primaVacacional,
-          otrosConceptos: line.otrosConceptos,
-          descuentos,
-          totalPercepciones,
-          totalPagar,
+          calcSueldo: amounts.calcSueldo,
+          calcHorasExtra: amounts.calcHorasExtra,
+          calcBonos: amounts.calcBonos,
+          calcComision: amounts.calcComision,
+          calcCompensaciones: amounts.calcCompensaciones,
+          calcPrimaVacacional: amounts.calcPrimaVacacional,
+          sueldo: amounts.sueldo,
+          horasExtra: amounts.horasExtra,
+          bonos: amounts.bonos,
+          comision: amounts.comision,
+          compensaciones: amounts.compensaciones,
+          primaVacacional: amounts.primaVacacional,
           origins,
         }}
       />

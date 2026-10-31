@@ -31,13 +31,79 @@ import {
 } from "./collaborator-credentials";
 import {
   canAdjustPayrollAmounts,
+  computeLineTotals,
   formatPayrollFolio,
   isoWeekFromDate,
   parsePayrollPeriodInput,
   payrollStatusLabel,
+  visiblePayrollAmounts,
 } from "./payroll";
 
 describe("personal y nómina", () => {
+  it("el desglose visible de nómina no suma otros conceptos ni descuentos", () => {
+    const shown = visiblePayrollAmounts({
+      sueldo: 1000,
+      calcSueldo: 1000,
+      stampedBase: 0,
+      cashBase: 0,
+      horasExtra: 100,
+      calcHorasExtra: 100,
+      overtimeStamped: 0,
+      overtimeCash: 0,
+      bonos: 50,
+      calcBonos: 50,
+      bonus: 0,
+      comision: 20,
+      calcComision: 20,
+      compensaciones: 10,
+      calcCompensaciones: 10,
+      primaVacacional: 5,
+      calcPrimaVacacional: 5,
+      primaStamped: 0,
+      primaCash: 0,
+    });
+    assert.equal(shown.total, 1185);
+    assert.equal(shown.calcTotal, 1185);
+
+    const legacyPrima = visiblePayrollAmounts({
+      sueldo: 0,
+      calcSueldo: 0,
+      stampedBase: 700,
+      cashBase: 300,
+      horasExtra: 0,
+      calcHorasExtra: 0,
+      overtimeStamped: 0,
+      overtimeCash: 0,
+      bonos: 0,
+      calcBonos: 0,
+      bonus: 0,
+      comision: 0,
+      calcComision: 0,
+      compensaciones: 0,
+      calcCompensaciones: 0,
+      primaVacacional: 0,
+      calcPrimaVacacional: 0,
+      primaStamped: 80,
+      primaCash: 20,
+    });
+    assert.equal(legacyPrima.sueldo, 1000);
+    assert.equal(legacyPrima.primaVacacional, 100);
+    assert.equal(legacyPrima.total, 1100);
+
+    const stored = computeLineTotals({
+      sueldo: 1000,
+      horasExtra: 100,
+      bonos: 50,
+      comision: 20,
+      compensaciones: 10,
+      primaVacacional: 5,
+      otrosConceptos: 300,
+      descuentos: 200,
+    });
+    assert.equal(stored.totalPercepciones, 1485);
+    assert.equal(stored.totalPagar, 1285);
+  });
+
   it("fuerza saldo 0 en ingreso nuevo y guarda medios días en migrado", () => {
     assert.equal(hireKindLabel("NUEVO"), "Nuevo");
     assert.equal(hireKindLabel("MIGRADO"), "Migrado");
@@ -610,6 +676,21 @@ describe("personal y nómina", () => {
     assert.equal(afterOpenAdjust.calcBonos, 1200);
     assert.equal(afterOpenAdjust.sueldo, 19000);
     assert.equal(afterOpenAdjust.bonos, 1500);
+
+    await updatePayrollLineAppliedAmounts(ceoActor, periodRow.id, integratedCollab.id, {
+      sueldo: 19000,
+      horasExtra: 500,
+      bonos: 1500,
+      comision: 2000,
+      compensaciones: 0,
+      primaVacacional: 0,
+    });
+    const preservedHidden = await prisma.payrollLine.findUniqueOrThrow({ where: { id: juanLine.id } });
+    assert.equal(preservedHidden.otrosConceptos, 300);
+    assert.equal(preservedHidden.descuentos, 200);
+    assert.equal(preservedHidden.totalPercepciones, 23300);
+    assert.equal(preservedHidden.totalPagar, 23100);
+    assert.equal(visiblePayrollAmounts(preservedHidden).total, 23000);
 
     // Se envía nuevamente a validación y el CEO valida/cierra
     await sendPayrollToValidation(coordActor, periodRow.id, inCorrection.version);

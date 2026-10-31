@@ -211,6 +211,66 @@ export function computeLineTotals(values: {
   return { totalPercepciones, totalPagar };
 }
 
+/** Importes que se muestran en el desglose del colaborador. Otros conceptos y descuentos siguen en la línea, pero no entran en este total. */
+export function visiblePayrollAmounts(line: {
+  sueldo: number;
+  calcSueldo: number;
+  stampedBase: number;
+  cashBase: number;
+  horasExtra: number;
+  calcHorasExtra: number;
+  overtimeStamped: number;
+  overtimeCash: number;
+  bonos: number;
+  calcBonos: number;
+  bonus: number;
+  comision: number;
+  calcComision: number;
+  compensaciones: number;
+  calcCompensaciones: number;
+  primaVacacional: number;
+  calcPrimaVacacional: number;
+  primaStamped: number;
+  primaCash: number;
+}) {
+  const sueldo = line.sueldo !== 0 || line.calcSueldo !== 0 ? line.sueldo : line.stampedBase + line.cashBase;
+  const calcSueldo = line.calcSueldo !== 0 ? line.calcSueldo : sueldo;
+  const horasExtra =
+    line.horasExtra !== 0 || line.calcHorasExtra !== 0 ? line.horasExtra : line.overtimeStamped + line.overtimeCash;
+  const calcHorasExtra = line.calcHorasExtra !== 0 ? line.calcHorasExtra : horasExtra;
+  const bonos = line.bonos !== 0 || line.calcBonos !== 0 ? line.bonos : line.bonus;
+  const calcBonos = line.calcBonos !== 0 ? line.calcBonos : bonos;
+  const comision = line.comision;
+  const calcComision = line.calcComision;
+  const compensaciones = line.compensaciones;
+  const calcCompensaciones = line.calcCompensaciones;
+  const primaVacacional =
+    line.primaVacacional !== 0 || line.calcPrimaVacacional !== 0
+      ? line.primaVacacional
+      : line.primaStamped + line.primaCash;
+  const calcPrimaVacacional = line.calcPrimaVacacional !== 0 ? line.calcPrimaVacacional : primaVacacional;
+  const total = roundMoney(sueldo + horasExtra + bonos + comision + compensaciones + primaVacacional);
+  const calcTotal = roundMoney(
+    calcSueldo + calcHorasExtra + calcBonos + calcComision + calcCompensaciones + calcPrimaVacacional,
+  );
+  return {
+    sueldo,
+    calcSueldo,
+    horasExtra,
+    calcHorasExtra,
+    bonos,
+    calcBonos,
+    comision,
+    calcComision,
+    compensaciones,
+    calcCompensaciones,
+    primaVacacional,
+    calcPrimaVacacional,
+    total,
+    calcTotal,
+  };
+}
+
 export type PayrollPendingWarning = {
   collaboratorId: string;
   collaboratorName: string;
@@ -641,8 +701,8 @@ export async function updatePayrollLineAppliedAmounts(
     comision: number;
     compensaciones: number;
     primaVacacional: number;
-    otrosConceptos: number;
-    descuentos: number;
+    otrosConceptos?: number;
+    descuentos?: number;
   },
 ) {
   if (!canAdjustPayrollAmounts(actor.role)) {
@@ -669,8 +729,21 @@ export async function updatePayrollLineAppliedAmounts(
     comision: roundMoney(Math.max(0, Number(input.comision) || 0)),
     compensaciones: roundMoney(Math.max(0, Number(input.compensaciones) || 0)),
     primaVacacional: roundMoney(Math.max(0, Number(input.primaVacacional) || 0)),
-    otrosConceptos: roundMoney(Math.max(0, Number(input.otrosConceptos) || 0)),
-    descuentos: roundMoney(Math.max(0, Number(input.descuentos) || 0)),
+    otrosConceptos:
+      input.otrosConceptos == null
+        ? roundMoney(Math.max(0, line.otrosConceptos))
+        : roundMoney(Math.max(0, Number(input.otrosConceptos) || 0)),
+    descuentos:
+      input.descuentos == null
+        ? roundMoney(
+            Math.max(
+              0,
+              line.descuentos !== 0 || line.calcDescuentos !== 0
+                ? line.descuentos
+                : line.discountStamped + line.discountCash,
+            ),
+          )
+        : roundMoney(Math.max(0, Number(input.descuentos) || 0)),
   };
 
   const totals = computeLineTotals(clean);

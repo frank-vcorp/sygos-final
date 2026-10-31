@@ -28,6 +28,7 @@ import {
   isPayrollEditable,
   payrollStatusLabel,
   payrollStatusTone,
+  visiblePayrollAmounts,
 } from "@/lib/payroll";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
@@ -260,22 +261,13 @@ export default async function NominaDetallePage({
                       <Th>Bonos</Th>
                       <Th>Comisión</Th>
                       <Th>Compensaciones</Th>
-                      <Th>Otros conceptos</Th>
-                      <Th>Descuentos</Th>
+                      <Th>Prima vacacional</Th>
                       <Th>Total</Th>
                     </tr>
                   </thead>
                   <tbody>
                     {row.lines.map((line) => {
-                      const sueldo = line.sueldo !== 0 || line.calcSueldo !== 0 ? line.sueldo : line.stampedBase + line.cashBase;
-                      const horasExtra = line.horasExtra !== 0 || line.calcHorasExtra !== 0 ? line.horasExtra : line.overtimeStamped + line.overtimeCash;
-                      const bonos = line.bonos !== 0 || line.calcBonos !== 0 ? line.bonos : line.bonus;
-                      const comision = line.comision;
-                      const compensaciones = line.compensaciones;
-                      const otros = roundMoney(line.otrosConceptos + line.primaVacacional);
-                      const descuentos = line.descuentos !== 0 || line.calcDescuentos !== 0 ? line.descuentos : line.discountStamped + line.discountCash;
-                      const total = line.totalPagar !== 0 || line.totalPercepciones !== 0 ? line.totalPagar : line.transferTotal + line.cashTotal;
-
+                      const amounts = visiblePayrollAmounts(line);
                       return (
                         <tr key={line.id}>
                           <Td>
@@ -283,14 +275,13 @@ export default async function NominaDetallePage({
                               {line.collaborator.user.name}
                             </RecordLink>
                           </Td>
-                          <Td className="tabular-nums">{money(sueldo)}</Td>
-                          <Td className="tabular-nums">{money(horasExtra)}</Td>
-                          <Td className="tabular-nums">{money(bonos)}</Td>
-                          <Td className="tabular-nums">{money(comision)}</Td>
-                          <Td className="tabular-nums">{money(compensaciones)}</Td>
-                          <Td className="tabular-nums">{money(otros)}</Td>
-                          <Td className="tabular-nums text-rose-700">{money(descuentos)}</Td>
-                          <Td className="font-bold text-slate-900 tabular-nums">{money(total)}</Td>
+                          <Td className="tabular-nums">{money(amounts.sueldo)}</Td>
+                          <Td className="tabular-nums">{money(amounts.horasExtra)}</Td>
+                          <Td className="tabular-nums">{money(amounts.bonos)}</Td>
+                          <Td className="tabular-nums">{money(amounts.comision)}</Td>
+                          <Td className="tabular-nums">{money(amounts.compensaciones)}</Td>
+                          <Td className="tabular-nums">{money(amounts.primaVacacional)}</Td>
+                          <Td className="font-bold text-slate-900 tabular-nums">{money(amounts.total)}</Td>
                         </tr>
                       );
                     })}
@@ -298,22 +289,21 @@ export default async function NominaDetallePage({
                 </Table>
               }
               cards={row.lines.map((line) => {
-                const sueldo = line.sueldo !== 0 || line.calcSueldo !== 0 ? line.sueldo : line.stampedBase + line.cashBase;
-                const total = line.totalPagar !== 0 || line.totalPercepciones !== 0 ? line.totalPagar : line.transferTotal + line.cashTotal;
+                const amounts = visiblePayrollAmounts(line);
                 return (
                   <MobileCard
                     key={line.id}
                     href={`/nomina/${row.id}/colaboradores/${line.collaboratorId}`}
                     title={line.collaborator.user.name}
-                    meta={<strong className="tabular-nums">{money(total)}</strong>}
+                    meta={<strong className="tabular-nums">{money(amounts.total)}</strong>}
                   >
                     <p>
-                      Sueldo: {money(sueldo)} · Horas extra: {money(line.horasExtra)} · Bonos:{" "}
-                      {money(line.bonos)}
+                      Sueldo: {money(amounts.sueldo)} · Horas extra: {money(amounts.horasExtra)} · Bonos:{" "}
+                      {money(amounts.bonos)}
                     </p>
                     <p className="mt-1">
-                      Comisión: {money(line.comision)} · Compensaciones: {money(line.compensaciones)} · Descuentos:{" "}
-                      {money(line.descuentos)}
+                      Comisión: {money(amounts.comision)} · Compensaciones: {money(amounts.compensaciones)} · Prima
+                      vacacional: {money(amounts.primaVacacional)}
                     </p>
                   </MobileCard>
                 );

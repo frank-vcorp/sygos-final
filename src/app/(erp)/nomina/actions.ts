@@ -112,8 +112,6 @@ export async function updatePayrollLineAmountsAction(formData: FormData) {
       comision: optionalMoneyFromForm(formData.get("comision")) ?? 0,
       compensaciones: optionalMoneyFromForm(formData.get("compensaciones")) ?? 0,
       primaVacacional: optionalMoneyFromForm(formData.get("primaVacacional")) ?? 0,
-      otrosConceptos: optionalMoneyFromForm(formData.get("otrosConceptos")) ?? 0,
-      descuentos: optionalMoneyFromForm(formData.get("descuentos")) ?? 0,
     });
     await setFlash({ tone: "ok", message: "Importes aplicados actualizados en esta nómina." });
   } catch (error) {
