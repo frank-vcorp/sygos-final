@@ -11,6 +11,7 @@ import {
   parseClabe,
   parseYearMonth,
 } from "@/lib/ceo-config";
+import { financeAccountDeleteBlockedMessage } from "@/lib/finance-account-ui";
 import { financeCatalogDeleteBlockedMessage, type FinanceCatalogClase } from "@/lib/finance-catalog-ui";
 import { moneyFromForm } from "@/lib/money";
 import { requireCompany } from "@/lib/session";
@@ -199,6 +200,41 @@ export async function updateFinanceAccountAction(formData: FormData) {
     await fail(back, error);
   }
   redirect(back);
+}
+
+export async function deleteFinanceAccountAction(formData: FormData) {
+  "use server";
+  const back = accountReturn(formData, null);
+  try {
+    const session = await requireCeo(back);
+    const id = requiredText(formData.get("accountId"), "Cuenta");
+    await deleteFinanceAccount(session.activeCompanyId, id);
+    await setFlash({ tone: "ok", message: "Cuenta eliminada." });
+  } catch (error) {
+    const blocked = isInUseConstraint(error)
+      ? new Error("No se puede eliminar: la cuenta está en uso.")
+      : error;
+    await fail(back, blocked);
+  }
+  redirect(back);
+}
+
+async function deleteFinanceAccount(companyId: string, id: string) {
+  const account = await prisma.financeAccount.findFirst({ where: { id, companyId } });
+  if (!account) throw new Error("Esa cuenta no es de esta empresa.");
+  const label = account.kind === "BANCO" ? account.bankName || account.name : account.name;
+  await prisma.$transaction(async (tx) => {
+    const [movements, purchases, transferTargets, cardPayments] = await Promise.all([
+      tx.financeMovement.count({ where: { companyId, accountId: account.id } }),
+      tx.purchase.count({ where: { companyId, accountId: account.id } }),
+      tx.financeMovement.count({ where: { companyId, originType: "CUENTA", originId: account.id } }),
+      tx.financeMovement.count({ where: { companyId, originType: "TARJETA", originId: account.id } }),
+    ]);
+    const blocked = financeAccountDeleteBlockedMessage(label, { movements, purchases, transferTargets, cardPayments }, account.balance);
+    if (blocked) throw new Error(blocked);
+    const deleted = await tx.financeAccount.deleteMany({ where: { id: account.id, companyId } });
+    if (deleted.count === 0) throw new Error("Esa cuenta no es de esta empresa.");
+  });
 }
 
 export async function saveIncomeCategoryAction(formData: FormData) {

@@ -1,4 +1,6 @@
-import { updateFinanceAccountAction } from "../ceo-actions";
+import { deleteFinanceAccountAction, updateFinanceAccountAction } from "../ceo-actions";
+import { ConfirmSubmit } from "@/components/submit-button";
+import { financeAccountDeleteConfirm } from "@/lib/finance-account-ui";
 import { matchesText } from "../filters";
 import { EditorPlaceholder, HiddenFields, MasterDetail, SelectLink, selectedRowClass } from "../pieces";
 import {
@@ -141,33 +143,39 @@ export function AccountsPanel({
 function AccountEditor({ account, q, tipo }: { account: AccountRow; q: string; tipo: string }) {
   const label = account.kind === "BANCO" ? account.bankName || account.name : account.name;
   return (
-    <FormPanel action={updateFinanceAccountAction} className="max-w-none">
-      <HiddenFields fields={{ accountId: account.id, q, tipo }} />
-      <FormSection
-        title={label}
-        description={`${accountKindLabel(account.kind)} · Saldo ${money(account.balance)}. El saldo no se edita aquí.`}
-        columns={1}
-      >
-        <Field label="Fiscal">
-          <select name="fiscal" defaultValue={account.fiscal ? "si" : "no"} className={controlClass}>
-            <option value="si">Sí</option>
-            <option value="no">No</option>
-          </select>
-        </Field>
-        {account.kind === "BANCO" ? (
-          <>
-            <Field label="Nombre del banco">
-              <input name="bankName" required defaultValue={account.bankName ?? ""} className={controlClass} />
-            </Field>
-            <Field label="CLABE">
-              <input name="clabe" required defaultValue={account.clabe ?? ""} inputMode="numeric" autoComplete="off" className={controlClass} />
-            </Field>
-          </>
-        ) : null}
-      </FormSection>
-      <FormActions>
-        <Button type="submit">Guardar cuenta</Button>
-      </FormActions>
-    </FormPanel>
+    <div className="space-y-3">
+      <FormPanel action={updateFinanceAccountAction} className="max-w-none">
+        <HiddenFields fields={{ accountId: account.id, q, tipo }} />
+        <FormSection
+          title={label}
+          description={`${accountKindLabel(account.kind)} · Saldo ${money(account.balance)}. El saldo no se edita aquí.`}
+          columns={1}
+        >
+          <Field label="Fiscal">
+            <select name="fiscal" defaultValue={account.fiscal ? "si" : "no"} className={controlClass}>
+              <option value="si">Sí</option>
+              <option value="no">No</option>
+            </select>
+          </Field>
+          {account.kind === "BANCO" ? (
+            <>
+              <Field label="Nombre del banco">
+                <input name="bankName" required defaultValue={account.bankName ?? ""} className={controlClass} />
+              </Field>
+              <Field label="CLABE">
+                <input name="clabe" required defaultValue={account.clabe ?? ""} inputMode="numeric" autoComplete="off" className={controlClass} />
+              </Field>
+            </>
+          ) : null}
+        </FormSection>
+        <FormActions>
+          <Button type="submit">Guardar cuenta</Button>
+        </FormActions>
+      </FormPanel>
+      <form action={deleteFinanceAccountAction} className="flex justify-end">
+        <HiddenFields fields={{ accountId: account.id, q, tipo }} />
+        <ConfirmSubmit message={financeAccountDeleteConfirm(label)} pendingLabel="Eliminando…">Eliminar</ConfirmSubmit>
+      </form>
+    </div>
   );
 }
