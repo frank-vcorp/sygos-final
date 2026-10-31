@@ -117,6 +117,26 @@ export function requireDailySalaries(dailyStamped: number, dailyCash: number) {
   return { dailyStamped: stamped, dailyCash: cash };
 }
 
+export type HireKind = "NUEVO" | "MIGRADO";
+
+export function hireKindLabel(hireKind: string | null | undefined) {
+  return hireKind === "MIGRADO" ? "Migrado" : "Nuevo";
+}
+
+/** Nuevo ignora el saldo capturado. Migrado guarda días en medios (mínimo 0, paso 0.5). */
+export function vacationBalanceForHire(hireKind: HireKind, vacationBalance: number) {
+  if (hireKind !== "MIGRADO") return 0;
+  const balance = Number(vacationBalance);
+  if (!Number.isFinite(balance) || balance < 0) {
+    throw new Error("El saldo inicial de vacaciones debe ser un número mayor o igual a 0.");
+  }
+  const halves = Math.round(balance * 2);
+  if (Math.abs(balance * 2 - halves) > 1e-6) {
+    throw new Error("El saldo inicial de vacaciones se captura en medios días.");
+  }
+  return halves / 2;
+}
+
 export function bracketRate(amount: number, brackets: Array<{ upTo: number | null; rate: number }>) {
   const ordered = [...brackets].sort((a, b) => (a.upTo ?? Number.POSITIVE_INFINITY) - (b.upTo ?? Number.POSITIVE_INFINITY));
   return ordered.find((row) => row.upTo == null || amount <= row.upTo)?.rate ?? 0;
@@ -218,7 +238,7 @@ export async function registerCollaborator(
   actor: Actor,
   input: {
     userId: string;
-    hireKind: "NUEVO" | "MIGRADO";
+    hireKind: HireKind;
     hiredAt: string;
     bossUserId: string | null;
     dailyStamped: number;
@@ -258,7 +278,7 @@ export async function registerCollaborator(
       hireKind: input.hireKind,
       status: "ACTIVO",
       hiredAt: noonUtc(input.hiredAt),
-      vacationBalance: input.hireKind === "MIGRADO" ? input.vacationBalance : 0,
+      vacationBalance: vacationBalanceForHire(input.hireKind, input.vacationBalance),
       dailyStamped: salaries.dailyStamped,
       dailyCash: salaries.dailyCash,
       overtimeRate: profile.exempt ? 0 : input.overtimeRate,
@@ -303,7 +323,9 @@ export async function createCollaboratorComplete(
     // 3. Datos laborales
     jobTitle: string;
     bossUserId?: string | null;
+    hireKind?: HireKind;
     hiredAt: string;
+    vacationBalance?: number;
     workSchedule: string;
     // 4. Datos fiscales y de seguridad social
     rfc: string;
@@ -343,6 +365,8 @@ export async function createCollaboratorComplete(
   if (!cleanPassword) throw new Error("La contraseña es obligatoria.");
   const cleanJobTitle = input.jobTitle.trim();
   if (!cleanJobTitle) throw new Error("El puesto es obligatorio.");
+  const hireKind: HireKind = input.hireKind === "MIGRADO" ? "MIGRADO" : "NUEVO";
+  const vacationBalance = vacationBalanceForHire(hireKind, input.vacationBalance ?? 0);
   const cleanHiredAt = input.hiredAt.trim();
   if (!cleanHiredAt) throw new Error("La fecha de ingreso es obligatoria.");
   const cleanSchedule = input.workSchedule.trim();
@@ -396,9 +420,10 @@ export async function createCollaboratorComplete(
       companyId: actor.activeCompanyId,
       userId: user.id,
       bossUserId,
-      hireKind: "NUEVO",
+      hireKind,
       status: "ACTIVO",
       hiredAt: noonUtc(cleanHiredAt),
+      vacationBalance,
       birthDate: input.birthDate?.trim() || null,
       phone: cleanPhone,
       email: input.email?.trim() || null,

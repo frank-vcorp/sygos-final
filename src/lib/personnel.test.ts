@@ -5,6 +5,7 @@ import {
   bracketRate,
   collaboratorDisplayStatus,
   filterCollaborators,
+  hireKindLabel,
   laborProfile,
   normalizeActivities,
   normalizeCommissionTiers,
@@ -14,6 +15,7 @@ import {
   parseCommissionTiers,
   primaByWeek,
   splitBySalary,
+  vacationBalanceForHire,
   vacationDaysForSeniority,
   weekdaysBetween,
 } from "./personnel";
@@ -32,6 +34,16 @@ import {
 } from "./payroll";
 
 describe("personal y nómina", () => {
+  it("fuerza saldo 0 en ingreso nuevo y guarda medios días en migrado", () => {
+    assert.equal(hireKindLabel("NUEVO"), "Nuevo");
+    assert.equal(hireKindLabel("MIGRADO"), "Migrado");
+    assert.equal(vacationBalanceForHire("NUEVO", 12), 0);
+    assert.equal(vacationBalanceForHire("MIGRADO", 7.5), 7.5);
+    assert.equal(vacationBalanceForHire("MIGRADO", 0), 0);
+    assert.throws(() => vacationBalanceForHire("MIGRADO", -1), /mayor o igual a 0/);
+    assert.throws(() => vacationBalanceForHire("MIGRADO", 1.25), /medios días/);
+  });
+
   it("cuenta solo lunes a viernes y reparte la prima del 25% por semana", () => {
     const days = weekdaysBetween("2026-10-05", "2026-10-11");
     assert.deepEqual(days, ["2026-10-05", "2026-10-06", "2026-10-07", "2026-10-08", "2026-10-09"]);
@@ -371,8 +383,13 @@ describe("personal y nómina", () => {
       productivityBonusEnabled: false,
       productivityBonus: 0,
     });
+    assert.equal(collab.hireKind, "MIGRADO");
+    assert.equal(collab.vacationBalance, 12);
+    assert.equal(integratedCollab.hireKind, "NUEVO");
+    assert.equal(integratedCollab.vacationBalance, 0);
     assert.equal(integratedCollab.dailyStamped, 400);
     assert.equal(integratedCollab.dailyCash, 150);
+
     assert.equal(integratedCollab.bankName, "BBVA");
     assert.equal(integratedCollab.bankAccount, "012180001234567890");
     assert.equal(integratedCollab.credentialPasswordPreview, "Sygos-2026!abc");
@@ -498,5 +515,29 @@ describe("personal y nómina", () => {
       fileDataUrl: "data:application/pdf;base64,JVBERi0xLjQ=",
     });
     assert.equal(payrollDoc.title, "Comprobante dispersión S44");
+
+    const migratedComplete = await createCollaboratorComplete(ceoActor, {
+      name: "Ana Migrada",
+      phone: "5588776655",
+      role: "VENTAS",
+      username: "ana.migrada",
+      password: "Sygos-2026!mig",
+      jobTitle: "Ejecutivo de Ventas",
+      bossUserId: ceoUser.id,
+      hireKind: "MIGRADO",
+      hiredAt: "2019-04-01",
+      vacationBalance: 7.5,
+      workSchedule: "Lunes a viernes 09:00 a 18:00",
+      rfc: "MAGA900401AAA",
+      curp: "MAGA900401MDFRRN02",
+      nss: "10987654321",
+      dailyStamped: 300,
+      dailyCash: 100,
+      bankName: "Santander",
+      bankAccount: "014180001111111111",
+    });
+    assert.equal(migratedComplete.hireKind, "MIGRADO");
+    assert.equal(migratedComplete.vacationBalance, 7.5);
+    assert.equal(migratedComplete.hiredAt.toISOString().slice(0, 10), "2019-04-01");
   });
 });

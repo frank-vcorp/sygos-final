@@ -113,6 +113,13 @@ export async function hireAction(formData: FormData) {
       const username = requiredText(formData.get("username"), "Usuario");
       const password = requiredText(formData.get("password"), "Contraseña");
 
+      const hireKind = formData.get("hireKind") === "MIGRADO" ? "MIGRADO" : "NUEVO";
+      const rawVacationBalance = String(formData.get("vacationBalance") ?? "").trim().replace(/,/g, "");
+      if (hireKind === "MIGRADO" && rawVacationBalance === "") {
+        throw new Error("El saldo inicial de vacaciones es obligatorio para un ingreso migrado.");
+      }
+      const vacationBalance = hireKind === "MIGRADO" ? Number(rawVacationBalance) : 0;
+
       const row = await createCollaboratorComplete(session, {
         name,
         phone,
@@ -125,7 +132,9 @@ export async function hireAction(formData: FormData) {
         password,
         jobTitle: requiredText(formData.get("jobTitle"), "Puesto"),
         bossUserId: optionalText(formData.get("bossUserId")),
+        hireKind,
         hiredAt: requiredText(formData.get("hiredAt"), "Fecha de ingreso"),
+        vacationBalance,
         workSchedule: requiredText(formData.get("workSchedule"), "Horario / jornada"),
         rfc: requiredText(formData.get("rfc"), "RFC"),
         curp: requiredText(formData.get("curp"), "CURP"),
@@ -174,14 +183,19 @@ export async function hireAction(formData: FormData) {
       redirect(`/personal/colaboradores/${row.id}?creado=1`);
     }
 
+    const legacyHireKind = formData.get("hireKind") === "MIGRADO" ? "MIGRADO" : "NUEVO";
+    const legacyVacationRaw = String(formData.get("vacationBalance") ?? "").trim().replace(/,/g, "");
+    if (legacyHireKind === "MIGRADO" && legacyVacationRaw === "") {
+      throw new Error("El saldo inicial de vacaciones es obligatorio para un ingreso migrado.");
+    }
     const row = await registerCollaborator(session, {
       userId: requiredText(formData.get("userId"), "Usuario"),
-      hireKind: formData.get("hireKind") === "MIGRADO" ? "MIGRADO" : "NUEVO",
+      hireKind: legacyHireKind,
       hiredAt: requiredText(formData.get("hiredAt"), "Fecha de ingreso"),
       bossUserId: optionalText(formData.get("bossUserId")),
       dailyStamped: moneyFromForm(formData.get("dailyStamped"), "Sueldo diario timbrado"),
       dailyCash: moneyFromForm(formData.get("dailyCash"), "Sueldo diario sin timbrar"),
-      vacationBalance: Number(formData.get("vacationBalance") || 0),
+      vacationBalance: legacyHireKind === "MIGRADO" ? Number(legacyVacationRaw) : 0,
       rfc: optionalText(formData.get("rfc")),
       overtimeRate: optionalMoneyFromForm(formData.get("overtimeRate")) ?? 0,
       jobTitle: optionalText(formData.get("jobTitle")),

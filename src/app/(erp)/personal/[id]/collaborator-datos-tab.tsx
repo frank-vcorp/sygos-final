@@ -45,6 +45,7 @@ type CollaboratorDatosProps = {
     bossName: string | null;
     hiredAtIso: string;
     hiredAtFormatted: string;
+    hireKindLabel: string;
     workSchedule: string;
     isActive: boolean;
     hasClosedProcesses: boolean;
@@ -301,6 +302,7 @@ export function CollaboratorDatosTab({
           <DataItem label="Puesto" value={collaborator.jobTitle} />
           <DataItem label="Jefe directo" value={collaborator.bossName ?? "—"} />
           <DataItem label="Fecha de ingreso" value={collaborator.hiredAtFormatted} />
+          <DataItem label="Tipo de ingreso" value={collaborator.hireKindLabel} />
           <DataItem label="Horario / jornada" value={collaborator.workSchedule} />
           <DataItem
             label="Estado"

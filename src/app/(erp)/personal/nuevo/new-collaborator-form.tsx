@@ -41,6 +41,9 @@ export function NewCollaboratorForm({
   const [suggestedPassword, setSuggestedPassword] = useState(() => generateCollaboratorPassword(3091));
   const [copied, setCopied] = useState(false);
 
+  const [hireKind, setHireKind] = useState<"NUEVO" | "MIGRADO">("NUEVO");
+  const [vacationBalance, setVacationBalance] = useState("");
+
   const [commissionEnabled, setCommissionEnabled] = useState(false);
   const [tiers, setTiers] = useState<CommissionTier[]>([
     { targetAmount: 0, kind: "PORCENTAJE", value: 0 },
@@ -300,7 +303,7 @@ export function NewCollaboratorForm({
       {/* 3. Datos laborales */}
       <FormSection
         title="3. Datos laborales"
-        description="Puesto, ubicación en la estructura y jornada operativa."
+        description="Puesto, tipo de ingreso, ubicación en la estructura y jornada operativa."
         columns={2}
       >
         <Field label="Puesto *">
@@ -331,9 +334,42 @@ export function NewCollaboratorForm({
             ))}
           </select>
         </Field>
-        <Field label="Fecha de ingreso *">
+        <Field label="Tipo de ingreso *">
+          <select
+            name="hireKind"
+            required
+            value={hireKind}
+            onChange={(e) => setHireKind(e.target.value === "MIGRADO" ? "MIGRADO" : "NUEVO")}
+            className={controlClass}
+          >
+            <option value="NUEVO">Nuevo</option>
+            <option value="MIGRADO">Migrado</option>
+          </select>
+        </Field>
+        <Field
+          label="Fecha de ingreso *"
+          hint={
+            hireKind === "MIGRADO"
+              ? "Fecha original de ingreso del colaborador."
+              : "Un ingreso nuevo inicia con saldo de vacaciones en 0."
+          }
+        >
           <input name="hiredAt" type="date" required defaultValue={today} className={controlClass} />
         </Field>
+        {hireKind === "MIGRADO" ? (
+          <Field label="Saldo inicial de vacaciones *" hint="Días hábiles. Se permiten medios días.">
+            <input
+              name="vacationBalance"
+              type="number"
+              required
+              min={0}
+              step={0.5}
+              value={vacationBalance}
+              onChange={(e) => setVacationBalance(e.target.value)}
+              className={controlClass}
+            />
+          </Field>
+        ) : null}
         <Field label="Horario / jornada *">
           <input
             name="workSchedule"

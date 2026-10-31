@@ -10,6 +10,7 @@ import { formatWhen } from "@/lib/form";
 import { can } from "@/lib/permissions";
 import {
   collaboratorDisplayStatus,
+  hireKindLabel,
   mexicoToday,
   parseActivities,
   parseCommissionTiers,
@@ -176,6 +177,7 @@ export default async function ColaboradorPage({
             bossName: row.boss?.name ?? null,
             hiredAtIso: row.hiredAt.toISOString().slice(0, 10),
             hiredAtFormatted: formatWhen(row.hiredAt),
+            hireKindLabel: hireKindLabel(row.hireKind),
             workSchedule: row.workSchedule,
             isActive,
             hasClosedProcesses,
