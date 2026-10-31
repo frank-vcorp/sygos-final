@@ -26,7 +26,7 @@ export type NavGroupDef = {
   links: NavLinkDef[];
   /** Título en mayúsculas como enlace directo, sin submenú desplegable. */
   direct?: boolean;
-  /** Subgrupos dentro del acordeón (Configuración del CEO). */
+  /** Subgrupos dentro de un acordeón. */
   sections?: NavSectionDef[];
 };
 

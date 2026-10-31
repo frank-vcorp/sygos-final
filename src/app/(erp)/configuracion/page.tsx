@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { CeoConfigHub } from "./ceo-hub";
 import { toggleInventoryAction, updateCompanyAction } from "./actions";
 import { RegimenSelect } from "@/components/regimen-select";
 import { Button, controlClass, Field, FormActions, FormPanel, FormSection, PageHeader } from "@/components/ui";
@@ -8,6 +9,7 @@ import { requireCompany } from "@/lib/session";
 
 export default async function ConfiguracionPage() {
   const session = await requireCompany();
+  if (session.role === "CEO") return <CeoConfigHub companyName={session.activeCompanyName} />;
   if (!can(session.role, "config.company")) redirect("/inicio");
   const company = await prisma.company.findUnique({ where: { id: session.activeCompanyId } });
   if (!company) redirect("/empresa");

@@ -46,41 +46,9 @@ export const CEO_NAV_GROUPS: NavGroupDef[] = [
   },
   {
     title: "Configuración",
-    links: [],
-    sections: [
-      {
-        title: "Finanzas",
-        links: [
-          { href: "/configuracion/cuentas", label: "Cuentas", show: showCeo },
-          { href: "/configuracion/catalogos-financieros", label: "Catálogos financieros", show: showCeo },
-        ],
-      },
-      {
-        title: "Comercial",
-        links: [
-          { href: "/configuracion/actividades", label: "Actividades comerciales", show: showCeo },
-          { href: "/configuracion/metas", label: "Metas", show: showCeo },
-        ],
-      },
-      {
-        title: "Operación técnica",
-        links: [
-          { href: "/configuracion/prioridades/diagnostico", label: "Prioridades de diagnóstico", show: showCeo },
-          { href: "/configuracion/prioridades/reparacion", label: "Prioridades de reparación / OS", show: showCeo },
-        ],
-      },
-      {
-        title: "Compras",
-        links: [
-          { href: "/configuracion/presupuestos", label: "Presupuestos", show: showCeo },
-        ],
-      },
-      {
-        title: "Usuarios",
-        links: [
-          { href: "/usuarios", label: "Usuarios", show: showCeo },
-        ],
-      },
+    links: [
+      { href: "/configuracion", label: "Configuración", show: showCeo },
+      { href: "/usuarios", label: "Usuarios", show: showCeo },
     ],
   },
 ];
