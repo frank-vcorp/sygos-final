@@ -64,16 +64,14 @@ export function NewCatalogDialog({
   categories,
   q,
   tipo,
-  estado,
 }: {
   categories: Array<{ id: string; name: string }>;
   q?: string;
   tipo?: string;
-  estado?: string;
 }) {
   return (
     <CreateDialog label="Nuevo" title="Nuevo concepto" titleId="nuevo-catalogo">
-      <CatalogCreateForm categories={categories} q={q} tipo={tipo} estado={estado} />
+      <CatalogCreateForm categories={categories} q={q} tipo={tipo} />
     </CreateDialog>
   );
 }
@@ -82,12 +80,10 @@ function CatalogCreateForm({
   categories,
   q,
   tipo,
-  estado,
 }: {
   categories: Array<{ id: string; name: string }>;
   q?: string;
   tipo?: string;
-  estado?: string;
 }) {
   const [clase, setClase] = useState<"ingreso" | "egreso" | "sub">("ingreso");
   const action = clase === "ingreso"
@@ -99,8 +95,7 @@ function CatalogCreateForm({
     <form action={action}>
       <Keep name="q" value={q} />
       <Keep name="tipo" value={tipo} />
-      <Keep name="estado" value={estado} />
-      <FormSection title="Concepto del catálogo" description="Ingresos, egresos y subcategorías de egreso viven en la misma lista." columns={1}>
+      <FormSection title="Concepto del catálogo" description="La subcategoría queda dentro de la categoría de egreso que elijas." columns={1}>
         <Field label="Tipo">
           <select
             value={clase}
@@ -126,12 +121,6 @@ function CatalogCreateForm({
         ) : null}
         <Field label="Nombre">
           <input name="name" required autoFocus className={controlClass} />
-        </Field>
-        <Field label="Estado">
-          <select name="active" defaultValue="si" className={controlClass}>
-            <option value="si">Activa</option>
-            <option value="no">Inactiva</option>
-          </select>
         </Field>
       </FormSection>
       <FormActions>

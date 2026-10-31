@@ -11,6 +11,7 @@ import {
   parseClabe,
   parseYearMonth,
 } from "@/lib/ceo-config";
+import { financeCatalogDeleteBlockedMessage, type FinanceCatalogClase } from "@/lib/finance-catalog-ui";
 import { moneyFromForm } from "@/lib/money";
 import { requireCompany } from "@/lib/session";
 
@@ -21,6 +22,12 @@ function isRedirect(error: unknown) {
 
 function isUnique(error: unknown) {
   return typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "P2002";
+}
+
+function isInUseConstraint(error: unknown) {
+  if (typeof error !== "object" || error === null || !("code" in error)) return false;
+  const code = (error as { code?: string }).code;
+  return code === "P2003" || code === "P2014";
 }
 
 async function requireCeo(back: string) {
@@ -90,9 +97,16 @@ function catalogReturn(formData: FormData, clase: string, id?: string | null) {
     vista: "catalogos",
     q: optionalText(formData.get("q")),
     tipo: optionalText(formData.get("tipo")),
-    estado: optionalText(formData.get("estado")),
     clase,
     id,
+  });
+}
+
+function catalogListReturn(formData: FormData) {
+  return queryBack("/configuracion/finanzas", {
+    vista: "catalogos",
+    q: optionalText(formData.get("q")),
+    tipo: optionalText(formData.get("tipo")),
   });
 }
 
@@ -195,15 +209,14 @@ export async function saveIncomeCategoryAction(formData: FormData) {
   try {
     const session = await requireCeo(back);
     const name = requiredText(formData.get("name"), "Nombre");
-    const active = activeFromForm(formData);
     if (existingId) {
       const updated = await prisma.incomeCategory.updateMany({
         where: { id: existingId, companyId: session.activeCompanyId },
-        data: { name, active },
+        data: { name },
       });
       if (updated.count === 0) throw new Error("Esa categoría de ingreso no es de esta empresa.");
     } else {
-      const created = await prisma.incomeCategory.create({ data: { companyId: session.activeCompanyId, name, active } });
+      const created = await prisma.incomeCategory.create({ data: { companyId: session.activeCompanyId, name } });
       savedId = created.id;
     }
     await setFlash({ tone: "ok", message: "Categoría de ingreso guardada." });
@@ -221,15 +234,14 @@ export async function saveExpenseCategoryAction(formData: FormData) {
   try {
     const session = await requireCeo(back);
     const name = requiredText(formData.get("name"), "Nombre");
-    const active = activeFromForm(formData);
     if (existingId) {
       const updated = await prisma.expenseCategory.updateMany({
         where: { id: existingId, companyId: session.activeCompanyId },
-        data: { name, active },
+        data: { name },
       });
       if (updated.count === 0) throw new Error("Esa categoría de egreso no es de esta empresa.");
     } else {
-      const created = await prisma.expenseCategory.create({ data: { companyId: session.activeCompanyId, name, active } });
+      const created = await prisma.expenseCategory.create({ data: { companyId: session.activeCompanyId, name } });
       savedId = created.id;
     }
     await setFlash({ tone: "ok", message: "Categoría de egreso guardada." });
@@ -247,7 +259,6 @@ export async function saveExpenseSubcategoryAction(formData: FormData) {
   try {
     const session = await requireCeo(back);
     const name = requiredText(formData.get("name"), "Nombre");
-    const active = activeFromForm(formData);
     const categoryId = requiredText(formData.get("categoryId"), "Categoría de egreso");
     const category = await prisma.expenseCategory.findFirst({
       where: { id: categoryId, companyId: session.activeCompanyId },
@@ -256,9 +267,9 @@ export async function saveExpenseSubcategoryAction(formData: FormData) {
     if (existingId) {
       const current = await prisma.expenseSubcategory.findFirst({ where: { id: existingId, category: { companyId: session.activeCompanyId } } });
       if (!current) throw new Error("Esa subcategoría no es de esta empresa.");
-      await prisma.expenseSubcategory.update({ where: { id: existingId }, data: { name, active, categoryId } });
+      await prisma.expenseSubcategory.update({ where: { id: existingId }, data: { name, categoryId } });
     } else {
-      const created = await prisma.expenseSubcategory.create({ data: { categoryId, name, active } });
+      const created = await prisma.expenseSubcategory.create({ data: { categoryId, name } });
       savedId = created.id;
     }
     await setFlash({ tone: "ok", message: "Subcategoría de egreso guardada." });
@@ -266,6 +277,119 @@ export async function saveExpenseSubcategoryAction(formData: FormData) {
     await fail(back, error);
   }
   redirect(catalogReturn(formData, "sub", savedId));
+}
+
+export async function deleteFinanceCatalogAction(formData: FormData) {
+  "use server";
+  const clase = catalogClase(formData.get("clase"));
+  const id = optionalText(formData.get("id"));
+  const back = catalogReturn(formData, clase, id);
+  try {
+    const session = await requireCeo(back);
+    if (!id) throw new Error("Falta el registro a eliminar.");
+    if (clase === "ingreso") await deleteIncomeCategory(session.activeCompanyId, id);
+    else if (clase === "egreso") await deleteExpenseCategory(session.activeCompanyId, id);
+    else await deleteExpenseSubcategory(session.activeCompanyId, id);
+    const message = clase === "ingreso"
+      ? "Categoría de ingreso eliminada."
+      : clase === "egreso"
+        ? "Categoría de egreso eliminada."
+        : "Subcategoría eliminada.";
+    await setFlash({ tone: "ok", message });
+  } catch (error) {
+    const blocked = isInUseConstraint(error)
+      ? new Error("No se puede eliminar: el registro está en uso.")
+      : error;
+    await fail(back, blocked);
+  }
+  redirect(catalogListReturn(formData));
+}
+
+function catalogClase(value: FormDataEntryValue | null): FinanceCatalogClase {
+  const text = optionalText(value);
+  if (text === "egreso" || text === "sub") return text;
+  return "ingreso";
+}
+
+async function deleteIncomeCategory(companyId: string, id: string) {
+  const category = await prisma.incomeCategory.findFirst({ where: { id, companyId } });
+  if (!category) throw new Error("Esa categoría de ingreso no es de esta empresa.");
+  await prisma.$transaction(async (tx) => {
+    const movements = await tx.financeMovement.count({
+      where: { companyId, direction: "INGRESO", category: category.name },
+    });
+    const blocked = financeCatalogDeleteBlockedMessage("ingreso", category.name, { purchases: 0, movements });
+    if (blocked) throw new Error(blocked);
+    const deleted = await tx.incomeCategory.deleteMany({ where: { id: category.id, companyId } });
+    if (deleted.count === 0) throw new Error("Esa categoría de ingreso no es de esta empresa.");
+  });
+}
+
+async function deleteExpenseCategory(companyId: string, id: string) {
+  const category = await prisma.expenseCategory.findFirst({ where: { id, companyId } });
+  if (!category) throw new Error("Esa categoría de egreso no es de esta empresa.");
+  await prisma.$transaction(async (tx) => {
+    const subs = await tx.expenseSubcategory.findMany({
+      where: { categoryId: category.id },
+      select: { id: true, name: true },
+    });
+    const purchases = await tx.purchase.count({
+      where: {
+        OR: [
+          { expenseCategoryId: category.id },
+          { companyId, expenseCategory: category.name },
+          ...subs.flatMap((subcategory) => [
+            { expenseSubcategoryId: subcategory.id },
+            { companyId, expenseCategory: category.name, expenseSubcategory: subcategory.name },
+          ]),
+        ],
+      },
+    });
+    const movements = await tx.financeMovement.count({
+      where: {
+        companyId,
+        direction: "EGRESO",
+        OR: [
+          { category: category.name },
+          { category: { startsWith: `${category.name} · ` } },
+        ],
+      },
+    });
+    const blocked = financeCatalogDeleteBlockedMessage("egreso", category.name, { purchases, movements });
+    if (blocked) throw new Error(blocked);
+    if (subs.length > 0) {
+      await tx.expenseSubcategory.deleteMany({ where: { categoryId: category.id } });
+    }
+    const deleted = await tx.expenseCategory.deleteMany({ where: { id: category.id, companyId } });
+    if (deleted.count === 0) throw new Error("Esa categoría de egreso no es de esta empresa.");
+  });
+}
+
+async function deleteExpenseSubcategory(companyId: string, id: string) {
+  const subcategory = await prisma.expenseSubcategory.findFirst({
+    where: { id, category: { companyId } },
+    include: { category: { select: { name: true } } },
+  });
+  if (!subcategory) throw new Error("Esa subcategoría no es de esta empresa.");
+  await prisma.$transaction(async (tx) => {
+    const purchases = await tx.purchase.count({
+      where: {
+        OR: [
+          { expenseSubcategoryId: subcategory.id },
+          { companyId, expenseCategory: subcategory.category.name, expenseSubcategory: subcategory.name },
+        ],
+      },
+    });
+    const movements = await tx.financeMovement.count({
+      where: { companyId, direction: "EGRESO", category: `${subcategory.category.name} · ${subcategory.name}` },
+    });
+    const blocked = financeCatalogDeleteBlockedMessage("sub", subcategory.name, { purchases, movements });
+    if (blocked) throw new Error(blocked);
+    const deleted = await tx.expenseSubcategory.deleteMany({
+      where: { id: subcategory.id, category: { companyId } },
+    });
+    if (deleted.count === 0) throw new Error("Esa subcategoría no es de esta empresa.");
+  });
 }
 
 export async function saveActivityTypeAction(formData: FormData) {

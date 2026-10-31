@@ -8,7 +8,7 @@ export default async function CatalogosFinancierosPage({
   const sp = await searchParams;
   const params = new URLSearchParams();
   params.set("vista", "catalogos");
-  for (const key of ["q", "tipo", "estado", "id", "clase"] as const) {
+  for (const key of ["q", "tipo", "id", "clase"] as const) {
     const value = sp[key];
     if (typeof value === "string" && value) params.set(key, value);
   }

@@ -1,7 +1,6 @@
 import { NewAccountDialog, NewCatalogDialog } from "./dialogs";
 import { AccountsPanel } from "./accounts";
-import { CatalogsPanel, type CatalogRow } from "./catalogs";
-import { readEstado } from "../filters";
+import { CatalogsPanel } from "./catalogs";
 import { requireCeoConfig } from "../guard";
 import { PageHeader, SegmentedNav } from "@/components/ui";
 import { prisma } from "@/lib/db";
@@ -9,14 +8,13 @@ import { prisma } from "@/lib/db";
 export default async function FinanzasConfigPage({
   searchParams,
 }: {
-  searchParams: Promise<{ vista?: string; q?: string; tipo?: string; estado?: string; id?: string; clase?: string }>;
+  searchParams: Promise<{ vista?: string; q?: string; tipo?: string; id?: string; clase?: string }>;
 }) {
   const session = await requireCeoConfig();
   const sp = await searchParams;
   const vista = sp.vista === "catalogos" ? "catalogos" : "cuentas";
   const q = (sp.q ?? "").trim();
   const tipo = (sp.tipo ?? "").trim();
-  const estado = readEstado(sp.estado);
   const [accounts, incomes, expenses] = await Promise.all([
     prisma.financeAccount.findMany({
       where: { companyId: session.activeCompanyId },
@@ -33,34 +31,12 @@ export default async function FinanzasConfigPage({
     }),
   ]);
   const categories = expenses.map((category) => ({ id: category.id, name: category.name }));
-  const catalogRows: CatalogRow[] = [
-    ...incomes.map((row) => ({
-      id: row.id,
-      clase: "ingreso" as const,
-      name: row.name,
-      active: row.active,
-      categoryId: null,
-      categoryName: null,
-    })),
-    ...expenses.flatMap((category) => [
-      {
-        id: category.id,
-        clase: "egreso" as const,
-        name: category.name,
-        active: category.active,
-        categoryId: null,
-        categoryName: null,
-      },
-      ...category.subcategories.map((sub) => ({
-        id: sub.id,
-        clase: "sub" as const,
-        name: sub.name,
-        active: sub.active,
-        categoryId: category.id,
-        categoryName: category.name,
-      })),
-    ]),
-  ];
+  const catalogIncomes = incomes.map((row) => ({ id: row.id, name: row.name }));
+  const catalogExpenses = expenses.map((category) => ({
+    id: category.id,
+    name: category.name,
+    subcategories: category.subcategories.map((sub) => ({ id: sub.id, name: sub.name })),
+  }));
 
   return (
     <>
@@ -69,10 +45,10 @@ export default async function FinanzasConfigPage({
         title="Finanzas"
         subtitle={vista === "cuentas"
           ? `${session.activeCompanyName} · Cuentas bancarias y de efectivo. El saldo no se edita aquí.`
-          : `${session.activeCompanyName} · Ingresos, egresos y subcategorías en la misma lista.`}
+          : `${session.activeCompanyName} · Las subcategorías de egreso quedan dentro de su categoría.`}
         action={vista === "cuentas"
           ? <NewAccountDialog q={q || undefined} tipo={tipo || undefined} />
-          : <NewCatalogDialog categories={categories} q={q || undefined} tipo={tipo || undefined} estado={estado === "todos" ? undefined : estado} />}
+          : <NewCatalogDialog categories={categories} q={q || undefined} tipo={tipo || undefined} />}
       />
       <SegmentedNav
         items={[
@@ -84,11 +60,10 @@ export default async function FinanzasConfigPage({
         <AccountsPanel accounts={accounts} q={q} tipo={tipo} selectedId={sp.id} />
       ) : (
         <CatalogsPanel
-          rows={catalogRows}
-          categories={categories}
+          incomes={catalogIncomes}
+          expenses={catalogExpenses}
           q={q}
           tipo={tipo}
-          estado={estado}
           selectedId={sp.id}
           selectedClase={sp.clase}
         />
