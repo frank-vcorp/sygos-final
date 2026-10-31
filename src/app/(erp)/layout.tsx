@@ -80,25 +80,31 @@ const CREATE: Partial<Record<string, { href: string; show: NavLink["showCreate"]
   "/compras/listas": { href: "/compras/listas/nueva", show: (role, code) => can(role, "purchase.operate", code) },
 };
 
-function erpNavGroups(role: Parameters<typeof can>[0]): Array<{ title: string | null; direct?: boolean; links: NavLink[] }> {
+function mapNavLink(link: { href: string; label?: string; show: NavLink["show"] }): NavLink {
+  const base = link.href.split("?")[0]!.split("#")[0]!;
+  const fromCatalog = LABELS[base];
+  const label = link.label ?? (typeof fromCatalog === "function" ? fromCatalog : fromCatalog ?? base);
+  const create = link.href.includes("vista=oc")
+    ? { href: "/compras?vista=oc&nueva=1", show: (role: Parameters<typeof can>[0], code: string | null) => can(role, "purchase.operate", code) }
+    : CREATE[base];
+  return {
+    href: link.href,
+    label,
+    show: link.show,
+    createHref: create?.href,
+    showCreate: create?.show,
+  };
+}
+
+function erpNavGroups(role: Parameters<typeof can>[0]): Array<{ title: string | null; direct?: boolean; links: NavLink[]; sections?: Array<{ title: string; links: NavLink[] }> }> {
   return navGroupsForRole(role).map((group) => ({
     title: group.title,
     direct: group.direct,
-    links: group.links.map((link) => {
-      const base = link.href.split("?")[0]!.split("#")[0]!;
-      const fromCatalog = LABELS[base];
-      const label = link.label ?? (typeof fromCatalog === "function" ? fromCatalog : fromCatalog ?? base);
-      const create = link.href.includes("vista=oc")
-        ? { href: "/compras?vista=oc&nueva=1", show: (role: Parameters<typeof can>[0], code: string | null) => can(role, "purchase.operate", code) }
-        : CREATE[base];
-      return {
-        href: link.href,
-        label,
-        show: link.show,
-        createHref: create?.href,
-        showCreate: create?.show,
-      };
-    }),
+    links: group.links.map(mapNavLink),
+    sections: group.sections?.map((section) => ({
+      title: section.title,
+      links: section.links.map(mapNavLink),
+    })),
   }));
 }
 
@@ -175,26 +181,31 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
               && session.role !== "GERENTE_OPERATIVO_SYSTRON"
             }
             groups={[
-              ...erpNavGroups(session.role).map((group) => ({
-                title: group.title,
-                direct: group.direct,
-                links: group.links
-                  .filter((link) => link.show(session.role, session.activeCompanyCode))
-                  .map((link) => {
-                    const base = typeof link.label === "function" ? link.label(session.activeCompanyCode) : link.label;
-                    const label = navLabel(link.href, session.role, session.activeCompanyCode) ?? base;
-                    return {
-                      href: link.href,
-                      label,
-                      createHref: link.showCreate?.(session.role, session.activeCompanyCode) ? link.createHref : undefined,
-                    };
-                  }),
-              })).filter((group) => group.links.length > 0),
+              ...erpNavGroups(session.role).map((group) => {
+                const toItem = (link: NavLink) => {
+                  const base = typeof link.label === "function" ? link.label(session.activeCompanyCode) : link.label;
+                  const label = navLabel(link.href, session.role, session.activeCompanyCode) ?? base;
+                  return {
+                    href: link.href,
+                    label,
+                    createHref: link.showCreate?.(session.role, session.activeCompanyCode) ? link.createHref : undefined,
+                  };
+                };
+                const links = group.links.filter((link) => link.show(session.role, session.activeCompanyCode)).map(toItem);
+                const sections = group.sections
+                  ?.map((section) => ({
+                    title: section.title,
+                    links: section.links.filter((link) => link.show(session.role, session.activeCompanyCode)).map(toItem),
+                  }))
+                  .filter((section) => section.links.length > 0);
+                return { title: group.title, direct: group.direct, links, sections };
+              }).filter((group) => group.links.length > 0 || (group.sections?.length ?? 0) > 0),
               ...(session.role === "VENTAS"
                 || session.role === "SUPERVISOR_TECNICO"
                 || session.role === "TECNICO"
                 || session.role === "AYUDANTE_GENERAL"
                 || session.role === "KIOSCO_ASISTENCIA"
+                || session.role === "ADMINISTRADOR"
                 ? []
                 : [{ title: null, links: [{ href: "/cuenta", label: "Cuenta" }] }]),
             ]}

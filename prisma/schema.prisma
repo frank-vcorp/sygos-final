@@ -23,6 +23,10 @@ model Company {
   registroPatronal String?
   employerCurp     String?
   employerState    String?
+  /// Presupuesto mensual de compras de refacciones. No limita una compra individual.
+  partsMonthlyBudget Float @default(100000)
+  /// Presupuesto mensual de compras generales. No limita una compra individual.
+  generalMonthlyBudget Float @default(5000)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   version         Int      @default(1)
@@ -59,6 +63,7 @@ model Company {
   shoppingLists    ShoppingList[]
   expenseCategories ExpenseCategory[]
   incomeCategories IncomeCategory[]
+  commercialMonthlyGoals CommercialMonthlyGoal[]
   collaborators    Collaborator[]
   payrollPeriods   PayrollPeriod[]
   commissionRuns   CommissionRun[]
@@ -826,12 +831,28 @@ model FinanceAccount {
   company   Company  @relation(fields: [companyId], references: [id])
   name      String
   kind      String
+  bankName  String?
+  clabe     String?
+  fiscal    Boolean  @default(false)
   balance   Float    @default(0)
   active    Boolean  @default(true)
 
   movements FinanceMovement[]
 
   @@unique([companyId, name])
+}
+
+/// Meta mensual en pesos del CEO: facturación o cobranza. No sustituye las metas por vendedor.
+model CommercialMonthlyGoal {
+  id        String  @id @default(cuid())
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id])
+  metric    String
+  year      Int
+  month     Int
+  amount    Float
+
+  @@unique([companyId, metric, year, month])
 }
 
 model FinanceMovement {

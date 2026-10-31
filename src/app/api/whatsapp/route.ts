@@ -20,7 +20,7 @@ export async function GET() {
   const session = await requireIntegrationsActor();
   if (!session) {
     return NextResponse.json(
-      { message: "Solo el CEO o el Administrador pueden administrar WhatsApp." },
+      { message: "Solo el Administrador puede administrar WhatsApp." },
       { status: 403 },
     );
   }
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
   const session = await requireIntegrationsActor();
   if (!session) {
     return NextResponse.json(
-      { message: "Solo el CEO o el Administrador pueden administrar WhatsApp." },
+      { message: "Solo el Administrador puede administrar WhatsApp." },
       { status: 403 },
     );
   }

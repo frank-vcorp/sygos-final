@@ -16,11 +16,18 @@ export type NavLinkDef = {
   label?: string;
 };
 
+export type NavSectionDef = {
+  title: string;
+  links: NavLinkDef[];
+};
+
 export type NavGroupDef = {
   title: string | null;
   links: NavLinkDef[];
   /** Título en mayúsculas como enlace directo, sin submenú desplegable. */
   direct?: boolean;
+  /** Subgrupos dentro del acordeón (Configuración del CEO). */
+  sections?: NavSectionDef[];
 };
 
 /** Entrada lateral suelta para quien puede capturar requerimientos en SYSTRON. */
@@ -116,9 +123,18 @@ export const NAV_GROUPS: NavGroupDef[] = [
       { href: "/personal/horas", show: (role, code) => ventas(role) && can(role, "overtime.capture", code) },
       { href: "/proveedores", show: (role, code) => notVentas(role) && can(role, "supplier.operate", code) },
       { href: "/usuarios", show: (role) => notVentas(role) && can(role, "user.manage") },
-      { href: "/configuracion", show: (role) => notVentas(role) && (can(role, "config.company") || can(role, "config.integrations")) },
-      { href: "/configuracion#integraciones", label: "WhatsApp y correo (SMTP)", show: (role) => notVentas(role) && can(role, "config.integrations") },
-      { href: "/pruebas", show: (role) => role === "ADMINISTRADOR" },
+    ],
+  },
+];
+
+/** Menú del Administrador: empresa, canales y usuarios. Sin operación del ERP. */
+export const ADMIN_NAV_GROUPS: NavGroupDef[] = [
+  {
+    title: null,
+    links: [
+      { href: "/configuracion", label: "Empresa", show: (role) => role === "ADMINISTRADOR" },
+      { href: "/configuracion/integraciones", label: "WhatsApp y correo (SMTP)", show: (role) => role === "ADMINISTRADOR" },
+      { href: "/usuarios", label: "Usuarios", show: (role) => role === "ADMINISTRADOR" },
     ],
   },
 ];
@@ -132,7 +148,7 @@ export function navGroupsForRole(role: Role): NavGroupDef[] {
   if (role === "SUPERVISOR_TECNICO") return SUPERVISOR_NAV_GROUPS;
   if (role === "TECNICO") return TECNICO_NAV_GROUPS;
   if (role === "GERENTE_OPERATIVO_SYSTRON") return GERENTE_SYSTRON_NAV_GROUPS;
-  if (role === "ADMINISTRADOR") return [...NAV_GROUPS, requerimientosNavGroup()];
+  if (role === "ADMINISTRADOR") return ADMIN_NAV_GROUPS;
   return NAV_GROUPS;
 }
 
@@ -140,7 +156,8 @@ export function visibleNavHrefs(role: Role, companyCode: string | null): string[
   const seen = new Set<string>();
   const out: string[] = [];
   for (const group of navGroupsForRole(role)) {
-    for (const link of group.links) {
+    const links = [...group.links, ...(group.sections?.flatMap((section) => section.links) ?? [])];
+    for (const link of links) {
       if (!link.show(role, companyCode) || seen.has(link.href)) continue;
       seen.add(link.href);
       out.push(link.href);

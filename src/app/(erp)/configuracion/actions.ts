@@ -14,8 +14,7 @@ import {
   verifySendGrid,
 } from "@/lib/sendgrid";
 import { setFlash } from "@/lib/flash";
-import { ConcurrencyError, optionalInt, optionalText, parseVersion, requiredText } from "@/lib/form";
-import { optionalMoneyFromForm } from "@/lib/money";
+import { ConcurrencyError, optionalInt, optionalText, parseVersion } from "@/lib/form";
 import { recordHistory } from "@/lib/history";
 import { can } from "@/lib/permissions";
 import { parseRegimen } from "@/lib/sat-regimen";
@@ -81,7 +80,7 @@ export async function updateCompanyAction(formData: FormData) {
 async function requireIntegrations(returnUrl = "/configuracion") {
   const session = await requireCompany();
   if (!can(session.role, "config.integrations")) {
-    await setFlash({ tone: "error", message: "Solo el CEO o el Administrador pueden configurar integraciones." });
+    await setFlash({ tone: "error", message: "Solo el Administrador puede configurar integraciones." });
     redirect(returnUrl);
   }
   return session;
@@ -332,45 +331,6 @@ export async function toggleInventoryAction(formData: FormData) {
   });
   await setFlash({ tone: "ok", message: enable ? "Inventario habilitado para Servomotores." : "Inventario deshabilitado." });
   redirect("/configuracion");
-}
-
-export async function updatePriorityAction(formData: FormData) {
-  "use server";
-  const session = await requireCompany();
-  if (!can(session.role, "config.company")) {
-    await setFlash({ tone: "error", message: "No tienes permiso para las prioridades." });
-    redirect("/configuracion");
-  }
-  const id = requiredText(formData.get("priorityId"), "Prioridad");
-  const slaMaxDays = optionalInt(formData.get("slaMaxDays"));
-  if (slaMaxDays == null || slaMaxDays < 1) {
-    await setFlash({ tone: "error", message: "El SLA máximo debe ser al menos un día hábil." });
-    redirect("/configuracion");
-  }
-  const updated = await prisma.priority.updateMany({
-    where: { id, companyId: session.activeCompanyId },
-    data: {
-      price: optionalMoneyFromForm(formData.get("price")),
-      incrementPct: optionalPercent(formData.get("incrementPct")),
-      targetMinDays: optionalInt(formData.get("targetMinDays")),
-      targetMaxDays: optionalInt(formData.get("targetMaxDays")),
-      slaMaxDays,
-    },
-  });
-  if (updated.count === 0) {
-    await setFlash({ tone: "error", message: "Esa prioridad no es de esta empresa." });
-    redirect("/configuracion");
-  }
-  await setFlash({ tone: "ok", message: "Prioridad actualizada. Los casos ya abiertos conservan la fotografía anterior." });
-  redirect("/configuracion");
-}
-
-function optionalPercent(value: FormDataEntryValue | null) {
-  const text = optionalText(value);
-  if (!text) return null;
-  const n = Number(text);
-  if (!Number.isFinite(n) || n < 0) throw new Error("El incremento no es válido.");
-  return n;
 }
 
 function isRedirect(error: unknown) {

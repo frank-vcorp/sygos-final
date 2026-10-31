@@ -86,6 +86,9 @@ const inactiveItemClass = "text-slate-600 hover:bg-slate-200/50 hover:text-slate
 const quickCreatePillClass =
   "mr-1.5 inline-flex h-7 w-7 items-center justify-center rounded-md text-base font-semibold leading-none text-slate-400 transition-colors hover:bg-slate-200/60 hover:text-[#0a477e]";
 
+type SideLink = { href: string; label: string; createHref?: string };
+type SideSection = { title: string; links: SideLink[] };
+
 export function SideNav({
   groups,
   /** Si es false, las secciones del menú no usan acordeón (p. ej. rol Ventas). */
@@ -94,7 +97,8 @@ export function SideNav({
   groups: Array<{
     title: string | null;
     direct?: boolean;
-    links: Array<{ href: string; label: string; createHref?: string }>;
+    links: SideLink[];
+    sections?: SideSection[];
   }>;
   accordionGroups?: boolean;
 }) {
@@ -108,8 +112,27 @@ export function SideNav({
     window.addEventListener("hashchange", sync);
     return () => window.removeEventListener("hashchange", sync);
   }, [path]);
-  const allHrefs = groups.flatMap((group) => group.links.map((link) => link.href));
+  const allHrefs = groups.flatMap((group) => [
+    ...group.links.map((link) => link.href),
+    ...(group.sections?.flatMap((section) => section.links.map((link) => link.href)) ?? []),
+  ]);
   const globalActiveHref = pickGlobalActiveNavHref(path, search, allHrefs, locationHash);
+  const renderLinks = (links: SideLink[]) =>
+    links.map((link) => {
+      const active = link.href === globalActiveHref;
+      return (
+        <div key={link.href} className={`flex min-h-9 items-center rounded-lg transition-all ${active ? activeItemClass : inactiveItemClass}`}>
+          <Link href={link.href} className={`block min-w-0 flex-1 px-3 py-2 text-[13.5px] ${active ? "font-semibold text-[#0a477e]" : "font-medium"}`} aria-current={active ? "page" : undefined}>
+            {link.label}
+          </Link>
+          {link.createHref ? (
+            <Link href={link.createHref} aria-label={`Alta rápida de ${link.label}`} title={`Alta rápida de ${link.label}`} className={quickCreatePillClass}>
+              +
+            </Link>
+          ) : null}
+        </div>
+      );
+    });
   return (
     <nav className="space-y-1.5 px-3 pb-6" aria-label="Secciones">
       {groups.map((group) => {
@@ -141,27 +164,20 @@ export function SideNav({
             </div>
           );
         }
-        const groupActive = group.links.some((link) => {
+        const sectionLinks = group.sections?.flatMap((section) => section.links) ?? [];
+        const groupActive = [...group.links, ...sectionLinks].some((link) => {
           if (link.href === globalActiveHref) return true;
           const base = link.href.split("?")[0]!.split("#")[0]!;
           return Boolean(base && base !== "/" && (path === base || path.startsWith(`${base}/`)));
         });
-        const links = group.links.map((link) => {
-            const active = link.href === globalActiveHref;
-            return (
-              <div key={link.href} className={`flex min-h-9 items-center rounded-lg transition-all ${active ? activeItemClass : inactiveItemClass}`}>
-                <Link href={link.href} className={`block min-w-0 flex-1 px-3 py-2 text-[13.5px] ${active ? "font-semibold text-[#0a477e]" : "font-medium"}`} aria-current={active ? "page" : undefined}>
-                  {link.label}
-                </Link>
-                {link.createHref ? (
-                  <Link href={link.createHref} aria-label={`Alta rápida de ${link.label}`} title={`Alta rápida de ${link.label}`} className={quickCreatePillClass}>
-                    +
-                  </Link>
-                ) : null}
-              </div>
-            );
-          });
-        if (!group.title) return <div key={`plain-${group.links.map((link) => link.href).join("-")}`} className="space-y-1">{links}</div>;
+        const links = renderLinks(group.links);
+        const sections = group.sections?.filter((section) => section.links.length > 0).map((section) => (
+          <div key={section.title} className="pt-2">
+            <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-[0.08em] text-slate-400">{section.title}</p>
+            <div className="space-y-1">{renderLinks(section.links)}</div>
+          </div>
+        ));
+        if (!group.title) return <div key={`plain-${group.links.map((link) => link.href).join("-")}`} className="space-y-1">{links}{sections}</div>;
         if (!accordionGroups) {
           return (
             <div key={group.title} className="pt-1">
@@ -171,7 +187,7 @@ export function SideNav({
                 <SectionIcon title={group.title} />
                 <span className="truncate">{group.title}</span>
               </div>
-              <div className="mt-1 ml-3 space-y-1 border-l border-slate-200/90 pb-2 pl-2">{links}</div>
+              <div className="mt-1 ml-3 space-y-1 border-l border-slate-200/90 pb-2 pl-2">{links}{sections}</div>
             </div>
           );
         }
@@ -184,7 +200,7 @@ export function SideNav({
               </span>
               <span className="text-base text-slate-400 transition-transform duration-200 group-open:rotate-90" aria-hidden>›</span>
             </summary>
-            <div className="mt-1 ml-3 space-y-1 border-l border-slate-200/90 pb-2 pl-2">{links}</div>
+            <div className="mt-1 ml-3 space-y-1 border-l border-slate-200/90 pb-2 pl-2">{links}{sections}</div>
           </details>
         );
       })}
