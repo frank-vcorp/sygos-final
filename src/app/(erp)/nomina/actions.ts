@@ -6,6 +6,7 @@ import { optionalText, parseVersion, requiredText } from "@/lib/form";
 import { moneyFromForm, optionalMoneyFromForm } from "@/lib/money";
 import {
   addPayrollDocument,
+  canAdjustPayrollAmounts,
   generateOrOpenWeeklyPayroll,
   returnPayrollToCorrection,
   sendPayrollToValidation,
@@ -100,7 +101,10 @@ export async function updatePayrollLineAmountsAction(formData: FormData) {
   const periodId = requiredText(formData.get("periodId"), "Nómina");
   const collaboratorId = requiredText(formData.get("collaboratorId"), "Colaborador");
   try {
-    const session = await guard("personnel.manage");
+    const session = await requireCompany();
+    if (!canAdjustPayrollAmounts(session.role)) {
+      throw new Error("No tienes permiso para ajustar importes de nómina.");
+    }
     await updatePayrollLineAppliedAmounts(session, periodId, collaboratorId, {
       sueldo: optionalMoneyFromForm(formData.get("sueldo")) ?? 0,
       horasExtra: optionalMoneyFromForm(formData.get("horasExtra")) ?? 0,

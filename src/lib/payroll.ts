@@ -50,6 +50,15 @@ export function isPayrollEditable(status: string): boolean {
   return status === "EN_PREPARACION" || status === "EN_CORRECCION" || status === "PRELIMINAR";
 }
 
+/** CEO, Administrador y Coordinación ajustan importes solo con la nómina abierta. */
+export function canAdjustPayrollAmounts(role: Role, status?: string): boolean {
+  const operator =
+    role === "ADMINISTRADOR" || role === "CEO" || role === "COORDINACION_ADMINISTRACION";
+  if (!operator) return false;
+  if (status === undefined) return true;
+  return isPayrollEditable(status);
+}
+
 export function isPayrollClosed(status: string): boolean {
   return status === "CERRADA" || status === "AUTORIZADA";
 }
@@ -313,11 +322,7 @@ export async function getPayrollPendingWarnings(
 }
 
 function assertPayrollOperator(actor: PayrollActor) {
-  if (
-    actor.role !== "ADMINISTRADOR" &&
-    actor.role !== "CEO" &&
-    actor.role !== "COORDINACION_ADMINISTRACION"
-  ) {
+  if (!canAdjustPayrollAmounts(actor.role)) {
     throw new Error("Nómina la operan Coordinación de Administración o el CEO.");
   }
 }
@@ -640,12 +645,14 @@ export async function updatePayrollLineAppliedAmounts(
     descuentos: number;
   },
 ) {
-  assertPayrollOperator(actor);
+  if (!canAdjustPayrollAmounts(actor.role)) {
+    throw new Error("Nómina la operan Coordinación de Administración o el CEO.");
+  }
   const period = await prisma.payrollPeriod.findFirst({
     where: { id: periodId, companyId: actor.activeCompanyId },
   });
   if (!period) throw new Error("La nómina no pertenece a la empresa activa.");
-  if (!isPayrollEditable(period.status)) {
+  if (!canAdjustPayrollAmounts(actor.role, period.status)) {
     throw new Error("Solo se pueden ajustar importes cuando la nómina está En preparación o En corrección.");
   }
 

@@ -4,7 +4,7 @@ import { Badge, EntityDetailHeader, EntityMetaItem } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
 import {
-  isPayrollEditable,
+  canAdjustPayrollAmounts,
   parsePayrollOrigins,
   payrollStatusLabel,
   payrollStatusTone,
@@ -35,7 +35,7 @@ export default async function NominaColaboradorDetallePage({
   });
   if (!line) notFound();
 
-  const editable = isPayrollEditable(period.status);
+  const editable = canAdjustPayrollAmounts(session.role, period.status);
   const origins = parsePayrollOrigins(line.originsJson);
   const jobLabel =
     (line.collaborator.jobTitle && line.collaborator.jobTitle.trim()) ||

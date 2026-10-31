@@ -30,6 +30,7 @@ import {
   suggestCollaboratorUsername,
 } from "./collaborator-credentials";
 import {
+  canAdjustPayrollAmounts,
   formatPayrollFolio,
   isoWeekFromDate,
   parsePayrollPeriodInput,
@@ -197,6 +198,17 @@ describe("personal y nómina", () => {
     assert.equal(payrollStatusLabel("PENDIENTE_VALIDACION"), "Pendiente de validación");
     assert.equal(payrollStatusLabel("EN_CORRECCION"), "En corrección");
     assert.equal(payrollStatusLabel("CERRADA"), "Cerrada");
+
+    for (const role of ["CEO", "ADMINISTRADOR", "COORDINACION_ADMINISTRACION"] as const) {
+      assert.equal(canAdjustPayrollAmounts(role, "EN_PREPARACION"), true, role);
+      assert.equal(canAdjustPayrollAmounts(role, "EN_CORRECCION"), true, role);
+      assert.equal(canAdjustPayrollAmounts(role, "PRELIMINAR"), true, role);
+      assert.equal(canAdjustPayrollAmounts(role, "PENDIENTE_VALIDACION"), false, role);
+      assert.equal(canAdjustPayrollAmounts(role, "CERRADA"), false, role);
+      assert.equal(canAdjustPayrollAmounts(role, "AUTORIZADA"), false, role);
+    }
+    assert.equal(canAdjustPayrollAmounts("VENTAS", "EN_PREPARACION"), false);
+    assert.equal(canAdjustPayrollAmounts("GERENTE_OPERATIVO_SYSTRON", "EN_CORRECCION"), false);
   });
 
   it("flujos de base de datos para Personal > Colaboradores (CEO vs Coordinación)", async () => {
@@ -481,7 +493,43 @@ describe("personal y nómina", () => {
     assert.equal(juanLine.calcBonos, 1200);
     assert.equal(juanLine.bonos, 1200);
 
-    // Ajuste de Valor aplicado conservando Valor calculado
+    // CEO ajusta en En preparación sin tocar el valor calculado
+    await updatePayrollLineAppliedAmounts(ceoActor, periodRow.id, integratedCollab.id, {
+      sueldo: 18000,
+      horasExtra: 0,
+      bonos: 1200,
+      comision: 0,
+      compensaciones: 0,
+      primaVacacional: 0,
+      otrosConceptos: 0,
+      descuentos: 0,
+    });
+    const afterCeoPrep = await prisma.payrollLine.findUniqueOrThrow({ where: { id: juanLine.id } });
+    assert.equal(afterCeoPrep.calcSueldo, 3850);
+    assert.equal(afterCeoPrep.sueldo, 18000);
+    assert.equal(afterCeoPrep.calcBonos, 1200);
+
+    await assert.rejects(
+      () =>
+        updatePayrollLineAppliedAmounts(
+          { ...ceoActor, role: "VENTAS", userId: empUser.id },
+          periodRow.id,
+          integratedCollab.id,
+          {
+            sueldo: 1,
+            horasExtra: 0,
+            bonos: 0,
+            comision: 0,
+            compensaciones: 0,
+            primaVacacional: 0,
+            otrosConceptos: 0,
+            descuentos: 0,
+          },
+        ),
+      /CEO/,
+    );
+
+    // Coordinación sigue pudiendo ajustar el valor aplicado
     await updatePayrollLineAppliedAmounts(coordActor, periodRow.id, integratedCollab.id, {
       sueldo: 18500,
       horasExtra: 500,
@@ -503,6 +551,21 @@ describe("personal y nómina", () => {
     const inValidation = await prisma.payrollPeriod.findUniqueOrThrow({ where: { id: periodRow.id } });
     assert.equal(inValidation.status, "PENDIENTE_VALIDACION");
 
+    await assert.rejects(
+      () =>
+        updatePayrollLineAppliedAmounts(ceoActor, periodRow.id, integratedCollab.id, {
+          sueldo: 1,
+          horasExtra: 0,
+          bonos: 0,
+          comision: 0,
+          compensaciones: 0,
+          primaVacacional: 0,
+          otrosConceptos: 0,
+          descuentos: 0,
+        }),
+      /En preparación o En corrección/,
+    );
+
     // Coordinación no puede validar ni regresar a corrección
     await assert.rejects(() => validateAndClosePayroll(coordActor, periodRow.id, inValidation.version), /CEO/);
     await assert.rejects(() => returnPayrollToCorrection(coordActor, periodRow.id, inValidation.version), /CEO/);
@@ -512,6 +575,41 @@ describe("personal y nómina", () => {
     const inCorrection = await prisma.payrollPeriod.findUniqueOrThrow({ where: { id: periodRow.id } });
     assert.equal(inCorrection.status, "EN_CORRECCION");
     assert.equal(inCorrection.folio, "NOM-SYSTRON-2026-S44");
+
+    const adminUser = await prisma.user.create({
+      data: { username: "admin_nomina", name: "Admin Nómina", passwordHash: "x", role: "ADMINISTRADOR" },
+    });
+    const adminActor = {
+      userId: adminUser.id,
+      role: "ADMINISTRADOR" as const,
+      activeCompanyId: company.id,
+      activeCompanyCode: "SYSTRON",
+    };
+    await updatePayrollLineAppliedAmounts(adminActor, periodRow.id, integratedCollab.id, {
+      sueldo: 19100,
+      horasExtra: 500,
+      bonos: 1500,
+      comision: 2000,
+      compensaciones: 0,
+      primaVacacional: 0,
+      otrosConceptos: 300,
+      descuentos: 200,
+    });
+    await updatePayrollLineAppliedAmounts(ceoActor, periodRow.id, integratedCollab.id, {
+      sueldo: 19000,
+      horasExtra: 500,
+      bonos: 1500,
+      comision: 2000,
+      compensaciones: 0,
+      primaVacacional: 0,
+      otrosConceptos: 300,
+      descuentos: 200,
+    });
+    const afterOpenAdjust = await prisma.payrollLine.findUniqueOrThrow({ where: { id: juanLine.id } });
+    assert.equal(afterOpenAdjust.calcSueldo, 3850);
+    assert.equal(afterOpenAdjust.calcBonos, 1200);
+    assert.equal(afterOpenAdjust.sueldo, 19000);
+    assert.equal(afterOpenAdjust.bonos, 1500);
 
     // Se envía nuevamente a validación y el CEO valida/cierra
     await sendPayrollToValidation(coordActor, periodRow.id, inCorrection.version);
