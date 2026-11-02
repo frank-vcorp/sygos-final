@@ -745,5 +745,27 @@ describe("personal y nómina", () => {
     assert.equal(migratedComplete.hireKind, "MIGRADO");
     assert.equal(migratedComplete.vacationBalance, 7.5);
     assert.equal(migratedComplete.hiredAt.toISOString().slice(0, 10), "2019-04-01");
+
+    const ceoColaborador = await createCollaboratorComplete(ceoActor, {
+      name: "CEO Adicional",
+      phone: "5511002233",
+      role: "CEO",
+      username: "ceo.adicional",
+      password: "Sygos-2026!ceo2",
+      jobTitle: "CEO",
+      hiredAt: "2026-11-01",
+      workSchedule: "Lunes a viernes 09:00 a 18:00",
+      rfc: "CEOA861101AAA",
+      curp: "CEOA861101HDFRRL09",
+      nss: "22334455667",
+      dailyStamped: 0,
+      dailyCash: 0,
+      bankName: "BBVA",
+      bankAccount: "012180009999888877",
+    });
+    assert.equal(ceoColaborador.bossUserId, null);
+    const ceoColaboradorUser = await prisma.user.findUniqueOrThrow({ where: { id: ceoColaborador.userId } });
+    assert.equal(ceoColaboradorUser.role, "CEO");
+    assert.equal(ceoColaboradorUser.companyId, null);
   });
 });

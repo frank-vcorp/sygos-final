@@ -305,7 +305,7 @@ export function CollaboratorDatosTab({
         <SectionHeader title="Datos laborales" isCeo={isCeo} onEdit={() => setModal("laborales")} />
         <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           <DataItem label="Puesto" value={collaborator.jobTitle} />
-          <DataItem label="Jefe directo" value={collaborator.bossName ?? "—"} />
+          <DataItem label="Jefe directo" value={collaborator.role === "CEO" ? "—" : (collaborator.bossName ?? "—")} />
           <DataItem label="Fecha de ingreso" value={collaborator.hiredAtFormatted} />
           <DataItem label="Tipo de ingreso" value={collaborator.hireKindLabel} />
           <DataItem label="Horario / jornada" value={collaborator.workSchedule} />
@@ -647,16 +647,18 @@ export function CollaboratorDatosTab({
             <Field label="Puesto">
               <input name="jobTitle" required defaultValue={collaborator.jobTitle} className={controlClass} />
             </Field>
-            <Field label="Jefe directo">
-              <select name="bossUserId" defaultValue={collaborator.bossUserId ?? ""} className={controlClass}>
-                <option value="">Sin jefe directo</option>
-                {bosses.map((boss) => (
-                  <option key={boss.id} value={boss.id}>
-                    {boss.name}
-                  </option>
-                ))}
-              </select>
-            </Field>
+            {collaborator.role !== "CEO" ? (
+              <Field label="Jefe directo">
+                <select name="bossUserId" defaultValue={collaborator.bossUserId ?? ""} className={controlClass}>
+                  <option value="">Sin jefe directo</option>
+                  {bosses.map((boss) => (
+                    <option key={boss.id} value={boss.id}>
+                      {boss.name}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            ) : null}
             <Field
               label="Fecha de ingreso"
               hint={

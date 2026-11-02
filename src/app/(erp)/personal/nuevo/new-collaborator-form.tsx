@@ -57,6 +57,8 @@ export function NewCollaboratorForm({
 
   const usernameSuggestion = useMemo(() => suggestCollaboratorUsername(name), [name]);
   const selectedRoleOption = roles.find((r) => r.value === role) ?? defaultRole;
+  const roleIsCeo = role === "CEO";
+  const bossRequired = !roleIsCeo && !selectedRoleOption.exemptBoss;
 
   const credentialsText = useMemo(
     () =>
@@ -278,21 +280,23 @@ export function NewCollaboratorForm({
         description="Tipo de ingreso, ubicación en la estructura y jornada operativa."
         columns={2}
       >
-        <Field label={selectedRoleOption.exemptBoss ? "Jefe directo" : "Jefe directo *"}>
-          <select
-            name="bossUserId"
-            required={!selectedRoleOption.exemptBoss}
-            defaultValue={bosses[0]?.id ?? ""}
-            className={controlClass}
-          >
-            <option value="">Selecciona jefe directo</option>
-            {bosses.map((b) => (
-              <option key={b.id} value={b.id}>
-                {b.name}
-              </option>
-            ))}
-          </select>
-        </Field>
+        {!roleIsCeo ? (
+          <Field label={bossRequired ? "Jefe directo *" : "Jefe directo"}>
+            <select
+              name="bossUserId"
+              required={bossRequired}
+              defaultValue={bosses[0]?.id ?? ""}
+              className={controlClass}
+            >
+              <option value="">Selecciona jefe directo</option>
+              {bosses.map((b) => (
+                <option key={b.id} value={b.id}>
+                  {b.name}
+                </option>
+              ))}
+            </select>
+          </Field>
+        ) : null}
         <Field label="Tipo de ingreso *">
           <select
             name="hireKind"

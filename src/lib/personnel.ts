@@ -9,6 +9,7 @@ import {
   companiesForRole,
   DEFAULT_MONTHLY_PURCHASE,
   DEFAULT_PURCHASE_LIMIT,
+  isMultiCompanyRole,
   isPurchaseManager,
   isRole,
   type Role,
@@ -24,6 +25,18 @@ export function laborProfile(role: Role) {
     overtimeSelf: !exempt && !["AYUDANTE_GENERAL", "KIOSCO_ASISTENCIA", "CEO", "ADMINISTRADOR", "COORDINACION_ADMINISTRACION", "GERENTE_OPERATIVO_SERVOMOTORES"].includes(role),
     overtimeByManager: role === "AYUDANTE_GENERAL",
   };
+}
+
+export function roleAvailableForCollaborator(role: Role, companyCode: string, actorRole: Role): boolean {
+  if (role === "ADMINISTRADOR" || role === "KIOSCO_ASISTENCIA") return false;
+  if (role === "CEO") return actorRole === "CEO" || actorRole === "ADMINISTRADOR";
+  const allowed = companiesForRole(role);
+  if (allowed === "both") return true;
+  return allowed.includes(companyCode as "SYSTRON" | "SERVOMOTORES");
+}
+
+export function collaboratorRoleSkipsBoss(role: string): boolean {
+  return role === "CEO";
 }
 
 export function mexicoToday(date = new Date()) {
@@ -356,7 +369,11 @@ export async function createCollaboratorComplete(
   if (!cleanName) throw new Error("El nombre completo es obligatorio.");
   const cleanPhone = input.phone.trim();
   if (!cleanPhone) throw new Error("El teléfono es obligatorio.");
-  if (!isRole(input.role) || input.role === "ADMINISTRADOR" || input.role === "CEO") {
+  if (!isRole(input.role) || input.role === "ADMINISTRADOR") {
+    throw new Error("Selecciona un rol válido para el colaborador.");
+  }
+  const roleIsCeo = input.role === "CEO";
+  if (roleIsCeo && actor.role !== "CEO" && actor.role !== "ADMINISTRADOR") {
     throw new Error("Selecciona un rol válido para el colaborador.");
   }
   const cleanUsername = input.username.trim();
@@ -384,8 +401,8 @@ export async function createCollaboratorComplete(
   if (!cleanBankAccount) throw new Error("La cuenta o CLABE es obligatoria.");
 
   const profile = laborProfile(input.role);
-  const bossUserId = input.bossUserId?.trim() || null;
-  if (!profile.exempt && !bossUserId) {
+  const bossUserId = roleIsCeo ? null : input.bossUserId?.trim() || null;
+  if (!roleIsCeo && !profile.exempt && !bossUserId) {
     throw new Error("El jefe directo es obligatorio.");
   }
   if (bossUserId) {
@@ -407,7 +424,7 @@ export async function createCollaboratorComplete(
       name: cleanName,
       passwordHash: hashPassword(cleanPassword),
       role: input.role,
-      companyId: companiesForRole(input.role) === "both" ? null : actor.activeCompanyId,
+      companyId: roleIsCeo || companiesForRole(input.role) === "both" ? null : actor.activeCompanyId,
       active: true,
       monthlyPurchaseBudget: isPurchaseManager(input.role) ? DEFAULT_MONTHLY_PURCHASE : null,
       purchaseLimit: isPurchaseManager(input.role) ? DEFAULT_PURCHASE_LIMIT : null,
@@ -511,6 +528,11 @@ export async function updateCollaboratorCredentialsSection(
   if (!isRole(input.role) || input.role === "ADMINISTRADOR") {
     throw new Error("Selecciona un rol válido.");
   }
+  const newRole = input.role;
+  const newRoleIsCeo = newRole === "CEO";
+  if (newRoleIsCeo && actor.role !== "CEO" && actor.role !== "ADMINISTRADOR") {
+    throw new Error("Selecciona un rol válido.");
+  }
   if (cleanUsername !== row.user.username) {
     const duplicate = await prisma.user.findUnique({ where: { username: cleanUsername } });
     if (duplicate && duplicate.id !== row.userId) {
@@ -522,7 +544,8 @@ export async function updateCollaboratorCredentialsSection(
     where: { id: row.userId },
     data: {
       username: cleanUsername,
-      role: input.role,
+      role: newRole,
+      companyId: isMultiCompanyRole(newRole) ? null : actor.activeCompanyId,
       ...(cleanPassword ? { passwordHash: hashPassword(cleanPassword) } : {}),
     },
   });
@@ -530,6 +553,7 @@ export async function updateCollaboratorCredentialsSection(
     where: { id: row.id, version },
     data: {
       ...(cleanPassword ? { credentialPasswordPreview: cleanPassword } : {}),
+      ...(newRoleIsCeo ? { bossUserId: null } : {}),
       version: { increment: 1 },
     },
   });
@@ -604,8 +628,10 @@ export async function updateLaborDataSection(
     include: { user: true, payrollLines: { include: { period: true }, take: 1 } },
   });
   if (!row) throw new Error("Esa ficha no es de esta empresa.");
-  if (input.bossUserId) {
-    const boss = await prisma.user.findFirst({ where: { id: input.bossUserId, active: true } });
+  const roleIsCeo = row.user.role === "CEO";
+  const bossUserId = roleIsCeo ? null : input.bossUserId || null;
+  if (bossUserId) {
+    const boss = await prisma.user.findFirst({ where: { id: bossUserId, active: true } });
     if (!boss) throw new Error("El jefe seleccionado no existe.");
   }
   const hasClosedProcesses = row.payrollLines.some(
@@ -616,7 +642,7 @@ export async function updateLaborDataSection(
     where: { id: row.id, version },
     data: {
       jobTitle: input.jobTitle?.trim() || null,
-      bossUserId: input.bossUserId || null,
+      bossUserId,
       hiredAt: nextHiredAt,
       workSchedule: input.workSchedule.trim() || "Lunes a viernes 09:00 a 18:00",
       version: { increment: 1 },

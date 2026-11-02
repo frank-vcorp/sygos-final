@@ -14,10 +14,11 @@ import {
   mexicoToday,
   parseActivities,
   parseCommissionTiers,
+  roleAvailableForCollaborator,
   weekdaysBetween,
 } from "@/lib/personnel";
 import { credentialsWhatsAppNoticeFromQuery } from "@/lib/collaborator-credentials";
-import { companiesForRole, ROLE_LABEL, ROLES, isRole, type Role } from "@/lib/roles";
+import { ROLE_LABEL, ROLES, isRole } from "@/lib/roles";
 import { requireCompany } from "@/lib/session";
 
 function formatTimeMexico(date: Date | null): string | null {
@@ -33,13 +34,6 @@ function formatTimeMexico(date: Date | null): string | null {
 function formatCollaboratorJob(jobTitle: string | null, role: string): string {
   if (jobTitle && jobTitle.trim()) return jobTitle.trim();
   return isRole(role) ? ROLE_LABEL[role] : role;
-}
-
-function roleAvailableForCollaborator(role: Role, companyCode: string): boolean {
-  if (role === "ADMINISTRADOR" || role === "CEO" || role === "KIOSCO_ASISTENCIA") return false;
-  const allowed = companiesForRole(role);
-  if (allowed === "both") return true;
-  return allowed.includes(companyCode as "SYSTRON" | "SERVOMOTORES");
 }
 
 export default async function ColaboradorPage({
@@ -120,7 +114,7 @@ export default async function ColaboradorPage({
   );
 
   const availableRoles = ROLES.filter((r) =>
-    roleAvailableForCollaborator(r, session.activeCompanyCode),
+    roleAvailableForCollaborator(r, session.activeCompanyCode, session.role),
   ).map((r) => ({ value: r, label: ROLE_LABEL[r] }));
 
   const baseHref = `/personal/colaboradores/${row.id}`;

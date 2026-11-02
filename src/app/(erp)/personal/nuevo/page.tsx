@@ -3,16 +3,9 @@ import { NewCollaboratorForm, type RoleOption } from "./new-collaborator-form";
 import { PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
-import { laborProfile, mexicoToday } from "@/lib/personnel";
-import { companiesForRole, ROLE_LABEL, ROLES, type Role } from "@/lib/roles";
+import { laborProfile, mexicoToday, roleAvailableForCollaborator } from "@/lib/personnel";
+import { ROLE_LABEL, ROLES } from "@/lib/roles";
 import { requireCompany } from "@/lib/session";
-
-function roleAvailableForCollaborator(role: Role, companyCode: string): boolean {
-  if (role === "ADMINISTRADOR" || role === "CEO" || role === "KIOSCO_ASISTENCIA") return false;
-  const allowed = companiesForRole(role);
-  if (allowed === "both") return true;
-  return allowed.includes(companyCode as "SYSTRON" | "SERVOMOTORES");
-}
 
 export default async function NuevoColaboradorPage() {
   const session = await requireCompany();
@@ -36,7 +29,7 @@ export default async function NuevoColaboradorPage() {
   });
 
   const roleOptions: RoleOption[] = ROLES.filter((r) =>
-    roleAvailableForCollaborator(r, session.activeCompanyCode),
+    roleAvailableForCollaborator(r, session.activeCompanyCode, session.role),
   ).map((r) => ({
     value: r,
     label: ROLE_LABEL[r],
