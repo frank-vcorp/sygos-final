@@ -51,6 +51,7 @@ export function RelateEquipmentForm({
           models={models}
           allowQuickEquipment={allowQuickEquipment}
           quickEquipmentKinds={quickEquipmentKinds}
+          pickExistingFolio
           emptyOptionLabel="Selecciona"
         />
         <Field label="Prioridad del servicio">

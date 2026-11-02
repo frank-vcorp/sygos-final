@@ -76,7 +76,7 @@ export function QuoteDraft({
         />
       </FormBlock>
 
-      <FormBlock title="2. Equipo" description={requiresEquipment ? "Busca un equipo del cliente por folio o modelo. Si todavía no existe, regístralo aquí; al elegir el modelo se completan marca y tipo." : "Relaciona un equipo si aplica. Puedes continuar sin uno."} columns={1}>
+      <FormBlock title="2. Equipo" description={requiresEquipment ? "El catálogo solo sugiere tipo, marca y modelo para la etiqueta. Siempre se crea un folio nuevo; para un EQUI ya registrado abre el servicio desde su ficha." : "Relaciona un equipo si aplica. Puedes continuar sin uno."} columns={1}>
         <ServiceEquipmentPicker
           equipment={equipment}
           clientId={clientId}

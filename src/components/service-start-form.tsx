@@ -49,7 +49,7 @@ export function ServiceStartForm({
       <div className="grid gap-5 p-5 md:p-7 xl:grid-cols-[minmax(0,1.15fr)_minmax(330px,0.85fr)]">
         <FormBlock
           title={warranty ? "1. Equipo" : "1. Cliente y equipo"}
-          description={warranty ? "El cliente se infiere de la reparación de origen." : "Busca en catálogo o crea un registro mínimo sin salir del flujo."}
+          description={warranty ? "El cliente se infiere de la reparación de origen." : "El catálogo solo sugiere la etiqueta; siempre se crea un folio nuevo para el servicio."}
           columns={1}
           tone="muted"
         >
@@ -115,7 +115,7 @@ export function ServiceStartForm({
           </div>
         </details>
       </div>
-      <FormActions note="El SLA inicia con la entrada física en taller, no con este alta.">
+      <FormActions note="Primero guarda la identificación del equipo; el SLA inicia con la entrada física en Almacén.">
         <Button type="submit">Crear servicio</Button>
       </FormActions>
     </FormPanel>

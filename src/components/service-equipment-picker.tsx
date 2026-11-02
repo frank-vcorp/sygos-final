@@ -20,7 +20,9 @@ export type ServiceEquipmentOption = {
 
 export function ServiceEquipmentPicker({
   equipment, clientId, companyCode, types, brands, models, warranty = false,
-  allowQuickEquipment = true, quickEquipmentKinds, emptyOptionLabel = "Selecciona", required = false, onEquipmentChange,
+  allowQuickEquipment = true, quickEquipmentKinds, emptyOptionLabel = "Selecciona", required = false,
+  pickExistingFolio = false,
+  onEquipmentChange,
 }: {
   equipment: ServiceEquipmentOption[];
   clientId: string;
@@ -33,6 +35,8 @@ export function ServiceEquipmentPicker({
   quickEquipmentKinds?: Array<"EQUI" | "MOT">;
   emptyOptionLabel?: string;
   required?: boolean;
+  /** Si false, el buscador solo sugiere tipo/marca/modelo (catálogo); siempre alta de folio nuevo. */
+  pickExistingFolio?: boolean;
   onEquipmentChange?: (equipmentId: string) => void;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
@@ -72,13 +76,17 @@ export function ServiceEquipmentPicker({
       if (row) openNewEquipment({ sourceId: id, model: row.model, brand: row.brand, typeName: row.type });
       return;
     }
-    const row = [...equipment, ...extraEquipment].find((item) => item.id === id);
-    if (!row || row.clientId !== clientId) {
-      setError("Ese folio pertenece a otro cliente. Elige un equipo de este cliente o registra uno nuevo.");
+    if (pickExistingFolio) {
+      const row = [...equipment, ...extraEquipment].find((item) => item.id === id);
+      if (!row || row.clientId !== clientId) {
+        setError("Ese folio pertenece a otro cliente. Elige un equipo de este cliente o registra uno nuevo.");
+        return;
+      }
+      setTemplate(null);
+      pickEquipment(id);
       return;
     }
-    setTemplate(null);
-    pickEquipment(id);
+    setError("Elige un modelo del catálogo o registra una identificación nueva.");
   }
 
   async function saveEquipment() {
@@ -109,33 +117,71 @@ export function ServiceEquipmentPicker({
 
   const mustSelect = warranty || required || emptyOptionLabel !== "Sin equipo físico";
   const available = warranty ? equipment : [...equipment, ...extraEquipment];
+  const templateOnly = !warranty && !pickExistingFolio;
   const options = warranty
     ? available.map((row) => ({ id: row.id, name: row.folio + " · " + row.model + " (" + row.kind + ")" }))
-    : !clientId ? [] : [
-      ...available.filter((row) => row.clientId === clientId).map((row) => ({
-        id: row.id,
-        name: [row.folio, row.model, row.brandName, row.serial].filter(Boolean).join(" · "),
-      })),
-      ...(allowQuickEquipment && allowedKinds.length > 0 ? models.map((row, index) => ({
-        id: "catalog-model:" + index,
-        name: [row.model, row.brand, row.type].filter(Boolean).join(" · "),
-      })) : []),
-    ];
+    : !clientId ? [] : templateOnly
+      ? (allowQuickEquipment && allowedKinds.length > 0 ? models.map((row, index) => ({
+          id: "catalog-model:" + index,
+          name: [row.model, row.brand, row.type].filter(Boolean).join(" · "),
+        })) : [])
+      : [
+          ...available.filter((row) => row.clientId === clientId).map((row) => ({
+            id: row.id,
+            name: [row.folio, row.model, row.brandName, row.serial].filter(Boolean).join(" · "),
+          })),
+          ...(allowQuickEquipment && allowedKinds.length > 0 ? models.map((row, index) => ({
+            id: "catalog-model:" + index,
+            name: [row.model, row.brand, row.type].filter(Boolean).join(" · "),
+          })) : []),
+        ];
+
+  const pickerLabel = warranty
+    ? "Equipo con reparación previa"
+    : templateOnly
+      ? "Modelo (sugerencia para etiqueta)"
+      : "Equipo o modelo";
+  const pickerHint = warranty
+    ? "La garantía exige un equipo con reparación pagada."
+    : !clientId
+      ? "Selecciona primero un cliente."
+      : templateOnly
+        ? "El catálogo solo prellena tipo, marca y modelo. Siempre se crea un folio nuevo; no reutiliza equipos existentes."
+        : "Busca por folio, modelo, marca o serie.";
+  const pickerEmpty = warranty
+    ? "Selecciona un equipo con reparación previa"
+    : mustSelect
+      ? templateOnly
+        ? "Elige un modelo del catálogo"
+        : "Busca o selecciona un equipo"
+      : "Sin equipo registrado";
+
+  const savedFolio = equipmentId
+    ? [...equipment, ...extraEquipment].find((row) => row.id === equipmentId)
+    : null;
 
   return (
     <div className="grid gap-3">
+      {error && !showNew ? <p role="alert" className="text-sm text-[var(--danger)]">{error}</p> : null}
+      {savedFolio && templateOnly ? (
+        <p className="rounded-md border border-[var(--line)] bg-[#f7fafc] px-3 py-2 text-sm">
+          Folio creado: <span className="font-medium">{savedFolio.folio}</span>
+          {" · "}
+          {[savedFolio.brandName, savedFolio.model, savedFolio.serial].filter(Boolean).join(" · ")}
+        </p>
+      ) : null}
       <SearchableEntityPicker
         key={`${clientId || "sin-cliente"}-${pickerVersion}`}
-        label={warranty ? "Equipo con reparación previa" : "Equipo o modelo"}
+        label={pickerLabel}
         name="equipmentId"
         options={options}
         selectedId={equipmentId}
         onSelect={warranty ? pickEquipment : selectFromCatalog}
         required={mustSelect}
         allowEmpty={!mustSelect}
-        emptyLabel={warranty ? "Selecciona un equipo con reparación previa" : mustSelect ? "Busca o selecciona un equipo" : "Sin equipo registrado"}
-        hint={warranty ? "La garantía exige un equipo con reparación pagada." : !clientId ? "Selecciona primero un cliente." : "Busca por folio, modelo, marca o serie."}
-        createLabel="Registrar equipo nuevo"
+        emptyLabel={pickerEmpty}
+        hint={pickerHint}
+        createLabel={templateOnly ? "Registrar identificación nueva" : "Registrar equipo nuevo"}
         onCreate={!warranty && allowQuickEquipment && allowedKinds.length > 0 && clientId ? (typedName) => openNewEquipment({ sourceId: "new:" + typedName, model: typedName, brand: "", typeName: "" }) : undefined}
       />
       {showNew ? (
@@ -144,8 +190,12 @@ export function ServiceEquipmentPicker({
             <h3 className="text-sm font-semibold text-[var(--ink)]">Nuevo equipo</h3>
             <Button type="button" tone="ghost" onClick={() => { setShowNew(false); setTemplate(null); setPickerVersion((current) => current + 1); }}>Cancelar</Button>
           </div>
-          {template?.sourceId && !template.sourceId.startsWith("new:") ? (
-            <p className="text-xs leading-5 text-[var(--muted)]">Se usarán estos datos como punto de partida. Al guardar se creará un equipo nuevo para el cliente seleccionado; el registro original no cambiará.</p>
+          {template?.sourceId ? (
+            <p className="text-xs leading-5 text-[var(--muted)]">
+              {template.sourceId.startsWith("catalog-model:")
+                ? "Datos del catálogo solo orientan la etiqueta. Al guardar se crea un folio nuevo para este cliente."
+                : "Al guardar se crea un folio nuevo para el cliente seleccionado."}
+            </p>
           ) : null}
           {allowedKinds.length === 1 ? (
             <div>
