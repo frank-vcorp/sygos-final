@@ -216,6 +216,7 @@ export async function createAttention(
   if (!equipment || equipment.originCompanyId !== actor.activeCompanyId) {
     throw new Error("La atención se crea en la empresa que originó el equipo.");
   }
+  await ownClient(actor, equipment.clientId);
   const reportedFault = input.reportedFault?.trim() || "";
   if (!reportedFault) throw new Error("Indica la falla reportada.");
   let originalCaseId = input.originalCaseId;
@@ -376,6 +377,9 @@ export async function startService(
   } else {
     const current = await prisma.equipment.findFirst({ where: { id: equipmentId, originCompanyId: actor.activeCompanyId } });
     if (!current) throw new Error("Ese equipo no pertenece a la empresa activa.");
+    if (clientId && clientId !== current.clientId) {
+      throw new Error("Ese folio pertenece a otro cliente. Elige un equipo de este cliente o registra uno nuevo.");
+    }
     version = current.version;
     clientId = current.clientId;
   }

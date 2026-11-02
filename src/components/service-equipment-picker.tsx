@@ -72,15 +72,9 @@ export function ServiceEquipmentPicker({
       if (row) openNewEquipment({ sourceId: id, model: row.model, brand: row.brand, typeName: row.type });
       return;
     }
-    const otherClientEquipment = equipment.find((row) => row.id === id && row.clientId !== clientId);
-    if (otherClientEquipment) {
-      openNewEquipment({
-        sourceId: id,
-        model: otherClientEquipment.model,
-        brand: otherClientEquipment.brandName ?? "",
-        typeName: otherClientEquipment.typeName ?? "",
-        kind: otherClientEquipment.kind,
-      });
+    const row = [...equipment, ...extraEquipment].find((item) => item.id === id);
+    if (!row || row.clientId !== clientId) {
+      setError("Ese folio pertenece a otro cliente. Elige un equipo de este cliente o registra uno nuevo.");
       return;
     }
     setTemplate(null);
@@ -122,10 +116,6 @@ export function ServiceEquipmentPicker({
         id: row.id,
         name: [row.folio, row.model, row.brandName, row.serial].filter(Boolean).join(" · "),
       })),
-      ...(allowQuickEquipment && allowedKinds.length > 0 ? available.filter((row) => row.clientId !== clientId).map((row) => ({
-        id: row.id,
-        name: [row.folio, row.model, row.brandName, row.serial].filter(Boolean).join(" · "),
-      })) : []),
       ...(allowQuickEquipment && allowedKinds.length > 0 ? models.map((row, index) => ({
         id: "catalog-model:" + index,
         name: [row.model, row.brand, row.type].filter(Boolean).join(" · "),
