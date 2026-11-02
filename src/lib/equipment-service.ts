@@ -242,12 +242,18 @@ export async function createAttention(
       ? await prisma.client.findUnique({ where: { id: "client-intercompany-systron" } })
       : client;
   if (!adminClient || !client) throw new Error("Falta el cliente administrativo de la atención.");
-  const inServiceCustody = equipment.custody === "EN_RESGUARDO" && equipment.holderCompanyId === service.id;
+  /** EQUI siempre entra por Almacén (Entradas → pasar a resguardo); MOT puede arrancar SLA si ya está en taller. */
+  const inServiceCustody =
+    equipment.kind !== "EQUI"
+    && equipment.custody === "EN_RESGUARDO"
+    && equipment.holderCompanyId === service.id;
+  const needsWarehouseEntry = equipment.kind === "EQUI" && equipment.custody === "EN_RESGUARDO";
   const needsIngress = equipment.kind === "MOT" && equipment.custody === "FUERA";
   const attention = await prisma.$transaction(async (tx) => {
     const updated = await tx.equipment.updateMany({
       where: { id: equipment.id, version: input.version },
       data: {
+        ...(needsWarehouseEntry ? { custody: "SIN_CUSTODIA", holderCompanyId: null } : {}),
         ...(needsIngress ? { custody: "PENDIENTE_INGRESO", holderCompanyId: null } : {}),
         version: { increment: 1 },
       },

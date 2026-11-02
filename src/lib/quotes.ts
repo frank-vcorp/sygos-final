@@ -425,8 +425,17 @@ export async function relateQuoteEquipment(actor: Actor, quoteId: string, versio
     ? await prisma.company.findUnique({ where: { code: "SERVOMOTORES" } })
     : await prisma.company.findUnique({ where: { id: actor.activeCompanyId } });
   if (!service) throw new Error("No está definida la empresa que ejecuta el servicio.");
-  const inShop = equipment.custody === "EN_RESGUARDO" && equipment.holderCompanyId === service.id;
+  const inShop =
+    equipment.kind !== "EQUI"
+    && equipment.custody === "EN_RESGUARDO"
+    && equipment.holderCompanyId === service.id;
   const concept = quote.lines.find((line) => line.authorized)?.concept ?? quote.lines[0]?.concept ?? "Servicio autorizado";
+  if (equipment.kind === "EQUI" && equipment.custody === "EN_RESGUARDO") {
+    await prisma.equipment.update({
+      where: { id: equipment.id },
+      data: { custody: "SIN_CUSTODIA", holderCompanyId: null, version: { increment: 1 } },
+    });
+  }
   const attention = await prisma.attention.create({
     data: {
       equipmentId: equipment.id,
