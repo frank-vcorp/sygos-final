@@ -71,6 +71,7 @@ export const SYSTRON_NAV: Partial<Record<Role, readonly string[]>> = {
     "/configuracion",
     "/configuracion/integraciones",
     "/usuarios",
+    "/admin/cuentas",
   ],
   COORDINACION_ADMINISTRACION: [
     "/panel?vista=pendientes",

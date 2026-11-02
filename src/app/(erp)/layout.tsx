@@ -61,6 +61,7 @@ const LABELS: Record<string, string | ((code: string | null) => string)> = {
   "/configuracion/integraciones": "WhatsApp y correo (SMTP)",
   "/configuracion/comunicaciones": "Comunicaciones",
   "/pruebas": "Modo de pruebas",
+  "/admin/cuentas": "Cuentas y saldos",
 };
 
 const CREATE: Partial<Record<string, { href: string; show: NavLink["showCreate"] }>> = {

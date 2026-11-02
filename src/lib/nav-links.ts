@@ -135,6 +135,7 @@ export const ADMIN_NAV_GROUPS: NavGroupDef[] = [
       { href: "/configuracion", label: "Empresa", show: (role) => role === "ADMINISTRADOR" },
       { href: "/configuracion/integraciones", label: "WhatsApp y correo (SMTP)", show: (role) => role === "ADMINISTRADOR" },
       { href: "/usuarios", label: "Usuarios", show: (role) => role === "ADMINISTRADOR" },
+      { href: "/admin/cuentas", label: "Cuentas y saldos", show: (role) => role === "ADMINISTRADOR" },
     ],
   },
 ];
