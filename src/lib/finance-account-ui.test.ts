@@ -30,7 +30,7 @@ describe("cuentas financieras del CEO", () => {
     );
     assert.equal(
       financeAccountDeleteBlockedMessage("Sobrante", { movements: 0, purchases: 0, transferTargets: 0, cardPayments: 0 }, 1200),
-      "No se puede eliminar la cuenta «Sobrante»: está en uso en saldo registrado.",
+      null,
     );
   });
 
@@ -38,6 +38,10 @@ describe("cuentas financieras del CEO", () => {
     assert.equal(
       financeAccountDeleteConfirm("BBVA operaciones"),
       "¿Eliminar la cuenta «BBVA operaciones»? Esta acción no se puede deshacer.",
+    );
+    assert.match(
+      financeAccountDeleteConfirm("Banco", 50000),
+      /¿Eliminar la cuenta «Banco»\? Esta acción no se puede deshacer\. El saldo registrado \(\$50,000\.00\) desaparecerá al eliminar la cuenta\./,
     );
   });
 });
