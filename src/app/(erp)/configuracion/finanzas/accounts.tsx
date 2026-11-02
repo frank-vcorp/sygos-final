@@ -1,8 +1,11 @@
+"use client";
+
 import { deleteFinanceAccountAction, updateFinanceAccountAction } from "../ceo-actions";
+import { ConfigEditDialog } from "../edit-dialog";
 import { ConfirmSubmit } from "@/components/submit-button";
 import { financeAccountDeleteConfirm } from "@/lib/finance-account-ui";
 import { matchesText } from "../filters";
-import { EditorPlaceholder, HiddenFields, MasterDetail, SelectLink, selectedRowClass } from "../pieces";
+import { HiddenFields } from "../pieces";
 import {
   ActiveFilters,
   Badge,
@@ -38,25 +41,16 @@ export function AccountsPanel({
   accounts,
   q,
   tipo,
-  selectedId,
 }: {
   accounts: AccountRow[];
   q: string;
   tipo: string;
-  selectedId?: string;
 }) {
   const kind = tipo === "BANCO" || tipo === "EFECTIVO" ? tipo : "";
   const visible = accounts.filter((account) => {
     if (kind && account.kind !== kind) return false;
     const label = account.kind === "BANCO" ? account.bankName || account.name : account.name;
     return matchesText(q, [label, account.name, account.bankName, account.clabe, accountKindLabel(account.kind)]);
-  });
-  const selected = accounts.find((account) => account.id === selectedId) ?? null;
-  const hrefFor = (id?: string) => listHref("/configuracion/finanzas", {
-    vista: "cuentas",
-    q: q || undefined,
-    tipo: kind || undefined,
-    id,
   });
 
   return (
@@ -73,8 +67,8 @@ export function AccountsPanel({
       </FilterBar>
       <ActiveFilters
         items={[
-          ...(kind ? [{ label: accountKindLabel(kind), clearHref: listHref("/configuracion/finanzas", { vista: "cuentas", q: q || undefined, id: selectedId }) }] : []),
-          ...(q ? [{ label: `Búsqueda: ${q}`, clearHref: listHref("/configuracion/finanzas", { vista: "cuentas", tipo: kind || undefined, id: selectedId }) }] : []),
+          ...(kind ? [{ label: accountKindLabel(kind), clearHref: listHref("/configuracion/finanzas", { vista: "cuentas", q: q || undefined }) }] : []),
+          ...(q ? [{ label: `Búsqueda: ${q}`, clearHref: listHref("/configuracion/finanzas", { vista: "cuentas", tipo: kind || undefined }) }] : []),
         ]}
       />
       {accounts.length === 0 ? (
@@ -82,58 +76,62 @@ export function AccountsPanel({
       ) : visible.length === 0 ? (
         <Empty title="Sin coincidencias" body="Ninguna cuenta coincide con el filtro." />
       ) : (
-        <MasterDetail
-          list={
-            <ResponsiveData
-              table={
-                <Table stickyHeader>
-                  <thead>
-                    <tr>
-                      <Th>Nombre</Th>
-                      <Th>Tipo</Th>
-                      <Th>Banco</Th>
-                      <Th>CLABE</Th>
-                      <Th>Fiscal</Th>
-                      <Th>Saldo</Th>
+        <ResponsiveData
+          table={
+            <Table stickyHeader>
+              <thead>
+                <tr>
+                  <Th>Nombre</Th>
+                  <Th>Tipo</Th>
+                  <Th>Banco</Th>
+                  <Th>CLABE</Th>
+                  <Th>Fiscal</Th>
+                  <Th>Saldo</Th>
+                  <Th>Acciones</Th>
+                </tr>
+              </thead>
+              <tbody>
+                {visible.map((account) => {
+                  const label = account.kind === "BANCO" ? account.bankName || account.name : account.name;
+                  return (
+                    <tr key={account.id}>
+                      <Td className="font-semibold text-slate-900">{label}</Td>
+                      <Td>{accountKindLabel(account.kind)}</Td>
+                      <Td>{account.bankName || "—"}</Td>
+                      <Td>{account.clabe || "—"}</Td>
+                      <Td><Badge tone={account.fiscal ? "ok" : "neutral"}>{account.fiscal ? "Sí" : "No"}</Badge></Td>
+                      <Td>{money(account.balance)}</Td>
+                      <Td>
+                        <ConfigEditDialog title={`Editar ${label}`} titleId={`editar-cuenta-${account.id}`}>
+                          <AccountEditor account={account} q={q} tipo={kind} />
+                        </ConfigEditDialog>
+                      </Td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {visible.map((account) => {
-                      const selected = account.id === selectedId;
-                      const label = account.kind === "BANCO" ? account.bankName || account.name : account.name;
-                      return (
-                        <tr key={account.id} className={selectedRowClass(selected)}>
-                          <Td><SelectLink href={hrefFor(account.id)} selected={selected}>{label}</SelectLink></Td>
-                          <Td>{accountKindLabel(account.kind)}</Td>
-                          <Td>{account.bankName || "—"}</Td>
-                          <Td>{account.clabe || "—"}</Td>
-                          <Td><Badge tone={account.fiscal ? "ok" : "neutral"}>{account.fiscal ? "Sí" : "No"}</Badge></Td>
-                          <Td>{money(account.balance)}</Td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </Table>
-              }
-              cards={visible.map((account) => {
-                const label = account.kind === "BANCO" ? account.bankName || account.name : account.name;
-                return (
-                  <MobileCard
-                    key={account.id}
-                    href={hrefFor(account.id)}
-                    title={label}
-                    meta={<Badge tone={account.fiscal ? "ok" : "neutral"}>{account.fiscal ? "Fiscal" : "No fiscal"}</Badge>}
-                  >
-                    <p>{accountKindLabel(account.kind)}</p>
-                    <p className="mt-1">Saldo {money(account.balance)}</p>
-                  </MobileCard>
-                );
-              })}
-            />
+                  );
+                })}
+              </tbody>
+            </Table>
           }
-          editor={selected ? <AccountEditor account={selected} q={q} tipo={kind} /> : (
-            <EditorPlaceholder title="Sin selección" body="Elige una cuenta de la lista para editarla. El saldo no se cambia aquí." />
-          )}
+          cards={visible.map((account) => {
+            const label = account.kind === "BANCO" ? account.bankName || account.name : account.name;
+            return (
+              <MobileCard
+                key={account.id}
+                title={label}
+                meta={<Badge tone={account.fiscal ? "ok" : "neutral"}>{account.fiscal ? "Fiscal" : "No fiscal"}</Badge>}
+                footer={
+                  <div className="flex justify-end">
+                    <ConfigEditDialog title={`Editar ${label}`} titleId={`editar-cuenta-m-${account.id}`}>
+                      <AccountEditor account={account} q={q} tipo={kind} />
+                    </ConfigEditDialog>
+                  </div>
+                }
+              >
+                <p>{accountKindLabel(account.kind)}</p>
+                <p className="mt-1">Saldo {money(account.balance)}</p>
+              </MobileCard>
+            );
+          })}
         />
       )}
     </>
@@ -144,7 +142,7 @@ function AccountEditor({ account, q, tipo }: { account: AccountRow; q: string; t
   const label = account.kind === "BANCO" ? account.bankName || account.name : account.name;
   return (
     <div className="space-y-3">
-      <FormPanel action={updateFinanceAccountAction} className="max-w-none">
+      <FormPanel action={updateFinanceAccountAction} className="max-w-none border-0 shadow-none">
         <HiddenFields fields={{ accountId: account.id, q, tipo }} />
         <FormSection
           title={label}
