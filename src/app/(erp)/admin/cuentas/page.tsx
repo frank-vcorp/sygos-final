@@ -40,7 +40,8 @@ export default async function AdminCuentasPage() {
         <Empty title="Sin cuentas activas" body="Esta empresa no tiene cuentas financieras registradas." />
       ) : (
         <>
-          <Table className="mb-6 max-w-4xl">
+          <div className="mb-6 max-w-4xl">
+            <Table>
             <thead>
               <tr>
                 <Th>Cuenta</Th>
@@ -66,7 +67,8 @@ export default async function AdminCuentasPage() {
                 </tr>
               ))}
             </tbody>
-          </Table>
+            </Table>
+          </div>
 
           <FormPanel action={adjustAccountBalanceAction} className="max-w-xl">
             <FormSection
