@@ -2,7 +2,9 @@ import { ClientNameLink } from "@/components/client-entity-links";
 import { SlaCountdown } from "@/components/sla-countdown";
 import { MobileCard, RecordLink, ResponsiveData, Table, Td, Th } from "@/components/ui";
 import {
+  formatServiciosBandejaDate,
   orderedBandejaColumns,
+  priorityNameTone,
   serviciosBandejaColumns,
   type ServicioBandejaColumnKey,
   type ServicioBandejaColumnOptions,
@@ -34,6 +36,20 @@ function tagTone(tag: string): StatusTone {
   if (tag === "Autorizado") return "ok";
   if (tag.toLowerCase().includes("refacciones")) return "info";
   return "neutral";
+}
+
+function AtencionVigenteCell({ createdAt, priorityName }: { createdAt: Date; priorityName: string }) {
+  const tone = priorityNameTone(priorityName);
+  return (
+    <div className="flex min-w-0 flex-col items-start gap-px leading-none">
+      <span className="whitespace-nowrap text-[13px] font-medium text-[var(--ink)]">
+        {formatServiciosBandejaDate(createdAt)}
+      </span>
+      <span className={`max-w-full truncate text-[10px] font-semibold leading-[1.1rem] ${TAG_TEXT_CLASS[tone]}`} title={priorityName}>
+        {priorityName}
+      </span>
+    </div>
+  );
 }
 
 function StatusBadge({ status }: { status: StackedStatus }) {
@@ -107,13 +123,13 @@ function rowSurfaceClass(wrapClass: string, extra?: string, historial?: boolean)
 
 function bandejaThLabel(key: ServicioBandejaColumnKey, trailHeader: string) {
   const labels: Record<ServicioBandejaColumnKey, string> = {
+    atencionVigente: "Atención",
     diagnostico: "Diagnóstico",
     ordenServicio: "Orden de servicio",
     equipo: "Equipo",
     cliente: "Cliente",
     edoTecnico: "Edo. técnico",
     edoAdministrativo: "Edo. administrativo",
-    edoFisico: "Edo. físico",
     cotizacion: "Cotización",
     cotizacionMonto: "Monto",
     vendedor: "Vendedor",
@@ -138,9 +154,14 @@ function BandejaTd({
 
   if (row.kind === "cancelado") {
     switch (columnKey) {
+      case "atencionVigente":
+        return (
+          <Td>
+            <AtencionVigenteCell createdAt={row.createdAt} priorityName={row.priorityName} />
+          </Td>
+        );
       case "diagnostico":
       case "ordenServicio":
-      case "edoFisico":
       case "vendedor":
       case "tecnico":
       case "cotizacion":
@@ -178,6 +199,12 @@ function BandejaTd({
   }
 
   switch (columnKey) {
+    case "atencionVigente":
+      return (
+        <Td>
+          <AtencionVigenteCell createdAt={row.attentionCreatedAt} priorityName={row.priorityName} />
+        </Td>
+      );
     case "diagnostico":
       return <Td><FolioCell folio={row.diagnosisFolio} href={row.diagnosisHref} /></Td>;
     case "ordenServicio":
@@ -198,8 +225,6 @@ function BandejaTd({
       return <Td><StatusBadge status={row.technical} /></Td>;
     case "edoAdministrativo":
       return <Td><StatusBadge status={row.administrative} /></Td>;
-    case "edoFisico":
-      return <Td><StatusBadge status={row.physical} /></Td>;
     case "vendedor":
       return <Td>{row.sellerName ?? "Sin asignar"}</Td>;
     case "tecnico":
@@ -278,6 +303,10 @@ export function ServiciosSupervisorList({
               <MobileCard href={row.equipmentHref} title="Atención cancelada" meta={<StatusBadge status={{ label: "Cancelada", tone: "danger" }} />}>
                 <p>{row.equipmentLabel}</p>
                 <p><ClienteCell clientId={row.clientId} clientName={row.clientName} clientIsSystem={row.clientIsSystem} /></p>
+                <p>
+                  {formatServiciosBandejaDate(row.createdAt)} ·{" "}
+                  <span className={TAG_TEXT_CLASS[priorityNameTone(row.priorityName)]}>{row.priorityName}</span>
+                </p>
                 <p>Cierre: {formatClosedAt(row.closedAt)}</p>
               </MobileCard>
             </div>
@@ -322,7 +351,12 @@ export function ServiciosSupervisorList({
               {columns.ordenServicio && row.osFolio ? <p>OS: {row.osFolio}</p> : null}
               <p>{row.equipmentLabel}</p>
               <p><ClienteCell clientId={row.clientId} clientName={row.clientName} clientIsSystem={row.clientIsSystem} /></p>
-              {columns.edoFisico ? <p>Físico: {row.physical.label}</p> : null}
+              {columns.atencionVigente ? (
+                <p>
+                  {formatServiciosBandejaDate(row.attentionCreatedAt)} ·{" "}
+                  <span className={TAG_TEXT_CLASS[priorityNameTone(row.priorityName)]}>{row.priorityName}</span>
+                </p>
+              ) : null}
               {columns.vendedor ? <p>Vendedor: {row.sellerName ?? "Sin asignar"}</p> : null}
               {columns.tecnico ? <p>Técnico: {row.technicianName ?? "Sin asignar"}</p> : null}
               {columns.sla ? (

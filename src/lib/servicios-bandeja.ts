@@ -2,13 +2,13 @@ import type { Role } from "@/lib/roles";
 import type { Custody } from "@/lib/custody";
 
 export type ServicioBandejaColumns = {
+  atencionVigente: boolean;
   diagnostico: boolean;
   ordenServicio: boolean;
   equipo: boolean;
   cliente: boolean;
   edoTecnico: boolean;
   edoAdministrativo: boolean;
-  edoFisico: boolean;
   cotizacion: boolean;
   cotizacionMonto: boolean;
   vendedor: boolean;
@@ -28,13 +28,13 @@ export type ServicioBandejaColumnOptions = {
 };
 
 const BANDEJA_COLUMN_SEQUENCE: ServicioBandejaColumnKey[] = [
+  "atencionVigente",
   "diagnostico",
   "ordenServicio",
   "equipo",
   "cliente",
   "edoTecnico",
   "edoAdministrativo",
-  "edoFisico",
   "vendedor",
   "tecnico",
   "sla",
@@ -48,9 +48,12 @@ export function orderedBandejaColumns(
 ): ServicioBandejaColumnKey[] {
   const active = BANDEJA_COLUMN_SEQUENCE.filter((key) => columns[key]);
   if (!options?.cotizacionFirst) return active;
+  const lead = active.filter((key) => key === "atencionVigente");
   const quote = active.filter((key) => key === "cotizacion" || key === "cotizacionMonto");
-  const rest = active.filter((key) => key !== "cotizacion" && key !== "cotizacionMonto");
-  return [...quote, ...rest];
+  const rest = active.filter(
+    (key) => key !== "atencionVigente" && key !== "cotizacion" && key !== "cotizacionMonto",
+  );
+  return [...lead, ...quote, ...rest];
 }
 
 export function serviciosBandejaColumns(
@@ -68,13 +71,13 @@ export function serviciosBandejaColumns(
   );
   const tecnicoView = role === "TECNICO";
   return {
+    atencionVigente: true,
     diagnostico: true,
     ordenServicio: true,
     equipo: true,
     cliente: true,
     edoTecnico: !ventas || ventasTaller,
     edoAdministrativo: !hideAdmin,
-    edoFisico: !tecnicoView,
     cotizacion: ventas,
     cotizacionMonto: showQuoteMonto,
     vendedor: !ventas,
@@ -216,4 +219,29 @@ export function formatEquipmentBandejaLabel(equipment: {
 
 export function equipmentDetailHref(kind: string, equipmentId: string) {
   return kind === "MOT" ? `/motores/${equipmentId}` : `/equipos/${equipmentId}`;
+}
+
+const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"] as const;
+
+/** Fecha corta para bandejas de servicios: `2/nov/2026` (zona Ciudad de México). */
+export function formatServiciosBandejaDate(date: Date): string {
+  const parts = new Intl.DateTimeFormat("es-MX", {
+    timeZone: "America/Mexico_City",
+    day: "numeric",
+    month: "numeric",
+    year: "numeric",
+  }).formatToParts(date);
+  const day = parts.find((part) => part.type === "day")?.value ?? "";
+  const monthIndex = Number(parts.find((part) => part.type === "month")?.value) - 1;
+  const year = parts.find((part) => part.type === "year")?.value ?? "";
+  const mes = MESES_CORTOS[monthIndex] ?? "";
+  return `${day}/${mes}/${year}`;
+}
+
+/** Tono de prioridad congelada (Normal / Alta / Exprés) para texto en bandejas. */
+export function priorityNameTone(name: string): StatusTone {
+  const normalized = name.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+  if (normalized.includes("expres")) return "danger";
+  if (normalized.includes("alta")) return "warn";
+  return "neutral";
 }

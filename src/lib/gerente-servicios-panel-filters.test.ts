@@ -26,6 +26,8 @@ function row(partial: Partial<ServicioBandejaRow> & Pick<ServicioBandejaRow, "id
     quoteMonto: "—",
     slaDueAt: null,
     slaStartedAt: null,
+    attentionCreatedAt: new Date(),
+    priorityName: "Normal",
     createdAt: new Date(),
     closedAt: null,
     primaryStatus: "EN_PROCESO",

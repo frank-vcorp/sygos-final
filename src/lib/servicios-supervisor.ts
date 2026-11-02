@@ -112,6 +112,8 @@ type CaseRecord = {
     attentionType: string;
     slaStartedAt: Date | null;
     sellerUserId: string | null;
+    priorityName: string;
+    createdAt: Date;
   };
   assignee: { name: string } | null;
 };
@@ -139,6 +141,8 @@ export type ServicioBandejaRow = {
   quoteMonto: string;
   slaDueAt: Date | null;
   slaStartedAt: Date | null;
+  attentionCreatedAt: Date;
+  priorityName: string;
   createdAt: Date;
   closedAt: Date | null;
   /** Estatus técnico crudo del caso principal (filtros historial). */
@@ -156,6 +160,7 @@ export type CancelledServicioBandejaRow = {
   clientIsSystem: boolean;
   closedAt: Date;
   createdAt: Date;
+  priorityName: string;
 };
 
 export type SupervisorServicioRow = ServicioBandejaRow | CancelledServicioBandejaRow;
@@ -272,6 +277,8 @@ function buildServicioRow(
     quoteMonto: quoteMontoBandejaLabel(quote),
     slaDueAt: primary.slaDueAt,
     slaStartedAt: primary.attention.slaStartedAt,
+    attentionCreatedAt: primary.attention.createdAt,
+    priorityName: primary.attention.priorityName,
     createdAt: primary.createdAt,
     closedAt: primary.validatedAt ?? primary.updatedAt,
     primaryStatus: technicalSource.status,
@@ -300,7 +307,7 @@ function groupCasesByEquipment(cases: CaseRecord[]) {
 
 const caseInclude = {
   equipment: { include: { client: true } },
-  attention: { select: { priorityName: true, slaStartedAt: true, attentionType: true, sellerUserId: true } },
+  attention: { select: { priorityName: true, createdAt: true, slaStartedAt: true, attentionType: true, sellerUserId: true } },
   assignee: { select: { name: true } },
 } as const;
 
@@ -515,6 +522,7 @@ export async function listHistorialServicios(
     clientIsSystem: row.equipment.client.isSystem,
     closedAt: row.updatedAt,
     createdAt: row.createdAt,
+    priorityName: row.priorityName,
   }));
 
   return [...serviceRows, ...cancelledRows].sort(

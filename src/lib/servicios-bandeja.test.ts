@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   administrativeStatus,
+  formatServiciosBandejaDate,
+  orderedBandejaColumns,
   PHYSICAL_ESTADO,
   physicalStatusFromCustody,
-  orderedBandejaColumns,
+  priorityNameTone,
   serviciosBandejaColumns,
   technicalStatusFromCase,
 } from "./servicios-bandeja";
@@ -91,8 +93,8 @@ describe("serviciosBandejaColumns", () => {
 
   it("supervisor técnico ve columnas de taller sin cotización comercial", () => {
     const cols = serviciosBandejaColumns("SUPERVISOR_TECNICO");
+    assert.equal(cols.atencionVigente, true);
     assert.equal(cols.edoTecnico, true);
-    assert.equal(cols.edoFisico, true);
     assert.equal(cols.tecnico, true);
     assert.equal(cols.sla, true);
     assert.equal(cols.cotizacion, false);
@@ -120,10 +122,26 @@ describe("serviciosBandejaColumns", () => {
   it("cotización puede ir primero en el orden de columnas", () => {
     const cols = serviciosBandejaColumns("VENTAS", { quoteMonto: false, tallerColumns: true });
     const order = orderedBandejaColumns(cols, { cotizacionFirst: true });
-    assert.equal(order[0], "cotizacion");
+    assert.equal(order[0], "atencionVigente");
+    assert.equal(order[1], "cotizacion");
     assert.equal(order.includes("diagnostico"), true);
     assert.equal(order.includes("tecnico"), true);
     assert.equal(order.includes("sla"), true);
     assert.equal(order.at(-1), "sla");
+  });
+});
+
+describe("formatServiciosBandejaDate", () => {
+  it("usa mes abreviado en español", () => {
+    const text = formatServiciosBandejaDate(new Date("2026-11-02T18:00:00.000Z"));
+    assert.match(text, /\/nov\/2026$/);
+  });
+});
+
+describe("priorityNameTone", () => {
+  it("clasifica prioridades congeladas", () => {
+    assert.equal(priorityNameTone("Normal"), "neutral");
+    assert.equal(priorityNameTone("Alta"), "warn");
+    assert.equal(priorityNameTone("Exprés"), "danger");
   });
 });

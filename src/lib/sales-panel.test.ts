@@ -34,6 +34,8 @@ function row(partial: Partial<ServicioBandejaRow>): ServicioBandejaRow {
     quoteMonto: "—",
     slaDueAt: null,
     slaStartedAt: null,
+    attentionCreatedAt: new Date(),
+    priorityName: "Normal",
     createdAt: new Date(),
     closedAt: null,
     primaryStatus: "VALIDADO",
