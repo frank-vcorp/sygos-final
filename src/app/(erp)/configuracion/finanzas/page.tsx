@@ -57,15 +57,13 @@ export default async function FinanzasConfigPage({
         ]}
       />
       {vista === "cuentas" ? (
-        <AccountsPanel accounts={accounts} q={q} tipo={tipo} selectedId={sp.id} />
+        <AccountsPanel accounts={accounts} q={q} tipo={tipo} />
       ) : (
         <CatalogsPanel
           incomes={catalogIncomes}
           expenses={catalogExpenses}
           q={q}
           tipo={tipo}
-          selectedId={sp.id}
-          selectedClase={sp.clase}
         />
       )}
     </>
