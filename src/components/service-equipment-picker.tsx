@@ -118,23 +118,64 @@ export function ServiceEquipmentPicker({
   const mustSelect = warranty || required || emptyOptionLabel !== "Sin equipo físico";
   const available = warranty ? equipment : [...equipment, ...extraEquipment];
   const templateOnly = !warranty && !pickExistingFolio;
+
+  function equipmentOptionName(row: ServiceEquipmentOption) {
+    return [row.folio, row.model, row.brandName, row.serial].filter(Boolean).join(" · ");
+  }
+
+  function equipmentOption(row: ServiceEquipmentOption) {
+    return { id: row.id, name: equipmentOptionName(row) };
+  }
+
   const options = warranty
     ? available.map((row) => ({ id: row.id, name: row.folio + " · " + row.model + " (" + row.kind + ")" }))
     : !clientId ? [] : templateOnly
-      ? (allowQuickEquipment && allowedKinds.length > 0 ? models.map((row, index) => ({
-          id: "catalog-model:" + index,
-          name: [row.model, row.brand, row.type].filter(Boolean).join(" · "),
-        })) : [])
-      : [
-          ...available.filter((row) => row.clientId === clientId).map((row) => ({
-            id: row.id,
-            name: [row.folio, row.model, row.brandName, row.serial].filter(Boolean).join(" · "),
-          })),
-          ...(allowQuickEquipment && allowedKinds.length > 0 ? models.map((row, index) => ({
-            id: "catalog-model:" + index,
-            name: [row.model, row.brand, row.type].filter(Boolean).join(" · "),
-          })) : []),
-        ];
+      ? (() => {
+        const byId = new Map<string, { id: string; name: string }>();
+        for (const row of extraEquipment.filter((item) => item.clientId === clientId)) {
+          byId.set(row.id, equipmentOption(row));
+        }
+        for (const row of available.filter((item) => item.clientId === clientId)) {
+          byId.set(row.id, equipmentOption(row));
+        }
+        const saved = [...byId.values()];
+        const catalogOptions =
+          allowQuickEquipment && allowedKinds.length > 0
+            ? models.map((row, index) => ({
+                id: "catalog-model:" + index,
+                name: [row.model, row.brand, row.type].filter(Boolean).join(" · "),
+              }))
+            : [];
+        const merged = [...saved, ...catalogOptions];
+        if (equipmentId && !merged.some((row) => row.id === equipmentId)) {
+          const selected = available.find((row) => row.id === equipmentId);
+          if (selected) merged.unshift(equipmentOption(selected));
+        }
+        return merged;
+      })()
+      : (() => {
+        const byId = new Map<string, { id: string; name: string }>();
+        for (const row of extraEquipment.filter((item) => item.clientId === clientId)) {
+          byId.set(row.id, equipmentOption(row));
+        }
+        for (const row of available.filter((item) => item.clientId === clientId)) {
+          byId.set(row.id, equipmentOption(row));
+        }
+        const clientOptions = [...byId.values()];
+        const catalogOptions =
+          allowQuickEquipment && allowedKinds.length > 0
+            ? models.map((row, index) => ({
+                id: "catalog-model:" + index,
+                name: [row.model, row.brand, row.type].filter(Boolean).join(" · "),
+              }))
+            : [];
+        const merged = [...clientOptions, ...catalogOptions];
+        if (equipmentId && !merged.some((row) => row.id === equipmentId)) {
+          const selected = available.find((row) => row.id === equipmentId);
+          if (selected) merged.unshift(equipmentOption(selected));
+        }
+        return merged;
+      })();
 
   const pickerLabel = warranty
     ? "Equipo con reparación previa"

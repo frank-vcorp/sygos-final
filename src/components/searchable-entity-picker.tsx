@@ -89,7 +89,7 @@ export function SearchableEntityPicker({
           aria-describedby={hint ? id + "-hint" : undefined}
           placeholder={emptyLabel}
           className={controlClass}
-          required={required}
+          required={required && !selectedId}
           title={"Selecciona un " + label.toLocaleLowerCase("es-MX") + " de la lista."}
           value={query}
           onFocus={() => { setOpen(true); setHighlight(0); setDirty(false); }}
