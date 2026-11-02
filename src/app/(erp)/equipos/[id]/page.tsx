@@ -1,5 +1,5 @@
+import { redirect } from "next/navigation";
 import { EquipmentDetail } from "@/components/equipment-detail";
-import { SalidaDocumentOverlay } from "@/components/salida-document-overlay";
 
 const CUSTODIA_VISTAS = new Set(["pendientes", "resguardo", "fuera", "definitiva"]);
 
@@ -12,16 +12,16 @@ export default async function EquipoPage({
 }) {
   const { id } = await params;
   const { etiqueta, vista, documentoSalida } = await searchParams;
+  if (documentoSalida) {
+    redirect(`/documentos/salida/${documentoSalida}`);
+  }
   const fromCustodiaVista = vista && CUSTODIA_VISTAS.has(vista) ? vista : undefined;
   return (
-    <>
-      <SalidaDocumentOverlay movementId={documentoSalida} />
-      <EquipmentDetail
-        id={id}
-        expectedKind="EQUI"
-        showLabel={etiqueta === "1"}
-        fromCustodiaVista={fromCustodiaVista}
-      />
-    </>
+    <EquipmentDetail
+      id={id}
+      expectedKind="EQUI"
+      showLabel={etiqueta === "1"}
+      fromCustodiaVista={fromCustodiaVista}
+    />
   );
 }

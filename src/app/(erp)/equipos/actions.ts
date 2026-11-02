@@ -134,10 +134,7 @@ export async function movementAction(formData: FormData) {
           ? `${result.folio} confirmado. Imprime el documento de salida.`
           : "Salida registrada.",
       });
-      if (movement === "SALIDA_PRUEBA") {
-        redirect(`/documentos/salida/${result.id}`);
-      }
-      redirect(`${back}?documentoSalida=${result.id}`);
+      redirect(`/documentos/salida/${result.id}`);
     }
     await setFlash({
       tone: "ok",
