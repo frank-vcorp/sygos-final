@@ -120,15 +120,9 @@ export async function EquipmentDetail({
     receiptMovement
     && isInitialWarehouseReceipt(expectedKind, equipment.custody as Custody, receiptMovement)
     && !openAttention;
-  /** Nueva atención desde ficha: solo si el equipo no está en resguardo (fuera, sin ingreso, prueba, proveedor). */
-  const custodyAllowsNewAttention =
-    equipment.custody === "SIN_CUSTODIA"
-    || equipment.custody === "PENDIENTE_INGRESO"
-    || equipment.custody === "FUERA_A_PRUEBA"
-    || equipment.custody === "FUERA"
-    || equipment.custody === "EN_PROVEEDOR";
+  /** Nueva atención desde ficha: solo cuando el equipo ya salió (Fuera) y no hay atención ABIERTA. */
   const showCreateAttentionFromEquipment =
-    canAttend && !openAttention && custodyAllowsNewAttention;
+    canAttend && !openAttention && equipment.custody === "FUERA";
   const activeCase = openAttention?.technicalCases[0] ?? null;
   const activeServiceHref = activeCase
     ? `/operacion/${activeCase.id}`
