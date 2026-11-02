@@ -159,9 +159,6 @@ export default async function CustodiaPage({ searchParams }: { searchParams: Pro
           ? "EQUI de SYSTRON. Los MOT enviados a Servomotores no aparecen aquí."
           : "Ingreso, resguardo, salida a prueba y egreso definitivo de MOT."}
       />
-      {showRefaccionesAlmacen ? (
-        <AlmacenRefaccionesPanel companyId={session.activeCompanyId} />
-      ) : null}
       <SegmentedNav items={tabs.map(([key, label]) => ({ href: `/custodia?vista=${key}`, label, active: view === key }))} />
       <ActiveFilters
         items={
@@ -249,6 +246,11 @@ export default async function CustodiaPage({ searchParams }: { searchParams: Pro
           })}
         />
       )}
+      {showRefaccionesAlmacen ? (
+        <div className="mt-8 border-t border-[var(--line)] pt-8">
+          <AlmacenRefaccionesPanel companyId={session.activeCompanyId} />
+        </div>
+      ) : null}
     </>
   );
 }
