@@ -120,6 +120,15 @@ export async function EquipmentDetail({
     receiptMovement
     && isInitialWarehouseReceipt(expectedKind, equipment.custody as Custody, receiptMovement)
     && !openAttention;
+  /** Nueva atención desde ficha: solo si el equipo no está en resguardo (fuera, sin ingreso, prueba, proveedor). */
+  const custodyAllowsNewAttention =
+    equipment.custody === "SIN_CUSTODIA"
+    || equipment.custody === "PENDIENTE_INGRESO"
+    || equipment.custody === "FUERA_A_PRUEBA"
+    || equipment.custody === "FUERA"
+    || equipment.custody === "EN_PROVEEDOR";
+  const showCreateAttentionFromEquipment =
+    canAttend && !openAttention && custodyAllowsNewAttention;
   const activeCase = openAttention?.technicalCases[0] ?? null;
   const activeServiceHref = activeCase
     ? `/operacion/${activeCase.id}`
@@ -191,7 +200,7 @@ export async function EquipmentDetail({
     })
     : null;
   let primaryAction: React.ReactNode = null;
-  if (awaitingAttentionForReceipt && canAttend) {
+  if (showCreateAttentionFromEquipment) {
     primaryAction = (
       <EquipmentAttentionLauncher
         equipmentId={equipment.id}
@@ -204,12 +213,12 @@ export async function EquipmentDetail({
         priorities={priorities.map((row) => ({ id: row.id, attentionType: row.attentionType, name: row.name }))}
       />
     );
-  } else if (canMove && movementOptions.length > 0 && !awaitingAttentionForReceipt && !custodyDetail) {
+  } else if (canMove && movementOptions.length > 0 && !showCreateAttentionFromEquipment && !custodyDetail) {
     primaryAction = <DetailAnchorButton href="#custodia-equipo">Registrar movimiento</DetailAnchorButton>;
   }
 
   let custodyPrimaryAction: React.ReactNode = null;
-  if (custodyDetail && !almacenCustody && !awaitingAttentionForReceipt && canMove && movementOptions.length > 0) {
+  if (custodyDetail && !almacenCustody && !showCreateAttentionFromEquipment && canMove && movementOptions.length > 0) {
     const label = simplifiedReceipt
       ? "Confirmar entrada física"
       : useWarehouseExit

@@ -573,20 +573,10 @@ export function ClientRelationsHub({
       <Card className="overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--line)] bg-[#f7fafc] px-3 py-2">
           <h2 className="text-sm font-semibold text-[#0b1f3a]">Servicios ({sortedAttentions.length})</h2>
-          {canService ? (
-            <ActionLink href={`/servicios/diagnostico/nuevo?clientId=${clientId}`} className="min-h-9 px-3 py-1.5 text-xs">
-              + Atención
-            </ActionLink>
-          ) : null}
         </div>
         {sortedAttentions.length === 0 ? (
           <div className="px-3 py-4 text-center text-xs text-[var(--muted)]">
             <p>Sin servicios registrados.</p>
-            {canService ? (
-              <ActionLink href={`/servicios/diagnostico/nuevo?clientId=${clientId}`} className="mt-3 inline-flex min-h-10">
-                Abrir primera atención
-              </ActionLink>
-            ) : null}
           </div>
         ) : (
           <div className={denseTable}>
