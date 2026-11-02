@@ -165,6 +165,7 @@ export async function loadWarehouseExitContext(input: {
   let enablingDocumentLabel: string | null = null;
   let technicalCaseId: string | null = null;
   let definitiveReason = "Reparación";
+  let osBillingDocument: Awaited<ReturnType<typeof findEnablingBillingDocument>> = null;
 
   if (input.custody !== "EN_RESGUARDO") {
     definitiveBlockedMessage = "La salida definitiva aplica con el equipo en resguardo.";
@@ -175,6 +176,7 @@ export async function loadWarehouseExitContext(input: {
     const expectedReason = receiptReasonFromAttention(osForDelivery.attention.attentionType);
     definitiveReason = expectedReason ?? "Reparación";
     const billing = await findEnablingBillingDocument(osForDelivery.id);
+    osBillingDocument = billing;
     if (billing) {
       canDefinitiveExit = true;
       enablingDocumentLabel = `${billing.kind} ${billing.folio}`;
@@ -182,9 +184,9 @@ export async function loadWarehouseExitContext(input: {
       canDefinitiveExit = true;
       enablingDocumentLabel = "Salida autorizada por CEO (sin documento)";
     } else if (osForDelivery.exitWithoutDocumentRequestedAt) {
-      definitiveBlockedMessage = "El vendedor solicitó salida sin documento. Espera la autorización del CEO.";
+      definitiveBlockedMessage = "Hay solicitud de salida sin documento pendiente de autorización del CEO.";
     } else {
-      definitiveBlockedMessage = "Falta remisión o factura emitida, o que ventas solicite autorización al CEO.";
+      definitiveBlockedMessage = "Falta remisión o factura emitida, o solicitar autorización al CEO desde almacén o ventas.";
     }
   }
 
@@ -244,12 +246,27 @@ export async function loadWarehouseExitContext(input: {
     blockedMessage = almacenExit.blockedMessage;
   }
 
+  const exitWithoutDocumentPending = Boolean(
+    osForDelivery?.exitWithoutDocumentRequestedAt && !osForDelivery.exitWithoutDocumentAuthorizedAt,
+  );
+  const exitWithoutDocumentAuthorized = osForDelivery ? definitiveExitAuthorized(osForDelivery) : false;
+  const canRequestExitWithoutDocument = Boolean(
+    osForDelivery
+    && !osBillingDocument
+    && !exitWithoutDocumentAuthorized
+    && !exitWithoutDocumentPending,
+  );
+
   return {
     exitMovement,
     canDefinitiveExit,
     definitiveBlockedMessage,
     enablingDocumentLabel,
     technicalCaseId,
+    osCaseVersion: osForDelivery?.version ?? null,
+    exitWithoutDocumentPending,
+    exitWithoutDocumentAuthorized,
+    canRequestExitWithoutDocument,
     definitiveReason,
     sellerName: seller?.name ?? "Vendedor asignado",
     canTestExit,
@@ -257,6 +274,25 @@ export async function loadWarehouseExitContext(input: {
     exitKind,
     blockedMessage,
   };
+}
+
+export async function listExitWithoutDocumentPending(serviceCompanyId: string, take = 12) {
+  return prisma.technicalCase.findMany({
+    where: {
+      serviceCompanyId,
+      kind: "OS",
+      status: "TERMINADA",
+      exitWithoutDocumentRequestedAt: { not: null },
+      exitWithoutDocumentAuthorizedAt: null,
+      equipment: { custody: "EN_RESGUARDO" },
+    },
+    include: {
+      equipment: { include: { client: true } },
+      attention: true,
+    },
+    orderBy: { exitWithoutDocumentRequestedAt: "desc" },
+    take,
+  });
 }
 
 /** Equipo en salida definitiva por OS terminada (motivo reparación). */
@@ -310,8 +346,11 @@ export async function requestExitWithoutDocument(
   if (row.exitWithoutDocumentRequestedAt && !row.exitWithoutDocumentAuthorizedAt) {
     throw new Error("Ya hay una solicitud pendiente ante el CEO.");
   }
-  if (actor.role !== "VENTAS" || row.attention.sellerUserId !== actor.userId) {
-    throw new Error("Solo el vendedor asignado puede solicitar esta salida.");
+  const assignedSeller =
+    actor.role === "VENTAS" && row.attention.sellerUserId === actor.userId;
+  const almacenActor = actor.role === "ALMACEN";
+  if (!assignedSeller && !almacenActor) {
+    throw new Error("Solo ventas (vendedor asignado) o almacén pueden solicitar esta salida.");
   }
   const updated = await prisma.technicalCase.updateMany({
     where: { id: caseId, version },

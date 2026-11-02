@@ -42,7 +42,7 @@ export function SalidaDocumentOverlay({ movementId }: { movementId: string | nul
       </div>
       <iframe
         ref={iframeRef}
-        src={`/documentos/salida/${movementId}`}
+        src={`/documentos/salida/${movementId}?embed=1`}
         title="Documento de salida"
         className="h-[min(72vh,640px)] w-full rounded-md border border-[var(--line)] bg-white"
       />

@@ -9,9 +9,17 @@ import { isWarehouseExitDocument, MOVEMENT_LABEL, type MovementKind } from "@/li
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
 
-export default async function SalidaDocumentoPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function SalidaDocumentoPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<{ embed?: string }>;
+}) {
   const session = await requireCompany();
   const { id } = await params;
+  const query = await searchParams;
+  const embedded = query.embed === "1";
   const movement = await prisma.custodyMovement.findFirst({
     where: { id, companyId: session.activeCompanyId },
     include: {
@@ -34,11 +42,13 @@ export default async function SalidaDocumentoPage({ params }: { params: Promise<
   const receiver = movement.receiverName ?? seller?.name ?? "—";
 
   return (
-    <div className="mx-auto max-w-4xl space-y-4 print:max-w-none">
-      <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
-        <TextLink href={backHref}>Volver al equipo</TextLink>
-        <PrintButton />
-      </div>
+    <div className={`mx-auto max-w-4xl space-y-4 print:max-w-none${embedded ? " p-0" : ""}`}>
+      {embedded ? null : (
+        <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
+          <TextLink href={backHref}>Volver al equipo</TextLink>
+          <PrintButton />
+        </div>
+      )}
       <article className="quote-document overflow-hidden rounded-lg border border-[var(--line)] bg-white text-sm print:rounded-none print:border-0">
         <header className="border-b-4 border-[var(--accent)] px-6 py-6 sm:px-10">
           <div className="flex flex-wrap items-start justify-between gap-6">

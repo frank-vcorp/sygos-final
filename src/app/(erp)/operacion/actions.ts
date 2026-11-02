@@ -28,6 +28,8 @@ import { requireCompany } from "@/lib/session";
 import { authorizeExitWithoutDocument, requestExitWithoutDocument } from "@/lib/warehouse-exit";
 
 function back(formData: FormData) {
+  const custom = optionalText(formData.get("returnTo"));
+  if (custom && custom.startsWith("/")) return custom;
   const id = String(formData.get("caseId") ?? "");
   const base = id ? `/operacion/${id}` : "/operacion";
   const anchor = optionalText(formData.get("scrollAnchor"));

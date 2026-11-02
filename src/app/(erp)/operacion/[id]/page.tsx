@@ -20,7 +20,7 @@ import {
 } from "../actions";
 import { ClientNameLink } from "@/components/client-entity-links";
 import { DiagnosisValidationActions } from "@/components/diagnosis-validation-actions";
-import { RequestExitWithoutDocumentButton } from "@/components/exit-without-document-actions";
+import { RequestExitWithoutDocumentButton, AuthorizeExitWithoutDocumentButton } from "@/components/exit-without-document-actions";
 import { PartInventoryFields } from "@/components/part-inventory-fields";
 import { PartRequestModal } from "@/components/part-request-modal";
 import { RepairClosureActions } from "@/components/repair-closure-actions";
@@ -108,11 +108,14 @@ export default async function OperacionDetallePage({ params }: { params: Promise
   const enablingBilling = await findEnablingBillingDocument(row.id);
   const exitAuthorized = definitiveExitAuthorized(row);
   const exitPending = Boolean(row.exitWithoutDocumentRequestedAt && !row.exitWithoutDocumentAuthorizedAt);
+  const isAssignedSeller = session.role === "VENTAS" && row.attention.sellerUserId === session.userId;
+  const isCeoActor = session.role === "CEO" || session.role === "ADMINISTRADOR";
   const showExitWithoutDocument =
     row.kind === "OS"
     && row.status === "TERMINADA"
     && row.equipment.custody === "EN_RESGUARDO"
-    && (session.role === "VENTAS" && row.attention.sellerUserId === session.userId || exitPending || exitAuthorized);
+    && !enablingBilling
+    && (isAssignedSeller || isCeoActor || exitPending || exitAuthorized);
 
   const [caseHistory, seller, relatedQuotes, relatedBilling, relatedSales] = await Promise.all([
     historyFor("OPERACION", row.id),
@@ -543,13 +546,21 @@ export default async function OperacionDetallePage({ params }: { params: Promise
               <p className="mt-1 text-[var(--muted)]">
                 Si aún no hay remisión ni factura, solicita autorización al CEO para que almacén registre la entrega.
               </p>
-              <div className="mt-3">
-                <RequestExitWithoutDocumentButton
-                  caseId={row.id}
-                  version={row.version}
-                  pending={exitPending}
-                  authorized={exitAuthorized}
-                />
+              <div className="mt-3 space-y-2">
+                {exitAuthorized ? (
+                  <p className="text-sm text-[var(--ok)]">Salida sin documento autorizada. Almacén puede registrar la entrega.</p>
+                ) : exitPending && isCeoActor ? (
+                  <AuthorizeExitWithoutDocumentButton caseId={row.id} version={row.version} />
+                ) : isAssignedSeller ? (
+                  <RequestExitWithoutDocumentButton
+                    caseId={row.id}
+                    version={row.version}
+                    pending={exitPending}
+                    authorized={exitAuthorized}
+                  />
+                ) : exitPending ? (
+                  <p className="text-sm text-[var(--muted)]">Solicitud pendiente de autorización del CEO.</p>
+                ) : null}
               </div>
             </Card>
           ) : null}

@@ -271,6 +271,10 @@ export async function EquipmentDetail({
         exitKind={warehouseExit!.exitKind}
         blockedMessage={warehouseExit!.blockedMessage}
         testReason={warehouseExit!.testReason}
+        osCaseVersion={warehouseExit!.osCaseVersion}
+        exitWithoutDocumentPending={warehouseExit!.exitWithoutDocumentPending}
+        canRequestExitWithoutDocument={warehouseExit!.canRequestExitWithoutDocument}
+        equipmentReturnTo={expectedKind === "MOT" ? `/motores/${equipment.id}` : `/equipos/${equipment.id}`}
       />
     )
     : null;
@@ -374,6 +378,10 @@ export async function EquipmentDetail({
                         exitKind={warehouseExit.exitKind}
                         blockedMessage={warehouseExit.blockedMessage}
                         testReason={warehouseExit.testReason}
+                        osCaseVersion={warehouseExit.osCaseVersion}
+                        exitWithoutDocumentPending={warehouseExit.exitWithoutDocumentPending}
+                        canRequestExitWithoutDocument={warehouseExit.canRequestExitWithoutDocument}
+                        equipmentReturnTo={expectedKind === "MOT" ? `/motores/${equipment.id}` : `/equipos/${equipment.id}`}
                       />
                     ) : (
                       <WarehouseExitForm

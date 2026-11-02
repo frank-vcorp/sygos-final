@@ -47,6 +47,9 @@ import {
   type BillingDocumentServiceLinks,
 } from "@/lib/billing-document-service-links";
 import { requireCompany } from "@/lib/session";
+import { ADMIN_ESTADO } from "@/lib/servicios-bandeja";
+import { listExitWithoutDocumentPending } from "@/lib/warehouse-exit";
+import { CeoExitWithoutDocumentPanel } from "@/components/ceo-exit-without-document-panel";
 
 const CLOSED = ["VALIDADO", "TERMINADA", "SIN_REPARACION"];
 
@@ -772,7 +775,7 @@ async function Coordination({ companyId, code, vista }: { companyId: string; cod
 }
 
 async function CeoExecutive({ companyId, name }: { companyId: string; name: string }) {
-  const [quotes, payrolls, overtime, vacations, leavePermissions, pendingJustifications, compensationRequests, commissions] = await Promise.all([
+  const [quotes, payrolls, overtime, vacations, leavePermissions, pendingJustifications, compensationRequests, commissions, activeServicios, exitWithoutDocPending] = await Promise.all([
     prisma.quote.findMany({ where: { companyId, status: "PENDIENTE_COTIZAR" }, take: 12 }),
     prisma.payrollPeriod.findMany({
       where: { companyId, status: { in: ["PENDIENTE_VALIDACION", "PRELIMINAR"] } },
@@ -804,7 +807,26 @@ async function CeoExecutive({ companyId, name }: { companyId: string; name: stri
       take: 12,
     }),
     prisma.commissionRun.findMany({ where: { companyId, status: "PRELIMINAR" }, take: 6 }),
+    listActiveServicios(companyId, ""),
+    listExitWithoutDocumentPending(companyId, 12),
   ]);
+
+  const directRepairOsRows = activeServicios.filter(
+    (row): row is ServicioBandejaRow =>
+      row.kind === "servicio"
+      && row.osHref != null
+      && row.administrative.label === ADMIN_ESTADO.SIN_COTIZAR
+      && row.physical.label === "En resguardo"
+      && row.slaStartedAt != null,
+  );
+
+  const exitPendingRows = exitWithoutDocPending.map((row) => ({
+    caseId: row.id,
+    version: row.version,
+    folio: row.folio,
+    equipmentFolio: row.equipment.folio,
+    clientName: row.equipment.client.name,
+  }));
 
   const permisoRows: PanelRow[] = [
     ...leavePermissions.map((row) => ({
@@ -840,6 +862,24 @@ async function CeoExecutive({ companyId, name }: { companyId: string; name: stri
     <>
       <PageHeader title={`Panel ${name}`} subtitle="Solo esta empresa. No hay suma con la otra." />
       <div className="grid gap-3">
+        <Block
+          title="Reparaciones directas en taller (OS sin cotizar)"
+          empty="No hay OS en resguardo sin cotización previa."
+          bandejaHref={serviciosBandejaHref({ vista: "activos" })}
+          rows={directRepairOsRows.map((row) => ({
+            key: row.id,
+            href: row.osHref!,
+            label: row.osFolio ?? row.equipmentLabel,
+            detail: `${row.equipmentLabel} · ${row.clientName}`,
+          }))}
+        />
+        <Card className="p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-base font-semibold text-[#0b1f3a]">Salidas sin documento (pendientes de autorizar)</h2>
+            <TextLink href={serviciosBandejaHref({ vista: "activos" })}>Ver servicios</TextLink>
+          </div>
+          <CeoExitWithoutDocumentPanel rows={exitPendingRows} />
+        </Card>
         <Block
           title="Cotizaciones pendientes de precio"
           empty="Nada por cotizar."

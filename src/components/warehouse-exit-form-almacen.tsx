@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { movementAction } from "@/app/(erp)/equipos/actions";
+import { RequestExitWithoutDocumentButton } from "@/components/exit-without-document-actions";
 import { Button, controlClass, Field } from "@/components/ui";
 
 type ReceiverMode = "vendedor" | "paqueteria";
@@ -21,6 +22,10 @@ export function WarehouseExitFormAlmacen({
   blockedMessage,
   testReason,
   direct = false,
+  osCaseVersion = null,
+  exitWithoutDocumentPending = false,
+  canRequestExitWithoutDocument = false,
+  equipmentReturnTo,
 }: {
   equipmentId: string;
   equipmentFolio: string;
@@ -36,6 +41,10 @@ export function WarehouseExitFormAlmacen({
   testReason: string;
   /** Cabecera del equipo: un clic, sin overlay; redirige al documento de salida. */
   direct?: boolean;
+  osCaseVersion?: number | null;
+  exitWithoutDocumentPending?: boolean;
+  canRequestExitWithoutDocument?: boolean;
+  equipmentReturnTo?: string;
 }) {
   const [receiverMode, setReceiverMode] = useState<ReceiverMode>("vendedor");
   const receiverName = receiverMode === "vendedor" ? sellerName : "Paquetería";
@@ -53,8 +62,21 @@ export function WarehouseExitFormAlmacen({
         <p>{blockedMessage ?? "No puedes registrar la salida todavía."}</p>
         {needsBillingHint && !direct ? (
           <p className="text-[var(--ink)]">
-            Salida definitiva: requiere <strong>remisión o factura</strong> de la OS terminada. Sin documento, <strong>ventas</strong> debe pedir autorización al <strong>CEO</strong> y almacén espera la aprobación.
+            Salida definitiva: requiere <strong>remisión o factura</strong> de la OS terminada, o <strong>autorización del CEO</strong> para entregar sin documento.
           </p>
+        ) : null}
+        {canRequestExitWithoutDocument && technicalCaseId && osCaseVersion != null ? (
+          <RequestExitWithoutDocumentButton
+            caseId={technicalCaseId}
+            version={osCaseVersion}
+            pending={false}
+            authorized={false}
+            returnTo={equipmentReturnTo}
+            label="Solicitar salida sin documentos al CEO"
+          />
+        ) : null}
+        {exitWithoutDocumentPending && !canRequestExitWithoutDocument ? (
+          <p className="text-[var(--ink)]">Solicitud enviada al CEO. Almacén podrá registrar la salida cuando la autoricen.</p>
         ) : null}
       </div>
     );
