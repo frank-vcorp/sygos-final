@@ -174,7 +174,7 @@ function AccountEditor({ account, q, tipo }: { account: AccountRow; q: string; t
       </FormPanel>
       <form action={deleteFinanceAccountAction} className="flex justify-end">
         <HiddenFields fields={{ accountId: account.id, q, tipo }} />
-        <ConfirmSubmit message={financeAccountDeleteConfirm(label)} pendingLabel="Eliminando…">Eliminar</ConfirmSubmit>
+        <ConfirmSubmit message={financeAccountDeleteConfirm(label, account.balance)} pendingLabel="Eliminando…">Eliminar</ConfirmSubmit>
       </form>
     </div>
   );

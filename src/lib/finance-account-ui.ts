@@ -1,3 +1,5 @@
+import { money } from "@/lib/money";
+
 export type FinanceAccountDeleteUsage = {
   movements: number;
   purchases: number;
@@ -15,7 +17,6 @@ export function financeAccountDeleteBlockedMessage(
   if (usage.purchases > 0) where.push("compras");
   if (usage.transferTargets > 0) where.push("transferencias");
   if (usage.cardPayments > 0) where.push("pagos con tarjeta");
-  if (balance !== 0 && where.length === 0) where.push("saldo registrado");
   if (where.length === 0) return null;
   const places = where.length === 1
     ? where[0]
@@ -25,6 +26,10 @@ export function financeAccountDeleteBlockedMessage(
   return `No se puede eliminar la cuenta «${label}»: está en uso en ${places}.`;
 }
 
-export function financeAccountDeleteConfirm(label: string) {
-  return `¿Eliminar la cuenta «${label}»? Esta acción no se puede deshacer.`;
+export function financeAccountDeleteConfirm(label: string, balance?: number) {
+  const base = `¿Eliminar la cuenta «${label}»? Esta acción no se puede deshacer.`;
+  if (balance != null && balance !== 0) {
+    return `${base} El saldo registrado (${money(balance)}) desaparecerá al eliminar la cuenta.`;
+  }
+  return base;
 }
