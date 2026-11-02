@@ -47,7 +47,7 @@ import {
   type BillingDocumentServiceLinks,
 } from "@/lib/billing-document-service-links";
 import { requireCompany } from "@/lib/session";
-import { ADMIN_ESTADO } from "@/lib/servicios-bandeja";
+import { ADMIN_ESTADO, PHYSICAL_ESTADO } from "@/lib/servicios-bandeja";
 import { listExitWithoutDocumentPending } from "@/lib/warehouse-exit";
 import { CeoExitWithoutDocumentPanel } from "@/components/ceo-exit-without-document-panel";
 
@@ -816,7 +816,7 @@ async function CeoExecutive({ companyId, name }: { companyId: string; name: stri
       row.kind === "servicio"
       && row.osHref != null
       && row.administrative.label === ADMIN_ESTADO.SIN_COTIZAR
-      && row.physical.label === "En resguardo"
+      && row.physical.label === PHYSICAL_ESTADO.EN_RESGUARDO
       && row.slaStartedAt != null,
   );
 

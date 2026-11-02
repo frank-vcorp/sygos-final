@@ -68,6 +68,10 @@ describe("sales panel filters", () => {
     );
     assert.equal(servicioOsValidadaPendienteEntrega(row({})), true);
     assert.equal(servicioOsValidadaPendienteEntrega(row({ physical: { label: "Entregado", tone: "neutral" } })), false);
+    assert.equal(
+      servicioOsValidadaPendienteEntrega(row({ physical: { label: "Por ingresar", tone: "warn" } })),
+      true,
+    );
   });
 
   it("marca CxC vigente", () => {

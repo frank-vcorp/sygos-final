@@ -108,8 +108,14 @@ export const TECHNICAL_ESTADO = {
 } as const;
 
 export const PHYSICAL_ESTADO = {
+  POR_INGRESAR: "Por ingresar",
+  EN_RESGUARDO: "En resguardo",
   ENTREGADO: "Entregado",
 } as const;
+
+export function physicalEstadoEsEntregadoAlCliente(physical: StackedStatus) {
+  return physical.label === PHYSICAL_ESTADO.ENTREGADO;
+}
 
 export function stackedHasTag(status: StackedStatus, tag: string) {
   return status.tags?.includes(tag) ?? false;
@@ -147,17 +153,17 @@ export function technicalStatusFromCase(status: string): StackedStatus {
 
 export function physicalStatusFromCustody(custody: string): StackedStatus {
   const value = custody as Custody;
-  if (value === "PENDIENTE_INGRESO") {
-    return { label: "Por ingresar", tone: "warn" };
+  if (value === "PENDIENTE_INGRESO" || value === "SIN_CUSTODIA") {
+    return { label: PHYSICAL_ESTADO.POR_INGRESAR, tone: "warn" };
   }
   if (value === "EN_RESGUARDO") {
-    return { label: "En resguardo", tone: "ok" };
+    return { label: PHYSICAL_ESTADO.EN_RESGUARDO, tone: "ok" };
   }
   if (value === "FUERA_A_PRUEBA" || value === "EN_PROVEEDOR") {
     return { label: "En pruebas", tone: "info" };
   }
-  if (value === "FUERA" || value === "SIN_CUSTODIA") {
-    return { label: "Entregado", tone: "neutral" };
+  if (value === "FUERA") {
+    return { label: PHYSICAL_ESTADO.ENTREGADO, tone: "neutral" };
   }
   return { label: custody, tone: "neutral" };
 }

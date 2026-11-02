@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   administrativeStatus,
+  PHYSICAL_ESTADO,
   physicalStatusFromCustody,
   orderedBandejaColumns,
   serviciosBandejaColumns,
@@ -67,6 +68,16 @@ describe("administrativeStatus", () => {
 describe("physicalStatusFromCustody", () => {
   it("proveedor cuenta como en pruebas", () => {
     assert.equal(physicalStatusFromCustody("EN_PROVEEDOR").label, "En pruebas");
+  });
+
+  it("EQUI sin entrada de almacén es por ingresar, no entregado", () => {
+    assert.equal(physicalStatusFromCustody("SIN_CUSTODIA").label, PHYSICAL_ESTADO.POR_INGRESAR);
+    assert.equal(physicalStatusFromCustody("SIN_CUSTODIA").tone, "warn");
+  });
+
+  it("MOT pendiente y salida al cliente usan etiquetas distintas", () => {
+    assert.equal(physicalStatusFromCustody("PENDIENTE_INGRESO").label, PHYSICAL_ESTADO.POR_INGRESAR);
+    assert.equal(physicalStatusFromCustody("FUERA").label, PHYSICAL_ESTADO.ENTREGADO);
   });
 });
 

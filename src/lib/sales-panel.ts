@@ -1,7 +1,7 @@
 import {
   ADMIN_ESTADO,
   ADMIN_SUBESTADO,
-  PHYSICAL_ESTADO,
+  physicalEstadoEsEntregadoAlCliente,
   stackedHasTag,
   stackedWithoutSubestados,
   TECHNICAL_ESTADO,
@@ -33,7 +33,7 @@ export function servicioOsValidadaAutorizada(row: ServicioBandejaRow) {
 export function servicioOsValidadaPendienteEntrega(row: ServicioBandejaRow) {
   if (!row.osFolio) return false;
   if (row.technical.label !== TECHNICAL_ESTADO.VALIDADO) return false;
-  return row.physical.label !== PHYSICAL_ESTADO.ENTREGADO;
+  return !physicalEstadoEsEntregadoAlCliente(row.physical);
 }
 
 export function receivableEsVigente(dueAt: Date, balance: number, now = Date.now()) {
