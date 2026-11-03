@@ -6,7 +6,7 @@ import { ClientNameLink } from "@/components/client-entity-links";
 import { TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { linesForTotal, money, quoteTotals } from "@/lib/money";
-import { QUOTE_STATUS_LABEL, QUOTE_TYPE_LABEL, type QuoteType } from "@/lib/quotes";
+import { QUOTE_STATUS_LABEL, QUOTE_TYPE_LABEL, quoteRequiresDeliveryDays, type QuoteType } from "@/lib/quotes";
 import { requireCompany } from "@/lib/session";
 
 export default async function CotizacionDocumentoPage({ params }: { params: Promise<{ id: string }> }) {
@@ -87,10 +87,10 @@ export default async function CotizacionDocumentoPage({ params }: { params: Prom
           <div className="text-sm">
             {quote.reference ? <div><p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Información complementaria</p><p className="mt-1 whitespace-pre-wrap">{quote.reference}</p></div> : null}
             <p className="mt-4 text-[var(--muted)]">Condición de pago: {quote.creditDays && quote.creditDays > 0 ? `${quote.creditDays} días de crédito` : "Pago de contado"}.</p>
-            {quote.quoteType === "REPARACION" && quote.deliveryBusinessDays != null ? (
+            {quoteRequiresDeliveryDays(quote) && quote.deliveryBusinessDays != null ? (
               <p className="mt-1 text-[var(--muted)]">Tiempo de entrega: {quote.deliveryBusinessDays} días hábiles.</p>
             ) : null}
-            {quote.quoteType === "REPARACION" && quote.slaDueAt ? (
+            {quoteRequiresDeliveryDays(quote) && quote.slaDueAt ? (
               <p className="mt-1 text-[var(--muted)]">
                 Fecha de entrega: {quote.slaDueAt.toLocaleDateString("es-MX", { timeZone: "America/Mexico_City", dateStyle: "long" })}.
               </p>

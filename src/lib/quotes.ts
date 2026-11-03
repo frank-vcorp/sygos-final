@@ -188,9 +188,31 @@ async function ensureOriginQuote(
 
 export function repairOrderSlaDueAt(
   repairQuote: { slaDueAt: Date | null } | null | undefined,
+  diagnosisQuote: { slaDueAt: Date | null } | null | undefined,
   diagnosis: { slaDueAt: Date | null },
 ): Date | null {
-  return repairQuote?.slaDueAt ?? diagnosis.slaDueAt;
+  return repairQuote?.slaDueAt ?? diagnosisQuote?.slaDueAt ?? diagnosis.slaDueAt;
+}
+
+export function quoteRequiresDeliveryDays(quote: { quoteType: string; technicalCaseId: string | null }) {
+  return quote.quoteType === "REPARACION"
+    || (quote.quoteType === "DIAGNOSTICO" && quote.technicalCaseId != null);
+}
+
+export function quoteDeliveryEmailNote(quote: {
+  quoteType: string;
+  technicalCaseId: string | null;
+  slaDueAt: Date | null;
+  deliveryBusinessDays: number | null;
+}): string {
+  if (!quoteRequiresDeliveryDays(quote)) return "";
+  if (quote.slaDueAt) {
+    return ` Fecha de entrega: ${quote.slaDueAt.toLocaleDateString("es-MX", { timeZone: "America/Mexico_City", dateStyle: "long" })}.`;
+  }
+  if (quote.deliveryBusinessDays) {
+    return ` Tiempo de entrega: ${quote.deliveryBusinessDays} días hábiles.`;
+  }
+  return "";
 }
 
 export async function setPrices(
@@ -206,7 +228,7 @@ export async function setPrices(
   });
   if (!quote || quote.status !== "PENDIENTE_COTIZAR") throw new Error("Esta cotización no admite precio.");
   let frozenDeliveryDays: number | undefined;
-  if (quote.quoteType === "REPARACION") {
+  if (quoteRequiresDeliveryDays(quote)) {
     if (!Number.isInteger(deliveryBusinessDays) || deliveryBusinessDays! < 1) {
       throw new Error("Indica el tiempo de entrega en días hábiles (entero mayor o igual a 1).");
     }
@@ -382,14 +404,12 @@ export async function decideQuote(
     assertSellerDiscountAllowed(discountPct, await sellerDiscountLimit(actor.userId));
     nextDiscountPct = discountPct;
   }
-  const repairSlaOnAuthorize = authorized && quote.quoteType === "REPARACION"
+  const repairSlaOnAuthorize = authorized && quote.deliveryBusinessDays != null && quote.deliveryBusinessDays >= 1
+    && (quote.quoteType === "REPARACION" || (quote.quoteType === "DIAGNOSTICO" && quote.technicalCaseId))
     ? (() => {
-        if (quote.deliveryBusinessDays == null || quote.deliveryBusinessDays < 1) {
-          throw new Error("Falta el tiempo de entrega en días hábiles de esta cotización.");
-        }
         const clientAuthorizedAt = new Date();
         const slaStartedAt = normalizeSlaStartFromAuthorization(clientAuthorizedAt);
-        const slaDueAt = addBusinessDays(slaStartedAt, quote.deliveryBusinessDays);
+        const slaDueAt = addBusinessDays(slaStartedAt, quote.deliveryBusinessDays!);
         return { clientAuthorizedAt, slaStartedAt, slaDueAt };
       })()
     : null;
@@ -442,6 +462,17 @@ export async function decideQuote(
     await archivePartPresolicitudesForDiagnosis(diagnosis.id);
   }
   if (authorized && inShop && diagnosis && quote.quoteType === "REPARACION") {
+    await openRepairOrder(diagnosis.id, actor.userId);
+  }
+  if (
+    authorized
+    && inShop
+    && diagnosis
+    && quote.quoteType === "DIAGNOSTICO"
+    && quote.technicalCaseId
+    && quote.deliveryBusinessDays != null
+    && quote.deliveryBusinessDays >= 1
+  ) {
     await openRepairOrder(diagnosis.id, actor.userId);
   }
 }
@@ -574,7 +605,17 @@ async function openRepairOrder(diagnosisCaseId: string, authorUserId: string) {
     orderBy: { updatedAt: "desc" },
     select: { slaDueAt: true },
   });
-  const slaDueAt = repairOrderSlaDueAt(repairQuote, diagnosis);
+  const diagnosisQuote = await prisma.quote.findFirst({
+    where: {
+      technicalCaseId: diagnosis.id,
+      quoteType: "DIAGNOSTICO",
+      status: { in: ["AUTORIZADA", "AUTORIZADA_PENDIENTE_EQUIPO"] },
+      deliveryBusinessDays: { not: null },
+    },
+    orderBy: { updatedAt: "desc" },
+    select: { slaDueAt: true },
+  });
+  const slaDueAt = repairOrderSlaDueAt(repairQuote, diagnosisQuote, diagnosis);
   const created = await prisma.technicalCase.create({
     data: {
       folio,

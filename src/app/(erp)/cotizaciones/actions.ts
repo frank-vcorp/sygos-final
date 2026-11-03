@@ -6,7 +6,7 @@ import { clientIdFromForm } from "@/lib/form-quick-entities";
 import { optionalText, parseVersion, requiredText } from "@/lib/form";
 import { moneyFromForm } from "@/lib/money";
 import { can, type Action } from "@/lib/permissions";
-import { QUOTE_TYPES, type QuoteType, applyDiscount, createSellerQuote, decideQuote, linkIntercompanyQuote, prepareQuoteFromCase, relateQuoteEquipment, setPrices, updateGeneratedQuoteConcepts, updateSellerQuoteConceptComplement } from "@/lib/quotes";
+import { QUOTE_TYPES, type QuoteType, applyDiscount, createSellerQuote, decideQuote, linkIntercompanyQuote, prepareQuoteFromCase, quoteDeliveryEmailNote, relateQuoteEquipment, setPrices, updateGeneratedQuoteConcepts, updateSellerQuoteConceptComplement } from "@/lib/quotes";
 import { sendMail } from "@/lib/sendgrid";
 import { prisma } from "@/lib/db";
 import { requireCompany } from "@/lib/session";
@@ -233,11 +233,7 @@ export async function sendQuoteMailAction(formData: FormData) {
     if (!quote) throw new Error("Esa cotización no es de esta empresa.");
     const email = quote.client.contacts.find((contact) => contact.email)?.email;
     if (!email) throw new Error("El cliente no tiene un contacto con correo. SendGrid no envió nada.");
-    const deliveryNote = quote.quoteType === "REPARACION" && quote.slaDueAt
-      ? ` Fecha de entrega: ${quote.slaDueAt.toLocaleDateString("es-MX", { timeZone: "America/Mexico_City", dateStyle: "long" })}.`
-      : quote.quoteType === "REPARACION" && quote.deliveryBusinessDays
-        ? ` Tiempo de entrega: ${quote.deliveryBusinessDays} días hábiles.`
-        : "";
+    const deliveryNote = quoteDeliveryEmailNote(quote);
     const result = await sendMail({
       companyId: session.activeCompanyId,
       to: email,
