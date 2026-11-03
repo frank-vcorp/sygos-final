@@ -1,7 +1,10 @@
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const MEXICO_TZ = "America/Mexico_City";
+const SLA_OPEN_HOUR = 8;
+const SLA_CLOSE_HOUR = 18;
 
 export function weekdayInMexico(date: Date): number {
-  const name = new Intl.DateTimeFormat("en-US", { timeZone: "America/Mexico_City", weekday: "short" }).format(date);
+  const name = new Intl.DateTimeFormat("en-US", { timeZone: MEXICO_TZ, weekday: "short" }).format(date);
   const index = WEEKDAYS.indexOf(name);
   return index < 0 ? 0 : index;
 }
@@ -16,6 +19,59 @@ export function addBusinessDays(start: Date, days: number): Date {
     if (weekday !== 0 && weekday !== 6) left -= 1;
   }
   return result;
+}
+
+function mexicoYmd(date: Date): { y: number; m: number; d: number } {
+  const iso = new Intl.DateTimeFormat("en-CA", { timeZone: MEXICO_TZ, year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
+  const [y, m, d] = iso.split("-").map(Number);
+  return { y, m, d };
+}
+
+function mexicoHourMinute(date: Date): { hour: number; minute: number } {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: MEXICO_TZ,
+    hour: "numeric",
+    minute: "numeric",
+    hour12: false,
+  }).formatToParts(date);
+  const hour = Number(parts.find((part) => part.type === "hour")?.value ?? 0);
+  const minute = Number(parts.find((part) => part.type === "minute")?.value ?? 0);
+  return { hour, minute };
+}
+
+/** Local wall time in Mexico City (UTC−6, no DST). */
+export function atMexicoCityLocal(y: number, m: number, d: number, hour: number, minute = 0): Date {
+  return new Date(Date.UTC(y, m - 1, d, hour + 6, minute, 0, 0));
+}
+
+function isWithinRepairQuoteSlaBusinessHours(capturedAt: Date): boolean {
+  const weekday = weekdayInMexico(capturedAt);
+  if (weekday === 0 || weekday === 6) return false;
+  const { hour, minute } = mexicoHourMinute(capturedAt);
+  const minutes = hour * 60 + minute;
+  return minutes >= SLA_OPEN_HOUR * 60 && minutes < SLA_CLOSE_HOUR * 60;
+}
+
+function nextMexicoBusinessDayYmd(from: Date): { y: number; m: number; d: number } {
+  let cursor = new Date(from.getTime() + 24 * 60 * 60 * 1000);
+  while (true) {
+    const weekday = weekdayInMexico(cursor);
+    if (weekday !== 0 && weekday !== 6) return mexicoYmd(cursor);
+    cursor = new Date(cursor.getTime() + 24 * 60 * 60 * 1000);
+  }
+}
+
+/**
+ * SLA for repair quotes starts when Ventas authorizes. Outside Mon–Fri 8:00–18:00 (Mexico City)
+ * the clock starts the next business day at 8:00; before 8:00 on a weekday starts same day at 8:00.
+ */
+export function normalizeSlaStartFromAuthorization(capturedAt: Date): Date {
+  if (isWithinRepairQuoteSlaBusinessHours(capturedAt)) return capturedAt;
+  const { hour } = mexicoHourMinute(capturedAt);
+  const weekday = weekdayInMexico(capturedAt);
+  const sameDayMorning = weekday >= 1 && weekday <= 5 && hour < SLA_OPEN_HOUR;
+  const target = sameDayMorning ? mexicoYmd(capturedAt) : nextMexicoBusinessDayYmd(capturedAt);
+  return atMexicoCityLocal(target.y, target.m, target.d, SLA_OPEN_HOUR);
 }
 
 export function warrantyDeadline(exitAt: Date): Date {

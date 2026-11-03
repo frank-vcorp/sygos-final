@@ -87,6 +87,14 @@ export default async function CotizacionDocumentoPage({ params }: { params: Prom
           <div className="text-sm">
             {quote.reference ? <div><p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Información complementaria</p><p className="mt-1 whitespace-pre-wrap">{quote.reference}</p></div> : null}
             <p className="mt-4 text-[var(--muted)]">Condición de pago: {quote.creditDays && quote.creditDays > 0 ? `${quote.creditDays} días de crédito` : "Pago de contado"}.</p>
+            {quote.quoteType === "REPARACION" && quote.deliveryBusinessDays != null ? (
+              <p className="mt-1 text-[var(--muted)]">Tiempo de entrega: {quote.deliveryBusinessDays} días hábiles.</p>
+            ) : null}
+            {quote.quoteType === "REPARACION" && quote.slaDueAt ? (
+              <p className="mt-1 text-[var(--muted)]">
+                Fecha de entrega: {quote.slaDueAt.toLocaleDateString("es-MX", { timeZone: "America/Mexico_City", dateStyle: "long" })}.
+              </p>
+            ) : null}
             <p className="mt-1 text-[var(--muted)]">Importes expresados en pesos mexicanos.</p>
           </div>
           <dl className="space-y-2 rounded-lg border border-[var(--line)] p-4">

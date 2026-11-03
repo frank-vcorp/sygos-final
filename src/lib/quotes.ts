@@ -8,6 +8,7 @@ import { technicalServiceConcept } from "./quote-concept";
 import type { Role } from "./roles";
 import { QUOTE_STATUS_LABEL, QUOTE_TYPE_LABEL, QUOTE_TYPES, type QuoteType } from "./quote-meta";
 import { SALES_NOT_ASSIGNED_MESSAGE } from "./sales-assignment";
+import { addBusinessDays, normalizeSlaStartFromAuthorization } from "./sla";
 
 export { QUOTE_STATUS_LABEL, QUOTE_TYPE_LABEL, QUOTE_TYPES, type QuoteType };
 
@@ -185,17 +186,32 @@ async function ensureOriginQuote(
   return quote;
 }
 
+export function repairOrderSlaDueAt(
+  repairQuote: { slaDueAt: Date | null } | null | undefined,
+  diagnosis: { slaDueAt: Date | null },
+): Date | null {
+  return repairQuote?.slaDueAt ?? diagnosis.slaDueAt;
+}
+
 export async function setPrices(
   actor: Actor,
   quoteId: string,
   version: number,
   prices: Array<{ lineId: string; amount: number }>,
+  deliveryBusinessDays?: number | null,
 ) {
   const quote = await prisma.quote.findFirst({
     where: { id: quoteId, companyId: actor.activeCompanyId },
     include: { lines: true, company: true },
   });
   if (!quote || quote.status !== "PENDIENTE_COTIZAR") throw new Error("Esta cotización no admite precio.");
+  let frozenDeliveryDays: number | undefined;
+  if (quote.quoteType === "REPARACION") {
+    if (!Number.isInteger(deliveryBusinessDays) || deliveryBusinessDays! < 1) {
+      throw new Error("Indica el tiempo de entrega en días hábiles (entero mayor o igual a 1).");
+    }
+    frozenDeliveryDays = deliveryBusinessDays!;
+  }
   await prisma.$transaction(async (tx) => {
     for (const price of prices) {
       const line = quote.lines.find((item) => item.id === price.lineId);
@@ -211,7 +227,12 @@ export async function setPrices(
     }
     const updated = await tx.quote.updateMany({
       where: { id: quote.id, version },
-      data: { status: "PENDIENTE_DECISION", creditDays: quote.creditDays, version: { increment: 1 } },
+      data: {
+        status: "PENDIENTE_DECISION",
+        creditDays: quote.creditDays,
+        ...(frozenDeliveryDays != null ? { deliveryBusinessDays: frozenDeliveryDays } : {}),
+        version: { increment: 1 },
+      },
     });
     if (updated.count === 0) throw new ConcurrencyError();
   });
@@ -361,10 +382,27 @@ export async function decideQuote(
     assertSellerDiscountAllowed(discountPct, await sellerDiscountLimit(actor.userId));
     nextDiscountPct = discountPct;
   }
+  const repairSlaOnAuthorize = authorized && quote.quoteType === "REPARACION"
+    ? (() => {
+        if (quote.deliveryBusinessDays == null || quote.deliveryBusinessDays < 1) {
+          throw new Error("Falta el tiempo de entrega en días hábiles de esta cotización.");
+        }
+        const clientAuthorizedAt = new Date();
+        const slaStartedAt = normalizeSlaStartFromAuthorization(clientAuthorizedAt);
+        const slaDueAt = addBusinessDays(slaStartedAt, quote.deliveryBusinessDays);
+        return { clientAuthorizedAt, slaStartedAt, slaDueAt };
+      })()
+    : null;
   await prisma.$transaction(async (tx) => {
     const updated = await tx.quote.updateMany({
       where: { id: quote.id, version },
-      data: { status, creditDays, discountPct: nextDiscountPct, version: { increment: 1 } },
+      data: {
+        status,
+        creditDays,
+        discountPct: nextDiscountPct,
+        ...(repairSlaOnAuthorize ?? {}),
+        version: { increment: 1 },
+      },
     });
     if (updated.count === 0) throw new ConcurrencyError();
     await tx.quoteLine.updateMany({ where: { quoteId: quote.id }, data: { authorized: false } });
@@ -527,6 +565,16 @@ async function openRepairOrder(diagnosisCaseId: string, authorUserId: string) {
     return existing;
   }
   const folio = await allocateFolio(diagnosis.serviceCompanyId, "OS");
+  const repairQuote = await prisma.quote.findFirst({
+    where: {
+      technicalCaseId: diagnosis.id,
+      quoteType: "REPARACION",
+      status: { in: ["AUTORIZADA", "AUTORIZADA_PENDIENTE_EQUIPO"] },
+    },
+    orderBy: { updatedAt: "desc" },
+    select: { slaDueAt: true },
+  });
+  const slaDueAt = repairOrderSlaDueAt(repairQuote, diagnosis);
   const created = await prisma.technicalCase.create({
     data: {
       folio,
@@ -536,7 +584,7 @@ async function openRepairOrder(diagnosisCaseId: string, authorUserId: string) {
       kind: "OS",
       status: "EN_ESPERA",
       spawnedFromId: diagnosis.id,
-      slaDueAt: diagnosis.slaDueAt,
+      slaDueAt,
       quotePending: false,
     },
   });

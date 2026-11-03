@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { addBusinessDays, compareBySla, formatSlaCountdown, warrantyDeadline } from "./sla";
+import { addBusinessDays, atMexicoCityLocal, compareBySla, formatSlaCountdown, normalizeSlaStartFromAuthorization, warrantyDeadline } from "./sla";
 
 describe("SLA", () => {
   it("salta sábado y domingo y conserva la hora de ingreso", () => {
@@ -42,5 +42,28 @@ describe("SLA", () => {
   it("cuenta seis meses desde la salida física", () => {
     const exit = new Date("2026-01-15T10:00:00-06:00");
     assert.equal(warrantyDeadline(exit).toISOString(), new Date("2026-07-15T10:00:00-06:00").toISOString());
+  });
+
+  it("conserva la autorización en horario hábil", () => {
+    const captured = new Date("2026-10-02T15:30:00-06:00");
+    assert.equal(normalizeSlaStartFromAuthorization(captured).toISOString(), captured.toISOString());
+  });
+
+  it("mueve autorización vespertina al siguiente día hábil a las 8:00", () => {
+    const captured = new Date("2026-10-02T19:00:00-06:00");
+    const expected = atMexicoCityLocal(2026, 10, 5, 8);
+    assert.equal(normalizeSlaStartFromAuthorization(captured).toISOString(), expected.toISOString());
+  });
+
+  it("mueve autorización antes de las 8:00 al mismo día hábil a las 8:00", () => {
+    const captured = new Date("2026-10-05T07:15:00-06:00");
+    const expected = atMexicoCityLocal(2026, 10, 5, 8);
+    assert.equal(normalizeSlaStartFromAuthorization(captured).toISOString(), expected.toISOString());
+  });
+
+  it("mueve autorización en fin de semana al lunes a las 8:00", () => {
+    const captured = new Date("2026-10-03T11:00:00-06:00");
+    const expected = atMexicoCityLocal(2026, 10, 5, 8);
+    assert.equal(normalizeSlaStartFromAuthorization(captured).toISOString(), expected.toISOString());
   });
 });

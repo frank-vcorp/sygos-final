@@ -116,7 +116,11 @@ export async function setPricesAction(formData: FormData) {
       lineId: String(lineId),
       amount: moneyFromForm(formData.getAll("amount")[index], "Precio"),
     }));
-    await setPrices(session, requiredText(formData.get("quoteId"), "Cotización"), parseVersion(formData.get("version")), prices);
+    const deliveryRaw = formData.get("deliveryBusinessDays");
+    const deliveryBusinessDays = deliveryRaw != null && String(deliveryRaw).trim() !== ""
+      ? Number.parseInt(String(deliveryRaw), 10)
+      : null;
+    await setPrices(session, requiredText(formData.get("quoteId"), "Cotización"), parseVersion(formData.get("version")), prices, deliveryBusinessDays);
     await setFlash({ tone: "ok", message: "Precio asignado." });
     redirect(target);
   } catch (error) {
@@ -229,11 +233,16 @@ export async function sendQuoteMailAction(formData: FormData) {
     if (!quote) throw new Error("Esa cotización no es de esta empresa.");
     const email = quote.client.contacts.find((contact) => contact.email)?.email;
     if (!email) throw new Error("El cliente no tiene un contacto con correo. SendGrid no envió nada.");
+    const deliveryNote = quote.quoteType === "REPARACION" && quote.slaDueAt
+      ? ` Fecha de entrega: ${quote.slaDueAt.toLocaleDateString("es-MX", { timeZone: "America/Mexico_City", dateStyle: "long" })}.`
+      : quote.quoteType === "REPARACION" && quote.deliveryBusinessDays
+        ? ` Tiempo de entrega: ${quote.deliveryBusinessDays} días hábiles.`
+        : "";
     const result = await sendMail({
       companyId: session.activeCompanyId,
       to: email,
       subject: `${quote.folio} · ${quote.company.name}`,
-      text: `Cotización ${quote.folio} de ${quote.company.name}.`,
+      text: `Cotización ${quote.folio} de ${quote.company.name}.${deliveryNote}`,
     });
     if (!result.ok) throw new Error(result.message);
     await setFlash({ tone: "ok", message: result.message });

@@ -157,6 +157,21 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
             />
           </label>
         ))}
+        {quote.quoteType === "REPARACION" ? (
+          <label className="grid gap-1">
+            <span className="text-xs font-semibold text-[var(--muted)]">Tiempo de entrega (días hábiles)</span>
+            <input
+              type="number"
+              name="deliveryBusinessDays"
+              required
+              min={1}
+              step={1}
+              defaultValue={quote.deliveryBusinessDays ?? ""}
+              className={controlClass}
+              aria-label="Tiempo de entrega en días hábiles"
+            />
+          </label>
+        ) : null}
         <SubmitButton>Asignar precio</SubmitButton>
       </form>
     );
@@ -352,6 +367,15 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
           {quote.status === "PENDIENTE_COTIZAR" && referencePrice != null ? <p className="mt-1">Referencia congelada de la prioridad: {money(referencePrice)}. El precio lo confirma CEO o Administrador.</p> : null}
           {quote.reference ? <p className="mt-1">Referencia: {quote.reference}</p> : null}
           {quote.creditDays != null ? <p className="mt-1">Crédito congelado: {quote.creditDays} días</p> : null}
+          {quote.quoteType === "REPARACION" && quote.deliveryBusinessDays != null ? (
+            <p className="mt-1">Tiempo de entrega: {quote.deliveryBusinessDays} días hábiles</p>
+          ) : null}
+          {quote.quoteType === "REPARACION" && quote.slaDueAt ? (
+            <p className="mt-1">
+              Fecha de entrega:{" "}
+              {quote.slaDueAt.toLocaleDateString("es-MX", { timeZone: "America/Mexico_City", dateStyle: "medium" })}
+            </p>
+          ) : null}
           {missing ? <p className="mt-3 rounded-md bg-[var(--warn-soft)] px-3 py-2">{missing}</p> : null}
           <table className="mt-4 min-w-full text-left">
             <thead><tr><th className="py-1">Concepto</th><th>Cant.</th>{priced ? <th>Precio</th> : null}</tr></thead>

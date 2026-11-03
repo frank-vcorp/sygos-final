@@ -577,6 +577,10 @@ model Quote {
   sellerConceptComplement String?
   creditDays         Int?
   discountPct        Float    @default(0)
+  deliveryBusinessDays Int?
+  clientAuthorizedAt DateTime?
+  slaStartedAt       DateTime?
+  slaDueAt           DateTime?
   sellerUserId       String?
   version            Int      @default(1)
   createdAt          DateTime @default(now())
