@@ -21,6 +21,7 @@ import { shoppingListKindFromList } from "@/lib/shopping-list-display";
 import {
   receivableEsVigente,
   servicioCotizadaSinAutorizacion,
+  servicioDxSinReparacionPendienteEmitir,
   servicioOsValidadaAutorizada,
   servicioOsValidadaPendienteEntrega,
   servicioPendienteAutorizacion,
@@ -521,6 +522,7 @@ async function Sales({
     newClientsMonth,
     activeServicios,
     osSinFacturaQuotes,
+    dxSinReparacionPendienteEmitir,
   ] = await Promise.all([
     prisma.receivable.findMany({
       where: { companyId, sellerUserId: userId, balance: { gt: 0 } },
@@ -567,6 +569,19 @@ async function Sales({
       select: { technicalCaseId: true },
       take: 100,
     }),
+    prisma.technicalCase.findMany({
+      where: {
+        serviceCompanyId: companyId,
+        kind: "DIAGNOSTICO",
+        status: "VALIDADO",
+        noRepairAt: { not: null },
+        attention: { attentionType: "DIAGNOSTICO" },
+        equipment: { client: { ownerUserId: userId, isSystem: false } },
+        billingDocuments: { some: { status: { in: ["SOLICITADA", "ERROR_FISCAL"] } } },
+      },
+      select: { folio: true },
+      take: 100,
+    }),
   ]);
 
   const overdueBalance = receivables
@@ -596,8 +611,11 @@ async function Sales({
   );
   const cotizadasSinAutorizacion = servicioRows.filter(servicioCotizadaSinAutorizacion);
   const pendientesAutorizacion = servicioRows.filter(servicioPendienteAutorizacion);
+  const dxSinReparacionPendienteFolios = new Set(dxSinReparacionPendienteEmitir.map((row) => row.folio));
   const facturacionPendiente = servicioRows.filter(
-    (row) => servicioOsValidadaAutorizada(row) && row.osFolio != null && osSinFacturaFolios.has(row.osFolio),
+    (row) =>
+      (servicioOsValidadaAutorizada(row) && row.osFolio != null && osSinFacturaFolios.has(row.osFolio))
+      || servicioDxSinReparacionPendienteEmitir(row, dxSinReparacionPendienteFolios),
   );
   const entregasOsValidadas = servicioRows.filter(servicioOsValidadaPendienteEntrega);
   const cobranzaServicios = await listServiciosForBillingLinks(
@@ -662,7 +680,7 @@ async function Sales({
         />
         <SalesPanelServiciosSection
           title="Facturación"
-          empty="No hay OS validadas sin factura emitida en servicios activos."
+          empty="No hay OS validadas sin factura emitida ni DX sin reparación pendiente de emitir."
           bandejaHref="/facturacion?vista=solicitudes"
           rows={facturacionPendiente}
           role={role}

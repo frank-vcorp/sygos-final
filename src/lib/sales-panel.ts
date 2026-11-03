@@ -8,6 +8,21 @@ import {
 } from "@/lib/servicios-bandeja";
 import type { ServicioBandejaRow } from "@/lib/servicios-supervisor";
 
+/** DX validado sin reparación (estado administrativo dedicado). */
+export function servicioDxSinReparacion(row: ServicioBandejaRow) {
+  return (
+    row.administrative.label === ADMIN_ESTADO.DX_SIN_REPARACION
+    && row.technical.label === TECHNICAL_ESTADO.VALIDADO
+    && Boolean(row.diagnosisFolio)
+  );
+}
+
+/** DX sin reparación con solicitud de factura/remisión aún no emitida (prioridad de cobro). */
+export function servicioDxSinReparacionPendienteEmitir(row: ServicioBandejaRow, diagnosisFolios: ReadonlySet<string>) {
+  if (!servicioDxSinReparacion(row)) return false;
+  return row.diagnosisFolio != null && diagnosisFolios.has(row.diagnosisFolio);
+}
+
 /** Cotizado sin subestado: precio definido, sin autorización del cliente aún. */
 export function servicioCotizadaSinAutorizacion(row: ServicioBandejaRow) {
   return row.administrative.label === ADMIN_ESTADO.COTIZADO && stackedWithoutSubestados(row.administrative);

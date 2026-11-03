@@ -37,7 +37,7 @@ export default async function FacturacionPage({ searchParams }: { searchParams: 
   const canEditClient = can(session.role, "client.edit", session.activeCompanyCode);
   const where =
     vista === "solicitudes"
-      ? { status: "SOLICITADA", kind: { not: "REMISION" } }
+      ? { status: "SOLICITADA" }
       : vista === "remisiones"
         ? { kind: "REMISION" }
         : vista === "canceladas"

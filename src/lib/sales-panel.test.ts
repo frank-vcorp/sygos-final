@@ -4,6 +4,7 @@ import { administrativeStatus } from "./servicios-bandeja";
 import {
   receivableEsVigente,
   servicioCotizadaSinAutorizacion,
+  servicioDxSinReparacionPendienteEmitir,
   servicioOsValidadaAutorizada,
   servicioOsValidadaPendienteEntrega,
   servicioPendienteAutorizacion,
@@ -82,5 +83,17 @@ describe("sales panel filters", () => {
     assert.equal(receivableEsVigente(future, 100), true);
     assert.equal(receivableEsVigente(past, 100), false);
     assert.equal(receivableEsVigente(past, 0), false);
+  });
+
+  it("incluye DX sin reparación pendiente de emitir en facturación ventas", () => {
+    const dxRow = row({
+      osFolio: null,
+      osHref: null,
+      diagnosisFolio: "DX-9",
+      diagnosisHref: "/operacion/dx9",
+      administrative: { label: "DX sin reparación", tone: "neutral" },
+    });
+    assert.equal(servicioDxSinReparacionPendienteEmitir(dxRow, new Set(["DX-9"])), true);
+    assert.equal(servicioDxSinReparacionPendienteEmitir(dxRow, new Set()), false);
   });
 });

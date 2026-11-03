@@ -46,6 +46,7 @@ import {
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
 import { buildAttentionHistoryTimeline, seesFullAttentionHistory } from "@/lib/attention-history";
+import { isNormalDiagnosisPriority, isPaidDiagnosisPriority } from "@/lib/diagnosis-no-repair";
 import { historyFor } from "@/lib/history";
 import { can } from "@/lib/permissions";
 import { ATTENTION_LABEL, type AttentionType } from "@/lib/priorities";
@@ -261,7 +262,12 @@ export default async function OperacionDetallePage({ params }: { params: Promise
       ? [{ label: `Ventas${relatedSales.length > 1 ? ` (${relatedSales.length})` : ""}`, href: relatedSales.length === 1 ? `/ventas/${relatedSales[0].id}` : "/ventas" }]
       : []),
     ...(relatedBilling.length > 0
-      ? [{ label: `Facturación${relatedBilling.length > 1 ? ` (${relatedBilling.length})` : ""}`, href: relatedBilling.length === 1 ? `/facturacion/${relatedBilling[0].id}` : "/facturacion" }]
+      ? [{
+          label: dxSinReparacion && relatedBilling.length === 1
+            ? `${relatedBilling[0].kind === "REMISION" ? "Remisión" : "Factura"} ${relatedBilling[0].folio}`
+            : `Facturación${relatedBilling.length > 1 ? ` (${relatedBilling.length})` : ""}`,
+          href: relatedBilling.length === 1 ? `/facturacion/${relatedBilling[0].id}` : "/facturacion",
+        }]
       : []),
     ...(canPrintDxSinReparacion
       ? [{ label: "Hoja DX sin reparación", href: `/documentos/dx-sin-reparacion/${row.id}` }]
@@ -480,6 +486,67 @@ export default async function OperacionDetallePage({ params }: { params: Promise
     </Card>
   );
 
+  const dxSinReparacionVentasCard =
+    dxSinReparacion
+    && row.status === "VALIDADO"
+    && can(session.role, "quote.follow", session.activeCompanyCode)
+      ? (() => {
+          const normal = isNormalDiagnosisPriority(row.attention.priorityName, row.attention.priorityPrice);
+          const billingEmitida = relatedBilling.find((doc) => doc.status === "EMITIDA");
+          const billingSolicitada = relatedBilling.find((doc) => doc.status === "SOLICITADA" || doc.status === "ERROR_FISCAL");
+          if (normal) {
+            return (
+              <Card className="mb-4 p-4 text-sm">
+                <p className="font-medium">DX sin reparación · prioridad Normal</p>
+                <p className="mt-1 text-[var(--muted)]">Sin cobro. Imprime la hoja de retiro y coordina la salida en almacén.</p>
+                {canPrintDxSinReparacion ? (
+                  <p className="mt-2">
+                    <TextLink href={`/documentos/dx-sin-reparacion/${row.id}`}>Imprimir hoja de retiro sin reparación</TextLink>
+                  </p>
+                ) : null}
+              </Card>
+            );
+          }
+          if (billingEmitida) {
+            return (
+              <Card className="mb-4 p-4 text-sm">
+                <p className="font-medium">DX sin reparación · documento emitido</p>
+                <p className="mt-1 text-[var(--muted)]">
+                  Lleva al cliente la {billingEmitida.kind === "REMISION" ? "remisión" : "factura"} para retirar el equipo en almacén.
+                </p>
+                <p className="mt-2">
+                  <TextLink href={`/facturacion/${billingEmitida.id}`}>{billingEmitida.folio}</TextLink>
+                </p>
+              </Card>
+            );
+          }
+          if (billingSolicitada) {
+            return (
+              <Card className="mb-4 p-4 text-sm">
+                <p className="font-medium">DX sin reparación · solicitud de facturación</p>
+                <p className="mt-1 text-[var(--muted)]">
+                  Coordinación debe emitir el documento; después imprime y acompaña al cliente a almacén.
+                </p>
+                <p className="mt-2">
+                  <TextLink href={`/facturacion/${billingSolicitada.id}`}>Ver solicitud {billingSolicitada.folio}</TextLink>
+                </p>
+              </Card>
+            );
+          }
+          if (isPaidDiagnosisPriority(row.attention.priorityName, row.attention.priorityPrice)) {
+            return (
+              <Card className="mb-4 border-[var(--warn)] bg-[var(--warn-soft)] p-4 text-sm">
+                <p className="font-medium">DX sin reparación · sin documento de cobro</p>
+                <p className="mt-1 text-[var(--muted)]">
+                  Prioridad {row.attention.priorityName}: debería existir una solicitud automática; avisa a administración.
+                </p>
+              </Card>
+            );
+          }
+          return null;
+        })()
+      : null;
+
   return (
     <>
       <EntityDetailHeader
@@ -545,6 +612,7 @@ export default async function OperacionDetallePage({ params }: { params: Promise
           </nav>
         }
       />
+      {dxSinReparacionVentasCard}
       {readOnly ? <p className="mb-4 text-sm text-[var(--muted)]">Consulta de solo lectura. SYSTRON no modifica el estado ni la bitácora de Servomotores.</p> : null}
       <DetailGrid>
         <div className="space-y-4">
