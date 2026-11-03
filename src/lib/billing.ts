@@ -93,6 +93,69 @@ export async function requestFromQuote(actor: Actor, quoteId: string, kind: "FAC
   return document;
 }
 
+export async function requestFromDiagnosisNoRepair(actor: Actor, diagnosisCaseId: string) {
+  const row = await prisma.technicalCase.findFirst({
+    where: { id: diagnosisCaseId, serviceCompanyId: actor.activeCompanyId, kind: "DIAGNOSTICO" },
+    include: {
+      attention: true,
+      equipment: { include: { client: true } },
+    },
+  });
+  if (!row?.noRepairAt) throw new Error("Este diagnóstico no está marcado como sin reparación.");
+  if (row.status !== "VALIDADO") throw new Error("La solicitud de facturación aplica tras validar el diagnóstico.");
+  const amount = row.attention.priorityPrice;
+  if (amount == null || amount <= 0) {
+    throw new Error("La prioridad normal no genera cobro por diagnóstico sin reparación.");
+  }
+  const existing = await prisma.billingDocument.findFirst({
+    where: {
+      technicalCaseId: row.id,
+      status: { in: ["SOLICITADA", "EMITIDA", "ERROR_FISCAL"] },
+    },
+  });
+  if (existing) return existing;
+
+  const client = row.equipment.client;
+  const kind: "FACTURA" | "REMISION" = client.requiresInvoice === true ? "FACTURA" : "REMISION";
+  if (client.requiresInvoice === true && kind === "REMISION") {
+    throw new Error("Este cliente requiere factura (CFDI).");
+  }
+  const total = roundMoney(amount);
+  const subtotal = roundMoney(total / 1.16);
+  const iva = roundMoney(total - subtotal);
+  const folio = await allocateFolio(actor.activeCompanyId, kind === "REMISION" ? "REM" : "FAC");
+  const concept = "DX sin reparación";
+  const document = await prisma.billingDocument.create({
+    data: {
+      folio,
+      companyId: actor.activeCompanyId,
+      kind,
+      status: "SOLICITADA",
+      clientId: client.id,
+      technicalCaseId: row.id,
+      equipmentId: row.equipmentId,
+      concept,
+      subtotal,
+      iva,
+      total,
+      creditDays: client.creditDays ?? 0,
+      rfcSnapshot: client.rfc,
+      fiscalStatus: kind === "REMISION" ? "NO_APLICA" : "PENDIENTE",
+      requestedByUserId: actor.userId,
+      lines: { create: [{ concept, quantity: 1, unitPrice: total, amount: total }] },
+    },
+  });
+  await recordHistory({
+    companyId: actor.activeCompanyId,
+    entityType: "DOCUMENTO",
+    entityId: document.id,
+    action: "SOLICITUD",
+    summary: `${folio} solicitado por prioridad ${row.attention.priorityName} (DX sin reparación).`,
+    authorUserId: actor.userId,
+  });
+  return document;
+}
+
 export type DocumentFiscalOverrides = { cfdiUse: string | null; paymentMethod: string | null };
 
 function fiscalForDocument(

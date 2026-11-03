@@ -98,6 +98,7 @@ export type StackedStatus = {
 export const ADMIN_ESTADO = {
   SIN_COTIZAR: "Sin cotizar",
   COTIZADO: "Cotizado",
+  DX_SIN_REPARACION: "DX sin reparación",
 } as const;
 
 /** Subestados (segunda línea) bajo el edo. administrativo. */
@@ -176,10 +177,15 @@ type AdminInput = {
   quoteStatus: string | null;
   quotePending: boolean;
   warrantyDecision: string | null;
+  diagnosisNoRepair?: boolean;
 };
 
 export function administrativeStatus(input: AdminInput): StackedStatus {
   const tags: string[] = [];
+
+  if (input.diagnosisNoRepair) {
+    return { label: ADMIN_ESTADO.DX_SIN_REPARACION, tone: "ok" };
+  }
 
   if (input.attentionType === "REPARACION") {
     if (input.quoteStatus === "NO_AUTORIZADA") tags.push(ADMIN_SUBESTADO.NO_AUTORIZADO);

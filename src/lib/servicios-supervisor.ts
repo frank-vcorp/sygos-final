@@ -96,6 +96,7 @@ type CaseRecord = {
   externalSupplierId: string | null;
   quotePending: boolean;
   warrantyDecision: string | null;
+  noRepairAt: Date | null;
   attentionId: string;
   equipmentId: string;
   equipment: {
@@ -247,7 +248,15 @@ function buildServicioRow(
   if (techCase?.externalSupplierId) technicianName = "Proveedor externo";
   else if (techCase?.assignee?.name) technicianName = techCase.assignee.name;
 
-  const quotePending = Boolean((diagnosis ?? primary).quotePending || (os?.quotePending ?? false));
+  const quotePending = Boolean(
+    !((diagnosis ?? primary).noRepairAt && (diagnosis ?? primary).status === "VALIDADO")
+    && ((diagnosis ?? primary).quotePending || (os?.quotePending ?? false)),
+  );
+  const diagnosisNoRepair = Boolean(
+    (diagnosis ?? primary).kind === "DIAGNOSTICO"
+    && (diagnosis ?? primary).noRepairAt
+    && (diagnosis ?? primary).status === "VALIDADO",
+  );
 
   return {
     kind: "servicio",
@@ -268,6 +277,7 @@ function buildServicioRow(
       quoteStatus,
       quotePending,
       warrantyDecision: (diagnosis ?? primary).warrantyDecision,
+      diagnosisNoRepair,
     }),
     physical: physicalStatusFromCustody(equipment.custody),
     sellerName,

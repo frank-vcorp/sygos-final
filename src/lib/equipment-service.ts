@@ -427,7 +427,7 @@ export async function registerMovement(
   let enablingDocument = input.enablingDocument;
   if (input.kind === "SALIDA" || input.kind === "EGRESO") {
     if (!input.technicalCaseId) {
-      throw new Error("La salida definitiva debe ligarse a la OS terminada.");
+      throw new Error("La salida definitiva debe ligarse a la operación que autoriza la entrega.");
     }
     const doc = await assertDefinitiveWarehouseExit(input.technicalCaseId, input.equipmentId);
     enablingDocument = doc.enablingDocument;

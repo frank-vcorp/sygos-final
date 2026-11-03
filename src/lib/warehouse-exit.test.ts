@@ -42,6 +42,7 @@ describe("almacén salida DX", () => {
     const result = resolveAlmacenWarehouseExit({
       custody: "EN_RESGUARDO",
       hasOsForDelivery: true,
+      hasNoRepairDxDelivery: false,
       canDefinitiveExit: true,
       definitiveBlockedMessage: null,
       attentionType: "DIAGNOSTICO",
@@ -50,5 +51,19 @@ describe("almacén salida DX", () => {
     });
     assert.equal(result.exitKind, "definitive");
     assert.equal(result.blockedMessage, null);
+  });
+
+  it("DX sin reparación validado habilita salida definitiva sin OS", () => {
+    const result = resolveAlmacenWarehouseExit({
+      custody: "EN_RESGUARDO",
+      hasOsForDelivery: false,
+      hasNoRepairDxDelivery: true,
+      canDefinitiveExit: true,
+      definitiveBlockedMessage: null,
+      attentionType: "DIAGNOSTICO",
+      canTestExit: false,
+      validatedDxOnAttention: true,
+    });
+    assert.equal(result.exitKind, "definitive");
   });
 });

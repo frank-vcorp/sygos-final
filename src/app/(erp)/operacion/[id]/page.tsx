@@ -9,6 +9,7 @@ import {
   finishRepairAction,
   issuePartAction,
   logAction,
+  markDiagnosisNoRepairAction,
   markPaidAction,
   overrideWarrantyAction,
   receivePartAction,
@@ -19,6 +20,7 @@ import {
   validateAction,
 } from "../actions";
 import { ClientNameLink } from "@/components/client-entity-links";
+import { DiagnosisNoRepairActions } from "@/components/diagnosis-no-repair-actions";
 import { DiagnosisValidationActions } from "@/components/diagnosis-validation-actions";
 import { RequestExitWithoutDocumentButton, AuthorizeExitWithoutDocumentButton } from "@/components/exit-without-document-actions";
 import { PartInventoryFields } from "@/components/part-inventory-fields";
@@ -205,6 +207,14 @@ export default async function OperacionDetallePage({ params }: { params: Promise
   const historial = (HISTORIAL_CASE as readonly string[]).includes(row.status);
   const closed = historial;
   const warranty = row.attention.attentionType === "DIAGNOSTICO_GARANTIA" && row.kind === "DIAGNOSTICO";
+  const dxSinReparacion =
+    row.kind === "DIAGNOSTICO"
+    && row.attention.attentionType === "DIAGNOSTICO"
+    && Boolean(row.noRepairAt);
+  const canPrintDxSinReparacion =
+    dxSinReparacion
+    && row.status === "VALIDADO"
+    && (can(session.role, "quote.follow", session.activeCompanyCode) || can(session.role, "custody.confirm", session.activeCompanyCode));
   const canManage = !readOnly && ["ADMINISTRADOR", "CEO", "SUPERVISOR_TECNICO", "GERENTE_OPERATIVO_SYSTRON", "GERENTE_OPERATIVO_SERVOMOTORES"].includes(session.role);
   const canWork = !readOnly && (session.role === "ADMINISTRADOR" || session.role === "CEO" || session.role === "SUPERVISOR_TECNICO" || (session.role === "GERENTE_OPERATIVO_SERVOMOTORES" && session.activeCompanyCode === "SERVOMOTORES") || (session.role === "TECNICO" && row.assigneeUserId === session.userId));
   const canCloseOsRepair =
@@ -253,6 +263,9 @@ export default async function OperacionDetallePage({ params }: { params: Promise
     ...(relatedBilling.length > 0
       ? [{ label: `Facturación${relatedBilling.length > 1 ? ` (${relatedBilling.length})` : ""}`, href: relatedBilling.length === 1 ? `/facturacion/${relatedBilling[0].id}` : "/facturacion" }]
       : []),
+    ...(canPrintDxSinReparacion
+      ? [{ label: "Hoja DX sin reparación", href: `/documentos/dx-sin-reparacion/${row.id}` }]
+      : []),
   ];
 
   const headerAssignmentForm = showInitialAssignment ? (
@@ -284,6 +297,23 @@ export default async function OperacionDetallePage({ params }: { params: Promise
           <input type="hidden" name="version" value={row.version} />
           <Button type="submit">Iniciar trabajo</Button>
         </form>
+      );
+    } else if (canWork && row.kind === "DIAGNOSTICO" && row.attention.attentionType === "DIAGNOSTICO" && ["EN_DIAGNOSTICO", "DEVUELTO"].includes(row.status)) {
+      primaryAction = (
+        <div className="flex flex-wrap items-center gap-2">
+          <form action={finishDiagnosisAction} className="inline">
+            <input type="hidden" name="caseId" value={row.id} />
+            <input type="hidden" name="version" value={row.version} />
+            <Button type="submit">Concluir diagnóstico</Button>
+          </form>
+          <DiagnosisNoRepairActions
+            caseId={row.id}
+            version={row.version}
+            markNoRepairAction={markDiagnosisNoRepairAction}
+            marked={dxSinReparacion}
+            markedReason={row.noRepairReason}
+          />
+        </div>
       );
     } else if (canWork && row.kind === "DIAGNOSTICO" && ["EN_DIAGNOSTICO", "DEVUELTO"].includes(row.status)) {
       primaryAction = (

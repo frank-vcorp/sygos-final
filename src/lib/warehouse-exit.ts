@@ -1,6 +1,11 @@
 import { prisma } from "@/lib/db";
 import type { Custody } from "@/lib/custody";
 import { receiptReasonFromAttention } from "@/lib/custody";
+import {
+  dxNoRepairPickupSheetLabel,
+  findValidatedNoRepairDiagnosis,
+  isNormalDiagnosisPriority,
+} from "./diagnosis-no-repair";
 
 const CLOSED_CASE = new Set(["VALIDADO", "TERMINADA", "SIN_REPARACION"]);
 
@@ -58,10 +63,11 @@ export function resolveAlmacenExitAttentionType(input: {
   return null;
 }
 
-/** Rol almacén: OS terminada en la atención vigente habilita salida definitiva aunque el tipo siga siendo diagnóstico. */
+/** Rol almacén: OS terminada o DX sin reparación validado habilitan salida definitiva. */
 export function resolveAlmacenWarehouseExit(input: {
   custody: Custody;
   hasOsForDelivery: boolean;
+  hasNoRepairDxDelivery: boolean;
   canDefinitiveExit: boolean;
   definitiveBlockedMessage: string | null;
   attentionType: string | null;
@@ -74,7 +80,7 @@ export function resolveAlmacenWarehouseExit(input: {
       blockedMessage: "El equipo debe estar en resguardo para registrar la salida.",
     };
   }
-  if (input.hasOsForDelivery) {
+  if (input.hasOsForDelivery || input.hasNoRepairDxDelivery) {
     return {
       exitKind: "definitive",
       blockedMessage: input.canDefinitiveExit
@@ -160,18 +166,31 @@ export async function loadWarehouseExitContext(input: {
   const osForDelivery =
     osCase && (!input.openAttentionId || osCase.attentionId === input.openAttentionId) ? osCase : null;
 
+  const noRepairDxForDelivery =
+    !osForDelivery && input.openAttentionId
+      ? await findValidatedNoRepairDiagnosis({
+        equipmentId: input.equipmentId,
+        serviceCompanyId: input.companyId,
+        attentionId: input.openAttentionId,
+      })
+      : !osForDelivery
+        ? await findValidatedNoRepairDiagnosis({
+          equipmentId: input.equipmentId,
+          serviceCompanyId: input.companyId,
+        })
+        : null;
+
   let canDefinitiveExit = false;
   let definitiveBlockedMessage: string | null = null;
   let enablingDocumentLabel: string | null = null;
   let technicalCaseId: string | null = null;
   let definitiveReason = "Reparación";
   let osBillingDocument: Awaited<ReturnType<typeof findEnablingBillingDocument>> = null;
+  let dxCaseVersion: number | null = null;
 
   if (input.custody !== "EN_RESGUARDO") {
     definitiveBlockedMessage = "La salida definitiva aplica con el equipo en resguardo.";
-  } else if (!osForDelivery) {
-    definitiveBlockedMessage = "No hay una orden de servicio terminada para entregar.";
-  } else {
+  } else if (osForDelivery) {
     technicalCaseId = osForDelivery.id;
     const expectedReason = receiptReasonFromAttention(osForDelivery.attention.attentionType);
     definitiveReason = expectedReason ?? "Reparación";
@@ -188,6 +207,25 @@ export async function loadWarehouseExitContext(input: {
     } else {
       definitiveBlockedMessage = "Falta remisión o factura emitida, o solicitar autorización al CEO desde almacén o ventas.";
     }
+  } else if (noRepairDxForDelivery) {
+    technicalCaseId = noRepairDxForDelivery.id;
+    dxCaseVersion = noRepairDxForDelivery.version;
+    definitiveReason = receiptReasonFromAttention(noRepairDxForDelivery.attention.attentionType) ?? "Diagnóstico";
+    if (isNormalDiagnosisPriority(noRepairDxForDelivery.attention.priorityName, noRepairDxForDelivery.attention.priorityPrice)) {
+      canDefinitiveExit = true;
+      enablingDocumentLabel = dxNoRepairPickupSheetLabel(noRepairDxForDelivery.folio);
+    } else {
+      const billing = await findEnablingBillingDocument(noRepairDxForDelivery.id);
+      osBillingDocument = billing;
+      if (billing) {
+        canDefinitiveExit = true;
+        enablingDocumentLabel = `${billing.kind} ${billing.folio}`;
+      } else {
+        definitiveBlockedMessage = "Falta remisión o factura emitida por la prioridad del diagnóstico sin reparación.";
+      }
+    }
+  } else {
+    definitiveBlockedMessage = "No hay una orden de servicio terminada ni un diagnóstico sin reparación validado para entregar.";
   }
 
   const diagnosisForTest = await findDiagnosisCaseForTestExit(
@@ -236,6 +274,7 @@ export async function loadWarehouseExitContext(input: {
     const almacenExit = resolveAlmacenWarehouseExit({
       custody: input.custody,
       hasOsForDelivery: Boolean(osForDelivery),
+      hasNoRepairDxDelivery: Boolean(noRepairDxForDelivery),
       canDefinitiveExit,
       definitiveBlockedMessage,
       attentionType,
@@ -263,7 +302,7 @@ export async function loadWarehouseExitContext(input: {
     definitiveBlockedMessage,
     enablingDocumentLabel,
     technicalCaseId,
-    osCaseVersion: osForDelivery?.version ?? null,
+    osCaseVersion: osForDelivery?.version ?? dxCaseVersion,
     exitWithoutDocumentPending,
     exitWithoutDocumentAuthorized,
     canRequestExitWithoutDocument,
@@ -303,17 +342,28 @@ export function isOsDefinitiveCustodyExit(movement: { kind: string; reason: stri
 
 export async function assertDefinitiveWarehouseExit(technicalCaseId: string, equipmentId: string) {
   const row = await prisma.technicalCase.findFirst({
-    where: { id: technicalCaseId, equipmentId, kind: "OS", status: "TERMINADA" },
-    include: { equipment: true },
+    where: { id: technicalCaseId, equipmentId },
+    include: { equipment: true, attention: true },
   });
-  if (!row) throw new Error("La salida definitiva requiere una OS terminada de este equipo.");
+  if (!row) throw new Error("No se encontró la operación para esta salida.");
   if (row.equipment.custody !== "EN_RESGUARDO") {
     throw new Error("El equipo debe estar en resguardo para registrar la salida.");
   }
-  const billing = await findEnablingBillingDocument(row.id);
-  if (billing) return { enablingDocument: `${billing.kind} ${billing.folio}` };
-  if (definitiveExitAuthorized(row)) return { enablingDocument: "Salida autorizada CEO" };
-  throw new Error("No hay documento emitido ni autorización del CEO para esta salida.");
+  if (row.kind === "OS" && row.status === "TERMINADA") {
+    const billing = await findEnablingBillingDocument(row.id);
+    if (billing) return { enablingDocument: `${billing.kind} ${billing.folio}` };
+    if (definitiveExitAuthorized(row)) return { enablingDocument: "Salida autorizada CEO" };
+    throw new Error("No hay documento emitido ni autorización del CEO para esta salida.");
+  }
+  if (row.kind === "DIAGNOSTICO" && row.status === "VALIDADO" && row.noRepairAt) {
+    if (isNormalDiagnosisPriority(row.attention.priorityName, row.attention.priorityPrice)) {
+      return { enablingDocument: dxNoRepairPickupSheetLabel(row.folio) };
+    }
+    const billing = await findEnablingBillingDocument(row.id);
+    if (billing) return { enablingDocument: `${billing.kind} ${billing.folio}` };
+    throw new Error("Falta remisión o factura emitida por la prioridad del diagnóstico sin reparación.");
+  }
+  throw new Error("La salida definitiva requiere una OS terminada o un diagnóstico sin reparación validado.");
 }
 
 export async function assertTestWarehouseExit(equipmentId: string, serviceCompanyId: string) {

@@ -13,6 +13,7 @@ import {
   finishDiagnosis,
   finishRepair,
   issuePartRequest,
+  markDiagnosisNoRepair,
   markRepairPaid,
   overrideWarranty,
   receivePartRequest,
@@ -68,6 +69,21 @@ export async function logAction(formData: FormData) {
 export async function finishDiagnosisAction(formData: FormData) {
   "use server";
   await run(formData, (session) => finishDiagnosis(session, requiredText(formData.get("caseId"), "Operación"), parseVersion(formData.get("version"))), "Diagnóstico terminado.");
+}
+
+export async function markDiagnosisNoRepairAction(formData: FormData) {
+  "use server";
+  await run(
+    formData,
+    (session) =>
+      markDiagnosisNoRepair(
+        session,
+        requiredText(formData.get("caseId"), "Operación"),
+        parseVersion(formData.get("version")),
+        requiredText(formData.get("reason"), "Motivo"),
+      ),
+    "Sin reparación registrado en el diagnóstico.",
+  );
 }
 
 export async function validateAction(formData: FormData) {

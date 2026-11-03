@@ -27,6 +27,8 @@ import {
 
 export { CASE_STATUS_LABEL };
 
+export { markDiagnosisNoRepair } from "./diagnosis-no-repair";
+
 const DIAGNOSIS_TYPES = new Set(["DIAGNOSTICO", "DIAGNOSTICO_GARANTIA"]);
 
 const CLOSED_TECHNICAL_STATUSES = ["VALIDADO", "TERMINADA", "SIN_REPARACION"] as const;
@@ -276,7 +278,8 @@ export async function finishDiagnosis(actor: Actor, caseId: string, version: num
   const servomotores = row.serviceCompany.code === "SERVOMOTORES";
   const status = servomotores ? "VALIDADO" : "PENDIENTE_VALIDACION";
   // Todo Diagnóstico normal termina en una cotización; la prioridad solo conserva precio/SLA.
-  const quotePending = servomotores && row.attention.attentionType === "DIAGNOSTICO";
+  const noRepair = Boolean(row.noRepairAt);
+  const quotePending = servomotores && row.attention.attentionType === "DIAGNOSTICO" && !noRepair;
   const updated = await prisma.technicalCase.updateMany({
     where: { id: row.id, version },
     data: {
@@ -300,6 +303,9 @@ export async function finishDiagnosis(actor: Actor, caseId: string, version: num
   if (quotePending) {
     const { ensureQuoteFromCase } = await import("./quotes");
     await ensureQuoteFromCase(actor, row.id);
+  } else if (servomotores && noRepair && row.attention.attentionType === "DIAGNOSTICO") {
+    const { applyDiagnosisNoRepairAfterValidation } = await import("./diagnosis-no-repair");
+    await applyDiagnosisNoRepairAfterValidation(actor, row.id);
   }
 }
 
@@ -332,7 +338,8 @@ export async function validateDiagnosis(actor: Actor, caseId: string, version: n
   const warrantyDecision = decision === "VALIDA" || decision === "NO_PROCEDENTE" ? decision : null;
   if (warranty && !warrantyDecision) throw new Error("Indica si la garantía procede.");
   // La validación de cualquier Diagnóstico normal entrega el pendiente de precio a CEO/Administrador.
-  const quotePending = row.attention.attentionType === "DIAGNOSTICO";
+  const noRepair = Boolean(row.noRepairAt);
+  const quotePending = row.attention.attentionType === "DIAGNOSTICO" && !noRepair;
   const updated = await prisma.technicalCase.updateMany({
     where: { id: row.id, version },
     data: {
@@ -357,6 +364,9 @@ export async function validateDiagnosis(actor: Actor, caseId: string, version: n
   if (!warranty && quotePending) {
     const { ensureQuoteFromCase } = await import("./quotes");
     await ensureQuoteFromCase(actor, row.id);
+  } else if (!warranty && noRepair && row.attention.attentionType === "DIAGNOSTICO") {
+    const { applyDiagnosisNoRepairAfterValidation } = await import("./diagnosis-no-repair");
+    await applyDiagnosisNoRepairAfterValidation(actor, row.id);
   }
 }
 
@@ -449,7 +459,7 @@ export async function reopenCase(actor: Actor, caseId: string, version: number, 
   const next = row.kind === "DIAGNOSTICO" ? "EN_DIAGNOSTICO" : "EN_REPARACION";
   const updated = await prisma.technicalCase.updateMany({
     where: { id: row.id, version },
-    data: { status: next, quotePending: false, version: { increment: 1 } },
+    data: { status: next, quotePending: false, noRepairAt: null, noRepairReason: null, noRepairByUserId: null, version: { increment: 1 } },
   });
   if (updated.count === 0) throw new ConcurrencyError();
   await recordHistory({
