@@ -569,19 +569,35 @@ async function Sales({
       select: { technicalCaseId: true },
       take: 100,
     }),
-    prisma.technicalCase.findMany({
-      where: {
-        serviceCompanyId: companyId,
-        kind: "DIAGNOSTICO",
-        status: "VALIDADO",
-        noRepairAt: { not: null },
-        attention: { attentionType: "DIAGNOSTICO" },
-        equipment: { client: { ownerUserId: userId, isSystem: false } },
-        billingDocuments: { some: { status: { in: ["SOLICITADA", "ERROR_FISCAL"] } } },
-      },
-      select: { folio: true },
-      take: 100,
-    }),
+    (async () => {
+      const pendingBillingCaseIds = (
+        await prisma.billingDocument.findMany({
+          where: {
+            companyId,
+            status: { in: ["SOLICITADA", "ERROR_FISCAL"] },
+            technicalCaseId: { not: null },
+          },
+          select: { technicalCaseId: true },
+          take: 200,
+        })
+      )
+        .map((row) => row.technicalCaseId)
+        .filter((id): id is string => Boolean(id));
+      if (pendingBillingCaseIds.length === 0) return [];
+      return prisma.technicalCase.findMany({
+        where: {
+          id: { in: [...new Set(pendingBillingCaseIds)] },
+          serviceCompanyId: companyId,
+          kind: "DIAGNOSTICO",
+          status: "VALIDADO",
+          noRepairAt: { not: null },
+          attention: { attentionType: "DIAGNOSTICO" },
+          equipment: { client: { ownerUserId: userId, isSystem: false } },
+        },
+        select: { folio: true },
+        take: 100,
+      });
+    })(),
   ]);
 
   const overdueBalance = receivables
