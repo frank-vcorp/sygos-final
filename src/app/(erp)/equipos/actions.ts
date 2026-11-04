@@ -7,6 +7,7 @@ import { setFlash } from "@/lib/flash";
 import { clientIdFromForm, supplierIdFromForm } from "@/lib/form-quick-entities";
 import { optionalText, parseVersion, requiredText } from "@/lib/form";
 import { can, type Action } from "@/lib/permissions";
+import { isReparacionExpressAttentionType } from "@/lib/priorities";
 import { requireCompany } from "@/lib/session";
 
 async function guard(action: Action) {
@@ -56,6 +57,7 @@ export async function createMotAction(formData: FormData) {
       throw new Error("Ventas no abre servicios manualmente; el servicio se genera al confirmar el ingreso en Almacén.");
     }
     const { clientId } = await clientIdFromForm(session, formData);
+    const attentionType = requiredText(formData.get("attentionType"), "Tipo de atención");
     const equipment = await createMot(session, {
       clientId,
       typeName: requiredText(formData.get("typeName") ?? formData.get("newType"), "Tipo"),
@@ -63,8 +65,10 @@ export async function createMotAction(formData: FormData) {
       model: requiredText(formData.get("model"), "Modelo"),
       description: optionalText(formData.get("description")),
       serial: optionalText(formData.get("serial")),
-      attentionType: requiredText(formData.get("attentionType"), "Tipo de atención"),
-      priorityId: requiredText(formData.get("priorityId"), "Prioridad"),
+      attentionType,
+      priorityId: isReparacionExpressAttentionType(attentionType)
+        ? optionalText(formData.get("priorityId"))
+        : requiredText(formData.get("priorityId"), "Prioridad"),
       reportedFault: requiredText(formData.get("reportedFault"), "Falla reportada"),
       antecedent: optionalText(formData.get("antecedent")),
       deliveryInstructions: optionalText(formData.get("deliveryInstructions")),
@@ -85,10 +89,13 @@ export async function createAttentionAction(formData: FormData) {
   const back = equipmentId ? (kind === "MOT" ? `/motores/${equipmentId}` : `/equipos/${equipmentId}`) : "/inicio";
   try {
     const session = await guard("attention.create");
+    const attentionType = requiredText(formData.get("attentionType"), "Tipo de atención");
     await createAttention(session, {
       equipmentId: requiredText(formData.get("equipmentId"), "Equipo"),
-      attentionType: requiredText(formData.get("attentionType"), "Tipo de atención"),
-      priorityId: requiredText(formData.get("priorityId"), "Prioridad"),
+      attentionType,
+      priorityId: isReparacionExpressAttentionType(attentionType)
+        ? optionalText(formData.get("priorityId"))
+        : requiredText(formData.get("priorityId"), "Prioridad"),
       reportedFault: requiredText(formData.get("reportedFault"), "Falla reportada"),
       antecedent: optionalText(formData.get("antecedent")),
       deliveryInstructions: optionalText(formData.get("deliveryInstructions")),

@@ -9,8 +9,8 @@ import {
   type StackedStatus,
 } from "@/lib/servicios-bandeja";
 import { compareBySla } from "@/lib/sla";
+import { isReparacionExpressAttentionType, type AttentionType } from "@/lib/priorities";
 import { parseServiciosDateBoundary, SERVICIO_TIPO_PARAM, type ServicioTipoParam } from "@/lib/servicios-catalog";
-import type { AttentionType } from "@/lib/priorities";
 
 export const CLOSED_CASE = ["VALIDADO", "TERMINADA", "SIN_REPARACION"] as const;
 export const HISTORIAL_CASE = [...CLOSED_CASE, "CANCELADA"] as const;
@@ -144,6 +144,7 @@ export type ServicioBandejaRow = {
   slaStartedAt: Date | null;
   attentionCreatedAt: Date;
   priorityName: string;
+  attentionType: string;
   createdAt: Date;
   closedAt: Date | null;
   /** Estatus técnico crudo del caso principal (filtros historial). */
@@ -168,6 +169,9 @@ export type SupervisorServicioRow = ServicioBandejaRow | CancelledServicioBandej
 
 export function servicioRowHighlight(row: SupervisorServicioRow, now = Date.now()) {
   if (row.kind === "cancelado") {
+    return { wrapClass: "", markers: [] as string[] };
+  }
+  if (isReparacionExpressAttentionType(row.attentionType)) {
     return { wrapClass: "", markers: [] as string[] };
   }
   const overdue = row.slaDueAt != null && row.slaDueAt.getTime() < now;
@@ -289,6 +293,7 @@ function buildServicioRow(
     slaStartedAt: primary.attention.slaStartedAt,
     attentionCreatedAt: primary.attention.createdAt,
     priorityName: primary.attention.priorityName,
+    attentionType: primary.attention.attentionType,
     createdAt: primary.createdAt,
     closedAt: primary.validatedAt ?? primary.updatedAt,
     primaryStatus: technicalSource.status,
@@ -453,8 +458,18 @@ export async function listActiveServicios(
   const rows = await mapCasesToBandejaRows(companyId, cases as CaseRecord[]);
   return rows.sort((a, b) =>
     compareBySla(
-      { slaDueAt: a.slaDueAt, slaStartedAt: a.slaStartedAt, createdAt: a.createdAt },
-      { slaDueAt: b.slaDueAt, slaStartedAt: b.slaStartedAt, createdAt: b.createdAt },
+      {
+        slaDueAt: a.slaDueAt,
+        slaStartedAt: a.slaStartedAt,
+        createdAt: a.createdAt,
+        express: isReparacionExpressAttentionType(a.attentionType),
+      },
+      {
+        slaDueAt: b.slaDueAt,
+        slaStartedAt: b.slaStartedAt,
+        createdAt: b.createdAt,
+        express: isReparacionExpressAttentionType(b.attentionType),
+      },
     ),
   );
 }

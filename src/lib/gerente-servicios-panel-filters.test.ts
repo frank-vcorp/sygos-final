@@ -28,6 +28,7 @@ function row(partial: Partial<ServicioBandejaRow> & Pick<ServicioBandejaRow, "id
     slaStartedAt: null,
     attentionCreatedAt: new Date(),
     priorityName: "Normal",
+    attentionType: "DIAGNOSTICO",
     createdAt: new Date(),
     closedAt: null,
     primaryStatus: "EN_PROCESO",
@@ -54,6 +55,7 @@ describe("filterServicioBandejaForGerentePanel", () => {
   it("filtra vencidos y compras por folio", () => {
     const rows = [
       row({ id: "v", slaDueAt: new Date(0) }),
+      row({ id: "express", attentionType: "REPARACION", slaDueAt: new Date(0) }),
       row({ id: "c", osFolio: "OS-9" }),
     ];
     assert.equal(filterServicioBandejaForGerentePanel(rows, "vencidos", ctx).length, 1);

@@ -113,7 +113,12 @@ export function formatSlaCountdown(dueAt: Date, now = Date.now()): SlaCountdown 
   return { text: "Vencido", overdue: true };
 }
 
-export function compareBySla<T extends { slaDueAt: Date | null; slaStartedAt: Date | null; createdAt: Date }>(a: T, b: T, now = Date.now()): number {
+export function compareBySla<
+  T extends { slaDueAt: Date | null; slaStartedAt: Date | null; createdAt: Date; express?: boolean },
+>(a: T, b: T, now = Date.now()): number {
+  const aExpress = a.express === true;
+  const bExpress = b.express === true;
+  if (aExpress !== bExpress) return aExpress ? -1 : 1;
   const aOver = a.slaDueAt != null && a.slaDueAt.getTime() < now;
   const bOver = b.slaDueAt != null && b.slaDueAt.getTime() < now;
   if (aOver !== bOver) return aOver ? -1 : 1;

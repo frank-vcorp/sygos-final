@@ -77,6 +77,7 @@ export default async function NuevoServicioPage({
         allowQuickEquipment={quickEquipmentKinds.length > 0}
         quickEquipmentKinds={quickEquipmentKinds}
         warranty={warranty}
+        hidePriority={attentionType === "REPARACION"}
       />
     </>
   );

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { isReparacionExpressAttentionType } from "@/lib/priorities";
 import { partRequestNeedsSupply } from "@/lib/part-inventory";
 import type { ServicioBandejaRow } from "@/lib/servicios-supervisor";
 
@@ -71,7 +72,12 @@ export function filterServicioBandejaForGerentePanel(
     case "validacion":
       return rows.filter((row) => row.primaryStatus === "PENDIENTE_VALIDACION");
     case "vencidos":
-      return rows.filter((row) => row.slaDueAt != null && row.slaDueAt.getTime() < ctx.now);
+      return rows.filter(
+        (row) =>
+          !isReparacionExpressAttentionType(row.attentionType)
+          && row.slaDueAt != null
+          && row.slaDueAt.getTime() < ctx.now,
+      );
     case "refacciones":
       return rows.filter((row) => ctx.refaccionAttentionIds.has(row.id));
     case "compras":

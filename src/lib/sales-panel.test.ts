@@ -37,6 +37,7 @@ function row(partial: Partial<ServicioBandejaRow>): ServicioBandejaRow {
     slaStartedAt: null,
     attentionCreatedAt: new Date(),
     priorityName: "Normal",
+    attentionType: "DIAGNOSTICO",
     createdAt: new Date(),
     closedAt: null,
     primaryStatus: "VALIDADO",

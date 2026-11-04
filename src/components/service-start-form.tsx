@@ -24,6 +24,7 @@ export function ServiceStartForm({
   allowQuickEquipment = true,
   quickEquipmentKinds,
   warranty,
+  hidePriority = false,
 }: {
   action: (formData: FormData) => void | Promise<void>;
   attentionType: string;
@@ -40,6 +41,7 @@ export function ServiceStartForm({
   allowQuickEquipment?: boolean;
   quickEquipmentKinds?: Array<"EQUI" | "MOT">;
   warranty: boolean;
+  hidePriority?: boolean;
 }) {
   const [clientId, setClientId] = useState(defaultClientId);
 
@@ -78,15 +80,17 @@ export function ServiceStartForm({
 
         <FormBlock
           title="2. Datos del servicio"
-          description="Define la prioridad y describe el motivo del ingreso."
+          description={hidePriority ? "Describe el motivo del ingreso." : "Define la prioridad y describe el motivo del ingreso."}
           columns={1}
         >
-          <Field label="Prioridad">
-            <select name="priorityId" required className={controlClass}>
-              <option value="">Selecciona</option>
-              {priorities.map((priority) => <option key={priority.id} value={priority.id}>{priority.name}</option>)}
-            </select>
-          </Field>
+          {hidePriority ? null : (
+            <Field label="Prioridad">
+              <select name="priorityId" required className={controlClass}>
+                <option value="">Selecciona</option>
+                {priorities.map((priority) => <option key={priority.id} value={priority.id}>{priority.name}</option>)}
+              </select>
+            </Field>
+          )}
           <Field label="Falla reportada" hint="Describe el síntoma o problema que reporta el cliente.">
             <textarea name="reportedFault" required rows={4} className={controlClass} />
           </Field>
@@ -115,7 +119,7 @@ export function ServiceStartForm({
           </div>
         </details>
       </div>
-      <FormActions note="Primero guarda la identificación del equipo; el SLA inicia con la entrada física en Almacén.">
+      <FormActions note={hidePriority ? "Primero guarda la identificación del equipo; la orden entra directo sin plazo SLA." : "Primero guarda la identificación del equipo; el SLA inicia con la entrada física en Almacén."}>
         <Button type="submit">Crear servicio</Button>
       </FormActions>
     </FormPanel>

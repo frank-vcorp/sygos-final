@@ -19,7 +19,7 @@ describe("custodia física", () => {
   it("toma el motivo de entrada del catálogo del almacén", () => {
     assert.deepEqual(reasonsFor("ENTRADA"), [
       "Diagnóstico",
-      "Reparación",
+      "Reparación Express",
       "Diagnóstico de Garantía",
       "Venta de equipo",
       "Retorno de proveedor",
@@ -34,7 +34,7 @@ describe("custodia física", () => {
     assert.equal(isInitialWarehouseReceipt("EQUI", "SIN_CUSTODIA", "ENTRADA"), true);
     assert.equal(isInitialWarehouseReceipt("EQUI", "FUERA", "ENTRADA"), false);
     assert.equal(receiptReasonFromAttention("DIAGNOSTICO"), "Diagnóstico");
-    assert.equal(receiptReasonFromAttention("REPARACION"), "Reparación");
+    assert.equal(receiptReasonFromAttention("REPARACION"), "Reparación Express");
   });
 
   it("no simula retorno si el equipo permanece fuera después de la prueba", () => {

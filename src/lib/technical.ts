@@ -12,6 +12,7 @@ type Actor = {
 };
 
 import { CASE_STATUS_LABEL } from "./case-labels";
+import { isReparacionExpressAttentionType } from "./priorities";
 import { buildPartSearchKey } from "./inventory-search";
 import {
   createPartRequestWithReservation,
@@ -80,7 +81,9 @@ export async function openCase(attentionId: string, receivedAt: Date) {
         kind: diagnosis ? "DIAGNOSTICO" : "OS",
         status: "EN_ESPERA",
         originalCaseId: attention.originalCaseId,
-        slaDueAt: addBusinessDays(receivedAt, attention.prioritySlaMaxDays),
+        slaDueAt: isReparacionExpressAttentionType(attention.attentionType)
+          ? null
+          : addBusinessDays(receivedAt, attention.prioritySlaMaxDays),
       },
     });
     if (attention.initialLog?.trim() && attention.createdByUserId) {

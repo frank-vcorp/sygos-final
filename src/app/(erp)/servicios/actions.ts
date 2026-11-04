@@ -30,6 +30,9 @@ export async function startServiceAction(formData: FormData) {
     if (!clientId && !equipmentId) {
       ({ clientId } = await clientIdFromForm(session, formData));
     }
+    const priorityId = attentionType === "REPARACION"
+      ? optionalText(formData.get("priorityId"))
+      : requiredText(formData.get("priorityId"), "Prioridad");
     const attention = await startService(session, {
       attentionType,
       clientId,
@@ -41,14 +44,19 @@ export async function startServiceAction(formData: FormData) {
       typeName: null,
       brandName: null,
       serial: null,
-      priorityId: requiredText(formData.get("priorityId"), "Prioridad"),
+      priorityId,
       reportedFault: requiredText(formData.get("reportedFault"), "Falla reportada"),
       antecedent: optionalText(formData.get("antecedent")),
       originalCaseId: optionalText(formData.get("originalCaseId")),
       initialLog: optionalText(formData.get("initialLog")),
     });
     const equipment = await import("@/lib/db").then(({ prisma }) => prisma.equipment.findUnique({ where: { id: attention.equipmentId } }));
-    await setFlash({ tone: "ok", message: "Servicio abierto. El SLA inicia cuando se confirme la entrada física." });
+    await setFlash({
+      tone: "ok",
+      message: attentionType === "REPARACION"
+        ? "Reparación Express abierta. Entra directo sin plazo SLA."
+        : "Servicio abierto. El SLA inicia cuando se confirme la entrada física.",
+    });
     redirect(equipment?.kind === "MOT" ? `/motores/${attention.equipmentId}` : `/equipos/${attention.equipmentId}`);
   } catch (error) {
     if (typeof error === "object" && error !== null && "digest" in error && String((error as { digest?: string }).digest).startsWith("NEXT_REDIRECT")) throw error;

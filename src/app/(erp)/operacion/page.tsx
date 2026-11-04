@@ -6,6 +6,7 @@ import { homePath } from "@/lib/home";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { compareBySla } from "@/lib/sla";
+import { isReparacionExpressAttentionType } from "@/lib/priorities";
 import { serviciosBandejaHref } from "@/lib/servicios-catalog";
 import { openOperationCaseWhere } from "@/lib/servicios-supervisor";
 import { CASE_STATUS_LABEL } from "@/lib/technical";
@@ -50,7 +51,12 @@ export default async function OperacionPage({ searchParams }: { searchParams: Pr
     take: 200,
   });
   const ordered = rows
-    .map((row) => ({ ...row, slaStartedAt: row.attention.slaStartedAt, createdAt: row.createdAt }))
+    .map((row) => ({
+      ...row,
+      slaStartedAt: row.attention.slaStartedAt,
+      createdAt: row.createdAt,
+      express: isReparacionExpressAttentionType(row.attention.attentionType),
+    }))
     .sort((a, b) => compareBySla(a, b));
   const tabs = [
     ["activas", "Activas"],
@@ -75,7 +81,7 @@ export default async function OperacionPage({ searchParams }: { searchParams: Pr
           <tbody>
             {ordered.map((row) => {
               const readOnly = row.serviceCompanyId !== session.activeCompanyId;
-              const overdue = row.slaDueAt != null && row.slaDueAt.getTime() < Date.now();
+              const overdue = !row.express && row.slaDueAt != null && row.slaDueAt.getTime() < Date.now();
               return (
                 <tr key={row.id}>
                   <Td><RecordLink href={`/operacion/${row.id}`}>{row.folio}</RecordLink>{readOnly ? " · lectura" : ""}</Td>
@@ -83,15 +89,20 @@ export default async function OperacionPage({ searchParams }: { searchParams: Pr
                   <Td><Badge tone={overdue ? "warn" : "neutral"}>{CASE_STATUS_LABEL[row.status] ?? row.status}</Badge></Td>
                   <Td>{row.attention.priorityName}</Td>
                   <Td>{row.externalSupplierId ? "Servicio externo" : row.assignee?.name ?? "Sin asignar"}</Td>
-                  <Td><SlaCountdown dueAt={row.slaDueAt} /></Td>
+                  <Td>
+                    <SlaCountdown
+                      dueAt={row.slaDueAt}
+                      express={row.express}
+                    />
+                  </Td>
                 </tr>
               );
             })}
           </tbody>
         </Table>} cards={ordered.map((row) => {
           const readOnly = row.serviceCompanyId !== session.activeCompanyId;
-          const overdue = row.slaDueAt != null && row.slaDueAt.getTime() < Date.now();
-          return <MobileCard key={row.id} href={`/operacion/${row.id}`} title={`${row.folio}${readOnly ? " · lectura" : ""}`} meta={<Badge tone={overdue ? "warn" : "neutral"}>{CASE_STATUS_LABEL[row.status] ?? row.status}</Badge>}><p>{row.equipment.folio} · {row.equipment.model}</p><p>{row.attention.priorityName} · {row.externalSupplierId ? "Servicio externo" : row.assignee?.name ?? "Sin asignar"}</p><p>SLA: <SlaCountdown dueAt={row.slaDueAt} /></p></MobileCard>;
+          const overdue = !row.express && row.slaDueAt != null && row.slaDueAt.getTime() < Date.now();
+          return <MobileCard key={row.id} href={`/operacion/${row.id}`} title={`${row.folio}${readOnly ? " · lectura" : ""}`} meta={<Badge tone={overdue ? "warn" : "neutral"}>{CASE_STATUS_LABEL[row.status] ?? row.status}</Badge>}><p>{row.equipment.folio} · {row.equipment.model}</p><p>{row.attention.priorityName} · {row.externalSupplierId ? "Servicio externo" : row.assignee?.name ?? "Sin asignar"}</p><p>SLA: <SlaCountdown dueAt={row.slaDueAt} express={row.express} /></p></MobileCard>;
         })} />
       )}
     </>

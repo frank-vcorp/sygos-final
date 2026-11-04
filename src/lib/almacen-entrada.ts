@@ -1,5 +1,5 @@
 import { receiptReasonFromAttention, type MovementKind } from "@/lib/custody";
-import { ATTENTION_LABEL, type AttentionType } from "@/lib/priorities";
+import { ATTENTION_LABEL, REPARACION_RECEIPT_REASON, type AttentionType } from "@/lib/priorities";
 import { serviceSeries } from "@/lib/servicios-catalog";
 
 type EntradaAttention = {
@@ -74,11 +74,11 @@ export function buildAlmacenEntradaPreset(input: {
     };
   }
   if (input.quoteType === "REPARACION" || input.quoteType === "DIAGNOSTICO") {
-    const reason = input.quoteType === "REPARACION" ? "Reparación" : "Diagnóstico";
+    const reason = input.quoteType === "REPARACION" ? REPARACION_RECEIPT_REASON : "Diagnóstico";
     return {
       movement,
       reason,
-      serviceLabel: input.quoteType === "REPARACION" ? "Reparación" : "Diagnóstico",
+      serviceLabel: input.quoteType === "REPARACION" ? ATTENTION_LABEL.REPARACION : "Diagnóstico",
       reportedFault: input.quoteConcept ?? "Servicio autorizado",
       clientName: input.clientName,
     };

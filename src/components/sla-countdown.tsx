@@ -15,15 +15,17 @@ function tickIntervalMs(dueMs: number, now: number) {
 export function SlaCountdown({
   dueAt,
   className,
+  express,
 }: {
   dueAt: Date | string | null | undefined;
   className?: string;
+  express?: boolean;
 }) {
   const ms = dueAt != null ? dueMs(dueAt) : null;
   const [now, setNow] = useState(() => Date.now());
 
   useEffect(() => {
-    if (ms == null || Number.isNaN(ms)) return;
+    if (express || ms == null || Number.isNaN(ms)) return;
     let id = 0;
     const schedule = () => {
       const next = tickIntervalMs(ms, Date.now());
@@ -34,7 +36,11 @@ export function SlaCountdown({
     };
     schedule();
     return () => window.clearTimeout(id);
-  }, [ms]);
+  }, [express, ms]);
+
+  if (express) {
+    return <span className={`font-semibold text-[#b42318] ${className ?? ""}`}>Express</span>;
+  }
 
   if (dueAt == null || ms == null || Number.isNaN(ms)) {
     return <span className={className}>—</span>;

@@ -5,7 +5,7 @@ import { allocateFolio } from "./folios";
 import { ConcurrencyError } from "./form";
 import { recordHistory } from "./history";
 import { rememberCatalog } from "./catalog";
-import { isAttentionType, type AttentionType } from "./priorities";
+import { isAttentionType, isReparacionExpressAttentionType, REPARACION_RECEIPT_REASON, reparacionExpressFrozenPriority, type AttentionType } from "./priorities";
 import { SALES_NOT_ASSIGNED_MESSAGE } from "./sales-assignment";
 import { assertDefinitiveWarehouseExit, assertTestWarehouseExit } from "./warehouse-exit";
 import { assertWarrantyOrigin, openCase, openPendingCases, resolveWarrantyOriginForEquipment } from "./technical";
@@ -34,6 +34,14 @@ async function freezePriority(companyId: string, attentionType: AttentionType, p
   });
   if (!priority) throw new Error("Selecciona una prioridad vigente de esta empresa para ese tipo de atención.");
   return priority;
+}
+
+async function resolveFrozenPriority(companyId: string, attentionType: AttentionType, priorityId: string | null | undefined) {
+  if (isReparacionExpressAttentionType(attentionType)) {
+    return reparacionExpressFrozenPriority();
+  }
+  if (!priorityId) throw new Error("Selecciona una prioridad vigente de esta empresa para ese tipo de atención.");
+  return freezePriority(companyId, attentionType, priorityId);
 }
 
 export async function createEqui(
@@ -127,7 +135,7 @@ export async function createMot(
     description: string | null;
     serial: string | null;
     attentionType: string;
-    priorityId: string;
+    priorityId?: string | null;
     reportedFault: string;
     antecedent: string | null;
     deliveryInstructions: string | null;
@@ -139,7 +147,7 @@ export async function createMot(
   if (!isAttentionType(input.attentionType)) throw new Error("Selecciona el tipo de atención.");
   const client = await ownClient(actor, input.clientId);
   const identity = await rememberCatalog(input.typeName, input.brand ?? "", input.model);
-  const priority = await freezePriority(actor.activeCompanyId, input.attentionType, input.priorityId);
+  const priority = await resolveFrozenPriority(actor.activeCompanyId, input.attentionType, input.priorityId);
   const servomotores = await prisma.company.findUnique({ where: { code: "SERVOMOTORES" } });
   if (!servomotores) throw new Error("Falta la empresa Servomotores.");
   const adminClient =
@@ -202,7 +210,7 @@ export async function createAttention(
   input: {
     equipmentId: string;
     attentionType: string;
-    priorityId: string;
+    priorityId?: string | null;
     reportedFault: string;
     antecedent: string | null;
     deliveryInstructions?: string | null;
@@ -231,7 +239,7 @@ export async function createAttention(
       if (!antecedent) antecedent = `Garantía sobre ${original.folio}`;
     }
   }
-  const priority = await freezePriority(actor.activeCompanyId, input.attentionType, input.priorityId);
+  const priority = await resolveFrozenPriority(actor.activeCompanyId, input.attentionType, input.priorityId);
   const service =
     equipment.kind === "MOT"
       ? await prisma.company.findUnique({ where: { code: "SERVOMOTORES" } })
@@ -318,7 +326,7 @@ export async function startService(
     typeName: string | null;
     brandName: string | null;
     serial: string | null;
-    priorityId: string;
+    priorityId?: string | null;
     reportedFault: string;
     antecedent: string | null;
     originalCaseId: string | null;
@@ -474,7 +482,10 @@ export async function registerMovement(
   if (receipt && attention?.status === "ABIERTA") {
     const expected = receiptReasonFromAttention(attention.attentionType);
     if (expected && input.reason !== expected) {
-      throw new Error(`El motivo debe ser «${expected}» según la atención abierta.`);
+      const legacyRepairReason = expected === REPARACION_RECEIPT_REASON && input.reason === "Reparación";
+      if (!legacyRepairReason) {
+        throw new Error(`El motivo debe ser «${expected}» según la atención abierta.`);
+      }
     }
   }
   const exitSeries = warehouseExitFolioSeries(input.kind);

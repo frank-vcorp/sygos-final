@@ -5,7 +5,7 @@ import { createAttentionAction } from "@/app/(erp)/equipos/actions";
 import { FormOverlayDialog } from "@/components/overlay-dialog";
 import { ClientNameLink } from "@/components/client-entity-links";
 import { Button, controlClass, Field } from "@/components/ui";
-import { ATTENTION_LABEL, ATTENTION_TYPES, type AttentionType } from "@/lib/priorities";
+import { ATTENTION_LABEL, ATTENTION_TYPES, isReparacionExpressAttentionType, type AttentionType } from "@/lib/priorities";
 
 type PriorityRow = { id: string; attentionType: string; name: string };
 
@@ -34,8 +34,11 @@ export function EquipmentAttentionLauncher({
   const [open, setOpen] = useState(false);
   const [attentionType, setAttentionType] = useState<AttentionType | "">("");
   const [reportedFault, setReportedFault] = useState("");
-  const priorityOptions = attentionType ? priorities.filter((row) => row.attentionType === attentionType) : [];
-  const canSubmit = Boolean(attentionType && reportedFault.trim());
+  const priorityOptions = attentionType && !isReparacionExpressAttentionType(attentionType)
+    ? priorities.filter((row) => row.attentionType === attentionType)
+    : [];
+  const expressType = attentionType ? isReparacionExpressAttentionType(attentionType) : false;
+  const canSubmit = Boolean(attentionType && reportedFault.trim() && (expressType || priorityOptions.length > 0));
 
   return (
     <>
@@ -77,14 +80,16 @@ export function EquipmentAttentionLauncher({
               ))}
             </select>
           </Field>
-          <Field label="Prioridad">
-            <select name="priorityId" required className={controlClass} disabled={!attentionType}>
-              <option value="">{attentionType ? "Selecciona" : "Elige el tipo primero"}</option>
-              {priorityOptions.map((row) => (
-                <option key={row.id} value={row.id}>{row.name}</option>
-              ))}
-            </select>
-          </Field>
+          {expressType ? null : (
+            <Field label="Prioridad">
+              <select name="priorityId" required className={controlClass} disabled={!attentionType}>
+                <option value="">{attentionType ? "Selecciona" : "Elige el tipo primero"}</option>
+                {priorityOptions.map((row) => (
+                  <option key={row.id} value={row.id}>{row.name}</option>
+                ))}
+              </select>
+            </Field>
+          )}
           <div className="flex flex-wrap justify-end gap-2">
             <Button type="button" tone="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
             <Button type="submit" disabled={!canSubmit}>Crear atención</Button>

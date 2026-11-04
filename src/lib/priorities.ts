@@ -3,9 +3,28 @@ export type AttentionType = (typeof ATTENTION_TYPES)[number];
 
 export const ATTENTION_LABEL: Record<AttentionType, string> = {
   DIAGNOSTICO: "Diagnóstico",
-  REPARACION: "Reparación",
+  REPARACION: "Reparación Express",
   DIAGNOSTICO_GARANTIA: "Diagnóstico de Garantía",
 };
+
+/** Motivo de entrada en almacén para atenciones REPARACION (Reparación Express). */
+export const REPARACION_RECEIPT_REASON = "Reparación Express";
+
+export function isReparacionExpressAttentionType(attentionType: string): boolean {
+  return attentionType === "REPARACION";
+}
+
+/** Prioridad congelada al alta de Reparación Express (sin catálogo ni SLA por días). */
+export function reparacionExpressFrozenPriority() {
+  return {
+    name: "Express",
+    price: null as number | null,
+    incrementPct: null as number | null,
+    targetMinDays: null as number | null,
+    targetMaxDays: null as number | null,
+    slaMaxDays: 0,
+  };
+}
 
 export function isAttentionType(value: string): value is AttentionType {
   return (ATTENTION_TYPES as readonly string[]).includes(value);

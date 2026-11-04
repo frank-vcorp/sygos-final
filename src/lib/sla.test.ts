@@ -19,6 +19,15 @@ describe("SLA", () => {
     assert.deepEqual(rows.map((row) => row.id), ["vencido", "cerca", "nuevo"]);
   });
 
+  it("prioriza filas express antes del resto del SLA", () => {
+    const now = Date.now();
+    const rows = [
+      { id: "vencido", express: false, slaDueAt: new Date(0), slaStartedAt: new Date(0), createdAt: new Date(0) },
+      { id: "express", express: true, slaDueAt: null, slaStartedAt: new Date(0), createdAt: new Date(0) },
+    ].sort((a, b) => compareBySla(a, b, now));
+    assert.deepEqual(rows.map((row) => row.id), ["express", "vencido"]);
+  });
+
   it("formatea cuenta regresiva con reloj cuando queda menos de un día", () => {
     const now = new Date("2026-10-05T12:00:00-06:00").getTime();
     const due = new Date("2026-10-05T15:30:45-06:00");

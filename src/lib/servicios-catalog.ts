@@ -97,7 +97,7 @@ export function serviciosTipoHref(tipo: ServicioTipoParam, q?: string) {
 
 export const SUPERVISOR_SERVICIO_SECTIONS: Array<{ param: ServicioTipoParam; menuLabel: string; title: string }> = [
   { param: "diagnostico", menuLabel: "Diagnósticos", title: "Diagnósticos" },
-  { param: "reparacion", menuLabel: "Reparaciones", title: "Reparaciones" },
+  { param: "reparacion", menuLabel: "Reparación Express", title: "Reparación Express" },
   { param: "garantia", menuLabel: "Garantías", title: "Garantías" },
 ];
 

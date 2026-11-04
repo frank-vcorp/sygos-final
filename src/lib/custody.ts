@@ -31,15 +31,17 @@ export const CUSTODY_LABEL: Record<Custody, string> = {
   FUERA: "Fuera",
 };
 
+import { REPARACION_RECEIPT_REASON } from "./priorities";
+
 export const MOVEMENT_REASONS: Record<MovementKind, readonly string[]> = {
-  ENTRADA: ["Diagnóstico", "Reparación", "Diagnóstico de Garantía", "Venta de equipo", "Retorno de proveedor"],
-  INGRESO: ["Diagnóstico", "Reparación", "Diagnóstico de Garantía", "Venta de equipo", "Retorno de proveedor"],
+  ENTRADA: ["Diagnóstico", REPARACION_RECEIPT_REASON, "Diagnóstico de Garantía", "Venta de equipo", "Retorno de proveedor"],
+  INGRESO: ["Diagnóstico", REPARACION_RECEIPT_REASON, "Diagnóstico de Garantía", "Venta de equipo", "Retorno de proveedor"],
   SALIDA_PRUEBA: ["Salida a prueba"],
   RETORNO: ["Salida a prueba"],
-  SALIDA_PROVEEDOR: ["Diagnóstico", "Reparación", "Diagnóstico de Garantía"],
+  SALIDA_PROVEEDOR: ["Diagnóstico", REPARACION_RECEIPT_REASON, "Diagnóstico de Garantía"],
   RETORNO_PROVEEDOR: ["Retorno de proveedor"],
-  SALIDA: ["Diagnóstico", "Reparación", "Diagnóstico de Garantía", "Venta de equipo", "Salida a prueba"],
-  EGRESO: ["Diagnóstico", "Reparación", "Diagnóstico de Garantía", "Venta de equipo", "Salida a prueba"],
+  SALIDA: ["Diagnóstico", REPARACION_RECEIPT_REASON, "Diagnóstico de Garantía", "Venta de equipo", "Salida a prueba"],
+  EGRESO: ["Diagnóstico", REPARACION_RECEIPT_REASON, "Diagnóstico de Garantía", "Venta de equipo", "Salida a prueba"],
 };
 
 export function reasonsFor(movement: MovementKind): readonly string[] {
@@ -101,7 +103,7 @@ export function isInitialWarehouseReceipt(kind: "EQUI" | "MOT", custody: Custody
 
 const ATTENTION_TO_RECEIPT_REASON: Record<string, string> = {
   DIAGNOSTICO: "Diagnóstico",
-  REPARACION: "Reparación",
+  REPARACION: REPARACION_RECEIPT_REASON,
   DIAGNOSTICO_GARANTIA: "Diagnóstico de Garantía",
 };
 

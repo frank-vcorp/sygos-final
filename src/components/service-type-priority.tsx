@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { controlClass, Field } from "@/components/ui";
+import { isReparacionExpressAttentionType } from "@/lib/priorities";
 
 export function ServiceTypePriority({
   types,
@@ -14,6 +15,7 @@ export function ServiceTypePriority({
 }) {
   const [type, setType] = useState("");
   const options = priorities.filter((row) => row.attentionType === type);
+  const hidePriority = type ? isReparacionExpressAttentionType(type) : false;
   return (
     <>
       <Field label="Tipo de atención" hint={hint}>
@@ -22,12 +24,14 @@ export function ServiceTypePriority({
           {types.map((row) => <option key={row.value} value={row.value}>{row.label}</option>)}
         </select>
       </Field>
-      <Field label="Prioridad" hint={type ? "Solo las prioridades de este tipo de atención." : "Primero elige el tipo de atención."}>
-        <select name="priorityId" required className={controlClass} disabled={!type}>
-          <option value="">{type ? "Selecciona" : "Elige el tipo primero"}</option>
-          {options.map((row) => <option key={row.id} value={row.id}>{row.label}</option>)}
-        </select>
-      </Field>
+      {hidePriority ? null : (
+        <Field label="Prioridad" hint={type ? "Solo las prioridades de este tipo de atención." : "Primero elige el tipo de atención."}>
+          <select name="priorityId" required className={controlClass} disabled={!type}>
+            <option value="">{type ? "Selecciona" : "Elige el tipo primero"}</option>
+            {options.map((row) => <option key={row.id} value={row.id}>{row.label}</option>)}
+          </select>
+        </Field>
+      )}
     </>
   );
 }

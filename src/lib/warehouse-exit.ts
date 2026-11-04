@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import type { Custody } from "@/lib/custody";
 import { receiptReasonFromAttention } from "@/lib/custody";
+import { REPARACION_RECEIPT_REASON } from "@/lib/priorities";
 import {
   dxNoRepairPickupSheetLabel,
   findValidatedNoRepairDiagnosis,
@@ -184,7 +185,7 @@ export async function loadWarehouseExitContext(input: {
   let definitiveBlockedMessage: string | null = null;
   let enablingDocumentLabel: string | null = null;
   let technicalCaseId: string | null = null;
-  let definitiveReason = "Reparación";
+  let definitiveReason = REPARACION_RECEIPT_REASON;
   let osBillingDocument: Awaited<ReturnType<typeof findEnablingBillingDocument>> = null;
   let dxCaseVersion: number | null = null;
 
@@ -193,7 +194,7 @@ export async function loadWarehouseExitContext(input: {
   } else if (osForDelivery) {
     technicalCaseId = osForDelivery.id;
     const expectedReason = receiptReasonFromAttention(osForDelivery.attention.attentionType);
-    definitiveReason = expectedReason ?? "Reparación";
+    definitiveReason = expectedReason ?? REPARACION_RECEIPT_REASON;
     const billing = await findEnablingBillingDocument(osForDelivery.id);
     osBillingDocument = billing;
     if (billing) {
@@ -337,7 +338,10 @@ export async function listExitWithoutDocumentPending(serviceCompanyId: string, t
 /** Equipo en salida definitiva por OS terminada (motivo reparación). */
 export function isOsDefinitiveCustodyExit(movement: { kind: string; reason: string; cancelledAt: Date | null } | undefined) {
   if (!movement || movement.cancelledAt) return false;
-  return (movement.kind === "SALIDA" || movement.kind === "EGRESO") && movement.reason === "Reparación";
+  return (
+    (movement.kind === "SALIDA" || movement.kind === "EGRESO")
+    && (movement.reason === REPARACION_RECEIPT_REASON || movement.reason === "Reparación")
+  );
 }
 
 export async function assertDefinitiveWarehouseExit(technicalCaseId: string, equipmentId: string) {

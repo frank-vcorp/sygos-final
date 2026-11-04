@@ -13,6 +13,7 @@ import {
   type StackedStatus,
 } from "@/lib/servicios-bandeja";
 import type { Role } from "@/lib/roles";
+import { isReparacionExpressAttentionType } from "@/lib/priorities";
 import { servicioRowHighlight, type SupervisorServicioRow } from "@/lib/servicios-supervisor";
 
 const TONE_CLASS: Record<StatusTone, string> = {
@@ -99,7 +100,18 @@ function formatClosedAt(date: Date) {
 
 const SLA_BANDEJA_CLASS = "text-[11px] leading-4 whitespace-nowrap";
 
-function SlaCell({ dueAt, historial, closedAt }: { dueAt: Date | null; historial: boolean; closedAt: Date | null }) {
+function SlaCell({
+  dueAt,
+  historial,
+  closedAt,
+  attentionType,
+}: {
+  dueAt: Date | null;
+  historial: boolean;
+  closedAt: Date | null;
+  attentionType?: string;
+}) {
+  const express = attentionType ? isReparacionExpressAttentionType(attentionType) : false;
   if (historial) {
     return (
       <span className={`text-xs text-[var(--muted)] ${SLA_BANDEJA_CLASS}`}>
@@ -109,7 +121,7 @@ function SlaCell({ dueAt, historial, closedAt }: { dueAt: Date | null; historial
   }
   return (
     <div className="inline-block w-max max-w-none rounded border border-[var(--line)] bg-[#f8fafc] px-1.5 py-0.5">
-      <SlaCountdown dueAt={dueAt} className={SLA_BANDEJA_CLASS} />
+      <SlaCountdown dueAt={dueAt} className={SLA_BANDEJA_CLASS} express={express} />
     </div>
   );
 }
@@ -232,7 +244,7 @@ function BandejaTd({
     case "sla":
       return (
         <Td>
-          <SlaCell dueAt={row.slaDueAt} historial={historial} closedAt={row.closedAt} />
+          <SlaCell dueAt={row.slaDueAt} historial={historial} closedAt={row.closedAt} attentionType={row.attentionType} />
         </Td>
       );
     case "cotizacion":
@@ -365,7 +377,11 @@ export function ServiciosSupervisorList({
                     <>Cierre: {row.closedAt ? formatClosedAt(row.closedAt) : "—"}</>
                   ) : (
                     <>
-                      SLA: <SlaCountdown dueAt={row.slaDueAt} />
+                      SLA:{" "}
+                      <SlaCountdown
+                        dueAt={row.slaDueAt}
+                        express={isReparacionExpressAttentionType(row.attentionType)}
+                      />
                     </>
                   )}
                 </p>
