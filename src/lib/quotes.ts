@@ -1,7 +1,14 @@
 import { prisma } from "./db";
-import { allocateFolio, serviceFolioForAttention } from "./folios";
+import {
+  allocateFolio,
+  ensureAttentionServiceNumber,
+  formatServiceFolio,
+  serviceCycleNumberFromFolio,
+  serviceFolioForAttention,
+} from "./folios";
 import { ConcurrencyError } from "./form";
 import { recordHistory } from "./history";
+import { ensureOsStubForDiagnosis } from "./technical";
 import { finalFromBase } from "./money";
 import { ATTENTION_LABEL, isReparacionExpressAttentionType, type AttentionType } from "./priorities";
 import { technicalServiceConcept } from "./quote-concept";
@@ -698,20 +705,34 @@ async function openRepairOrder(diagnosisCaseId: string, authorUserId: string) {
     select: { slaDueAt: true },
   });
   const slaDueAt = repairOrderSlaDueAt(repairQuote, diagnosisQuote, diagnosis);
-  const existing = await prisma.technicalCase.findFirst({ where: { spawnedFromId: diagnosis.id, kind: "OS" } });
-  if (existing) {
-    if (slaDueAt && existing.slaDueAt == null) {
-      await prisma.technicalCase.update({
-        where: { id: existing.id },
+  let osCase = await prisma.$transaction((tx) =>
+    ensureOsStubForDiagnosis(diagnosis.attention, diagnosis, tx),
+  );
+  if (!osCase) {
+    osCase = await prisma.technicalCase.findFirst({ where: { spawnedFromId: diagnosis.id, kind: "OS" } });
+  }
+  if (osCase) {
+    if (slaDueAt && osCase.slaDueAt == null) {
+      osCase = await prisma.technicalCase.update({
+        where: { id: osCase.id },
         data: { slaDueAt, quotePending: false },
       });
     }
     const { promotePartPresolicitudesToRepairOrder } = await import("./part-presolicitud");
-    await promotePartPresolicitudesToRepairOrder(diagnosis.id, existing.id, authorUserId);
-    return existing;
+    await promotePartPresolicitudesToRepairOrder(diagnosis.id, osCase.id, authorUserId);
+    return osCase;
   }
   const created = await prisma.$transaction(async (tx) => {
-    const folio = await serviceFolioForAttention(diagnosis.attentionId, diagnosis.serviceCompanyId, "OS", tx);
+    let n = diagnosis.attention.serviceNumber ?? serviceCycleNumberFromFolio(diagnosis.folio);
+    if (n == null) {
+      n = await ensureAttentionServiceNumber(diagnosis.attentionId, diagnosis.serviceCompanyId, tx);
+    } else if (diagnosis.attention.serviceNumber !== n) {
+      await tx.attention.update({
+        where: { id: diagnosis.attentionId },
+        data: { serviceNumber: n },
+      });
+    }
+    const folio = formatServiceFolio("OS", n);
     return tx.technicalCase.create({
       data: {
         folio,

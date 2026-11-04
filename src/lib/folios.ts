@@ -13,7 +13,7 @@ export function formatServiceFolio(series: ServiceFolioSeries, n: number): strin
   return `${series}-${n}`;
 }
 
-function serviceCycleNumberFromFolio(folio: string): number | null {
+export function serviceCycleNumberFromFolio(folio: string): number | null {
   const match = folio.match(SERVICE_CYCLE_FOLIO);
   if (!match) return null;
   const n = Number.parseInt(match[2]!, 10);

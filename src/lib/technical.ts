@@ -1,5 +1,11 @@
+import type { Prisma } from "@prisma/client";
 import { prisma } from "./db";
-import { serviceFolioForAttention } from "./folios";
+import {
+  ensureAttentionServiceNumber,
+  formatServiceFolio,
+  serviceCycleNumberFromFolio,
+  serviceFolioForAttention,
+} from "./folios";
 import { ConcurrencyError } from "./form";
 import { recordHistory } from "./history";
 import { addBusinessDays, warrantyDeadline } from "./sla";
@@ -54,6 +60,80 @@ export async function lastTechnicianWhoClosedEquipmentCase(
   return prior?.finishedByUserId ?? null;
 }
 
+type ServiceTx = Prisma.TransactionClient;
+
+export async function ensureOsStubForDiagnosis(
+  attention: {
+    id: string;
+    equipmentId: string;
+    serviceCompanyId: string;
+    originalCaseId: string | null;
+    serviceNumber: number | null;
+  },
+  dxCase: { id: string; folio: string },
+  tx: ServiceTx,
+) {
+  let n = attention.serviceNumber ?? serviceCycleNumberFromFolio(dxCase.folio);
+  if (n == null) {
+    n = await ensureAttentionServiceNumber(attention.id, attention.serviceCompanyId, tx);
+  }
+  if (attention.serviceNumber !== n) {
+    await tx.attention.update({ where: { id: attention.id }, data: { serviceNumber: n } });
+  }
+  const expectedFolio = formatServiceFolio("OS", n);
+  const existing = await tx.technicalCase.findFirst({
+    where: { spawnedFromId: dxCase.id, kind: "OS" },
+  });
+  if (existing) {
+    if (existing.folio !== expectedFolio) {
+      const collision = await tx.technicalCase.findFirst({
+        where: {
+          serviceCompanyId: attention.serviceCompanyId,
+          folio: expectedFolio,
+          id: { not: existing.id },
+        },
+      });
+      if (!collision) {
+        await tx.technicalCase.update({ where: { id: existing.id }, data: { folio: expectedFolio } });
+        return { ...existing, folio: expectedFolio };
+      }
+    }
+    return existing;
+  }
+  const collision = await tx.technicalCase.findFirst({
+    where: { serviceCompanyId: attention.serviceCompanyId, folio: expectedFolio },
+  });
+  if (collision) return null;
+  return tx.technicalCase.create({
+    data: {
+      folio: expectedFolio,
+      attentionId: attention.id,
+      equipmentId: attention.equipmentId,
+      serviceCompanyId: attention.serviceCompanyId,
+      kind: "OS",
+      status: "EN_ESPERA",
+      spawnedFromId: dxCase.id,
+      originalCaseId: attention.originalCaseId,
+      slaDueAt: null,
+      quotePending: true,
+    },
+  });
+}
+
+async function backfillMissingOsStubsForEquipment(equipmentId: string) {
+  const attentions = await prisma.attention.findMany({
+    where: { equipmentId, attentionType: "DIAGNOSTICO", slaStartedAt: { not: null } },
+    include: { technicalCases: true },
+  });
+  for (const attention of attentions) {
+    const dxCase = attention.technicalCases.find((c) => c.kind === "DIAGNOSTICO");
+    const hasOs = attention.technicalCases.some((c) => c.kind === "OS");
+    if (dxCase && !hasOs) {
+      await prisma.$transaction((tx) => ensureOsStubForDiagnosis(attention, dxCase, tx));
+    }
+  }
+}
+
 export async function openPendingCases(equipmentId: string, receivedAt: Date) {
   const attentions = await prisma.attention.findMany({
     where: { equipmentId, slaStartedAt: { not: null }, technicalCases: { none: {} } },
@@ -61,6 +141,7 @@ export async function openPendingCases(equipmentId: string, receivedAt: Date) {
   for (const attention of attentions) {
     await openCase(attention.id, attention.slaStartedAt ?? receivedAt);
   }
+  await backfillMissingOsStubsForEquipment(equipmentId);
 }
 
 export async function openCase(attentionId: string, receivedAt: Date) {
@@ -71,7 +152,17 @@ export async function openCase(attentionId: string, receivedAt: Date) {
   if (!attention || !attention.slaStartedAt) return null;
   const diagnosis = DIAGNOSIS_TYPES.has(attention.attentionType);
   if (attention.technicalCases.length > 0) {
-    if (!isReparacionExpressAttentionType(attention.attentionType)) return null;
+    if (!isReparacionExpressAttentionType(attention.attentionType)) {
+      if (attention.attentionType === "DIAGNOSTICO") {
+        const dxCase = attention.technicalCases.find((c) => c.kind === "DIAGNOSTICO");
+        const hasOs = attention.technicalCases.some((c) => c.kind === "OS");
+        if (dxCase && !hasOs) {
+          await prisma.$transaction((tx) => ensureOsStubForDiagnosis(attention, dxCase, tx));
+          return dxCase;
+        }
+      }
+      return null;
+    }
     if (attention.technicalCases.some((c) => c.kind === "DIAGNOSTICO")) return null;
     if (!attention.technicalCases.some((c) => c.kind === "OS")) return null;
     return openDiagnosisOnExpressAttention(attention, receivedAt);
@@ -109,12 +200,13 @@ export async function openCase(attentionId: string, receivedAt: Date) {
       await tx.attention.update({ where: { id: attention.id }, data: { initialLog: null } });
     }
     if (diagnosis && attention.attentionType === "DIAGNOSTICO") {
-      const osFolio = await serviceFolioForAttention(
-        attention.id,
-        attention.serviceCompanyId,
-        "OS",
-        tx,
-      );
+      let n = serviceCycleNumberFromFolio(technicalCase.folio);
+      if (n == null) {
+        n = await ensureAttentionServiceNumber(attention.id, attention.serviceCompanyId, tx);
+      } else {
+        await tx.attention.update({ where: { id: attention.id }, data: { serviceNumber: n } });
+      }
+      const osFolio = formatServiceFolio("OS", n);
       await tx.technicalCase.create({
         data: {
           folio: osFolio,

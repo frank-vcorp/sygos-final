@@ -330,4 +330,92 @@ describe("folios", () => {
 
     await prisma.$disconnect();
   });
+
+  it("openCase backfill OS stub en atención legacy solo con DX", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "sygos-os-backfill-"));
+    process.env.DATABASE_URL = `file:${join(dir, "test.db")}`;
+    const { execSync } = await import("child_process");
+    execSync("npx prisma db push --skip-generate", {
+      cwd: join(import.meta.dirname, "../.."),
+      env: process.env,
+      stdio: "ignore",
+    });
+
+    const { prisma } = await import("./db");
+    const { openCase } = await import("./technical");
+
+    const company = await prisma.company.create({ data: { code: "BF", name: "Backfill" } });
+    const user = await prisma.user.create({
+      data: {
+        username: "bf-test",
+        name: "Test",
+        passwordHash: "x",
+        role: "CEO",
+        companyId: company.id,
+      },
+    });
+    const client = await prisma.client.create({
+      data: {
+        companyId: company.id,
+        name: "Cliente",
+        active: true,
+        isSystem: false,
+        requiresInvoice: true,
+        rfc: "XAXX010101000",
+        cfdiUse: "G03",
+        paymentMethod: "PUE",
+      },
+    });
+    const equipment = await prisma.equipment.create({
+      data: {
+        folio: "EQUI-bf-1",
+        kind: "EQUI",
+        originCompanyId: company.id,
+        clientId: client.id,
+        model: "M",
+        custody: "EN_RESGUARDO",
+        holderCompanyId: company.id,
+        createdByUserId: user.id,
+      },
+    });
+    const legacyAttention = await prisma.attention.create({
+      data: {
+        equipmentId: equipment.id,
+        originCompanyId: company.id,
+        serviceCompanyId: company.id,
+        adminClientId: client.id,
+        attentionType: "DIAGNOSTICO",
+        priorityName: "Normal",
+        prioritySlaMaxDays: 5,
+        reportedFault: "Legacy sin OS",
+        slaStartedAt: new Date(),
+      },
+    });
+    const dxOnly = await prisma.technicalCase.create({
+      data: {
+        folio: "DX-1",
+        attentionId: legacyAttention.id,
+        equipmentId: equipment.id,
+        serviceCompanyId: company.id,
+        kind: "DIAGNOSTICO",
+        status: "EN_DIAGNOSTICO",
+        quotePending: false,
+      },
+    });
+
+    const result = await openCase(legacyAttention.id, new Date());
+    assert.ok(result);
+    assert.equal(result!.id, dxOnly.id);
+
+    const osStub = await prisma.technicalCase.findFirst({
+      where: { attentionId: legacyAttention.id, kind: "OS", spawnedFromId: dxOnly.id },
+    });
+    assert.ok(osStub);
+    assert.equal(osStub!.folio, "OS-1");
+
+    const synced = await prisma.attention.findUnique({ where: { id: legacyAttention.id } });
+    assert.equal(synced!.serviceNumber, 1);
+
+    await prisma.$disconnect();
+  });
 });
