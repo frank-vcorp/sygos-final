@@ -156,6 +156,7 @@ async function ensureOriginQuote(
   row: {
     id: string;
     attentionId: string;
+    serviceCompanyId: string;
     folio: string;
     kind: string;
     equipmentId: string;
