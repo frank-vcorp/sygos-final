@@ -678,12 +678,6 @@ async function openRepairOrder(diagnosisCaseId: string, authorUserId: string) {
     include: { attention: true },
   });
   if (!diagnosis) return null;
-  const existing = await prisma.technicalCase.findFirst({ where: { spawnedFromId: diagnosis.id, kind: "OS" } });
-  if (existing) {
-    const { promotePartPresolicitudesToRepairOrder } = await import("./part-presolicitud");
-    await promotePartPresolicitudesToRepairOrder(diagnosis.id, existing.id, authorUserId);
-    return existing;
-  }
   const repairQuote = await prisma.quote.findFirst({
     where: {
       technicalCaseId: diagnosis.id,
@@ -704,6 +698,18 @@ async function openRepairOrder(diagnosisCaseId: string, authorUserId: string) {
     select: { slaDueAt: true },
   });
   const slaDueAt = repairOrderSlaDueAt(repairQuote, diagnosisQuote, diagnosis);
+  const existing = await prisma.technicalCase.findFirst({ where: { spawnedFromId: diagnosis.id, kind: "OS" } });
+  if (existing) {
+    if (slaDueAt && existing.slaDueAt == null) {
+      await prisma.technicalCase.update({
+        where: { id: existing.id },
+        data: { slaDueAt, quotePending: false },
+      });
+    }
+    const { promotePartPresolicitudesToRepairOrder } = await import("./part-presolicitud");
+    await promotePartPresolicitudesToRepairOrder(diagnosis.id, existing.id, authorUserId);
+    return existing;
+  }
   const created = await prisma.$transaction(async (tx) => {
     const folio = await serviceFolioForAttention(diagnosis.attentionId, diagnosis.serviceCompanyId, "OS", tx);
     return tx.technicalCase.create({

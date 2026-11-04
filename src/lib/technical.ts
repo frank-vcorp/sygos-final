@@ -108,6 +108,28 @@ export async function openCase(attentionId: string, receivedAt: Date) {
       });
       await tx.attention.update({ where: { id: attention.id }, data: { initialLog: null } });
     }
+    if (diagnosis && attention.attentionType === "DIAGNOSTICO") {
+      const osFolio = await serviceFolioForAttention(
+        attention.id,
+        attention.serviceCompanyId,
+        "OS",
+        tx,
+      );
+      await tx.technicalCase.create({
+        data: {
+          folio: osFolio,
+          attentionId: attention.id,
+          equipmentId: attention.equipmentId,
+          serviceCompanyId: attention.serviceCompanyId,
+          kind: "OS",
+          status: "EN_ESPERA",
+          spawnedFromId: technicalCase.id,
+          originalCaseId: attention.originalCaseId,
+          slaDueAt: null,
+          quotePending: true,
+        },
+      });
+    }
     return technicalCase;
   });
   await recordHistory({

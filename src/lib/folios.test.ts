@@ -134,6 +134,11 @@ describe("folios", () => {
     const opened = await openCase(newAttention.id, new Date());
     assert.ok(opened);
     assert.equal(opened!.folio, "DX-2");
+    const osStub = await prisma.technicalCase.findFirst({
+      where: { attentionId: newAttention.id, kind: "OS", spawnedFromId: opened!.id },
+    });
+    assert.ok(osStub);
+    assert.equal(osStub!.folio, "OS-2");
 
     await prisma.$disconnect();
   });

@@ -85,6 +85,27 @@ export async function applyDiagnosisNoRepairAfterValidation(actor: Actor, caseId
   if (!row?.noRepairAt || !diagnosisNoRepairEligible(row.attention.attentionType)) return;
   if (row.status !== "VALIDADO") return;
 
+  const spawnedOs = await prisma.technicalCase.findFirst({
+    where: {
+      spawnedFromId: row.id,
+      kind: "OS",
+      status: "EN_ESPERA",
+      quotePending: true,
+    },
+  });
+  if (spawnedOs) {
+    const brief = row.noRepairReason?.trim() || "Sin reparación tras diagnóstico.";
+    await prisma.technicalCase.update({
+      where: { id: spawnedOs.id },
+      data: {
+        status: "SIN_REPARACION",
+        resultText: brief,
+        quotePending: false,
+        finishedByUserId: actor.userId,
+      },
+    });
+  }
+
   if (isPaidDiagnosisPriority(row.attention.priorityName, row.attention.priorityPrice)) {
     const { requestFromDiagnosisNoRepair } = await import("./billing");
     await requestFromDiagnosisNoRepair(
