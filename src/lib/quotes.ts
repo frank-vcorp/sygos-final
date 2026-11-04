@@ -1,5 +1,5 @@
 import { prisma } from "./db";
-import { allocateFolio } from "./folios";
+import { allocateFolio, serviceFolioForAttention } from "./folios";
 import { ConcurrencyError } from "./form";
 import { recordHistory } from "./history";
 import { finalFromBase } from "./money";
@@ -83,13 +83,22 @@ export async function prepareQuoteFromCase(actor: Actor, caseId: string) {
 }
 
 export async function ensureQuoteFromCase(actor: { userId: string; activeCompanyId: string }, caseId: string) {
-  const existing = await prisma.quote.findFirst({ where: { technicalCaseId: caseId, companyId: actor.activeCompanyId } });
-  if (existing) return existing;
   const row = await prisma.technicalCase.findUnique({
     where: { id: caseId },
     include: { attention: true, equipment: true },
   });
   if (!row) throw new Error("No se encontró la operación técnica.");
+  const siblingCaseIds = await prisma.technicalCase.findMany({
+    where: { attentionId: row.attentionId },
+    select: { id: true },
+  });
+  const existing = await prisma.quote.findFirst({
+    where: {
+      companyId: actor.activeCompanyId,
+      technicalCaseId: { in: siblingCaseIds.map((item) => item.id) },
+    },
+  });
+  if (existing) return existing;
   const recoverValidatedDiagnosis =
     row.status === "VALIDADO" && row.kind === "DIAGNOSTICO" && row.attention.attentionType === "DIAGNOSTICO";
   if (!row.quotePending && !recoverValidatedDiagnosis) throw new Error("Esta operación no está pendiente de cotizar.");
@@ -105,7 +114,7 @@ export async function ensureQuoteFromCase(actor: { userId: string; activeCompany
   if (!client) throw new Error("Falta el cliente de la cotización.");
   const repair = row.kind === "OS";
   const concept = automaticQuoteConcept(row);
-  const folio = await allocateFolio(actor.activeCompanyId, "COT");
+  const folio = await serviceFolioForAttention(row.attentionId, actor.activeCompanyId, "COT");
   const quote = await prisma.quote.create({
     data: {
       folio,
@@ -146,6 +155,7 @@ export async function ensureQuoteFromCase(actor: { userId: string; activeCompany
 async function ensureOriginQuote(
   row: {
     id: string;
+    attentionId: string;
     folio: string;
     kind: string;
     equipmentId: string;
@@ -159,7 +169,7 @@ async function ensureOriginQuote(
   const existing = await prisma.quote.findFirst({ where: { technicalCaseId: row.id, companyId: row.equipment.originCompanyId } });
   if (existing) return existing;
   const concept = automaticQuoteConcept(row);
-  const folio = await allocateFolio(row.equipment.originCompanyId, "COT");
+  const folio = await serviceFolioForAttention(row.attentionId, row.equipment.originCompanyId, "COT");
   const quote = await prisma.quote.create({
     data: {
       folio,
@@ -673,7 +683,6 @@ async function openRepairOrder(diagnosisCaseId: string, authorUserId: string) {
     await promotePartPresolicitudesToRepairOrder(diagnosis.id, existing.id, authorUserId);
     return existing;
   }
-  const folio = await allocateFolio(diagnosis.serviceCompanyId, "OS");
   const repairQuote = await prisma.quote.findFirst({
     where: {
       technicalCaseId: diagnosis.id,
@@ -694,25 +703,28 @@ async function openRepairOrder(diagnosisCaseId: string, authorUserId: string) {
     select: { slaDueAt: true },
   });
   const slaDueAt = repairOrderSlaDueAt(repairQuote, diagnosisQuote, diagnosis);
-  const created = await prisma.technicalCase.create({
-    data: {
-      folio,
-      attentionId: diagnosis.attentionId,
-      equipmentId: diagnosis.equipmentId,
-      serviceCompanyId: diagnosis.serviceCompanyId,
-      kind: "OS",
-      status: "EN_ESPERA",
-      spawnedFromId: diagnosis.id,
-      slaDueAt,
-      quotePending: false,
-    },
+  const created = await prisma.$transaction(async (tx) => {
+    const folio = await serviceFolioForAttention(diagnosis.attentionId, diagnosis.serviceCompanyId, "OS", tx);
+    return tx.technicalCase.create({
+      data: {
+        folio,
+        attentionId: diagnosis.attentionId,
+        equipmentId: diagnosis.equipmentId,
+        serviceCompanyId: diagnosis.serviceCompanyId,
+        kind: "OS",
+        status: "EN_ESPERA",
+        spawnedFromId: diagnosis.id,
+        slaDueAt,
+        quotePending: false,
+      },
+    });
   });
   await recordHistory({
     companyId: diagnosis.serviceCompanyId,
     entityType: "OPERACION",
     entityId: created.id,
     action: "ALTA",
-    summary: `${folio} abierta porque la cotización fue autorizada y el equipo ya está en resguardo.`,
+    summary: `${created.folio} abierta porque la cotización fue autorizada y el equipo ya está en resguardo.`,
     authorUserId,
   });
   const { promotePartPresolicitudesToRepairOrder } = await import("./part-presolicitud");

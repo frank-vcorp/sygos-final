@@ -1,5 +1,5 @@
 import { prisma } from "./db";
-import { allocateFolio } from "./folios";
+import { allocateFolio, serviceFolioForAttention } from "./folios";
 import { recordCompanyCash } from "./purchases";
 import { stampBillingDocument } from "./facturapi";
 import { ConcurrencyError } from "./form";
@@ -36,6 +36,37 @@ async function invoicedTotal(quoteId: string) {
   return roundMoney(rows.reduce((sum, row) => sum + row.total, 0));
 }
 
+async function assertAtMostOneServiceInvoice(attentionId: string, kind: "FACTURA" | "REMISION") {
+  if (kind !== "FACTURA") return;
+  const caseIds = (
+    await prisma.technicalCase.findMany({ where: { attentionId }, select: { id: true } })
+  ).map((row) => row.id);
+  if (caseIds.length === 0) return;
+  const quoteIds = (
+    await prisma.quote.findMany({ where: { technicalCaseId: { in: caseIds } }, select: { id: true } })
+  ).map((row) => row.id);
+  const existing = await prisma.billingDocument.findFirst({
+    where: {
+      kind: "FACTURA",
+      status: { in: ["SOLICITADA", "EMITIDA", "ERROR_FISCAL"] },
+      OR: [
+        { technicalCaseId: { in: caseIds } },
+        ...(quoteIds.length > 0 ? [{ quoteId: { in: quoteIds } }] : []),
+      ],
+    },
+  });
+  if (existing) throw new Error("Este servicio ya tiene una factura; no se permite otra FAC ligada a la atención.");
+}
+
+async function serviceBillingFolio(
+  attentionId: string,
+  companyId: string,
+  kind: "FACTURA" | "REMISION",
+): Promise<string> {
+  const series = kind === "REMISION" ? "REM" : "FAC";
+  return serviceFolioForAttention(attentionId, companyId, series);
+}
+
 export async function requestFromQuote(actor: Actor, quoteId: string, kind: "FACTURA" | "REMISION", amount: number | null) {
   const quote = await prisma.quote.findFirst({
     where: { id: quoteId, companyId: actor.activeCompanyId },
@@ -49,6 +80,14 @@ export async function requestFromQuote(actor: Actor, quoteId: string, kind: "FAC
   if (quote.client.requiresInvoice !== true && kind === "FACTURA") {
     throw new Error("Este cliente no está marcado como que requiere factura; usa remisión.");
   }
+  if (quote.technicalCaseId && kind === "FACTURA") {
+    const linkedCase = await prisma.technicalCase.findUnique({
+      where: { id: quote.technicalCaseId },
+      select: { attentionId: true },
+    });
+    if (!linkedCase) throw new Error("No se encontró la operación ligada a la cotización.");
+    await assertAtMostOneServiceInvoice(linkedCase.attentionId, kind);
+  }
   const totals = quoteTotals(linesForTotal(quote.lines, quote.quoteType, quote.status), quote.discountPct);
   if (!totals) throw new Error("La cotización no tiene importe.");
   const used = await invoicedTotal(quote.id);
@@ -59,7 +98,17 @@ export async function requestFromQuote(actor: Actor, quoteId: string, kind: "FAC
   const ratio = totals.total === 0 ? 0 : total / totals.total;
   const subtotal = roundMoney(totals.subtotal * ratio);
   const iva = roundMoney(total - subtotal);
-  const folio = await allocateFolio(actor.activeCompanyId, kind === "REMISION" ? "REM" : "FAC");
+  let folio: string;
+  if (quote.technicalCaseId) {
+    const linkedCase = await prisma.technicalCase.findUnique({
+      where: { id: quote.technicalCaseId },
+      select: { attentionId: true },
+    });
+    if (!linkedCase) throw new Error("No se encontró la operación ligada a la cotización.");
+    folio = await serviceBillingFolio(linkedCase.attentionId, actor.activeCompanyId, kind);
+  } else {
+    folio = await allocateFolio(actor.activeCompanyId, kind === "REMISION" ? "REM" : "FAC");
+  }
   const concept = quote.lines.filter((line) => line.authorized || quote.quoteType !== "VENTA_EQUIPO").map((line) => line.concept).join("; ") || quote.folio;
   const document = await prisma.billingDocument.create({
     data: {
@@ -120,10 +169,11 @@ export async function requestFromDiagnosisNoRepair(actor: Actor, diagnosisCaseId
   if (client.requiresInvoice === true && kind === "REMISION") {
     throw new Error("Este cliente requiere factura (CFDI).");
   }
+  await assertAtMostOneServiceInvoice(row.attentionId, kind);
   const total = roundMoney(amount);
   const subtotal = roundMoney(total / 1.16);
   const iva = roundMoney(total - subtotal);
-  const folio = await allocateFolio(actor.activeCompanyId, kind === "REMISION" ? "REM" : "FAC");
+  const folio = await serviceBillingFolio(row.attentionId, actor.activeCompanyId, kind);
   const concept = "DX sin reparación";
   const document = await prisma.billingDocument.create({
     data: {

@@ -369,6 +369,8 @@ model Attention {
   originQuoteId       String?
   status              String    @default("ABIERTA")
   slaStartedAt        DateTime?
+  /** Consecutivo interno SRV (no mostrar en UI); DX/OS/COT/FAC/REM del ciclo comparten este entero. */
+  serviceNumber       Int?
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
   version             Int       @default(1)

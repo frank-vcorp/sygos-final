@@ -1,5 +1,5 @@
 import { prisma } from "./db";
-import { allocateFolio } from "./folios";
+import { serviceFolioForAttention } from "./folios";
 import { ConcurrencyError } from "./form";
 import { recordHistory } from "./history";
 import { addBusinessDays, warrantyDeadline } from "./sla";
@@ -68,10 +68,21 @@ export async function openCase(attentionId: string, receivedAt: Date) {
     where: { id: attentionId },
     include: { technicalCases: true, serviceCompany: true },
   });
-  if (!attention || attention.technicalCases.length > 0 || !attention.slaStartedAt) return null;
+  if (!attention || !attention.slaStartedAt) return null;
   const diagnosis = DIAGNOSIS_TYPES.has(attention.attentionType);
-  const folio = await allocateFolio(attention.serviceCompanyId, diagnosis ? "DX" : "OS");
+  if (attention.technicalCases.length > 0) {
+    if (!isReparacionExpressAttentionType(attention.attentionType)) return null;
+    if (attention.technicalCases.some((c) => c.kind === "DIAGNOSTICO")) return null;
+    if (!attention.technicalCases.some((c) => c.kind === "OS")) return null;
+    return openDiagnosisOnExpressAttention(attention, receivedAt);
+  }
   const technicalCase = await prisma.$transaction(async (tx) => {
+    const folio = await serviceFolioForAttention(
+      attention.id,
+      attention.serviceCompanyId,
+      diagnosis ? "DX" : "OS",
+      tx,
+    );
     const technicalCase = await tx.technicalCase.create({
       data: {
         folio,
@@ -114,6 +125,47 @@ export async function openCase(attentionId: string, receivedAt: Date) {
       technicalCase.id,
     );
   }
+  return technicalCase;
+}
+
+/** Reparación Express: DX posterior en la misma atención reutiliza el número SRV de la OS. */
+async function openDiagnosisOnExpressAttention(
+  attention: {
+    id: string;
+    equipmentId: string;
+    serviceCompanyId: string;
+    originalCaseId: string | null;
+    initialLog: string | null;
+    createdByUserId: string | null;
+    prioritySlaMaxDays: number;
+    technicalCases: Array<{ kind: string }>;
+  },
+  receivedAt: Date,
+) {
+  const technicalCase = await prisma.$transaction(async (tx) => {
+    const folio = await serviceFolioForAttention(attention.id, attention.serviceCompanyId, "DX", tx);
+    return tx.technicalCase.create({
+      data: {
+        folio,
+        attentionId: attention.id,
+        equipmentId: attention.equipmentId,
+        serviceCompanyId: attention.serviceCompanyId,
+        kind: "DIAGNOSTICO",
+        status: "EN_ESPERA",
+        originalCaseId: attention.originalCaseId,
+        slaDueAt: addBusinessDays(receivedAt, attention.prioritySlaMaxDays),
+        quotePending: false,
+      },
+    });
+  });
+  await recordHistory({
+    companyId: attention.serviceCompanyId,
+    entityType: "OPERACION",
+    entityId: technicalCase.id,
+    action: "ALTA",
+    summary: `${technicalCase.folio} abierta en la misma atención Express.`,
+    authorUserId: attention.createdByUserId,
+  });
   return technicalCase;
 }
 
@@ -393,27 +445,34 @@ async function spawnWarrantyRepair(diagnosisCaseId: string, authorUserId: string
     await promotePartPresolicitudesToRepairOrder(diagnosis.id, existing.id, authorUserId);
     return;
   }
-  const folio = await allocateFolio(diagnosis.serviceCompanyId, "OS");
-  const created = await prisma.technicalCase.create({
-    data: {
-      folio,
-      attentionId: diagnosis.attentionId,
-      equipmentId: diagnosis.equipmentId,
-      serviceCompanyId: diagnosis.serviceCompanyId,
-      kind: "OS",
-      status: "EN_ESPERA",
-      spawnedFromId: diagnosis.id,
-      originalCaseId: diagnosis.originalCaseId,
-      slaDueAt: diagnosis.slaDueAt,
-      quotePending: false,
-    },
+  const created = await prisma.$transaction(async (tx) => {
+    const folio = await serviceFolioForAttention(
+      diagnosis.attentionId,
+      diagnosis.serviceCompanyId,
+      "OS",
+      tx,
+    );
+    return tx.technicalCase.create({
+      data: {
+        folio,
+        attentionId: diagnosis.attentionId,
+        equipmentId: diagnosis.equipmentId,
+        serviceCompanyId: diagnosis.serviceCompanyId,
+        kind: "OS",
+        status: "EN_ESPERA",
+        spawnedFromId: diagnosis.id,
+        originalCaseId: diagnosis.originalCaseId,
+        slaDueAt: diagnosis.slaDueAt,
+        quotePending: false,
+      },
+    });
   });
   await recordHistory({
     companyId: diagnosis.serviceCompanyId,
     entityType: "OPERACION",
     entityId: created.id,
     action: "ALTA",
-    summary: `Reparación en garantía ${folio}. No genera un cobro nuevo si se resuelve.`,
+    summary: `Reparación en garantía ${created.folio}. No genera un cobro nuevo si se resuelve.`,
     authorUserId,
   });
   const { promotePartPresolicitudesToRepairOrder } = await import("./part-presolicitud");
