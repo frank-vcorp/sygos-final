@@ -114,7 +114,7 @@ export async function ensureQuoteFromCase(actor: { userId: string; activeCompany
   if (!client) throw new Error("Falta el cliente de la cotización.");
   const repair = row.kind === "OS";
   const concept = automaticQuoteConcept(row);
-  const folio = await serviceFolioForAttention(row.attentionId, actor.activeCompanyId, "COT");
+  const folio = await serviceFolioForAttention(row.attentionId, row.serviceCompanyId, "COT");
   const quote = await prisma.quote.create({
     data: {
       folio,
@@ -169,7 +169,7 @@ async function ensureOriginQuote(
   const existing = await prisma.quote.findFirst({ where: { technicalCaseId: row.id, companyId: row.equipment.originCompanyId } });
   if (existing) return existing;
   const concept = automaticQuoteConcept(row);
-  const folio = await serviceFolioForAttention(row.attentionId, row.equipment.originCompanyId, "COT");
+  const folio = await serviceFolioForAttention(row.attentionId, row.serviceCompanyId, "COT");
   const quote = await prisma.quote.create({
     data: {
       folio,
