@@ -62,6 +62,7 @@ const LABELS: Record<string, string | ((code: string | null) => string)> = {
   "/configuracion/comunicaciones": "Comunicaciones",
   "/pruebas": "Modo de pruebas",
   "/admin/cuentas": "Cuentas y saldos",
+  "/admin/mantenimiento": "Reinicio folios de servicio (staging)",
 };
 
 const CREATE: Partial<Record<string, { href: string; show: NavLink["showCreate"] }>> = {
