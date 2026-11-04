@@ -24,15 +24,15 @@ describe("technicalStatusFromCase", () => {
 });
 
 describe("administrativeStatus", () => {
-  it("reparación directa: sin cotizar con autorizado", () => {
+  it("reparación express sin precio CEO", () => {
     const row = administrativeStatus({
       attentionType: "REPARACION",
-      quoteStatus: null,
-      quotePending: false,
+      quoteStatus: "PENDIENTE_COTIZAR",
+      quotePending: true,
       warrantyDecision: null,
     });
     assert.equal(row.label, "Sin cotizar");
-    assert.deepEqual(row.tags, ["Autorizado"]);
+    assert.equal(row.tags, undefined);
   });
 
   it("cotizado pendiente de decisión sin subestado", () => {

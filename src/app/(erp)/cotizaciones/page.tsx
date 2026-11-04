@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { ClientNameLink } from "@/components/client-entity-links";
 import { CotizacionesListFilter } from "@/components/compact-list-filters";
+import { SlaCountdown } from "@/components/sla-countdown";
 import { ActionLink, ActiveFilters, Badge, Card, Empty, ListCap, MobileCard, PageHeader, RecordLink, ResponsiveData, Table, Td, Th, TextLink } from "@/components/ui";
 import { listHref } from "@/lib/list-url";
 import { homePath } from "@/lib/home";
@@ -8,7 +9,7 @@ import { prisma } from "@/lib/db";
 import { linesForTotal, money, quoteTotals } from "@/lib/money";
 import { coordFilterChips, coordPageSubtitle, coordPageTitle, coordUsesSidebarNav } from "@/lib/coordination-ui";
 import { can } from "@/lib/permissions";
-import { ensureQuoteFromCase, QUOTE_STATUS_LABEL, QUOTE_TYPE_LABEL, type QuoteType } from "@/lib/quotes";
+import { ensureQuoteFromCase, quoteListSlaLabel, QUOTE_STATUS_LABEL, QUOTE_TYPE_LABEL, type QuoteType } from "@/lib/quotes";
 import { requireCompany } from "@/lib/session";
 
 export default async function CotizacionesPage({ searchParams }: { searchParams: Promise<{ vista?: string; q?: string }> }) {
@@ -103,11 +104,12 @@ export default async function CotizacionesPage({ searchParams }: { searchParams:
         />
       ) : (
         <ResponsiveData table={<Table>
-          <thead><tr><Th>Folio</Th><Th>Cliente</Th><Th>Tipo</Th><Th>Estado</Th><Th>Total</Th></tr></thead>
+          <thead><tr><Th>Folio</Th><Th>Cliente</Th><Th>Tipo</Th><Th>Estado</Th><Th>Total</Th><Th>SLA</Th></tr></thead>
           <tbody>
             {quotes.map((quote) => {
               const hidePrice = session.role === "VENTAS" && quote.status === "PENDIENTE_COTIZAR";
               const totals = hidePrice ? null : quoteTotals(linesForTotal(quote.lines, quote.quoteType, quote.status), quote.discountPct);
+              const sla = quoteListSlaLabel(quote);
               return (
                 <tr key={quote.id}>
                   <Td><RecordLink href={`/cotizaciones/${quote.id}`}>{quote.folio}</RecordLink></Td>
@@ -115,6 +117,13 @@ export default async function CotizacionesPage({ searchParams }: { searchParams:
                   <Td>{QUOTE_TYPE_LABEL[quote.quoteType as QuoteType] ?? quote.quoteType}</Td>
                   <Td><Badge tone={quote.status === "PENDIENTE_DECISION" ? "warn" : quote.status.startsWith("AUTORIZADA") ? "ok" : quote.status === "NO_AUTORIZADA" ? "danger" : "neutral"}>{QUOTE_STATUS_LABEL[quote.status] ?? quote.status}</Badge></Td>
                   <Td>{hidePrice ? "Sin precio" : money(totals?.total)}</Td>
+                  <Td>
+                    {sla.kind === "countdown" ? (
+                      <SlaCountdown dueAt={sla.dueAt} className="text-xs tabular-nums" />
+                    ) : (
+                      <span className="text-xs text-[var(--muted)]">{sla.text}</span>
+                    )}
+                  </Td>
                 </tr>
               );
             })}
@@ -122,6 +131,7 @@ export default async function CotizacionesPage({ searchParams }: { searchParams:
         </Table>} cards={quotes.map((quote) => {
           const hidePrice = session.role === "VENTAS" && quote.status === "PENDIENTE_COTIZAR";
           const totals = hidePrice ? null : quoteTotals(linesForTotal(quote.lines, quote.quoteType, quote.status), quote.discountPct);
+          const sla = quoteListSlaLabel(quote);
           return (
             <MobileCard
               key={quote.id}
@@ -131,6 +141,14 @@ export default async function CotizacionesPage({ searchParams }: { searchParams:
               footer={<ClientNameLink clientId={quote.client.id} name={quote.client.name} isSystem={quote.client.isSystem} canEdit={canEditClient} />}
             >
               <p>{QUOTE_TYPE_LABEL[quote.quoteType as QuoteType] ?? quote.quoteType} · {hidePrice ? "Sin precio" : money(totals?.total)}</p>
+              <p>
+                SLA:{" "}
+                {sla.kind === "countdown" ? (
+                  <SlaCountdown dueAt={sla.dueAt} className="text-xs tabular-nums" />
+                ) : (
+                  sla.text
+                )}
+              </p>
             </MobileCard>
           );
         })} />

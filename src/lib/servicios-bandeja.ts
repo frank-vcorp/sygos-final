@@ -187,12 +187,6 @@ export function administrativeStatus(input: AdminInput): StackedStatus {
     return { label: ADMIN_ESTADO.DX_SIN_REPARACION, tone: "ok" };
   }
 
-  if (input.attentionType === "REPARACION") {
-    if (input.quoteStatus === "NO_AUTORIZADA") tags.push(ADMIN_SUBESTADO.NO_AUTORIZADO);
-    else tags.push(ADMIN_SUBESTADO.AUTORIZADO);
-    return { label: ADMIN_ESTADO.SIN_COTIZAR, tone: "warn", tags };
-  }
-
   if (input.quoteStatus === "NO_AUTORIZADA") {
     tags.push(ADMIN_SUBESTADO.NO_AUTORIZADO);
     return { label: ADMIN_ESTADO.COTIZADO, tone: "info", tags };

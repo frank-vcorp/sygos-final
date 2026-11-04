@@ -6,6 +6,7 @@ import { HistoryTimeline } from "@/components/history-timeline";
 import { QuoteDecisionActions } from "@/components/quote-decision-actions";
 import { QuoteSellerDecisionDiscountPanel, QuoteSellerDecisionHeaderActions, QuoteSellerDecisionRoot } from "@/components/quote-seller-decision";
 import { QuoteConcept } from "@/components/quote-concept";
+import { SlaCountdown } from "@/components/sla-countdown";
 import { SubmitButton } from "@/components/submit-button";
 import {
   Badge,
@@ -32,7 +33,7 @@ import { linesForTotal, money, quoteTotals } from "@/lib/money";
 import { can } from "@/lib/permissions";
 import { PRESOLICITUD_LABEL } from "@/lib/part-presolicitud";
 import { ATTENTION_LABEL, type AttentionType } from "@/lib/priorities";
-import { QUOTE_STATUS_LABEL, QUOTE_TYPE_LABEL, quoteRequiresDeliveryDays, seesEconomicDetail, type QuoteType } from "@/lib/quotes";
+import { QUOTE_STATUS_LABEL, QUOTE_TYPE_LABEL, quoteDeliveryDaysRequired, quoteListSlaLabel, quoteRequiresDeliveryDays, quoteShowsDeliveryDaysField, seesEconomicDetail, type QuoteType } from "@/lib/quotes";
 import { ClientNameLink, ContactNameLink } from "@/components/client-entity-links";
 import { redirectIfSalesNotAssigned } from "@/lib/sales-assignment";
 import { requireCompany } from "@/lib/session";
@@ -101,6 +102,11 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
   const repairOrder = source
     ? await prisma.technicalCase.findFirst({ where: { spawnedFromId: source.id, kind: "OS" } })
     : null;
+  const caseContext = source
+    ? { kind: source.kind, attentionType: source.attention.attentionType }
+    : null;
+  const showDeliveryDays = quoteShowsDeliveryDaysField(quote, caseContext);
+  const deliveryDaysRequired = quoteDeliveryDaysRequired(quote, caseContext);
   const referencePrice = source?.attention.priorityPrice;
   const priced = quote.status !== "PENDIENTE_COTIZAR" || session.role !== "VENTAS";
   const totals = priced ? quoteTotals(linesForTotal(quote.lines, quote.quoteType, quote.status), quote.discountPct) : null;
@@ -157,13 +163,15 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
             />
           </label>
         ))}
-        {quoteRequiresDeliveryDays(quote) ? (
+        {showDeliveryDays ? (
           <label className="grid gap-1">
-            <span className="text-xs font-semibold text-[var(--muted)]">Tiempo de entrega (días hábiles)</span>
+            <span className="text-xs font-semibold text-[var(--muted)]">
+              Tiempo de entrega (días hábiles){deliveryDaysRequired ? "" : " · opcional"}
+            </span>
             <input
               type="number"
               name="deliveryBusinessDays"
-              required
+              required={deliveryDaysRequired}
               min={1}
               step={1}
               defaultValue={quote.deliveryBusinessDays ?? ""}

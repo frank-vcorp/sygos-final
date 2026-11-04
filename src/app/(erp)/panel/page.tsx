@@ -848,8 +848,9 @@ async function CeoExecutive({ companyId, name }: { companyId: string; name: stri
   const directRepairOsRows = activeServicios.filter(
     (row): row is ServicioBandejaRow =>
       row.kind === "servicio"
+      && row.attentionType === "REPARACION"
       && row.osHref != null
-      && row.administrative.label === ADMIN_ESTADO.SIN_COTIZAR
+      && !row.quoteFolio
       && row.physical.label === PHYSICAL_ESTADO.EN_RESGUARDO
       && row.slaStartedAt != null,
   );

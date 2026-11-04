@@ -84,6 +84,7 @@ export async function openCase(attentionId: string, receivedAt: Date) {
         slaDueAt: isReparacionExpressAttentionType(attention.attentionType)
           ? null
           : addBusinessDays(receivedAt, attention.prioritySlaMaxDays),
+        quotePending: isReparacionExpressAttentionType(attention.attentionType),
       },
     });
     if (attention.initialLog?.trim() && attention.createdByUserId) {
@@ -106,6 +107,13 @@ export async function openCase(attentionId: string, receivedAt: Date) {
     summary: `${technicalCase.folio} abierta y en espera de asignación técnica.`,
     authorUserId: attention.createdByUserId,
   });
+  if (isReparacionExpressAttentionType(attention.attentionType) && attention.createdByUserId) {
+    const { ensureQuoteFromCase } = await import("./quotes");
+    await ensureQuoteFromCase(
+      { userId: attention.createdByUserId, activeCompanyId: attention.serviceCompanyId },
+      technicalCase.id,
+    );
+  }
   return technicalCase;
 }
 
@@ -424,13 +432,14 @@ export async function finishRepair(actor: Actor, caseId: string, version: number
     throw new Error("Hay refacciones pendientes. No se cierra como reparación terminada.");
   }
   const warranty = Boolean(row.spawnedFromId);
+  const expressRepair = isReparacionExpressAttentionType(row.attention.attentionType);
   const updated = await prisma.technicalCase.updateMany({
     where: { id: row.id, version },
     data: {
       status: outcome,
       resultText,
       finishedByUserId: actor.userId,
-      quotePending: warranty ? false : true,
+      quotePending: warranty || expressRepair ? false : true,
       version: { increment: 1 },
     },
   });
@@ -445,7 +454,7 @@ export async function finishRepair(actor: Actor, caseId: string, version: number
       : "Sin reparación. El cargo queda para la decisión comercial.",
     authorUserId: actor.userId,
   });
-  if (!warranty) {
+  if (!warranty && !expressRepair) {
     const { ensureQuoteFromCase } = await import("./quotes");
     await ensureQuoteFromCase(actor, row.id);
   }

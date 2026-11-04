@@ -3,7 +3,7 @@ import { allocateFolio } from "./folios";
 import { ConcurrencyError } from "./form";
 import { recordHistory } from "./history";
 import { finalFromBase } from "./money";
-import { ATTENTION_LABEL, type AttentionType } from "./priorities";
+import { ATTENTION_LABEL, isReparacionExpressAttentionType, type AttentionType } from "./priorities";
 import { technicalServiceConcept } from "./quote-concept";
 import type { Role } from "./roles";
 import { QUOTE_STATUS_LABEL, QUOTE_TYPE_LABEL, QUOTE_TYPES, type QuoteType } from "./quote-meta";
@@ -199,6 +199,59 @@ export function quoteRequiresDeliveryDays(quote: { quoteType: string; technicalC
     || (quote.quoteType === "DIAGNOSTICO" && quote.technicalCaseId != null);
 }
 
+type QuoteCaseContext = { kind: string; attentionType: string } | null | undefined;
+
+/** Reparación Express (OS directa): el CEO puede omitir días hábiles al asignar precio. */
+export function quoteDeliveryDaysRequired(
+  quote: { quoteType: string; technicalCaseId: string | null },
+  caseContext: QuoteCaseContext,
+): boolean {
+  if (!quoteRequiresDeliveryDays(quote)) return false;
+  if (
+    quote.quoteType === "REPARACION"
+    && caseContext?.kind === "OS"
+    && isReparacionExpressAttentionType(caseContext.attentionType)
+  ) {
+    return false;
+  }
+  return true;
+}
+
+export function quoteShowsDeliveryDaysField(
+  quote: { quoteType: string; technicalCaseId: string | null },
+  caseContext: QuoteCaseContext,
+): boolean {
+  return quoteDeliveryDaysRequired(quote, caseContext)
+    || (
+      quote.quoteType === "REPARACION"
+      && caseContext?.kind === "OS"
+      && isReparacionExpressAttentionType(caseContext.attentionType)
+    );
+}
+
+/** Texto de columna SLA en listados de cotizaciones. */
+export function quoteListSlaLabel(quote: {
+  status: string;
+  slaDueAt: Date | null;
+  deliveryBusinessDays: number | null;
+  quoteType: string;
+  technicalCaseId: string | null;
+}): { kind: "countdown"; dueAt: Date } | { kind: "text"; text: string } {
+  if (quote.slaDueAt) {
+    return { kind: "countdown", dueAt: quote.slaDueAt };
+  }
+  if (quote.deliveryBusinessDays != null && quote.deliveryBusinessDays >= 1 && quote.status !== "PENDIENTE_COTIZAR") {
+    return { kind: "text", text: `${quote.deliveryBusinessDays} días hábiles` };
+  }
+  if (quote.status === "PENDIENTE_COTIZAR") {
+    return { kind: "text", text: "Sin precio" };
+  }
+  if (quoteRequiresDeliveryDays(quote) && quote.deliveryBusinessDays == null) {
+    return { kind: "text", text: "Sin plazo" };
+  }
+  return { kind: "text", text: "—" };
+}
+
 export function quoteDeliveryEmailNote(quote: {
   quoteType: string;
   technicalCaseId: string | null;
@@ -227,12 +280,31 @@ export async function setPrices(
     include: { lines: true, company: true },
   });
   if (!quote || quote.status !== "PENDIENTE_COTIZAR") throw new Error("Esta cotización no admite precio.");
+  const caseRow = quote.technicalCaseId
+    ? await prisma.technicalCase.findUnique({
+        where: { id: quote.technicalCaseId },
+        select: { kind: true, attention: { select: { attentionType: true } } },
+      })
+    : null;
+  const deliveryRequired = quoteDeliveryDaysRequired(
+    quote,
+    caseRow ? { kind: caseRow.kind, attentionType: caseRow.attention.attentionType } : null,
+  );
   let frozenDeliveryDays: number | undefined;
-  if (quoteRequiresDeliveryDays(quote)) {
+  if (deliveryRequired) {
     if (!Number.isInteger(deliveryBusinessDays) || deliveryBusinessDays! < 1) {
       throw new Error("Indica el tiempo de entrega en días hábiles (entero mayor o igual a 1).");
     }
     frozenDeliveryDays = deliveryBusinessDays!;
+  } else if (
+    deliveryBusinessDays != null
+    && deliveryBusinessDays !== undefined
+    && String(deliveryBusinessDays).trim() !== ""
+  ) {
+    if (!Number.isInteger(deliveryBusinessDays) || deliveryBusinessDays < 1) {
+      throw new Error("Si indicas tiempo de entrega, usa un entero mayor o igual a 1.");
+    }
+    frozenDeliveryDays = deliveryBusinessDays;
   }
   await prisma.$transaction(async (tx) => {
     for (const price of prices) {
@@ -425,6 +497,12 @@ export async function decideQuote(
       },
     });
     if (updated.count === 0) throw new ConcurrencyError();
+    if (repairSlaOnAuthorize?.slaDueAt && diagnosis?.kind === "OS") {
+      await tx.technicalCase.update({
+        where: { id: diagnosis.id },
+        data: { slaDueAt: repairSlaOnAuthorize.slaDueAt },
+      });
+    }
     await tx.quoteLine.updateMany({ where: { quoteId: quote.id }, data: { authorized: false } });
     if (chosen.length > 0) {
       await tx.quoteLine.updateMany({ where: { id: { in: chosen.map((line) => line.id) } }, data: { authorized: true } });
