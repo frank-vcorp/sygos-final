@@ -36,6 +36,25 @@ export function commercialAttentionTypeForQuote(quote: {
   return "DIAGNOSTICO";
 }
 
+/** Tras ingreso en almacén: COTDX liga al DX; COTOS al OS (no al stub reservado del ciclo DX). */
+export function commercialCaseKindForQuote(quote: {
+  quoteType: string;
+  folio: string;
+  technicalCaseId: string | null;
+}): "DIAGNOSTICO" | "OS" {
+  if (isCotosQuote(quote)) return "OS";
+  if (quote.quoteType === "DIAGNOSTICO" && isSellerCommercialQuote(quote)) return "DIAGNOSTICO";
+  return quote.quoteType === "REPARACION" ? "OS" : "DIAGNOSTICO";
+}
+
+export function pickCommercialCaseForAttention(
+  quote: { quoteType: string; folio: string; technicalCaseId: string | null },
+  cases: Array<{ id: string; kind: string }>,
+) {
+  const kind = commercialCaseKindForQuote(quote);
+  return cases.find((row) => row.kind === kind) ?? null;
+}
+
 async function freezePriorityFromCatalog(
   companyId: string,
   attentionType: AttentionType,
@@ -1109,9 +1128,9 @@ export async function openWaitingRepairs(equipmentId: string, authorUserId: stri
   for (const quote of linked) {
     const attention = await prisma.attention.findFirst({
       where: { originQuoteId: quote.id },
-      include: { technicalCases: { orderBy: { createdAt: "desc" }, take: 1 } },
+      include: { technicalCases: true },
     });
-    const opened = attention?.technicalCases[0];
+    const opened = attention ? pickCommercialCaseForAttention(quote, attention.technicalCases) : null;
     if (!opened) continue;
     await linkCommercialQuoteToTechnicalCase(
       quote.id,

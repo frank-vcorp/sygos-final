@@ -341,6 +341,21 @@ async function loadCase(id: string) {
   return row;
 }
 
+/** OS reservada del ciclo DX (folio SRV): no ejecuta reparación hasta autorización comercial. */
+async function assertRepairOsExecutable(row: Awaited<ReturnType<typeof loadCase>>) {
+  if (row.kind !== "OS" || !row.spawnedFromId || !row.quotePending) return;
+  const parent = await prisma.technicalCase.findUnique({
+    where: { id: row.spawnedFromId },
+    include: { attention: true },
+  });
+  if (
+    parent?.kind === "DIAGNOSTICO"
+    && parent.attention.attentionType === "DIAGNOSTICO"
+  ) {
+    throw new Error("La orden de reparación arranca cuando el diagnóstico esté concluido y el cliente autorice la reparación.");
+  }
+}
+
 function assertServiceCompany(actor: Actor, serviceCompanyId: string) {
   if (actor.activeCompanyId !== serviceCompanyId) {
     throw new Error("SYSTRON consulta esta operación en solo lectura. El estado lo cambia quien ejecuta el servicio.");
@@ -374,6 +389,7 @@ export function canCloseRepair(
 export async function assignCase(actor: Actor, caseId: string, version: number, assigneeUserId: string | null, supplierId: string | null) {
   const row = await loadCase(caseId);
   assertServiceCompany(actor, row.serviceCompanyId);
+  await assertRepairOsExecutable(row);
   if (!canAssign(actor)) throw new Error("No puedes asignar esta operación.");
   if (["VALIDADO", "TERMINADA", "SIN_REPARACION"].includes(row.status)) {
     throw new Error("La operación ya está cerrada técnicamente.");
@@ -410,6 +426,7 @@ export async function assignCase(actor: Actor, caseId: string, version: number, 
 export async function startCase(actor: Actor, caseId: string, version: number) {
   const row = await loadCase(caseId);
   assertServiceCompany(actor, row.serviceCompanyId);
+  await assertRepairOsExecutable(row);
   if (!canExecute(actor, row.assigneeUserId) && !(actor.role === "GERENTE_OPERATIVO_SERVOMOTORES")) {
     throw new Error("Solo el responsable asignado inicia el trabajo.");
   }

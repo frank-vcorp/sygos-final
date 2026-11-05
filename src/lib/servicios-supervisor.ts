@@ -283,12 +283,14 @@ function buildServicioRow(
     cases.find((c) => c.kind === "DIAGNOSTICO")
     ?? (os?.spawnedFromId ? cases.find((c) => c.id === os.spawnedFromId) : null)
     ?? null;
-  const primary = os ?? diagnosis ?? cases[0];
+  const diagnosisActive =
+    diagnosis != null && !(CLOSED_CASE as readonly string[]).includes(diagnosis.status);
+  const primary = (diagnosisActive ? diagnosis : null) ?? os ?? diagnosis ?? cases[0];
   const equipment = primary.equipment;
-  const technicalSource = os ?? diagnosis ?? primary;
+  const technicalSource = diagnosisActive ? diagnosis : (os ?? diagnosis ?? primary);
 
   const diagnosisFolio = diagnosis?.folio ?? null;
-  const diagnosisHref = diagnosis && !os ? `/operacion/${diagnosis.id}` : null;
+  const diagnosisHref = diagnosis ? `/operacion/${diagnosis.id}` : null;
   const osFolio = os?.folio ?? null;
   const osHref = os ? `/operacion/${os.id}` : null;
 

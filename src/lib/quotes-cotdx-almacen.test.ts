@@ -193,6 +193,7 @@ describe("COTDX comercial → almacén", () => {
     });
     assert.ok(dx);
     assert.equal(dx!.status, "EN_ESPERA");
+    assert.equal(linked!.technicalCaseId, dx!.id, "COTDX debe ligarse al DX, no al OS reservado del ciclo");
 
     await prisma.$disconnect();
   });
