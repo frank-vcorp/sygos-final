@@ -54,6 +54,7 @@ export async function createQuoteAction(formData: FormData) {
       reference: optionalText(formData.get("reference")),
       concepts,
       contactIds,
+      priorityId: optionalText(formData.get("priorityId")),
     });
     const fromVentas = optionalText(formData.get("origin")) === "ventas";
     await setFlash({
@@ -82,7 +83,7 @@ export async function relateEquipmentAction(formData: FormData) {
       quoteId,
       parseVersion(formData.get("version")),
       equipmentId,
-      requiredText(formData.get("priorityId"), "Prioridad"),
+      optionalText(formData.get("priorityId")) ?? "",
     );
     await setFlash({ tone: "ok", message: "Equipo relacionado. La operación arranca cuando el equipo está en resguardo." });
     redirect(target);
@@ -120,7 +121,18 @@ export async function setPricesAction(formData: FormData) {
     const deliveryBusinessDays = deliveryRaw != null && String(deliveryRaw).trim() !== ""
       ? Number.parseInt(String(deliveryRaw), 10)
       : null;
-    await setPrices(session, requiredText(formData.get("quoteId"), "Cotización"), parseVersion(formData.get("version")), prices, deliveryBusinessDays);
+    const hoursRaw = formData.get("fieldServiceHours");
+    const fieldServiceHours = hoursRaw != null && String(hoursRaw).trim() !== ""
+      ? Number.parseFloat(String(hoursRaw))
+      : null;
+    await setPrices(
+      session,
+      requiredText(formData.get("quoteId"), "Cotización"),
+      parseVersion(formData.get("version")),
+      prices,
+      deliveryBusinessDays,
+      fieldServiceHours,
+    );
     await setFlash({ tone: "ok", message: "Precio asignado." });
     redirect(target);
   } catch (error) {

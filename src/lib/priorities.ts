@@ -1,17 +1,25 @@
-export const ATTENTION_TYPES = ["DIAGNOSTICO", "REPARACION", "DIAGNOSTICO_GARANTIA"] as const;
+export const ATTENTION_TYPES = ["DIAGNOSTICO", "REPARACION", "REPARACION_TALLER", "DIAGNOSTICO_GARANTIA"] as const;
 export type AttentionType = (typeof ATTENTION_TYPES)[number];
 
 export const ATTENTION_LABEL: Record<AttentionType, string> = {
   DIAGNOSTICO: "Diagnóstico",
   REPARACION: "Reparación Express",
+  REPARACION_TALLER: "Reparación / servicio taller",
   DIAGNOSTICO_GARANTIA: "Diagnóstico de Garantía",
 };
 
 /** Motivo de entrada en almacén para atenciones REPARACION (Reparación Express). */
 export const REPARACION_RECEIPT_REASON = "Reparación Express";
 
+/** Motivo de entrada para COTOS (reparación taller, no Express). */
+export const REPARACION_TALLER_RECEIPT_REASON = "Reparación taller";
+
 export function isReparacionExpressAttentionType(attentionType: string): boolean {
   return attentionType === "REPARACION";
+}
+
+export function isReparacionTallerAttentionType(attentionType: string): boolean {
+  return attentionType === "REPARACION_TALLER";
 }
 
 /** Prioridad congelada al alta de Reparación Express (sin catálogo ni SLA por días). */
@@ -67,6 +75,9 @@ export function initialPriorities(companyCode: "SYSTRON" | "SERVOMOTORES"): Prio
     row("REPARACION", "Normal", null, 0),
     row("REPARACION", "Alta", null, 10),
     row("REPARACION", "Exprés", null, 20),
+    row("REPARACION_TALLER", "Normal", null, 0),
+    row("REPARACION_TALLER", "Alta", null, 10),
+    row("REPARACION_TALLER", "Exprés", null, 20),
     row("DIAGNOSTICO_GARANTIA", "Normal", 0, null),
     row("DIAGNOSTICO_GARANTIA", "Alta", 0, null),
     row("DIAGNOSTICO_GARANTIA", "Exprés", 0, null),

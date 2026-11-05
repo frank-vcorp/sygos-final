@@ -10,8 +10,11 @@ import { ConcurrencyError } from "./form";
 import { recordHistory } from "./history";
 import { ensureOsStubForDiagnosis } from "./technical";
 import { finalFromBase } from "./money";
-import { ATTENTION_LABEL, isReparacionExpressAttentionType, type AttentionType } from "./priorities";
+import { isReparacionExpressAttentionType, type AttentionType } from "./priorities";
+import { ensureReparacionTallerPriorities } from "./priority-catalog";
 import { technicalServiceConcept } from "./quote-concept";
+import { commercialQuoteSeriesForType, isCotosQuote, isSellerCommercialQuote } from "./quote-folio-series";
+import { createFieldServiceCaseFromQuote, FIELD_SERVICE_DEFAULT_HOURS, parseFieldServicePricing } from "./field-service";
 import type { Role } from "./roles";
 import { QUOTE_STATUS_LABEL, QUOTE_TYPE_LABEL, QUOTE_TYPES, type QuoteType } from "./quote-meta";
 import { SALES_NOT_ASSIGNED_MESSAGE } from "./sales-assignment";
@@ -20,6 +23,50 @@ import { addBusinessDays, normalizeSlaStartFromAuthorization } from "./sla";
 export { QUOTE_STATUS_LABEL, QUOTE_TYPE_LABEL, QUOTE_TYPES, type QuoteType };
 
 type Actor = { userId: string; role: Role; activeCompanyId: string; activeCompanyCode: string };
+
+/** Tipo de atención al abrir operación desde cotización comercial del vendedor. */
+export function commercialAttentionTypeForQuote(quote: {
+  quoteType: string;
+  folio: string;
+  technicalCaseId: string | null;
+}): AttentionType {
+  if (quote.quoteType === "DIAGNOSTICO") return "DIAGNOSTICO";
+  if (isCotosQuote(quote)) return "REPARACION_TALLER";
+  if (quote.quoteType === "REPARACION") return "REPARACION";
+  return "DIAGNOSTICO";
+}
+
+async function freezePriorityFromCatalog(
+  companyId: string,
+  attentionType: AttentionType,
+  priorityId: string,
+) {
+  await ensureReparacionTallerPriorities(companyId);
+  const priority = await prisma.priority.findFirst({
+    where: { id: priorityId, companyId, attentionType, active: true },
+  });
+  if (!priority) throw new Error("Selecciona una prioridad vigente de este servicio.");
+  return priority;
+}
+
+function frozenPriorityFromQuote(quote: {
+  priorityName: string | null;
+  priorityPrice: number | null;
+  priorityIncrementPct: number | null;
+  priorityTargetMinDays: number | null;
+  priorityTargetMaxDays: number | null;
+  prioritySlaMaxDays: number | null;
+}) {
+  if (!quote.priorityName || quote.prioritySlaMaxDays == null) return null;
+  return {
+    name: quote.priorityName,
+    price: quote.priorityPrice,
+    incrementPct: quote.priorityIncrementPct,
+    targetMinDays: quote.priorityTargetMinDays,
+    targetMaxDays: quote.priorityTargetMaxDays,
+    slaMaxDays: quote.prioritySlaMaxDays,
+  };
+}
 
 export function seesEconomicDetail(role: Role, companyCode: string, quoteCompanyCode: string, isBaseForOther: boolean): boolean {
   if (role === "VENTAS") return false;
@@ -43,6 +90,7 @@ export async function createSellerQuote(
     reference: string | null;
     concepts: Array<{ concept: string; quantity: number }>;
     contactIds: string[];
+    priorityId?: string | null;
   },
 ) {
   if (input.concepts.length === 0) throw new Error("Agrega al menos un concepto.");
@@ -57,10 +105,19 @@ export async function createSellerQuote(
   } else if (input.quoteType === "DIAGNOSTICO" || input.quoteType === "REPARACION") {
     throw new Error("Selecciona o registra un equipo para esta cotización.");
   }
+  if (input.quoteType === "CAMPO" && input.concepts.every((line) => !line.concept.trim())) {
+    throw new Error("Describe el servicio de campo en los conceptos.");
+  }
+  let frozenPriority: Awaited<ReturnType<typeof freezePriorityFromCatalog>> | null = null;
+  if (input.quoteType === "DIAGNOSTICO") {
+    if (!input.priorityId) throw new Error("Selecciona la prioridad del diagnóstico.");
+    frozenPriority = await freezePriorityFromCatalog(actor.activeCompanyId, "DIAGNOSTICO", input.priorityId);
+  }
   if (input.contactIds.length === 0) throw new Error("Selecciona al menos un contacto.");
   const contacts = await prisma.contact.count({ where: { id: { in: input.contactIds }, clientId: client.id, active: true } });
   if (contacts !== input.contactIds.length) throw new Error("Algún contacto no pertenece al cliente.");
-  const folio = await allocateFolio(actor.activeCompanyId, "COT");
+  const folioSeries = commercialQuoteSeriesForType(input.quoteType);
+  const folio = await allocateFolio(actor.activeCompanyId, folioSeries);
   const quote = await prisma.quote.create({
     data: {
       folio,
@@ -71,6 +128,16 @@ export async function createSellerQuote(
       equipmentId: input.equipmentId,
       reference: input.reference,
       sellerUserId: actor.role === "VENTAS" || actor.role === "GERENTE_OPERATIVO_SERVOMOTORES" ? actor.userId : client.ownerUserId,
+      ...(frozenPriority
+        ? {
+            priorityName: frozenPriority.name,
+            priorityPrice: frozenPriority.price,
+            priorityIncrementPct: frozenPriority.incrementPct,
+            priorityTargetMinDays: frozenPriority.targetMinDays,
+            priorityTargetMaxDays: frozenPriority.targetMaxDays,
+            prioritySlaMaxDays: frozenPriority.slaMaxDays,
+          }
+        : {}),
       lines: { create: input.concepts.map((line) => ({ concept: line.concept, quantity: line.quantity })) },
     },
   });
@@ -292,6 +359,7 @@ export async function setPrices(
   version: number,
   prices: Array<{ lineId: string; amount: number }>,
   deliveryBusinessDays?: number | null,
+  fieldServiceHours?: number | null,
 ) {
   const quote = await prisma.quote.findFirst({
     where: { id: quoteId, companyId: actor.activeCompanyId },
@@ -324,17 +392,29 @@ export async function setPrices(
     }
     frozenDeliveryDays = deliveryBusinessDays;
   }
+  const campoPricing = parseFieldServicePricing(
+    quote.quoteType,
+    fieldServiceHours,
+    quote.lines.map((line) => {
+      const price = prices.find((item) => item.lineId === line.id);
+      return { unitPrice: price?.amount ?? line.unitPrice };
+    }),
+  );
   await prisma.$transaction(async (tx) => {
     for (const price of prices) {
       const line = quote.lines.find((item) => item.id === price.lineId);
       if (!line) throw new Error("Hay un concepto que no pertenece a la cotización.");
       if (!Number.isFinite(price.amount) || price.amount < 0) throw new Error("El precio no es válido.");
       const increment = line.incrementPct;
+      let unitAmount = price.amount;
+      if (campoPricing && quote.quoteType === "CAMPO") {
+        unitAmount = campoPricing.hours * campoPricing.unitPrice;
+      }
       await tx.quoteLine.update({
         where: { id: line.id },
         data: increment != null
-          ? { basePrice: price.amount, unitPrice: finalFromBase(price.amount, increment) }
-          : { unitPrice: price.amount, basePrice: null },
+          ? { basePrice: unitAmount, unitPrice: finalFromBase(unitAmount, increment) }
+          : { unitPrice: unitAmount, basePrice: null },
       });
     }
     const updated = await tx.quote.updateMany({
@@ -343,6 +423,9 @@ export async function setPrices(
         status: "PENDIENTE_DECISION",
         creditDays: quote.creditDays,
         ...(frozenDeliveryDays != null ? { deliveryBusinessDays: frozenDeliveryDays } : {}),
+        ...(campoPricing
+          ? { fieldServiceHours: campoPricing.hours, fieldServiceUnitPrice: campoPricing.unitPrice }
+          : {}),
         version: { increment: 1 },
       },
     });
@@ -485,7 +568,22 @@ export async function decideQuote(
     : null;
   const received = Boolean(equipment && equipment.custody === "EN_RESGUARDO");
   const inShop = Boolean(received && diagnosis?.kind === "DIAGNOSTICO" && equipment?.holderCompanyId === diagnosis.serviceCompanyId);
-  const needsEquipment = authorized && serviceQuote && diagnosis?.kind !== "OS" && !received;
+  const cotosInShop = Boolean(
+    authorized
+    && isCotosQuote(quote)
+    && received
+    && equipment?.holderCompanyId
+    && !quote.technicalCaseId,
+  );
+  const cotdxInShop = Boolean(
+    authorized
+    && quote.quoteType === "DIAGNOSTICO"
+    && isSellerCommercialQuote(quote)
+    && received
+    && equipment?.holderCompanyId
+    && !quote.technicalCaseId,
+  );
+  const needsEquipment = authorized && serviceQuote && diagnosis?.kind !== "OS" && !received && !cotosInShop && !cotdxInShop;
   const status = !authorized ? "NO_AUTORIZADA" : needsEquipment ? "AUTORIZADA_PENDIENTE_EQUIPO" : "AUTORIZADA";
   const creditDays = quote.client.creditDays;
   const saleFolio = status === "AUTORIZADA" && quote.quoteType === "VENTA_EQUIPO" ? await allocateFolio(quote.companyId, "VTA") : null;
@@ -571,6 +669,32 @@ export async function decideQuote(
   ) {
     await openRepairOrder(diagnosis.id, actor.userId);
   }
+  if (authorized && quote.quoteType === "CAMPO") {
+    const fresh = await prisma.quote.findUnique({
+      where: { id: quote.id },
+      include: { lines: true },
+    });
+    if (fresh) {
+      await createFieldServiceCaseFromQuote(
+        {
+          id: fresh.id,
+          companyId: fresh.companyId,
+          clientId: fresh.clientId,
+          sellerUserId: fresh.sellerUserId,
+          lines: fresh.lines.map((line) => ({ ...line, authorized: chosen.some((c) => c.id === line.id) })),
+          fieldServiceHours: fresh.fieldServiceHours,
+          fieldServiceUnitPrice: fresh.fieldServiceUnitPrice,
+        },
+        actor.userId,
+      );
+    }
+  }
+  if (authorized && cotosInShop && equipment) {
+    await openCotosRepairFromQuote(actor, quote, equipment.id);
+  }
+  if (authorized && cotdxInShop && equipment) {
+    await openCotdxFromQuote(actor, quote, equipment.id);
+  }
 }
 
 export async function relateQuoteEquipment(actor: Actor, quoteId: string, version: number, equipmentId: string, priorityId: string) {
@@ -583,9 +707,11 @@ export async function relateQuoteEquipment(actor: Actor, quoteId: string, versio
   if (quote.quoteType !== "DIAGNOSTICO" && quote.quoteType !== "REPARACION") throw new Error("Este tipo no abre operación al ingresar el equipo.");
   const equipment = await prisma.equipment.findFirst({ where: { id: equipmentId, originCompanyId: actor.activeCompanyId, clientId: quote.clientId } });
   if (!equipment) throw new Error("El equipo no es de este cliente en esta empresa.");
-  const attentionType = quote.quoteType === "REPARACION" ? "REPARACION" : "DIAGNOSTICO";
-  const priority = await prisma.priority.findFirst({ where: { id: priorityId, companyId: actor.activeCompanyId, attentionType, active: true } });
-  if (!priority) throw new Error("Selecciona una prioridad vigente de este servicio.");
+  const attentionType = commercialAttentionTypeForQuote(quote);
+  const fromQuote = frozenPriorityFromQuote(quote);
+  const priority = fromQuote
+    ?? await freezePriorityFromCatalog(actor.activeCompanyId, attentionType, priorityId);
+  if (!fromQuote && !priorityId) throw new Error("Selecciona una prioridad vigente de este servicio.");
   const service = equipment.kind === "MOT"
     ? await prisma.company.findUnique({ where: { code: "SERVOMOTORES" } })
     : await prisma.company.findUnique({ where: { id: actor.activeCompanyId } });
@@ -601,6 +727,7 @@ export async function relateQuoteEquipment(actor: Actor, quoteId: string, versio
       data: { custody: "SIN_CUSTODIA", holderCompanyId: null, version: { increment: 1 } },
     });
   }
+  const quotePriceLine = quote.lines.find((line) => line.authorized && line.unitPrice != null) ?? quote.lines.find((line) => line.unitPrice != null);
   const attention = await prisma.attention.create({
     data: {
       equipmentId: equipment.id,
@@ -609,8 +736,8 @@ export async function relateQuoteEquipment(actor: Actor, quoteId: string, versio
       adminClientId: quote.clientId,
       attentionType,
       priorityName: priority.name,
-      priorityPrice: priority.price,
-      priorityIncrementPct: priority.incrementPct,
+      priorityPrice: quotePriceLine?.basePrice ?? priority.price,
+      priorityIncrementPct: quotePriceLine?.incrementPct ?? priority.incrementPct,
       priorityTargetMin: priority.targetMinDays,
       priorityTargetMax: priority.targetMaxDays,
       prioritySlaMaxDays: priority.slaMaxDays,
@@ -640,7 +767,144 @@ export async function relateQuoteEquipment(actor: Actor, quoteId: string, versio
   const { openCase } = await import("./technical");
   const created = await openCase(attention.id, attention.slaStartedAt ?? new Date());
   if (!created) return;
-  await prisma.quote.update({ where: { id: quote.id }, data: { technicalCaseId: created.id, status: "AUTORIZADA" } });
+  let caseId = created.id;
+  if (isCotosQuote(quote) && quote.deliveryBusinessDays != null && quote.deliveryBusinessDays >= 1) {
+    const clientAuthorizedAt = quote.clientAuthorizedAt ?? new Date();
+    const slaStartedAt = normalizeSlaStartFromAuthorization(clientAuthorizedAt);
+    const slaDueAt = addBusinessDays(slaStartedAt, quote.deliveryBusinessDays);
+    await prisma.technicalCase.update({ where: { id: created.id }, data: { slaDueAt, quotePending: false } });
+  }
+  await prisma.quote.update({ where: { id: quote.id }, data: { technicalCaseId: caseId, status: "AUTORIZADA" } });
+}
+
+async function openCotdxFromQuote(
+  actor: Actor,
+  quote: {
+    id: string;
+    companyId: string;
+    clientId: string;
+    sellerUserId: string | null;
+    lines: Array<{ authorized: boolean; concept: string; unitPrice: number | null; basePrice: number | null; incrementPct: number | null }>;
+    priorityName: string | null;
+    priorityPrice: number | null;
+    priorityIncrementPct: number | null;
+    priorityTargetMinDays: number | null;
+    priorityTargetMaxDays: number | null;
+    prioritySlaMaxDays: number | null;
+  },
+  equipmentId: string,
+) {
+  const equipment = await prisma.equipment.findUnique({ where: { id: equipmentId } });
+  if (!equipment) return;
+  const service = equipment.kind === "MOT"
+    ? await prisma.company.findUnique({ where: { code: "SERVOMOTORES" } })
+    : await prisma.company.findUnique({ where: { id: actor.activeCompanyId } });
+  if (!service || equipment.holderCompanyId !== service.id) return;
+  const fromQuote = frozenPriorityFromQuote(quote);
+  if (!fromQuote) throw new Error("La cotización COTDX no tiene prioridad congelada.");
+  const concept = quote.lines.find((line) => line.authorized)?.concept ?? quote.lines[0]?.concept ?? "Diagnóstico autorizado";
+  const quotePriceLine = quote.lines.find((line) => line.authorized && line.unitPrice != null) ?? quote.lines.find((line) => line.unitPrice != null);
+  const attention = await prisma.attention.create({
+    data: {
+      equipmentId: equipment.id,
+      originCompanyId: equipment.originCompanyId,
+      serviceCompanyId: service.id,
+      adminClientId: quote.clientId,
+      attentionType: "DIAGNOSTICO",
+      priorityName: fromQuote.name,
+      priorityPrice: quotePriceLine?.basePrice ?? fromQuote.price,
+      priorityIncrementPct: quotePriceLine?.incrementPct ?? fromQuote.incrementPct,
+      priorityTargetMin: fromQuote.targetMinDays,
+      priorityTargetMax: fromQuote.targetMaxDays,
+      prioritySlaMaxDays: fromQuote.slaMaxDays,
+      reportedFault: concept,
+      sellerUserId: quote.sellerUserId,
+      originQuoteId: quote.id,
+      status: "EN_PROCESO",
+      slaStartedAt: new Date(),
+    },
+  });
+  const { openCase } = await import("./technical");
+  const created = await openCase(attention.id, attention.slaStartedAt ?? new Date());
+  if (!created) return;
+  await prisma.quote.update({
+    where: { id: quote.id },
+    data: { technicalCaseId: created.id, equipmentId: equipment.id, status: "AUTORIZADA", version: { increment: 1 } },
+  });
+}
+
+async function openCotosRepairFromQuote(
+  actor: Actor,
+  quote: {
+    id: string;
+    companyId: string;
+    clientId: string;
+    sellerUserId: string | null;
+    lines: Array<{ authorized: boolean; concept: string; unitPrice: number | null; basePrice: number | null; incrementPct: number | null }>;
+    deliveryBusinessDays: number | null;
+    clientAuthorizedAt: Date | null;
+    priorityName: string | null;
+    priorityPrice: number | null;
+    priorityIncrementPct: number | null;
+    priorityTargetMinDays: number | null;
+    priorityTargetMaxDays: number | null;
+    prioritySlaMaxDays: number | null;
+  },
+  equipmentId: string,
+) {
+  const equipment = await prisma.equipment.findUnique({ where: { id: equipmentId } });
+  if (!equipment) return;
+  const service = equipment.kind === "MOT"
+    ? await prisma.company.findUnique({ where: { code: "SERVOMOTORES" } })
+    : await prisma.company.findUnique({ where: { id: actor.activeCompanyId } });
+  if (!service || equipment.holderCompanyId !== service.id) return;
+  const fromQuote = frozenPriorityFromQuote(quote);
+  if (!fromQuote) {
+    await ensureReparacionTallerPriorities(actor.activeCompanyId);
+  }
+  const priority = fromQuote ?? {
+    name: "Normal",
+    price: null as number | null,
+    incrementPct: 0,
+    targetMinDays: 5,
+    targetMaxDays: 10,
+    slaMaxDays: 10,
+  };
+  const concept = quote.lines.find((line) => line.authorized)?.concept ?? quote.lines[0]?.concept ?? "Reparación autorizada";
+  const quotePriceLine = quote.lines.find((line) => line.authorized && line.unitPrice != null) ?? quote.lines.find((line) => line.unitPrice != null);
+  const attention = await prisma.attention.create({
+    data: {
+      equipmentId: equipment.id,
+      originCompanyId: equipment.originCompanyId,
+      serviceCompanyId: service.id,
+      adminClientId: quote.clientId,
+      attentionType: "REPARACION_TALLER",
+      priorityName: priority.name,
+      priorityPrice: quotePriceLine?.basePrice ?? priority.price,
+      priorityIncrementPct: quotePriceLine?.incrementPct ?? priority.incrementPct,
+      priorityTargetMin: priority.targetMinDays,
+      priorityTargetMax: priority.targetMaxDays,
+      prioritySlaMaxDays: priority.slaMaxDays,
+      reportedFault: concept,
+      sellerUserId: quote.sellerUserId,
+      originQuoteId: quote.id,
+      status: "EN_PROCESO",
+      slaStartedAt: new Date(),
+    },
+  });
+  const { openCase } = await import("./technical");
+  const created = await openCase(attention.id, attention.slaStartedAt ?? new Date());
+  if (!created) return;
+  if (quote.deliveryBusinessDays != null && quote.deliveryBusinessDays >= 1) {
+    const clientAuthorizedAt = quote.clientAuthorizedAt ?? new Date();
+    const slaStartedAt = normalizeSlaStartFromAuthorization(clientAuthorizedAt);
+    const slaDueAt = addBusinessDays(slaStartedAt, quote.deliveryBusinessDays);
+    await prisma.technicalCase.update({ where: { id: created.id }, data: { slaDueAt, quotePending: false } });
+  }
+  await prisma.quote.update({
+    where: { id: quote.id },
+    data: { technicalCaseId: created.id, equipmentId: equipment.id, status: "AUTORIZADA", version: { increment: 1 } },
+  });
 }
 
 export async function openWaitingRepairs(equipmentId: string, authorUserId: string) {

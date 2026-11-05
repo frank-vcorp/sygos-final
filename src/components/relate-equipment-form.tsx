@@ -19,6 +19,7 @@ export function RelateEquipmentForm({
   brands,
   models,
   relateAction,
+  frozenPriorityName,
 }: {
   quoteId: string;
   version: number;
@@ -32,6 +33,8 @@ export function RelateEquipmentForm({
   brands: string[];
   models: ModelRow[];
   relateAction: (formData: FormData) => void | Promise<void>;
+  /** Prioridad ya congelada en COTDX al alta. */
+  frozenPriorityName?: string | null;
 }) {
   return (
     <FormPanel action={relateAction}>
@@ -55,10 +58,17 @@ export function RelateEquipmentForm({
           emptyOptionLabel="Selecciona"
         />
         <Field label="Prioridad del servicio">
-          <select name="priorityId" required className={controlClass} defaultValue="">
-            <option value="">Selecciona</option>
-            {priorities.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-          </select>
+          {frozenPriorityName ? (
+            <>
+              <input type="hidden" name="priorityId" value="" />
+              <p className="rounded-md border border-[var(--line)] bg-[#f7fafc] px-3 py-2 text-sm">{frozenPriorityName} (definida en la cotización)</p>
+            </>
+          ) : (
+            <select name="priorityId" required className={controlClass} defaultValue="">
+              <option value="">Selecciona</option>
+              {priorities.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+            </select>
+          )}
         </Field>
       </FormSection>
       <FormActions><SubmitButton>Relacionar equipo</SubmitButton></FormActions>

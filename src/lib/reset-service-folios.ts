@@ -5,11 +5,13 @@ const RESET_SERIES = ["SRV", "DX", "OS", "COT", "FAC", "REM"] as const;
 
 const FUNCTIONAL_HISTORY_OPS = ["OPERACION", "COTIZACION", "FACTURACION"] as const;
 
-/** Cotizaciones del ciclo de servicio (no ventas CAMPO / VENTA_EQUIPO salvo enlace a caso). */
+/** Cotizaciones del ciclo de servicio (no ventas comerciales COT* / CAMPO). */
 export const serviceQuoteWhere: Prisma.QuoteWhereInput = {
   OR: [
-    { quoteType: { in: ["DIAGNOSTICO", "REPARACION"] } },
-    { technicalCaseId: { not: null } },
+    {
+      quoteType: { in: ["DIAGNOSTICO", "REPARACION"] },
+      technicalCaseId: { not: null },
+    },
     { folio: { startsWith: "COT-" } },
   ],
 };

@@ -33,7 +33,8 @@ import { linesForTotal, money, quoteTotals } from "@/lib/money";
 import { can } from "@/lib/permissions";
 import { PRESOLICITUD_LABEL } from "@/lib/part-presolicitud";
 import { ATTENTION_LABEL, type AttentionType } from "@/lib/priorities";
-import { QUOTE_STATUS_LABEL, QUOTE_TYPE_LABEL, quoteDeliveryDaysRequired, quoteListSlaLabel, quoteRequiresDeliveryDays, quoteShowsDeliveryDaysField, seesEconomicDetail, type QuoteType } from "@/lib/quotes";
+import { QUOTE_STATUS_LABEL, QUOTE_TYPE_LABEL, commercialAttentionTypeForQuote, quoteDeliveryDaysRequired, quoteListSlaLabel, quoteRequiresDeliveryDays, quoteShowsDeliveryDaysField, seesEconomicDetail, type QuoteType } from "@/lib/quotes";
+import { FIELD_SERVICE_DEFAULT_HOURS, FIELD_SERVICE_STATUS_LABEL, fieldServiceTotal, quoteCampoDisplayTotal } from "@/lib/field-service";
 import { ClientNameLink, ContactNameLink } from "@/components/client-entity-links";
 import { redirectIfSalesNotAssigned } from "@/lib/sales-assignment";
 import { requireCompany } from "@/lib/session";
@@ -45,7 +46,14 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
   const { id } = await params;
   const quote = await prisma.quote.findFirst({
     where: { id, companyId: session.activeCompanyId },
-    include: { client: { include: { contacts: { where: { active: true }, orderBy: [{ isPrimary: "desc" }, { name: "asc" }] } } }, lines: true, sales: true, company: true, equipment: true },
+    include: {
+      client: { include: { contacts: { where: { active: true }, orderBy: [{ isPrimary: "desc" }, { name: "asc" }] } } },
+      lines: true,
+      sales: true,
+      company: true,
+      equipment: true,
+      fieldServiceCase: true,
+    },
   });
   if (!quote) notFound();
   await redirectIfSalesNotAssigned(session, quote.sellerUserId, "/cotizaciones");
@@ -114,7 +122,10 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
   const [gear, priorities, types, brands, models] = waitingEquipment
     ? await Promise.all([
         prisma.equipment.findMany({ where: { originCompanyId: session.activeCompanyId, ...(session.role === "VENTAS" ? { client: { ownerUserId: session.userId } } : {}) }, orderBy: { createdAt: "desc" }, select: { id: true, folio: true, model: true, clientId: true, kind: true, typeName: true, brandName: true, serial: true } }),
-        prisma.priority.findMany({ where: { companyId: session.activeCompanyId, attentionType: quote.quoteType, active: true }, orderBy: { sortOrder: "asc" } }),
+        prisma.priority.findMany({
+          where: { companyId: session.activeCompanyId, attentionType: commercialAttentionTypeForQuote(quote), active: true },
+          orderBy: { sortOrder: "asc" },
+        }),
         prisma.catalogType.findMany({ orderBy: { name: "asc" } }),
         prisma.catalogBrand.findMany({ orderBy: { name: "asc" } }),
         prisma.catalogModel.findMany({ include: { type: true, brand: true } }),
@@ -163,6 +174,20 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
             />
           </label>
         ))}
+        {quote.quoteType === "CAMPO" ? (
+          <label className="grid gap-1">
+            <span className="text-xs font-semibold text-[var(--muted)]">Horas (CEO)</span>
+            <input
+              type="number"
+              name="fieldServiceHours"
+              min={0.5}
+              step={0.5}
+              defaultValue={quote.fieldServiceHours ?? FIELD_SERVICE_DEFAULT_HOURS}
+              className={controlClass}
+              aria-label="Horas de servicio de campo"
+            />
+          </label>
+        ) : null}
         {showDeliveryDays ? (
           <label className="grid gap-1">
             <span className="text-xs font-semibold text-[var(--muted)]">
@@ -325,7 +350,17 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
                 equipmentLabel
               )}
             </EntityMetaItem>
-            {totals ? <EntityMetaItem label="Total">{money(totals.total)}</EntityMetaItem> : <EntityMetaItem label="Total">Sin precio</EntityMetaItem>}
+            {quote.priorityName ? <EntityMetaItem label="Prioridad">{quote.priorityName}</EntityMetaItem> : null}
+            {quote.fieldServiceCase ? (
+              <EntityMetaItem label="SCA">
+                <TextLink href={`/servicio-campo/${quote.fieldServiceCase.id}`}>{quote.fieldServiceCase.folio}</TextLink>
+              </EntityMetaItem>
+            ) : null}
+            {totals ? <EntityMetaItem label="Total">{money(totals.total)}</EntityMetaItem> : quoteCampoDisplayTotal(quote) != null ? (
+              <EntityMetaItem label="Total estimado">{money(quoteCampoDisplayTotal(quote)!)}</EntityMetaItem>
+            ) : (
+              <EntityMetaItem label="Total">Sin precio</EntityMetaItem>
+            )}
           </>
         }
         primaryAction={primaryAction}
@@ -529,6 +564,7 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
               brands={brands.map((brand) => brand.name)}
               models={models.map((row) => ({ type: row.type.name, brand: row.brand.name, model: row.name }))}
               relateAction={relateEquipmentAction}
+              frozenPriorityName={quote.priorityName}
             />
             </div>
           ) : null}

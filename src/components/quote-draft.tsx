@@ -6,9 +6,11 @@ import { ClientPicker } from "@/components/client-picker";
 import { ServiceEquipmentPicker, type ServiceEquipmentOption } from "@/components/service-equipment-picker";
 import { Button, controlClass, Field, FormBlock } from "@/components/ui";
 import { QUOTE_TYPES, QUOTE_TYPE_LABEL, type QuoteType } from "@/lib/quote-meta";
+import { prioritySummary } from "@/lib/priorities";
 
 type Contact = { id: string; name: string; isPrimary: boolean };
 type Client = { id: string; name: string; contacts: Contact[] };
+type PriorityOption = { id: string; label: string };
 
 export function QuoteDraft({
   clients,
@@ -23,6 +25,7 @@ export function QuoteDraft({
   brands,
   models,
   fixedQuoteType,
+  diagnosisPriorities = [],
 }: {
   clients: Client[];
   equipment: ServiceEquipmentOption[];
@@ -36,6 +39,7 @@ export function QuoteDraft({
   brands: string[];
   models: Array<{ type: string; brand: string; model: string }>;
   fixedQuoteType?: QuoteType;
+  diagnosisPriorities?: PriorityOption[];
 }) {
   const [clientId, setClientId] = useState(defaultClientId);
   const [createdClients, setCreatedClients] = useState<Client[]>([]);
@@ -44,6 +48,7 @@ export function QuoteDraft({
   const client = [...clients, ...createdClients].find((row) => row.id === clientId);
   const contacts = client?.contacts ?? [];
   const requiresEquipment = quoteType === "DIAGNOSTICO" || quoteType === "REPARACION";
+  const requiresDiagnosisPriority = quoteType === "DIAGNOSTICO" && !fixedQuoteType;
   const concepts = lines
     .map((line) => ({ concept: line.concept.replaceAll("|", " ").trim(), quantity: line.quantity.trim() || "1" }))
     .filter((line) => line.concept)
@@ -67,6 +72,16 @@ export function QuoteDraft({
             </select>
           </Field>
         )}
+        {requiresDiagnosisPriority ? (
+          <Field label="Prioridad del diagnóstico" hint="Obligatoria en COTDX; se hereda al abrir el DX.">
+            <select name="priorityId" className={controlClass} required defaultValue="">
+              <option value="">Selecciona</option>
+              {diagnosisPriorities.map((item) => (
+                <option key={item.id} value={item.id}>{item.label}</option>
+              ))}
+            </select>
+          </Field>
+        ) : null}
         <ClientPicker
           clients={clients}
           allowQuickClient={allowQuickClient}

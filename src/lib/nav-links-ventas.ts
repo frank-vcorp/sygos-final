@@ -34,6 +34,7 @@ export const VENTAS_NAV_GROUPS: NavGroupDef[] = [
       { href: "/equipos", show: (role, code) => ventas(role) && showEquiCatalog(role, code) },
       { href: "/cotizaciones", show: (role, code) => ventas(role) && (can(role, "quote.create", code) || can(role, "quote.price", code)) },
       { href: "/ventas", label: "Venta de equipo", show: (role, code) => ventas(role) && (can(role, "agenda.use", code) || can(role, "quote.follow", code)) },
+      { href: "/servicio-campo", label: "Servicio de campo", show: (role, code) => ventas(role) && code === "SYSTRON" && (can(role, "quote.create", code) || can(role, "quote.follow", code)) },
     ],
   },
   {

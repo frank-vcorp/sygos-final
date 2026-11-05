@@ -67,6 +67,7 @@ model Company {
   collaborators    Collaborator[]
   payrollPeriods   PayrollPeriod[]
   commissionRuns   CommissionRun[]
+  fieldServiceCases FieldServiceCase[]
 }
 
 model User {
@@ -146,6 +147,7 @@ model Client {
   billingDocuments BillingDocument[]
   receivables      Receivable[]
   payments         Payment[]
+  fieldServiceCases FieldServiceCase[]
 
   @@index([companyId, name])
 }
@@ -587,6 +589,16 @@ model Quote {
   slaStartedAt       DateTime?
   slaDueAt           DateTime?
   sellerUserId       String?
+  /// Prioridad congelada al alta comercial COTDX (hereda a la atención/DX).
+  priorityName       String?
+  priorityPrice      Float?
+  priorityIncrementPct Float?
+  priorityTargetMinDays Int?
+  priorityTargetMaxDays Int?
+  prioritySlaMaxDays Int?
+  /// Horas CEO para COTSC → SCA (default 4).
+  fieldServiceHours  Float?
+  fieldServiceUnitPrice Float?
   version            Int      @default(1)
   createdAt          DateTime @default(now())
   updatedAt          DateTime @updatedAt
@@ -594,10 +606,35 @@ model Quote {
   lines QuoteLine[]
   sales Sale[]
   billingDocuments BillingDocument[]
+  fieldServiceCase FieldServiceCase?
 
   @@unique([companyId, folio])
   @@index([companyId, status])
   @@index([technicalCaseId])
+}
+
+/// Servicio de campo (SCA) generado desde cotización COTSC autorizada.
+model FieldServiceCase {
+  id          String   @id @default(cuid())
+  folio       String
+  companyId   String
+  company     Company  @relation(fields: [companyId], references: [id])
+  clientId    String
+  client      Client   @relation(fields: [clientId], references: [id])
+  quoteId     String   @unique
+  quote       Quote    @relation(fields: [quoteId], references: [id])
+  concept     String   @default("Servicio de Campo")
+  description String
+  hours       Float    @default(4)
+  unitPrice   Float
+  status      String   @default("ABIERTO")
+  sellerUserId String?
+  version     Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([companyId, folio])
+  @@index([companyId, status])
 }
 
 model QuoteLine {
