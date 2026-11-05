@@ -65,7 +65,7 @@ export const NAV_GROUPS: NavGroupDef[] = [
   {
     title: "Comercial",
     links: [
-      { href: "/cotizaciones", show: (role, code) => can(role, "quote.create", code) || can(role, "quote.price", code) },
+      { href: "/cotizaciones", show: (role, code) => can(role, "quote.create", code) || can(role, "quote.price", code) || can(role, "quote.follow", code) },
       { href: "/ventas", show: (role, code) => ventas(role) && (can(role, "agenda.use", code) || can(role, "quote.follow", code)) },
       { href: "/servicio-campo", show: (role, code) => code === "SYSTRON" && (can(role, "quote.create", code) || can(role, "quote.follow", code)) },
       { href: "/clientes", show: (role, code) => can(role, "client.create", code) || can(role, "client.edit", code) },

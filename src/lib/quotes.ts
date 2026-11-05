@@ -116,6 +116,13 @@ export async function createSellerQuote(
   if (input.contactIds.length === 0) throw new Error("Selecciona al menos un contacto.");
   const contacts = await prisma.contact.count({ where: { id: { in: input.contactIds }, clientId: client.id, active: true } });
   if (contacts !== input.contactIds.length) throw new Error("Algún contacto no pertenece al cliente.");
+  const sellerUserId =
+    actor.role === "VENTAS" || actor.role === "GERENTE_OPERATIVO_SERVOMOTORES"
+      ? actor.userId
+      : client.ownerUserId;
+  if (!sellerUserId) {
+    throw new Error("El cliente no tiene vendedor asignado. Asigna un responsable comercial en la ficha del cliente antes de crear la cotización.");
+  }
   const folioSeries = commercialQuoteSeriesForType(input.quoteType);
   const folio = await allocateFolio(actor.activeCompanyId, folioSeries);
   const quote = await prisma.quote.create({
@@ -127,7 +134,7 @@ export async function createSellerQuote(
       status: "PENDIENTE_COTIZAR",
       equipmentId: input.equipmentId,
       reference: input.reference,
-      sellerUserId: actor.role === "VENTAS" || actor.role === "GERENTE_OPERATIVO_SERVOMOTORES" ? actor.userId : client.ownerUserId,
+      sellerUserId,
       ...(frozenPriority
         ? {
             priorityName: frozenPriority.name,
@@ -535,7 +542,13 @@ export async function applyDiscount(actor: Actor, quoteId: string, version: numb
   if (actor.role !== "VENTAS") throw new Error("Solo el Vendedor puede aplicar descuentos.");
   assertSellerDiscountAllowed(discountPct, await sellerDiscountLimit(actor.userId));
   const updated = await prisma.quote.updateMany({
-    where: { id: quoteId, companyId: actor.activeCompanyId, status: "PENDIENTE_DECISION", version },
+    where: {
+      id: quoteId,
+      companyId: actor.activeCompanyId,
+      sellerUserId: actor.userId,
+      status: "PENDIENTE_DECISION",
+      version,
+    },
     data: { discountPct, version: { increment: 1 } },
   });
   if (updated.count === 0) throw new ConcurrencyError();
@@ -555,6 +568,7 @@ export async function decideQuote(
     include: { lines: true, client: true },
   });
   if (!quote || quote.status !== "PENDIENTE_DECISION") throw new Error("La cotización no está pendiente de decisión.");
+  if (actor.role === "VENTAS" && quote.sellerUserId !== actor.userId) throw new Error(SALES_NOT_ASSIGNED_MESSAGE);
   if (quote.lines.some((line) => line.unitPrice == null)) throw new Error("Falta el precio.");
   if (!authorized && !rejectionReason) throw new Error("Indica por qué el cliente no autorizó la cotización.");
   const chosen = authorized ? quote.lines.filter((line) => quote.quoteType !== "VENTA_EQUIPO" || lineIds.includes(line.id)) : [];

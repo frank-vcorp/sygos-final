@@ -152,6 +152,7 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
   const sellerPendingDecision =
     quote.status === "PENDIENTE_DECISION"
     && session.role === "VENTAS"
+    && quote.sellerUserId === session.userId
     && can(session.role, "quote.follow", session.activeCompanyCode);
 
   let primaryAction: React.ReactNode = null;

@@ -18,11 +18,18 @@ export default async function CotizacionesPage({ searchParams }: { searchParams:
     redirect(homePath(session.role, session.activeCompanyCode));
   }
   const canEditClient = can(session.role, "client.edit", session.activeCompanyCode);
+  const isVentas = session.role === "VENTAS";
   const { vista, q } = await searchParams;
   const query = (q ?? "").trim();
   const pending = vista === "pendientes";
   const decision = vista === "decision";
-  if (pending && can(session.role, "quote.price", session.activeCompanyCode)) {
+  const ventasPendingDecision = isVentas && pending;
+  const listStatusFilter = pending
+    ? { status: isVentas ? "PENDIENTE_DECISION" as const : "PENDIENTE_COTIZAR" as const }
+    : decision
+      ? { status: "PENDIENTE_DECISION" as const }
+      : {};
+  if (pending && can(session.role, "quote.price", session.activeCompanyCode) && !isVentas) {
     const missing = await prisma.technicalCase.findMany({
       where: {
         serviceCompanyId: session.activeCompanyId,
@@ -48,8 +55,7 @@ export default async function CotizacionesPage({ searchParams }: { searchParams:
   const quotes = await prisma.quote.findMany({
     where: {
       companyId: session.activeCompanyId,
-      ...(pending ? { status: "PENDIENTE_COTIZAR" } : {}),
-      ...(decision ? { status: "PENDIENTE_DECISION" } : {}),
+      ...listStatusFilter,
       ...(session.role === "VENTAS" ? { sellerUserId: session.userId } : {}),
       ...(query ? { OR: [{ folio: { contains: query } }, { client: { name: { contains: query } } }] } : {}),
     },
@@ -57,7 +63,7 @@ export default async function CotizacionesPage({ searchParams }: { searchParams:
     orderBy: { createdAt: "desc" },
     take: 100,
   });
-  const cases = pending && can(session.role, "quote.price", session.activeCompanyCode)
+  const cases = pending && can(session.role, "quote.price", session.activeCompanyCode) && !isVentas
     ? await prisma.technicalCase.findMany({
         where: { serviceCompanyId: session.activeCompanyId, quotePending: true, NOT: { id: { in: (await prisma.quote.findMany({ where: { technicalCaseId: { not: null }, companyId: session.activeCompanyId }, select: { technicalCaseId: true } })).map((row) => row.technicalCaseId).filter((id): id is string => Boolean(id)) } } },
         include: { equipment: true },
@@ -65,27 +71,68 @@ export default async function CotizacionesPage({ searchParams }: { searchParams:
       })
     : [];
   const sidebarNav = coordUsesSidebarNav(session.role);
-  const sectionTitle = pending ? "Pendientes de cotizar" : decision ? "Esperando decisión" : undefined;
+  const ventasDecisionTitle = "Esperan tu decisión (cliente)";
+  const sectionTitle = ventasPendingDecision || (isVentas && decision)
+    ? ventasDecisionTitle
+    : pending
+      ? "Pendientes de cotizar"
+      : decision
+        ? "Esperando decisión"
+        : undefined;
+  const ventasDecisionCount = isVentas && !pending && !decision
+    ? await prisma.quote.count({
+        where: { companyId: session.activeCompanyId, sellerUserId: session.userId, status: "PENDIENTE_DECISION" },
+      })
+    : 0;
   return (
     <>
       <PageHeader
-        title={coordPageTitle(sidebarNav, sectionTitle, pending ? "Pendientes de cotizar" : decision ? "Esperando decisión del cliente" : "Cotizaciones")}
+        title={coordPageTitle(
+          sidebarNav,
+          sectionTitle,
+          ventasPendingDecision || (isVentas && decision)
+            ? ventasDecisionTitle
+            : pending
+              ? "Pendientes de cotizar"
+              : decision
+                ? "Esperando decisión del cliente"
+                : "Cotizaciones",
+        )}
         subtitle={coordPageSubtitle(
           sidebarNav,
           session.activeCompanyCode,
-          session.role === "VENTAS" ? "Consulta el avance de tus propuestas y da seguimiento a las que esperan respuesta del cliente." : "Revisa las propuestas que necesitan precio y las que esperan respuesta del cliente.",
-          pending ? "Por cotizar" : decision ? "Decisión del cliente" : "Propuestas comerciales",
+          session.role === "VENTAS"
+            ? ventasPendingDecision || decision
+              ? "Estas cotizaciones ya tienen precio. Registra la respuesta del cliente o aplica descuento si aplica."
+              : "Consulta el avance de tus propuestas y da seguimiento a las que esperan respuesta del cliente."
+            : "Revisa las propuestas que necesitan precio y las que esperan respuesta del cliente.",
+          ventasPendingDecision || (isVentas && decision)
+            ? "Decisión del cliente"
+            : pending
+              ? "Por cotizar"
+              : decision
+                ? "Decisión del cliente"
+                : "Propuestas comerciales",
         )}
         action={can(session.role, "quote.create", session.activeCompanyCode) ? <ActionLink href="/cotizaciones/nuevo">Nueva cotización</ActionLink> : null}
       />
-      {sidebarNav ? null : <CotizacionesListFilter vista={pending ? "pendientes" : decision ? "decision" : "todas"} q={query} />}
+      {sidebarNav ? null : <CotizacionesListFilter vista={pending ? "pendientes" : decision ? "decision" : "todas"} q={query} ventas={isVentas} />}
       <ActiveFilters
         items={coordFilterChips(sidebarNav, [
-          ...(pending ? [{ label: "Pendientes de cotizar", clearHref: listHref("/cotizaciones", { q: query || undefined }) }] : []),
-          ...(decision ? [{ label: "Decisión del cliente", clearHref: listHref("/cotizaciones", { q: query || undefined }) }] : []),
+          ...(ventasPendingDecision ? [{ label: ventasDecisionTitle, clearHref: listHref("/cotizaciones", { q: query || undefined }) }] : []),
+          ...(pending && !isVentas ? [{ label: "Pendientes de cotizar", clearHref: listHref("/cotizaciones", { q: query || undefined }) }] : []),
+          ...(decision && !isVentas ? [{ label: "Decisión del cliente", clearHref: listHref("/cotizaciones", { q: query || undefined }) }] : []),
+          ...(decision && isVentas ? [{ label: ventasDecisionTitle, clearHref: listHref("/cotizaciones", { q: query || undefined }) }] : []),
           ...(query ? [{ label: `Búsqueda: ${query}`, clearHref: listHref("/cotizaciones", { vista: pending ? "pendientes" : decision ? "decision" : undefined }) }] : []),
         ])}
       />
+      {ventasDecisionCount > 0 ? (
+        <Card className="mb-4 border-[var(--warn)]/40 bg-[var(--warn)]/5 px-4 py-3 text-sm">
+          <TextLink href="/cotizaciones?vista=pendientes">
+            {ventasDecisionCount === 1 ? "1 cotización espera" : `${ventasDecisionCount} cotizaciones esperan`} tu decisión del cliente
+          </TextLink>
+        </Card>
+      ) : null}
       {cases.length > 0 ? (
         <Card className="mb-4 divide-y divide-[var(--line)] overflow-hidden">
           {cases.map((row) => (

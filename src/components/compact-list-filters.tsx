@@ -71,7 +71,7 @@ export function VentasListFilter({ vista, q }: { vista: string; q: string }) {
   );
 }
 
-export function CotizacionesListFilter({ vista, q }: { vista: string; q: string }) {
+export function CotizacionesListFilter({ vista, q, ventas = false }: { vista: string; q: string; ventas?: boolean }) {
   const { filters, update, apply } = useListFilters("/cotizaciones", { vista, q }, (f) => ({
     vista: f.vista === "todas" ? undefined : f.vista,
     q: f.q.trim() || undefined,
@@ -80,8 +80,8 @@ export function CotizacionesListFilter({ vista, q }: { vista: string; q: string 
     <CompactFilterBar onSubmit={apply}>
       <select name="vista" value={filters.vista} aria-label="Vista de cotizaciones" className={`${controlClass} sm:w-[190px]`} onChange={(event) => update("vista", event.target.value)}>
         <option value="todas">Todas</option>
-        <option value="pendientes">Sin precio</option>
-        <option value="decision">Esperan respuesta</option>
+        <option value="pendientes">{ventas ? "Esperan tu decisión" : "Sin precio"}</option>
+        <option value="decision">{ventas ? "Esperan tu decisión" : "Esperan respuesta"}</option>
       </select>
       <input name="q" value={filters.q} placeholder="Buscar por folio o cliente" className={`${controlClass} sm:flex-1`} onChange={(event) => update("q", event.target.value)} />
     </CompactFilterBar>
