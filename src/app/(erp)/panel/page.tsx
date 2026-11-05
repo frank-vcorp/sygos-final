@@ -19,12 +19,15 @@ import {
 } from "@/lib/requirement-list-enrichment";
 import { shoppingListKindFromList } from "@/lib/shopping-list-display";
 import {
+  mergeSalesPendientesAutorizacion,
+  quoteVisibleToSeller,
   receivableEsVigente,
   servicioCotizadaSinAutorizacion,
   servicioDxSinReparacionPendienteEmitir,
   servicioOsValidadaAutorizada,
   servicioOsValidadaPendienteEntrega,
-  servicioPendienteAutorizacion,
+  servicioPendienteAutorizacionForSeller,
+  servicioRowFromPendingQuote,
 } from "@/lib/sales-panel";
 import type { Role } from "@/lib/roles";
 import {
@@ -521,6 +524,7 @@ async function Sales({
     collectedMonth,
     newClientsMonth,
     activeServicios,
+    pendingDecisionQuotes,
     osSinFacturaQuotes,
     dxSinReparacionPendienteEmitir,
   ] = await Promise.all([
@@ -559,6 +563,33 @@ async function Sales({
       where: { companyId, ownerUserId: userId, isSystem: false, createdAt: { gte: monthStart } },
     }),
     listActiveServicios(companyId, "", { clientOwnerUserId: userId }),
+    prisma.quote.findMany({
+      where: {
+        companyId,
+        status: "PENDIENTE_DECISION",
+        OR: [
+          { sellerUserId: userId },
+          { client: { ownerUserId: userId, isSystem: false } },
+        ],
+      },
+      include: {
+        client: { select: { id: true, name: true, isSystem: true, ownerUserId: true } },
+        equipment: {
+          select: {
+            id: true,
+            kind: true,
+            folio: true,
+            custody: true,
+            typeName: true,
+            brandName: true,
+            model: true,
+            client: { select: { id: true, name: true, isSystem: true } },
+          },
+        },
+        lines: { select: { quantity: true, unitPrice: true, authorized: true } },
+      },
+      take: 100,
+    }),
     prisma.quote.findMany({
       where: {
         companyId,
@@ -626,7 +657,26 @@ async function Sales({
       : [],
   );
   const cotizadasSinAutorizacion = servicioRows.filter(servicioCotizadaSinAutorizacion);
-  const pendientesAutorizacion = servicioRows.filter(servicioPendienteAutorizacion);
+  const coveredPendingQuoteIds = new Set(
+    servicioRows
+      .filter((row) => row.quoteStatus === "PENDIENTE_DECISION" && row.quoteHref)
+      .map((row) => row.quoteHref!.replace("/cotizaciones/", "")),
+  );
+  const orphanPendingQuoteRows = pendingDecisionQuotes
+    .filter(
+      (quote) =>
+        quoteVisibleToSeller(
+          { sellerUserId: quote.sellerUserId, clientOwnerUserId: quote.client.ownerUserId },
+          userId,
+        )
+        && (!quote.technicalCaseId || !coveredPendingQuoteIds.has(quote.id)),
+    )
+    .map((quote) => servicioRowFromPendingQuote(quote));
+  const pendientesAutorizacion = mergeSalesPendientesAutorizacion(
+    servicioRows,
+    orphanPendingQuoteRows,
+    userId,
+  );
   const dxSinReparacionPendienteFolios = new Set(dxSinReparacionPendienteEmitir.map((row) => row.folio));
   const facturacionPendiente = servicioRows.filter(
     (row) =>

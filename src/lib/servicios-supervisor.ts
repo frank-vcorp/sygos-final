@@ -140,6 +140,7 @@ export type ServicioBandejaRow = {
   quoteFolio: string | null;
   quoteHref: string | null;
   quoteStatus: string | null;
+  quoteSellerUserId: string | null;
   quoteMonto: string;
   slaDueAt: Date | null;
   slaStartedAt: Date | null;
@@ -198,6 +199,7 @@ type QuoteBandejaPick = {
   quoteType: string;
   discountPct: number;
   updatedAt: Date;
+  sellerUserId: string | null;
   lines: Array<{ quantity: number; unitPrice: number | null; authorized: boolean }>;
 };
 
@@ -211,18 +213,60 @@ function quoteMontoBandejaLabel(quote: QuoteBandejaPick | null): string {
   return totals ? money(totals.total) : "—";
 }
 
+/** Prioriza cotización que espera decisión del vendedor sobre borradores más recientes. */
+export function pickBestQuoteForBandeja(quotes: QuoteBandejaPick[]): QuoteBandejaPick | null {
+  if (quotes.length === 0) return null;
+  const rank = (status: string) => {
+    if (status === "PENDIENTE_DECISION") return 0;
+    if (status === "PENDIENTE_COTIZAR") return 1;
+    if (status === "NO_AUTORIZADA") return 2;
+    return 3;
+  };
+  return [...quotes].sort((a, b) => {
+    const byStatus = rank(a.status) - rank(b.status);
+    if (byStatus !== 0) return byStatus;
+    return b.updatedAt.getTime() - a.updatedAt.getTime();
+  })[0]!;
+}
+
 function pickQuoteForAttention(
-  attentionId: string,
+  _attentionId: string,
   caseIds: string[],
   equipmentId: string,
   quotes: QuoteBandejaPick[],
 ) {
   const linked = quotes.filter((q) => q.technicalCaseId && caseIds.includes(q.technicalCaseId));
   if (linked.length > 0) {
-    return linked.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())[0] ?? null;
+    return pickBestQuoteForBandeja(linked);
   }
   const byEquipment = quotes.filter((q) => q.equipmentId === equipmentId);
-  return byEquipment.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())[0] ?? null;
+  return pickBestQuoteForBandeja(byEquipment);
+}
+
+async function technicalCaseIdsPendingSellerDecision(
+  companyId: string,
+  clientOwnerUserId?: string,
+): Promise<string[]> {
+  const rows = await prisma.quote.findMany({
+    where: {
+      companyId,
+      status: "PENDIENTE_DECISION",
+      technicalCaseId: { not: null },
+      ...(clientOwnerUserId
+        ? {
+            OR: [
+              { sellerUserId: clientOwnerUserId },
+              { client: { ownerUserId: clientOwnerUserId, isSystem: false } },
+            ],
+          }
+        : {}),
+    },
+    select: { technicalCaseId: true },
+    take: 200,
+  });
+  return [
+    ...new Set(rows.map((row) => row.technicalCaseId).filter((id): id is string => Boolean(id))),
+  ];
 }
 
 function buildServicioRow(
@@ -290,6 +334,7 @@ function buildServicioRow(
     quoteFolio: quote?.folio ?? null,
     quoteHref: quote ? `/cotizaciones/${quote.id}` : null,
     quoteStatus,
+    quoteSellerUserId: quote?.sellerUserId ?? null,
     quoteMonto: quoteMontoBandejaLabel(quote),
     slaDueAt: primary.slaDueAt,
     slaStartedAt: primary.attention.slaStartedAt,
@@ -370,6 +415,7 @@ async function mapCasesToBandejaRows(companyId: string, cases: CaseRecord[]): Pr
         quoteType: true,
         discountPct: true,
         updatedAt: true,
+        sellerUserId: true,
         lines: { select: { quantity: true, unitPrice: true, authorized: true } },
       },
       orderBy: { updatedAt: "desc" },
@@ -442,8 +488,11 @@ export async function listActiveServicios(
   const technicianId = options?.assigneeUserId;
   const clientOwnerUserId = options?.clientOwnerUserId;
 
+  const pendingDecisionCaseIds = q
+    ? []
+    : await technicalCaseIdsPendingSellerDecision(companyId, clientOwnerUserId);
+
   const activeFilters = [
-    { serviceCompanyId: companyId },
     technicianId ? technicianActiveCaseWhere(technicianId) : openOperationCaseWhere(),
     ...(clientOwnerUserId ? [clientOwnerScope(clientOwnerUserId)] : []),
     ...(attentionType ? [{ attention: { attentionType } }] : []),
@@ -452,7 +501,13 @@ export async function listActiveServicios(
   ].filter((part) => Object.keys(part).length > 0);
 
   const cases = await prisma.technicalCase.findMany({
-    where: { AND: activeFilters },
+    where: {
+      serviceCompanyId: companyId,
+      OR: [
+        { AND: activeFilters },
+        ...(pendingDecisionCaseIds.length > 0 ? [{ id: { in: pendingDecisionCaseIds } }] : []),
+      ],
+    },
     include: caseInclude,
     take: 200,
   });

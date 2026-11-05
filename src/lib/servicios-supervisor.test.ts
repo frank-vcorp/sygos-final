@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { HISTORIAL_CASE, openOperationCaseWhere, technicianActiveCaseWhere, TECHNICIAN_HANDOFF_CASE } from "./servicios-supervisor";
+import { HISTORIAL_CASE, openOperationCaseWhere, pickBestQuoteForBandeja, technicianActiveCaseWhere, TECHNICIAN_HANDOFF_CASE } from "./servicios-supervisor";
 
 describe("openOperationCaseWhere", () => {
   it("mantiene operación abierta y diagnósticos validados con cotización pendiente", () => {
@@ -12,6 +12,33 @@ describe("openOperationCaseWhere", () => {
 
   it("el historial sigue incluyendo VALIDADO", () => {
     assert.ok(HISTORIAL_CASE.includes("VALIDADO"));
+  });
+});
+
+describe("pickBestQuoteForBandeja", () => {
+  it("prioriza PENDIENTE_DECISION sobre cotizaciones más recientes sin precio", () => {
+    const older = {
+      id: "q1",
+      folio: "COT-2",
+      technicalCaseId: "case-1",
+      equipmentId: "eq-1",
+      status: "PENDIENTE_DECISION",
+      quoteType: "DIAGNOSTICO",
+      discountPct: 0,
+      updatedAt: new Date("2026-01-01"),
+      sellerUserId: "seller-1",
+      lines: [{ quantity: 1, unitPrice: 500, authorized: false }],
+    };
+    const newer = {
+      ...older,
+      id: "q2",
+      folio: "COTDX-9",
+      status: "PENDIENTE_COTIZAR",
+      updatedAt: new Date("2026-02-01"),
+      technicalCaseId: null,
+    };
+    const picked = pickBestQuoteForBandeja([newer, older]);
+    assert.equal(picked?.id, "q1");
   });
 });
 

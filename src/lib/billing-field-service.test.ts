@@ -27,6 +27,7 @@ describe("facturación SCA", () => {
       data: {
         companyId: company.id,
         name: "Cliente",
+        ownerUserId: user.id,
         active: true,
         isSystem: false,
         requiresInvoice: true,

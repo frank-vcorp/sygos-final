@@ -81,6 +81,10 @@ function automaticQuoteConcept(row: {
   return technicalServiceConcept(row.equipment);
 }
 
+function resolveQuoteSellerUserId(attentionSellerUserId: string | null, clientOwnerUserId: string | null) {
+  return attentionSellerUserId ?? clientOwnerUserId;
+}
+
 export async function createSellerQuote(
   actor: Actor,
   input: {
@@ -205,7 +209,7 @@ export async function ensureQuoteFromCase(actor: { userId: string; activeCompany
       status: "PENDIENTE_COTIZAR",
       equipmentId: row.equipmentId,
       technicalCaseId: row.id,
-      sellerUserId: row.attention.sellerUserId,
+      sellerUserId: resolveQuoteSellerUserId(row.attention.sellerUserId, client.ownerUserId),
       reference: row.folio,
       lines: {
         create: [{
@@ -252,6 +256,10 @@ async function ensureOriginQuote(
   if (existing) return existing;
   const concept = automaticQuoteConcept(row);
   const folio = await serviceFolioForAttention(row.attentionId, row.serviceCompanyId, "COT");
+  const originClient = await prisma.client.findUnique({
+    where: { id: row.equipment.clientId },
+    select: { ownerUserId: true },
+  });
   const quote = await prisma.quote.create({
     data: {
       folio,
@@ -262,7 +270,7 @@ async function ensureOriginQuote(
       equipmentId: row.equipmentId,
       technicalCaseId: row.id,
       linkedQuoteId: baseQuoteId,
-      sellerUserId: row.attention.sellerUserId,
+      sellerUserId: resolveQuoteSellerUserId(row.attention.sellerUserId, originClient?.ownerUserId ?? null),
       reference: row.folio,
       lines: { create: [{ concept, quantity: 1 }] },
     },
@@ -370,7 +378,7 @@ export async function setPrices(
 ) {
   const quote = await prisma.quote.findFirst({
     where: { id: quoteId, companyId: actor.activeCompanyId },
-    include: { lines: true, company: true },
+    include: { lines: true, company: true, client: { select: { ownerUserId: true } } },
   });
   if (!quote || quote.status !== "PENDIENTE_COTIZAR") throw new Error("Esta cotización no admite precio.");
   const caseRow = quote.technicalCaseId
@@ -429,6 +437,9 @@ export async function setPrices(
       data: {
         status: "PENDIENTE_DECISION",
         creditDays: quote.creditDays,
+        ...(quote.sellerUserId == null && quote.client.ownerUserId
+          ? { sellerUserId: quote.client.ownerUserId }
+          : {}),
         ...(frozenDeliveryDays != null ? { deliveryBusinessDays: frozenDeliveryDays } : {}),
         ...(campoPricing
           ? { fieldServiceHours: campoPricing.hours, fieldServiceUnitPrice: campoPricing.unitPrice }

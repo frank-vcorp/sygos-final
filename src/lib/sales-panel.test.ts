@@ -8,6 +8,9 @@ import {
   servicioOsValidadaAutorizada,
   servicioOsValidadaPendienteEntrega,
   servicioPendienteAutorizacion,
+  servicioPendienteAutorizacionForSeller,
+  servicioRowFromPendingQuote,
+  mergeSalesPendientesAutorizacion,
 } from "./sales-panel";
 import type { ServicioBandejaRow } from "./servicios-supervisor";
 
@@ -33,6 +36,7 @@ function row(partial: Partial<ServicioBandejaRow>): ServicioBandejaRow {
     quoteFolio: null,
     quoteHref: null,
     quoteStatus: null,
+    quoteSellerUserId: null,
     quoteMonto: "—",
     slaDueAt: null,
     slaStartedAt: null,
@@ -105,5 +109,55 @@ describe("sales panel filters", () => {
     });
     assert.equal(servicioDxSinReparacionPendienteEmitir(dxRow, new Set(["DX-9"])), true);
     assert.equal(servicioDxSinReparacionPendienteEmitir(dxRow, new Set()), false);
+  });
+
+  it("COT legacy PENDIENTE_DECISION aparece solo en pendientes de autorización del vendedor", () => {
+    const pendiente = administrativeStatus({
+      attentionType: "DIAGNOSTICO",
+      quoteStatus: "PENDIENTE_DECISION",
+      quotePending: false,
+      warrantyDecision: null,
+    });
+    const legacyRow = row({
+      administrative: pendiente,
+      quoteStatus: "PENDIENTE_DECISION",
+      quoteSellerUserId: "seller-1",
+      quoteFolio: "COT-2",
+      quoteHref: "/cotizaciones/q-cot-2",
+    });
+    assert.equal(servicioCotizadaSinAutorizacion(legacyRow), false);
+    assert.equal(servicioPendienteAutorizacion(legacyRow), true);
+    assert.equal(servicioPendienteAutorizacionForSeller(legacyRow, "seller-1"), true);
+    assert.equal(servicioPendienteAutorizacionForSeller(legacyRow, "otro-vendedor"), false);
+  });
+
+  it("prioriza fila de servicio sobre cotización huérfana duplicada", () => {
+    const pendiente = administrativeStatus({
+      attentionType: "DIAGNOSTICO",
+      quoteStatus: "PENDIENTE_DECISION",
+      quotePending: false,
+      warrantyDecision: null,
+    });
+    const servicio = row({
+      id: "att-1",
+      administrative: pendiente,
+      quoteStatus: "PENDIENTE_DECISION",
+      quoteSellerUserId: "seller-1",
+      quoteHref: "/cotizaciones/q1",
+    });
+    const orphan = servicioRowFromPendingQuote({
+      id: "q1",
+      folio: "COT-2",
+      quoteType: "DIAGNOSTICO",
+      status: "PENDIENTE_DECISION",
+      discountPct: 0,
+      sellerUserId: "seller-1",
+      client: { id: "c1", name: "Cliente", isSystem: false, ownerUserId: "seller-1" },
+      equipment: null,
+      lines: [{ quantity: 1, unitPrice: 1000, authorized: false }],
+    });
+    const merged = mergeSalesPendientesAutorizacion([servicio], [orphan], "seller-1");
+    assert.equal(merged.length, 1);
+    assert.equal(merged[0]!.id, "att-1");
   });
 });
