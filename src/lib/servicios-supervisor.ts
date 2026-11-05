@@ -229,15 +229,36 @@ export function pickBestQuoteForBandeja(quotes: QuoteBandejaPick[]): QuoteBandej
   })[0]!;
 }
 
-function pickQuoteForAttention(
+type QuoteLinkCasePick = { id: string; kind: string; spawnedFromId: string | null };
+
+/** Evita mostrar cotización ligada al OS reservado si la misma atención ya tiene cotización en el DX. */
+export function filterQuotesPreferDiagnosisOverReservedOs(
+  quotes: QuoteBandejaPick[],
+  cases: QuoteLinkCasePick[],
+): QuoteBandejaPick[] {
+  if (quotes.length <= 1) return quotes;
+  const diagnosis = cases.find((row) => row.kind === "DIAGNOSTICO");
+  if (!diagnosis) return quotes;
+  const reservedOs = cases.find(
+    (row) => row.kind === "OS" && row.spawnedFromId === diagnosis.id,
+  );
+  if (!reservedOs) return quotes;
+  const onDiagnosis = quotes.filter((q) => q.technicalCaseId === diagnosis.id);
+  if (onDiagnosis.length === 0) return quotes;
+  const withoutReservedOs = quotes.filter((q) => q.technicalCaseId !== reservedOs.id);
+  return withoutReservedOs.length > 0 ? withoutReservedOs : quotes;
+}
+
+export function pickQuoteForAttention(
   _attentionId: string,
-  caseIds: string[],
+  cases: QuoteLinkCasePick[],
   equipmentId: string,
   quotes: QuoteBandejaPick[],
 ) {
+  const caseIds = cases.map((row) => row.id);
   const linked = quotes.filter((q) => q.technicalCaseId && caseIds.includes(q.technicalCaseId));
   if (linked.length > 0) {
-    return pickBestQuoteForBandeja(linked);
+    return pickBestQuoteForBandeja(filterQuotesPreferDiagnosisOverReservedOs(linked, cases));
   }
   const byEquipment = quotes.filter((q) => q.equipmentId === equipmentId);
   return pickBestQuoteForBandeja(byEquipment);
@@ -438,7 +459,7 @@ async function mapCasesToBandejaRows(companyId: string, cases: CaseRecord[]): Pr
       const primary = attentionCases[0];
       const quote = pickQuoteForAttention(
         attentionId,
-        attentionCases.map((c) => c.id),
+        attentionCases.map((c) => ({ id: c.id, kind: c.kind, spawnedFromId: c.spawnedFromId })),
         primary.equipmentId,
         quotes,
       );

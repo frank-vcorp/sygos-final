@@ -1,6 +1,14 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { HISTORIAL_CASE, openOperationCaseWhere, pickBestQuoteForBandeja, technicianActiveCaseWhere, TECHNICIAN_HANDOFF_CASE } from "./servicios-supervisor";
+import {
+  filterQuotesPreferDiagnosisOverReservedOs,
+  HISTORIAL_CASE,
+  openOperationCaseWhere,
+  pickBestQuoteForBandeja,
+  pickQuoteForAttention,
+  technicianActiveCaseWhere,
+  TECHNICIAN_HANDOFF_CASE,
+} from "./servicios-supervisor";
 
 describe("openOperationCaseWhere", () => {
   it("mantiene operación abierta y diagnósticos validados con cotización pendiente", () => {
@@ -39,6 +47,39 @@ describe("pickBestQuoteForBandeja", () => {
     };
     const picked = pickBestQuoteForBandeja([newer, older]);
     assert.equal(picked?.id, "q1");
+  });
+});
+
+describe("pickQuoteForAttention", () => {
+  const cases = [
+    { id: "dx-1", kind: "DIAGNOSTICO", spawnedFromId: null },
+    { id: "os-stub", kind: "OS", spawnedFromId: "dx-1" },
+  ];
+  const quoteOnDx = {
+    id: "q-dx",
+    folio: "COT-5",
+    technicalCaseId: "dx-1",
+    equipmentId: "eq-1",
+    status: "PENDIENTE_COTIZAR",
+    quoteType: "DIAGNOSTICO",
+    discountPct: 0,
+    updatedAt: new Date("2026-01-02"),
+    sellerUserId: "seller-1",
+    lines: [{ quantity: 1, unitPrice: null, authorized: false }],
+  };
+  const quoteOnOs = {
+    ...quoteOnDx,
+    id: "q-os",
+    folio: "COT-5",
+    technicalCaseId: "os-stub",
+    updatedAt: new Date("2026-01-03"),
+  };
+
+  it("prefiere cotización ligada al DX sobre OS reservado del ciclo", () => {
+    const filtered = filterQuotesPreferDiagnosisOverReservedOs([quoteOnOs, quoteOnDx], cases);
+    assert.deepEqual(filtered.map((q) => q.id), ["q-dx"]);
+    const picked = pickQuoteForAttention("att-1", cases, "eq-1", [quoteOnOs, quoteOnDx]);
+    assert.equal(picked?.id, "q-dx");
   });
 });
 
