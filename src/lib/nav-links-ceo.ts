@@ -37,7 +37,6 @@ export const CEO_NAV_GROUPS: NavGroupDef[] = [
   {
     title: "Finanzas",
     links: [
-      { href: "/finanzas", label: "Dashboard financiero", show: showCeo },
       { href: "/finanzas?vista=movimientos", label: "Movimientos", show: showCeo },
       { href: "/finanzas?vista=ingresos", label: "Ingresos", show: showCeo },
       { href: "/finanzas?vista=egresos", label: "Egresos", show: showCeo },

@@ -60,7 +60,6 @@ export const SYSTRON_NAV: Partial<Record<Role, readonly string[]>> = {
     "/compras",
     "/compras?vista=oc",
     "/proveedores",
-    "/finanzas",
     "/finanzas?vista=movimientos",
     "/finanzas?vista=ingresos",
     "/finanzas?vista=egresos",
