@@ -10,7 +10,7 @@ import { ConcurrencyError } from "./form";
 import { recordHistory } from "./history";
 import { ensureOsStubForDiagnosis } from "./technical";
 import { finalFromBase } from "./money";
-import { isReparacionExpressAttentionType, type AttentionType } from "./priorities";
+import { ATTENTION_LABEL, isReparacionExpressAttentionType, type AttentionType } from "./priorities";
 import { ensureReparacionTallerPriorities } from "./priority-catalog";
 import { technicalServiceConcept } from "./quote-concept";
 import { commercialQuoteSeriesForType, isCotosQuote, isSellerCommercialQuote } from "./quote-folio-series";
@@ -714,12 +714,100 @@ export async function decideQuote(
       );
     }
   }
-  if (authorized && cotosInShop && equipment) {
-    await openCotosRepairFromQuote(actor, quote, equipment.id);
+  const activeQuote = authorized
+    ? await prisma.quote.findUnique({ where: { id: quote.id }, include: { lines: true } })
+    : null;
+  if (
+    authorized
+    && needsEquipment
+    && equipment
+    && activeQuote
+    && isSellerCommercialQuote(activeQuote)
+    && (activeQuote.quoteType === "DIAGNOSTICO" || isCotosQuote(activeQuote))
+  ) {
+    await ensureCommercialAttentionBeforeWarehouse(actor, activeQuote, equipment);
   }
-  if (authorized && cotdxInShop && equipment) {
-    await openCotdxFromQuote(actor, quote, equipment.id);
+  if (authorized && cotosInShop && equipment && activeQuote) {
+    await openCotosRepairFromQuote(actor, activeQuote, equipment.id);
   }
+  if (authorized && cotdxInShop && equipment && activeQuote) {
+    await openCotdxFromQuote(actor, activeQuote, equipment.id);
+  }
+}
+
+/** Atención ABIERTA tras autorizar COTDX/COTOS comercial con equipo aún fuera de resguardo (ingreso en almacén). */
+async function ensureCommercialAttentionBeforeWarehouse(
+  actor: Actor,
+  quote: {
+    id: string;
+    clientId: string;
+    quoteType: string;
+    folio: string;
+    technicalCaseId: string | null;
+    sellerUserId: string | null;
+    priorityName: string | null;
+    priorityPrice: number | null;
+    priorityIncrementPct: number | null;
+    priorityTargetMinDays: number | null;
+    priorityTargetMaxDays: number | null;
+    prioritySlaMaxDays: number | null;
+    lines: Array<{ authorized: boolean; concept: string; unitPrice: number | null; basePrice: number | null; incrementPct: number | null }>;
+  },
+  equipment: { id: string; kind: string; originCompanyId: string },
+) {
+  const existing = await prisma.attention.findFirst({ where: { originQuoteId: quote.id } });
+  if (existing) return;
+  const attentionType = commercialAttentionTypeForQuote(quote);
+  const fromQuote = frozenPriorityFromQuote(quote);
+  if (!fromQuote && quote.quoteType === "DIAGNOSTICO") {
+    throw new Error("La cotización COTDX no tiene prioridad congelada.");
+  }
+  if (!fromQuote && isCotosQuote(quote)) {
+    await ensureReparacionTallerPriorities(actor.activeCompanyId);
+  }
+  const priority = fromQuote ?? {
+    name: "Normal",
+    price: null as number | null,
+    incrementPct: 0,
+    targetMinDays: 5,
+    targetMaxDays: 10,
+    slaMaxDays: 10,
+  };
+  const service = equipment.kind === "MOT"
+    ? await prisma.company.findUnique({ where: { code: "SERVOMOTORES" } })
+    : await prisma.company.findUnique({ where: { id: actor.activeCompanyId } });
+  if (!service) throw new Error("No está definida la empresa que ejecuta el servicio.");
+  const concept = quote.lines.find((line) => line.authorized)?.concept ?? quote.lines[0]?.concept ?? "Servicio autorizado";
+  const quotePriceLine = quote.lines.find((line) => line.authorized && line.unitPrice != null)
+    ?? quote.lines.find((line) => line.unitPrice != null);
+  const attention = await prisma.attention.create({
+    data: {
+      equipmentId: equipment.id,
+      originCompanyId: equipment.originCompanyId,
+      serviceCompanyId: service.id,
+      adminClientId: quote.clientId,
+      attentionType,
+      priorityName: priority.name,
+      priorityPrice: quotePriceLine?.basePrice ?? priority.price,
+      priorityIncrementPct: quotePriceLine?.incrementPct ?? priority.incrementPct,
+      priorityTargetMin: priority.targetMinDays,
+      priorityTargetMax: priority.targetMaxDays,
+      prioritySlaMaxDays: priority.slaMaxDays,
+      reportedFault: concept,
+      sellerUserId: quote.sellerUserId,
+      originQuoteId: quote.id,
+      status: "ABIERTA",
+      slaStartedAt: null,
+    },
+  });
+  await recordHistory({
+    companyId: actor.activeCompanyId,
+    entityType: "COTIZACION",
+    entityId: quote.id,
+    action: "ATENCION",
+    summary: `Atención ${ATTENTION_LABEL[attentionType]} abierta para ingreso en almacén tras autorización.`,
+    authorUserId: actor.userId,
+  });
 }
 
 export async function relateQuoteEquipment(actor: Actor, quoteId: string, version: number, equipmentId: string, priorityId: string) {
