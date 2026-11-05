@@ -688,8 +688,8 @@ async function Sales({
             },
             {
               subtitle: "Pendientes de autorización",
-              empty: "No hay servicios «Cotizado» con subestado «No autorizado».",
-              bandejaHref: serviciosBandejaHref({ vista: "activos" }),
+              empty: "No hay cotizaciones pendientes de tu autorización comercial.",
+              bandejaHref: "/cotizaciones?vista=decision",
               rows: pendientesAutorizacion,
             },
           ]}

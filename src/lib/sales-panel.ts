@@ -23,13 +23,17 @@ export function servicioDxSinReparacionPendienteEmitir(row: ServicioBandejaRow, 
   return row.diagnosisFolio != null && diagnosisFolios.has(row.diagnosisFolio);
 }
 
-/** Cotizado sin subestado: precio definido, sin autorización del cliente aún. */
+/** Cotizado sin subestado distinto de la decisión comercial del vendedor (legacy / casos intermedios). */
 export function servicioCotizadaSinAutorizacion(row: ServicioBandejaRow) {
+  if (row.quoteStatus === "PENDIENTE_DECISION") return false;
   return row.administrative.label === ADMIN_ESTADO.COTIZADO && stackedWithoutSubestados(row.administrative);
 }
 
-/** Cotizado con subestado «No autorizado» (decisión registrada). */
+/** Cotización comercial pendiente de autorizar (PENDIENTE_DECISION) o cotizado con subestado «No autorizado». */
 export function servicioPendienteAutorizacion(row: ServicioBandejaRow) {
+  if (row.quoteStatus === "PENDIENTE_DECISION") {
+    return row.administrative.label === ADMIN_ESTADO.COTIZADO;
+  }
   return (
     row.administrative.label === ADMIN_ESTADO.COTIZADO
     && stackedHasTag(row.administrative, ADMIN_SUBESTADO.NO_AUTORIZADO)

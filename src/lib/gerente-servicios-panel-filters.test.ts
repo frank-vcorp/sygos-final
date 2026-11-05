@@ -23,6 +23,7 @@ function row(partial: Partial<ServicioBandejaRow> & Pick<ServicioBandejaRow, "id
     technicianName: null,
     quoteFolio: null,
     quoteHref: null,
+    quoteStatus: null,
     quoteMonto: "—",
     slaDueAt: null,
     slaStartedAt: null,

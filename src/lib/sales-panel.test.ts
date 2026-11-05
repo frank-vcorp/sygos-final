@@ -32,6 +32,7 @@ function row(partial: Partial<ServicioBandejaRow>): ServicioBandejaRow {
     technicianName: null,
     quoteFolio: null,
     quoteHref: null,
+    quoteStatus: null,
     quoteMonto: "—",
     slaDueAt: null,
     slaStartedAt: null,
@@ -62,6 +63,14 @@ describe("sales panel filters", () => {
     assert.equal(servicioCotizadaSinAutorizacion(row({ administrative: pendiente })), true);
     assert.equal(servicioPendienteAutorizacion(row({ administrative: rechazada })), true);
     assert.equal(servicioPendienteAutorizacion(row({ administrative: pendiente })), false);
+    assert.equal(
+      servicioPendienteAutorizacion(row({ administrative: pendiente, quoteStatus: "PENDIENTE_DECISION", quoteHref: "/cotizaciones/q1" })),
+      true,
+    );
+    assert.equal(
+      servicioCotizadaSinAutorizacion(row({ administrative: pendiente, quoteStatus: "PENDIENTE_DECISION" })),
+      false,
+    );
   });
 
   it("detecta OS validada autorizada y pendiente de entrega", () => {

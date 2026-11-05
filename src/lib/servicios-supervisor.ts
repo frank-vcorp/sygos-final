@@ -139,6 +139,7 @@ export type ServicioBandejaRow = {
   technicianName: string | null;
   quoteFolio: string | null;
   quoteHref: string | null;
+  quoteStatus: string | null;
   quoteMonto: string;
   slaDueAt: Date | null;
   slaStartedAt: Date | null;
@@ -288,6 +289,7 @@ function buildServicioRow(
     technicianName,
     quoteFolio: quote?.folio ?? null,
     quoteHref: quote ? `/cotizaciones/${quote.id}` : null,
+    quoteStatus,
     quoteMonto: quoteMontoBandejaLabel(quote),
     slaDueAt: primary.slaDueAt,
     slaStartedAt: primary.attention.slaStartedAt,
