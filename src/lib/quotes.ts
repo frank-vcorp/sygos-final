@@ -841,26 +841,34 @@ export async function relateQuoteEquipment(actor: Actor, quoteId: string, versio
     });
   }
   const quotePriceLine = quote.lines.find((line) => line.authorized && line.unitPrice != null) ?? quote.lines.find((line) => line.unitPrice != null);
-  const attention = await prisma.attention.create({
-    data: {
-      equipmentId: equipment.id,
-      originCompanyId: equipment.originCompanyId,
-      serviceCompanyId: service.id,
-      adminClientId: quote.clientId,
-      attentionType,
-      priorityName: priority.name,
-      priorityPrice: quotePriceLine?.basePrice ?? priority.price,
-      priorityIncrementPct: quotePriceLine?.incrementPct ?? priority.incrementPct,
-      priorityTargetMin: priority.targetMinDays,
-      priorityTargetMax: priority.targetMaxDays,
-      prioritySlaMaxDays: priority.slaMaxDays,
-      reportedFault: concept,
-      sellerUserId: quote.sellerUserId,
-      originQuoteId: quote.id,
-      status: inShop ? "EN_PROCESO" : "ABIERTA",
-      slaStartedAt: inShop ? new Date() : null,
-    },
-  });
+  let attention = await prisma.attention.findFirst({ where: { originQuoteId: quote.id } });
+  if (!attention) {
+    attention = await prisma.attention.create({
+      data: {
+        equipmentId: equipment.id,
+        originCompanyId: equipment.originCompanyId,
+        serviceCompanyId: service.id,
+        adminClientId: quote.clientId,
+        attentionType,
+        priorityName: priority.name,
+        priorityPrice: quotePriceLine?.basePrice ?? priority.price,
+        priorityIncrementPct: quotePriceLine?.incrementPct ?? priority.incrementPct,
+        priorityTargetMin: priority.targetMinDays,
+        priorityTargetMax: priority.targetMaxDays,
+        prioritySlaMaxDays: priority.slaMaxDays,
+        reportedFault: concept,
+        sellerUserId: quote.sellerUserId,
+        originQuoteId: quote.id,
+        status: inShop ? "EN_PROCESO" : "ABIERTA",
+        slaStartedAt: inShop ? new Date() : null,
+      },
+    });
+  } else if (inShop && attention.slaStartedAt == null) {
+    attention = await prisma.attention.update({
+      where: { id: attention.id },
+      data: { status: "EN_PROCESO", slaStartedAt: new Date() },
+    });
+  }
   const updated = await prisma.quote.updateMany({
     where: { id: quote.id, version },
     data: { equipmentId: equipment.id, version: { increment: 1 } },
@@ -880,14 +888,36 @@ export async function relateQuoteEquipment(actor: Actor, quoteId: string, versio
   const { openCase } = await import("./technical");
   const created = await openCase(attention.id, attention.slaStartedAt ?? new Date());
   if (!created) return;
-  let caseId = created.id;
-  if (isCotosQuote(quote) && quote.deliveryBusinessDays != null && quote.deliveryBusinessDays >= 1) {
-    const clientAuthorizedAt = quote.clientAuthorizedAt ?? new Date();
-    const slaStartedAt = normalizeSlaStartFromAuthorization(clientAuthorizedAt);
-    const slaDueAt = addBusinessDays(slaStartedAt, quote.deliveryBusinessDays);
-    await prisma.technicalCase.update({ where: { id: created.id }, data: { slaDueAt, quotePending: false } });
-  }
-  await prisma.quote.update({ where: { id: quote.id }, data: { technicalCaseId: caseId, status: "AUTORIZADA" } });
+  await linkCommercialQuoteToTechnicalCase(
+    quote.id,
+    equipment.id,
+    created.id,
+    isCotosQuote(quote) ? quote : undefined,
+  );
+}
+
+async function applyCotosDeliverySlaToCase(
+  quote: { deliveryBusinessDays: number | null; clientAuthorizedAt: Date | null },
+  caseId: string,
+) {
+  if (quote.deliveryBusinessDays == null || quote.deliveryBusinessDays < 1) return;
+  const clientAuthorizedAt = quote.clientAuthorizedAt ?? new Date();
+  const slaStartedAt = normalizeSlaStartFromAuthorization(clientAuthorizedAt);
+  const slaDueAt = addBusinessDays(slaStartedAt, quote.deliveryBusinessDays);
+  await prisma.technicalCase.update({ where: { id: caseId }, data: { slaDueAt, quotePending: false } });
+}
+
+async function linkCommercialQuoteToTechnicalCase(
+  quoteId: string,
+  equipmentId: string,
+  caseId: string,
+  cotosSla?: { deliveryBusinessDays: number | null; clientAuthorizedAt: Date | null },
+) {
+  if (cotosSla) await applyCotosDeliverySlaToCase(cotosSla, caseId);
+  await prisma.quote.update({
+    where: { id: quoteId },
+    data: { technicalCaseId: caseId, equipmentId, status: "AUTORIZADA", version: { increment: 1 } },
+  });
 }
 
 async function openCotdxFromQuote(
@@ -913,6 +943,29 @@ async function openCotdxFromQuote(
     ? await prisma.company.findUnique({ where: { code: "SERVOMOTORES" } })
     : await prisma.company.findUnique({ where: { id: actor.activeCompanyId } });
   if (!service || equipment.holderCompanyId !== service.id) return;
+  const existing = await prisma.attention.findFirst({
+    where: { originQuoteId: quote.id },
+    include: { technicalCases: true },
+  });
+  if (existing) {
+    const dxCase = existing.technicalCases.find((row) => row.kind === "DIAGNOSTICO");
+    if (dxCase) {
+      await linkCommercialQuoteToTechnicalCase(quote.id, equipment.id, dxCase.id);
+      return;
+    }
+    const slaStartedAt = existing.slaStartedAt ?? new Date();
+    if (!existing.slaStartedAt) {
+      await prisma.attention.update({
+        where: { id: existing.id },
+        data: { status: "EN_PROCESO", slaStartedAt },
+      });
+    }
+    const { openCase } = await import("./technical");
+    const created = await openCase(existing.id, slaStartedAt);
+    if (!created) return;
+    await linkCommercialQuoteToTechnicalCase(quote.id, equipment.id, created.id);
+    return;
+  }
   const fromQuote = frozenPriorityFromQuote(quote);
   if (!fromQuote) throw new Error("La cotización COTDX no tiene prioridad congelada.");
   const concept = quote.lines.find((line) => line.authorized)?.concept ?? quote.lines[0]?.concept ?? "Diagnóstico autorizado";
@@ -940,10 +993,7 @@ async function openCotdxFromQuote(
   const { openCase } = await import("./technical");
   const created = await openCase(attention.id, attention.slaStartedAt ?? new Date());
   if (!created) return;
-  await prisma.quote.update({
-    where: { id: quote.id },
-    data: { technicalCaseId: created.id, equipmentId: equipment.id, status: "AUTORIZADA", version: { increment: 1 } },
-  });
+  await linkCommercialQuoteToTechnicalCase(quote.id, equipment.id, created.id);
 }
 
 async function openCotosRepairFromQuote(
@@ -971,6 +1021,29 @@ async function openCotosRepairFromQuote(
     ? await prisma.company.findUnique({ where: { code: "SERVOMOTORES" } })
     : await prisma.company.findUnique({ where: { id: actor.activeCompanyId } });
   if (!service || equipment.holderCompanyId !== service.id) return;
+  const existing = await prisma.attention.findFirst({
+    where: { originQuoteId: quote.id },
+    include: { technicalCases: true },
+  });
+  if (existing) {
+    const osCase = existing.technicalCases.find((row) => row.kind === "OS");
+    if (osCase) {
+      await linkCommercialQuoteToTechnicalCase(quote.id, equipment.id, osCase.id, quote);
+      return;
+    }
+    const slaStartedAt = existing.slaStartedAt ?? new Date();
+    if (!existing.slaStartedAt) {
+      await prisma.attention.update({
+        where: { id: existing.id },
+        data: { status: "EN_PROCESO", slaStartedAt },
+      });
+    }
+    const { openCase } = await import("./technical");
+    const created = await openCase(existing.id, slaStartedAt);
+    if (!created) return;
+    await linkCommercialQuoteToTechnicalCase(quote.id, equipment.id, created.id, quote);
+    return;
+  }
   const fromQuote = frozenPriorityFromQuote(quote);
   if (!fromQuote) {
     await ensureReparacionTallerPriorities(actor.activeCompanyId);
@@ -1008,16 +1081,7 @@ async function openCotosRepairFromQuote(
   const { openCase } = await import("./technical");
   const created = await openCase(attention.id, attention.slaStartedAt ?? new Date());
   if (!created) return;
-  if (quote.deliveryBusinessDays != null && quote.deliveryBusinessDays >= 1) {
-    const clientAuthorizedAt = quote.clientAuthorizedAt ?? new Date();
-    const slaStartedAt = normalizeSlaStartFromAuthorization(clientAuthorizedAt);
-    const slaDueAt = addBusinessDays(slaStartedAt, quote.deliveryBusinessDays);
-    await prisma.technicalCase.update({ where: { id: created.id }, data: { slaDueAt, quotePending: false } });
-  }
-  await prisma.quote.update({
-    where: { id: quote.id },
-    data: { technicalCaseId: created.id, equipmentId: equipment.id, status: "AUTORIZADA", version: { increment: 1 } },
-  });
+  await linkCommercialQuoteToTechnicalCase(quote.id, equipment.id, created.id, quote);
 }
 
 export async function openWaitingRepairs(equipmentId: string, authorUserId: string) {
@@ -1049,10 +1113,12 @@ export async function openWaitingRepairs(equipmentId: string, authorUserId: stri
     });
     const opened = attention?.technicalCases[0];
     if (!opened) continue;
-    await prisma.quote.update({
-      where: { id: quote.id },
-      data: { technicalCaseId: opened.id, status: "AUTORIZADA", version: { increment: 1 } },
-    });
+    await linkCommercialQuoteToTechnicalCase(
+      quote.id,
+      equipmentId,
+      opened.id,
+      isCotosQuote(quote) ? quote : undefined,
+    );
   }
 }
 
