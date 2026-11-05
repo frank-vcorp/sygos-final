@@ -37,12 +37,13 @@ export const CEO_NAV_GROUPS: NavGroupDef[] = [
   {
     title: "Finanzas",
     links: [
-      { href: "/finanzas?vista=movimientos", label: "Movimientos", show: showCeo },
       { href: "/finanzas?vista=ingresos", label: "Ingresos", show: showCeo },
       { href: "/finanzas?vista=egresos", label: "Egresos", show: showCeo },
-      { href: "/finanzas?vista=cuentas", label: "Cuentas", show: showCeo },
-      { href: "/finanzas?vista=transferencias", label: "Transferencias", show: showCeo },
-      { href: "/finanzas?vista=cxp", label: "CxP", show: showCeo },
+      { href: "/cobranza?vista=cxc", label: "Cuentas por cobrar", show: showCeo },
+      { href: "/finanzas?vista=cxp", label: "Cuentas por pagar", show: showCeo },
+      { href: "/pagos", label: "Pagos", show: showCeo },
+      { href: "/cobranza", label: "Cobranza", show: showCeo },
+      { href: "/finanzas?vista=movimientos", label: "Movimientos", show: showCeo },
     ],
   },
   {
