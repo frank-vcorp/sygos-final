@@ -1,8 +1,10 @@
 import { notFound, redirect } from "next/navigation";
+import { requestFieldServiceDocumentAction } from "../actions";
 import { ClientNameLink } from "@/components/client-entity-links";
 import { HistoryTimeline } from "@/components/history-timeline";
 import {
   Badge,
+  Button,
   Card,
   EntityDetailHeader,
   EntityMetaItem,
@@ -27,12 +29,24 @@ export default async function ServicioCampoDetallePage({ params }: { params: Pro
   const { id } = await params;
   const row = await prisma.fieldServiceCase.findFirst({
     where: { id, companyId: session.activeCompanyId },
-    include: { client: true, quote: true },
+    include: {
+      client: true,
+      quote: true,
+      billingDocuments: {
+        where: { status: { in: ["SOLICITADA", "EMITIDA", "ERROR_FISCAL"] } },
+        orderBy: { createdAt: "desc" },
+      },
+    },
   });
   if (!row) notFound();
   await redirectIfSalesNotAssigned(session, row.sellerUserId, "/servicio-campo");
   const history = await historyFor("SERVICIO_CAMPO", row.id);
   const total = fieldServiceTotal(row.hours, row.unitPrice);
+  const invoiced = row.billingDocuments.reduce((sum, doc) => sum + doc.total, 0);
+  const canRequestInvoice = can(session.role, "invoice.request", session.activeCompanyCode)
+    && row.quote.status === "AUTORIZADA"
+    && total > invoiced;
+  const hasFac = row.billingDocuments.some((doc) => doc.kind === "FACTURA");
 
   return (
     <>
@@ -65,9 +79,40 @@ export default async function ServicioCampoDetallePage({ params }: { params: Pro
             <div><dt className="text-[var(--muted)]">Precio unitario</dt><dd>{money(row.unitPrice)}</dd></div>
             <div><dt className="text-[var(--muted)]">Total</dt><dd>{money(total)}</dd></div>
           </dl>
-          <p className="mt-4 text-sm text-[var(--muted)]">
-            Facturación FAC ligada a SCA: pendiente de reglas de facturación dedicadas (TODO).
-          </p>
+          <div className="mt-4 border-t border-[var(--line)] pt-4">
+            <h3 className="text-sm font-semibold text-[#0b1f3a]">Facturación</h3>
+            {row.billingDocuments.length > 0 ? (
+              <ul className="mt-2 space-y-1 text-sm">
+                {row.billingDocuments.map((doc) => (
+                  <li key={doc.id}>
+                    <TextLink href={`/facturacion/${doc.id}`}>{doc.folio}</TextLink>
+                    {" · "}
+                    {doc.kind === "FACTURA" ? "Factura" : "Remisión"}
+                    {" · "}
+                    {money(doc.total)}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-2 text-sm text-[var(--muted)]">Sin documentos solicitados o emitidos.</p>
+            )}
+            {canRequestInvoice && !row.client.isSystem ? (
+              <form action={requestFieldServiceDocumentAction} className="mt-3">
+                <input type="hidden" name="fieldServiceCaseId" value={row.id} />
+                <input type="hidden" name="kind" value={row.client.requiresInvoice && !hasFac ? "FACTURA" : "REMISION"} />
+                <Button type="submit" tone="ghost">
+                  {row.client.requiresInvoice
+                    ? hasFac
+                      ? "Solicitar remisión (saldo)"
+                      : "Solicitar factura"
+                    : "Solicitar remisión"}
+                </Button>
+              </form>
+            ) : null}
+            {canRequestInvoice && row.client.isSystem ? (
+              <p className="mt-2 text-sm text-[var(--muted)]">Cliente sistema: usa el flujo intercompañía desde la cotización.</p>
+            ) : null}
+          </div>
         </Card>
         <Card className="p-5">
           <PageHeader title="Historial" />

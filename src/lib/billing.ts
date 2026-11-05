@@ -36,6 +36,13 @@ async function invoicedTotal(quoteId: string) {
   return roundMoney(rows.reduce((sum, row) => sum + row.total, 0));
 }
 
+async function invoicedTotalForFieldService(fieldServiceCaseId: string) {
+  const rows = await prisma.billingDocument.findMany({
+    where: { fieldServiceCaseId, status: { in: ["SOLICITADA", "EMITIDA", "ERROR_FISCAL"] } },
+  });
+  return roundMoney(rows.reduce((sum, row) => sum + row.total, 0));
+}
+
 async function assertAtMostOneServiceInvoice(attentionId: string, kind: "FACTURA" | "REMISION") {
   if (kind !== "FACTURA") return;
   const caseIds = (
@@ -70,9 +77,13 @@ async function serviceBillingFolio(
 export async function requestFromQuote(actor: Actor, quoteId: string, kind: "FACTURA" | "REMISION", amount: number | null) {
   const quote = await prisma.quote.findFirst({
     where: { id: quoteId, companyId: actor.activeCompanyId },
-    include: { lines: true, client: true },
+    include: { lines: true, client: true, fieldServiceCase: true },
   });
   if (!quote || quote.status !== "AUTORIZADA") throw new Error("Solo se solicita documento de una cotización autorizada.");
+  if (quote.quoteType === "CAMPO") {
+    if (!quote.fieldServiceCase) throw new Error("La cotización de campo aún no tiene un SCA; autoriza y confirma el caso en servicio de campo.");
+    return requestFromFieldServiceCase(actor, quote.fieldServiceCase.id, kind, amount);
+  }
   if (actor.role === "VENTAS" && quote.sellerUserId !== actor.userId) throw new Error(SALES_NOT_ASSIGNED_MESSAGE);
   if (quote.client.requiresInvoice === true && kind === "REMISION") {
     throw new Error("Este cliente requiere factura (CFDI).");
@@ -137,6 +148,78 @@ export async function requestFromQuote(actor: Actor, quoteId: string, kind: "FAC
     entityId: document.id,
     action: "SOLICITUD",
     summary: `${folio} quedó solicitado. Coordinación emite el documento.`,
+    authorUserId: actor.userId,
+  });
+  return document;
+}
+
+/** Facturación de servicio de campo (SCA): folio FAC/REM global de empresa, ligado al SCA (no ciclo SRV). */
+export async function requestFromFieldServiceCase(
+  actor: Actor,
+  fieldServiceCaseId: string,
+  kind: "FACTURA" | "REMISION",
+  amount: number | null,
+) {
+  const row = await prisma.fieldServiceCase.findFirst({
+    where: { id: fieldServiceCaseId, companyId: actor.activeCompanyId },
+    include: { client: true, quote: { include: { lines: true } } },
+  });
+  if (!row) throw new Error("No se encontró el servicio de campo.");
+  if (row.quote.status !== "AUTORIZADA") throw new Error("La cotización COTSC debe estar autorizada.");
+  if (actor.role === "VENTAS" && row.sellerUserId !== actor.userId) throw new Error(SALES_NOT_ASSIGNED_MESSAGE);
+  if (row.client.requiresInvoice === true && kind === "REMISION") {
+    throw new Error("Este cliente requiere factura (CFDI).");
+  }
+  if (row.client.requiresInvoice !== true && kind === "FACTURA") {
+    throw new Error("Este cliente no está marcado como que requiere factura; usa remisión.");
+  }
+  const serviceTotal = roundMoney(row.hours * row.unitPrice);
+  if (serviceTotal <= 0) throw new Error("El servicio de campo no tiene importe facturable.");
+  const existingFac = await prisma.billingDocument.findFirst({
+    where: {
+      fieldServiceCaseId: row.id,
+      kind: "FACTURA",
+      status: { in: ["SOLICITADA", "EMITIDA", "ERROR_FISCAL"] },
+    },
+  });
+  if (kind === "FACTURA" && existingFac) {
+    throw new Error("Este SCA ya tiene una factura; no se permite otra FAC ligada al caso.");
+  }
+  const used = await invoicedTotalForFieldService(row.id);
+  const remaining = roundMoney(serviceTotal - used);
+  if (remaining <= 0 && kind === "FACTURA") throw new Error("Ese servicio de campo ya no tiene saldo por facturar.");
+  const total = kind === "REMISION" && (amount == null || amount === 0) ? 0 : roundMoney(amount ?? remaining);
+  if (kind === "FACTURA" && (total <= 0 || total > remaining)) throw new Error("El importe no puede exceder el saldo permitido.");
+  const subtotal = roundMoney(total / 1.16);
+  const iva = roundMoney(total - subtotal);
+  const folio = await allocateFolio(actor.activeCompanyId, kind === "REMISION" ? "REM" : "FAC");
+  const concept = `${row.concept} · ${row.folio}${row.description.trim() ? `: ${row.description.trim()}` : ""}`;
+  const document = await prisma.billingDocument.create({
+    data: {
+      folio,
+      companyId: actor.activeCompanyId,
+      kind,
+      status: "SOLICITADA",
+      clientId: row.clientId,
+      quoteId: row.quoteId,
+      fieldServiceCaseId: row.id,
+      concept,
+      subtotal,
+      iva,
+      total,
+      creditDays: row.quote.creditDays ?? row.client.creditDays ?? 0,
+      rfcSnapshot: row.client.rfc,
+      fiscalStatus: kind === "REMISION" ? "NO_APLICA" : "PENDIENTE",
+      requestedByUserId: actor.userId,
+      lines: { create: [{ concept, quantity: 1, unitPrice: total, amount: total }] },
+    },
+  });
+  await recordHistory({
+    companyId: actor.activeCompanyId,
+    entityType: "DOCUMENTO",
+    entityId: document.id,
+    action: "SOLICITUD",
+    summary: `${folio} quedó solicitado para ${row.folio}. Coordinación emite el documento.`,
     authorUserId: actor.userId,
   });
   return document;
