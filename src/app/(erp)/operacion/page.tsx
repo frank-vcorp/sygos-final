@@ -33,7 +33,7 @@ export default async function OperacionPage({ searchParams }: { searchParams: Pr
       ...(view === "validacion" ? { status: "PENDIENTE_VALIDACION" } : {}),
       ...(view === "cotizar" ? { quotePending: true } : {}),
       ...(view === "activas" ? openOperationCaseWhere() : {}),
-      hiddenReservedOsStubCaseWhere(),
+      ...hiddenReservedOsStubCaseWhere(),
       ...(session.role === "TECNICO" ? { assigneeUserId: session.userId } : {}),
       ...(session.role === "VENTAS" ? { equipment: salesPortfolioEquipmentWhere(session.role, session.userId) } : {}),
       OR: [
