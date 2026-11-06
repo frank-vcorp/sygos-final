@@ -311,7 +311,7 @@ async function GerenteSystronPanel({
     prisma.requirement.findMany({
       where: { companyId, kind: "REFACCION", status: "PENDIENTE" },
       orderBy: { createdAt: "desc" },
-      take: 100,
+      take: 20,
     }),
     canManageRequirements
       ? prisma.supplier.findMany({
@@ -785,20 +785,20 @@ async function Coordination({ companyId, code, vista }: { companyId: string; cod
     prisma.billingDocument.findMany({
       where: { companyId, status: "SOLICITADA", kind: { not: "REMISION" } },
       select: { id: true, folio: true, kind: true, technicalCaseId: true, quote: { select: { technicalCaseId: true } } },
-      take: 12,
+      take: 20,
     }),
     prisma.billingDocument.findMany({
       where: { companyId, status: "SOLICITADA", kind: "REMISION" },
       select: { id: true, folio: true, kind: true, technicalCaseId: true, quote: { select: { technicalCaseId: true } } },
-      take: 12,
+      take: 20,
     }),
-    prisma.payment.findMany({ where: { companyId, status: "PENDIENTE" }, orderBy: { createdAt: "asc" }, take: 12 }),
-    prisma.purchase.findMany({ where: { companyId, kind: "DIRECTA", status: "PENDIENTE_VALIDAR" }, take: 12 }),
+    prisma.payment.findMany({ where: { companyId, status: "PENDIENTE" }, orderBy: { createdAt: "asc" }, take: 20 }),
+    prisma.purchase.findMany({ where: { companyId, kind: "DIRECTA", status: "PENDIENTE_VALIDAR" }, take: 20 }),
     prisma.payable.findMany({
       where: { companyId, balance: { gt: 0 } },
       include: { supplier: true, document: true },
       orderBy: { dueAt: "asc" },
-      take: 12,
+      take: 20,
     }),
     prisma.payable.aggregate({ where: { companyId, balance: { gt: 0 } }, _sum: { balance: true } }),
   ]);
@@ -860,39 +860,39 @@ async function Coordination({ companyId, code, vista }: { companyId: string; cod
 
 async function CeoExecutive({ companyId, name }: { companyId: string; name: string }) {
   const [quotes, payrolls, overtime, vacations, leavePermissions, pendingJustifications, compensationRequests, commissions, activeServicios, exitWithoutDocPending] = await Promise.all([
-    prisma.quote.findMany({ where: { companyId, status: "PENDIENTE_COTIZAR" }, take: 12 }),
+    prisma.quote.findMany({ where: { companyId, status: "PENDIENTE_COTIZAR" }, take: 20 }),
     prisma.payrollPeriod.findMany({
       where: { companyId, status: { in: ["PENDIENTE_VALIDACION", "PRELIMINAR"] } },
-      take: 6,
+      take: 10,
     }),
     prisma.overtimeRequest.findMany({
       where: { status: "PENDIENTE_CEO", collaborator: { companyId } },
       include: { collaborator: { include: { user: true } } },
-      take: 12,
+      take: 20,
     }),
     prisma.vacationRequest.findMany({
       where: { status: "PENDIENTE", collaborator: { companyId } },
       include: { collaborator: { include: { user: true } } },
-      take: 12,
+      take: 20,
     }),
     prisma.leavePermissionRequest.findMany({
       where: { status: "PENDIENTE", collaborator: { companyId } },
       include: { collaborator: { include: { user: true } } },
-      take: 12,
+      take: 20,
     }),
     prisma.attendanceDay.findMany({
       where: { justificationStatus: "PENDIENTE_VALIDACION_CEO", collaborator: { companyId } },
       include: { collaborator: { include: { user: true } } },
-      take: 12,
+      take: 20,
     }),
     prisma.compensationRequest.findMany({
       where: { status: "PENDIENTE", collaborator: { companyId } },
       include: { collaborator: { include: { user: true } } },
-      take: 12,
+      take: 20,
     }),
-    prisma.commissionRun.findMany({ where: { companyId, status: "PRELIMINAR" }, take: 6 }),
+    prisma.commissionRun.findMany({ where: { companyId, status: "PRELIMINAR" }, take: 10 }),
     listActiveServicios(companyId, ""),
-    listExitWithoutDocumentPending(companyId, 12),
+    listExitWithoutDocumentPending(companyId, 20),
   ]);
 
   const directRepairOsRows = activeServicios.filter(
@@ -951,7 +951,7 @@ async function CeoExecutive({ companyId, name }: { companyId: string; name: stri
           title="Reparaciones directas en taller (OS sin cotizar)"
           empty="No hay OS en resguardo sin cotización previa."
           bandejaHref={serviciosBandejaHref({ vista: "activos" })}
-          rows={directRepairOsRows.map((row) => ({
+          rows={directRepairOsRows.slice(0, 20).map((row) => ({
             key: row.id,
             href: row.osHref!,
             label: row.osFolio ?? row.equipmentLabel,
@@ -1023,15 +1023,15 @@ async function CeoExecutive({ companyId, name }: { companyId: string; name: stri
 
 async function Executive({ companyId, name }: { companyId: string; name: string }) {
   const [quotes, orders, warranties, payrolls, commissions, overtime, overdue, invoiced] = await Promise.all([
-    prisma.quote.findMany({ where: { companyId, status: "PENDIENTE_COTIZAR" }, take: 12 }),
-    prisma.purchase.findMany({ where: { companyId, kind: "OC", status: "PENDIENTE_AUTORIZACION" }, take: 12 }),
-    prisma.technicalCase.findMany({ where: { serviceCompanyId: companyId, warrantyDecision: "NO_PROCEDENTE", commercialDecision: null }, take: 12 }),
+    prisma.quote.findMany({ where: { companyId, status: "PENDIENTE_COTIZAR" }, take: 20 }),
+    prisma.purchase.findMany({ where: { companyId, kind: "OC", status: "PENDIENTE_AUTORIZACION" }, take: 20 }),
+    prisma.technicalCase.findMany({ where: { serviceCompanyId: companyId, warrantyDecision: "NO_PROCEDENTE", commercialDecision: null }, take: 20 }),
     prisma.payrollPeriod.findMany({
       where: { companyId, status: { in: ["PENDIENTE_VALIDACION", "PRELIMINAR"] } },
-      take: 6,
+      take: 10,
     }),
-    prisma.commissionRun.findMany({ where: { companyId, status: "PRELIMINAR" }, take: 6 }),
-    prisma.overtimeRequest.findMany({ where: { status: "PENDIENTE_CEO", collaborator: { companyId } }, include: { collaborator: { include: { user: true } } }, take: 12 }),
+    prisma.commissionRun.findMany({ where: { companyId, status: "PRELIMINAR" }, take: 10 }),
+    prisma.overtimeRequest.findMany({ where: { status: "PENDIENTE_CEO", collaborator: { companyId } }, include: { collaborator: { include: { user: true } } }, take: 20 }),
     prisma.technicalCase.count({ where: { serviceCompanyId: companyId, status: { notIn: CLOSED }, slaDueAt: { lt: new Date() } } }),
     prisma.billingDocument.aggregate({ where: { companyId, status: "EMITIDA", kind: { not: "REMISION" } }, _sum: { total: true } }),
   ]);

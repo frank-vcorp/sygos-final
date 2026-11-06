@@ -4,7 +4,7 @@ import type { ServicioBandejaColumnOptions } from "@/lib/servicios-bandeja";
 import type { Role } from "@/lib/roles";
 import type { SupervisorServicioRow } from "@/lib/servicios-supervisor";
 
-const LIST_CAP = 12;
+const LIST_CAP = 20;
 
 function countLabel(count: number) {
   if (count === 0) return "Sin pendientes";
