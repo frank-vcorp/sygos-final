@@ -12,7 +12,7 @@ import { ensureOsStubForDiagnosis } from "./technical";
 import { finalFromBase } from "./money";
 import { ATTENTION_LABEL, isReparacionExpressAttentionType, type AttentionType } from "./priorities";
 import { ensureReparacionTallerPriorities } from "./priority-catalog";
-import { technicalServiceConcept } from "./quote-concept";
+import { commercialSellerQuoteConcept, technicalServiceConcept } from "./quote-concept";
 import { commercialQuoteSeriesForType, isCotosQuote, isSellerCommercialQuote } from "./quote-folio-series";
 import { createFieldServiceCaseFromQuote, FIELD_SERVICE_DEFAULT_HOURS, parseFieldServicePricing } from "./field-service";
 import type { Role } from "./roles";
@@ -116,21 +116,28 @@ export async function createSellerQuote(
     priorityId?: string | null;
   },
 ) {
-  if (input.concepts.length === 0) throw new Error("Agrega al menos un concepto.");
   const client = await prisma.client.findFirst({
     where: { id: input.clientId, companyId: actor.activeCompanyId, active: true, isSystem: false },
   });
   if (!client) throw new Error("Selecciona un cliente activo de esta empresa.");
   if (actor.role === "VENTAS" && client.ownerUserId !== actor.userId) throw new Error(SALES_NOT_ASSIGNED_MESSAGE);
-  if (input.equipmentId) {
-    const equipment = await prisma.equipment.findFirst({ where: { id: input.equipmentId, originCompanyId: actor.activeCompanyId, clientId: client.id } });
-    if (!equipment) throw new Error("Selecciona un equipo de este cliente.");
-  } else if (input.quoteType === "DIAGNOSTICO" || input.quoteType === "REPARACION") {
+  const equipment = input.equipmentId
+    ? await prisma.equipment.findFirst({
+        where: { id: input.equipmentId, originCompanyId: actor.activeCompanyId, clientId: client.id },
+        select: { typeName: true, brandName: true, model: true, serial: true },
+      })
+    : null;
+  if (input.equipmentId && !equipment) throw new Error("Selecciona un equipo de este cliente.");
+  if (!input.equipmentId && (input.quoteType === "DIAGNOSTICO" || input.quoteType === "REPARACION")) {
     throw new Error("Selecciona o registra un equipo para esta cotización.");
   }
-  if (input.quoteType === "CAMPO" && input.concepts.every((line) => !line.concept.trim())) {
-    throw new Error("Describe el servicio de campo en los conceptos.");
-  }
+  const manualConcepts = input.concepts
+    .map((line) => ({ concept: line.concept.trim(), quantity: line.quantity }))
+    .filter((line) => line.concept.length > 0);
+  const concepts =
+    manualConcepts.length > 0
+      ? manualConcepts
+      : [{ concept: commercialSellerQuoteConcept(input.quoteType, equipment), quantity: 1 }];
   let frozenPriority: Awaited<ReturnType<typeof freezePriorityFromCatalog>> | null = null;
   if (input.quoteType === "DIAGNOSTICO") {
     if (!input.priorityId) throw new Error("Selecciona la prioridad del diagnóstico.");
@@ -168,7 +175,7 @@ export async function createSellerQuote(
             prioritySlaMaxDays: frozenPriority.slaMaxDays,
           }
         : {}),
-      lines: { create: input.concepts.map((line) => ({ concept: line.concept, quantity: line.quantity })) },
+      lines: { create: concepts.map((line) => ({ concept: line.concept, quantity: line.quantity })) },
     },
   });
   await recordHistory({

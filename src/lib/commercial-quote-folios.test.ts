@@ -82,13 +82,16 @@ describe("commercial quote folios", () => {
         quoteType: "DIAGNOSTICO",
         equipmentId: equipment.id,
         reference: null,
-        concepts: [{ concept: "Diagnóstico comercial", quantity: 1 }],
+        concepts: [],
         contactIds: [contact.id],
         priorityId: priority!.id,
       },
     );
     assert.match(quote.folio, /^COTDX-/);
     assert.equal(quote.priorityName, "Alta");
+    const stored = await prisma.quote.findUnique({ where: { id: quote.id }, include: { lines: true } });
+    assert.equal(stored!.lines.length, 1);
+    assert.match(stored!.lines[0]!.concept, /^Diagnóstico/);
     await prisma.$disconnect();
   });
 
@@ -217,12 +220,13 @@ describe("commercial quote folios", () => {
         quoteType: "CAMPO",
         equipmentId: null,
         reference: null,
-        concepts: [{ concept: "Instalación en planta", quantity: 1 }],
+        concepts: [],
         contactIds: [contact.id],
       },
     );
     assert.match(quote.folio, /^COTSC-/);
     const withLines = await prisma.quote.findUnique({ where: { id: quote.id }, include: { lines: true } });
+    assert.equal(withLines!.lines[0]!.concept, "Servicio de campo");
     await setPrices(
       { userId: user.id, role: "CEO", activeCompanyId: company.id, activeCompanyCode: "SYSTRON" },
       quote.id,

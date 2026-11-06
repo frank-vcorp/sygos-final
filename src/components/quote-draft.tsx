@@ -4,7 +4,7 @@ import { useState } from "react";
 import { ContactNameLink } from "@/components/client-entity-links";
 import { ClientPicker } from "@/components/client-picker";
 import { ServiceEquipmentPicker, type ServiceEquipmentOption } from "@/components/service-equipment-picker";
-import { Button, controlClass, Field, FormBlock } from "@/components/ui";
+import { controlClass, Field, FormBlock } from "@/components/ui";
 import { QUOTE_TYPES, QUOTE_TYPE_LABEL, type QuoteType } from "@/lib/quote-meta";
 import { prioritySummary } from "@/lib/priorities";
 
@@ -44,16 +44,10 @@ export function QuoteDraft({
   const [clientId, setClientId] = useState(defaultClientId);
   const [createdClients, setCreatedClients] = useState<Client[]>([]);
   const [quoteType, setQuoteType] = useState<QuoteType>(fixedQuoteType ?? "DIAGNOSTICO");
-  const [lines, setLines] = useState([{ concept: "", quantity: "1" }]);
   const client = [...clients, ...createdClients].find((row) => row.id === clientId);
   const contacts = client?.contacts ?? [];
   const requiresEquipment = quoteType === "DIAGNOSTICO" || quoteType === "REPARACION";
   const requiresDiagnosisPriority = quoteType === "DIAGNOSTICO" && !fixedQuoteType;
-  const concepts = lines
-    .map((line) => ({ concept: line.concept.replaceAll("|", " ").trim(), quantity: line.quantity.trim() || "1" }))
-    .filter((line) => line.concept)
-    .map((line) => `${line.concept}|${line.quantity}`)
-    .join("\n");
   if (clients.length === 0 && !allowQuickClient) {
     return (
       <p className="rounded-md border border-[#efd0d0] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]">
@@ -106,60 +100,7 @@ export function QuoteDraft({
         />
       </FormBlock>
 
-      <FormBlock title="3. Conceptos" description="Qué incluye la cotización. El precio se define después." columns={1}>
-        <div className="overflow-hidden rounded-lg border border-[var(--line)] bg-white">
-          <div
-            className="hidden grid-cols-[minmax(0,1fr)_5rem_4.5rem] gap-2 border-b border-[var(--line)] bg-[#f7fafc] px-3 py-2 text-xs font-semibold uppercase tracking-wide text-[var(--muted)] sm:grid"
-            aria-hidden
-          >
-            <span>Descripción</span>
-            <span>Cant.</span>
-            <span />
-          </div>
-          <div className="divide-y divide-[var(--line)]">
-            {lines.map((line, index) => (
-              <div key={index} className="grid gap-2 p-3 sm:grid-cols-[minmax(0,1fr)_5rem_4.5rem] sm:items-center">
-                <Field label={index === 0 ? "Descripción" : `Concepto ${index + 1}`} className="sm:[&>span]:sr-only">
-                  <input
-                    aria-label={`Concepto ${index + 1}`}
-                    required
-                    value={line.concept}
-                    placeholder="Describe lo que se cotizará"
-                    className={controlClass}
-                    onChange={(event) => setLines((current) => current.map((row, i) => (i === index ? { ...row, concept: event.target.value } : row)))}
-                  />
-                </Field>
-                <Field label="Cant." className="sm:[&>span]:sr-only">
-                  <input
-                    aria-label={`Cantidad ${index + 1}`}
-                    type="number"
-                    min={1}
-                    step={1}
-                    value={line.quantity}
-                    className={controlClass}
-                    onChange={(event) => setLines((current) => current.map((row, i) => (i === index ? { ...row, quantity: event.target.value } : row)))}
-                  />
-                </Field>
-                <div className="flex items-end sm:justify-end">
-                  {lines.length > 1 ? (
-                    <Button type="button" tone="ghost" className="min-h-10 w-full text-[var(--danger)] sm:w-auto" onClick={() => setLines((current) => current.filter((_, i) => i !== index))}>
-                      Quitar
-                    </Button>
-                  ) : (
-                    <span className="hidden sm:block" />
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-        <Button type="button" tone="ghost" className="w-fit border-dashed" onClick={() => setLines((current) => [...current, { concept: "", quantity: "1" }])}>
-          + Agregar concepto
-        </Button>
-        <input type="hidden" name="concepts" value={concepts} />
-      </FormBlock>
-
-      <FormBlock title="4. Destinatarios y referencia" description="Selecciona al menos un contacto. La referencia interna es opcional." columns={2}>
+      <FormBlock title="3. Destinatarios y referencia" description="Selecciona al menos un contacto. La referencia interna es opcional." columns={2}>
         <Field label="Referencia comercial" hint="Folio del cliente, orden de compra, etc.">
           <input name="reference" className={controlClass} placeholder="Opcional" />
         </Field>
