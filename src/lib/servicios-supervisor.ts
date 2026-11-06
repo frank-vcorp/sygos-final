@@ -33,6 +33,41 @@ export function openOperationCaseWhere() {
   };
 }
 
+type ReservedOsStubPick = {
+  kind: string;
+  spawnedFromId: string | null;
+  quotePending: boolean;
+  attention: { attentionType: string };
+};
+
+/** OS reservada del ciclo SRV (DX-n / OS-n): invisible en UI hasta autorizar reparación (mirror assertRepairOsExecutable). */
+export function isHiddenReservedOsStubInDiagnosisCycle(
+  caseRow: ReservedOsStubPick,
+  siblingCases?: Array<{ id: string; kind: string }>,
+): boolean {
+  if (caseRow.kind !== "OS" || !caseRow.spawnedFromId || !caseRow.quotePending) return false;
+  if (caseRow.attention.attentionType !== "DIAGNOSTICO") return false;
+  if (siblingCases) {
+    const parent = siblingCases.find((row) => row.id === caseRow.spawnedFromId);
+    if (parent && parent.kind !== "DIAGNOSTICO") return false;
+  }
+  return true;
+}
+
+/** Excluye filas de OS reservada en consultas Prisma (cola operación / bandejas activas). */
+export function hiddenReservedOsStubCaseWhere() {
+  return {
+    NOT: {
+      AND: [
+        { kind: "OS" },
+        { spawnedFromId: { not: null } },
+        { quotePending: true },
+        { attention: { attentionType: "DIAGNOSTICO" } },
+      ],
+    },
+  };
+}
+
 type ListScope = {
   assigneeUserId?: string;
   /** Cartera de ventas: solo equipos de clientes asignados al vendedor. */
@@ -229,15 +264,36 @@ export function pickBestQuoteForBandeja(quotes: QuoteBandejaPick[]): QuoteBandej
   })[0]!;
 }
 
-function pickQuoteForAttention(
+type QuoteLinkCasePick = { id: string; kind: string; spawnedFromId: string | null };
+
+/** Evita mostrar cotización ligada al OS reservado si la misma atención ya tiene cotización en el DX. */
+export function filterQuotesPreferDiagnosisOverReservedOs(
+  quotes: QuoteBandejaPick[],
+  cases: QuoteLinkCasePick[],
+): QuoteBandejaPick[] {
+  if (quotes.length <= 1) return quotes;
+  const diagnosis = cases.find((row) => row.kind === "DIAGNOSTICO");
+  if (!diagnosis) return quotes;
+  const reservedOs = cases.find(
+    (row) => row.kind === "OS" && row.spawnedFromId === diagnosis.id,
+  );
+  if (!reservedOs) return quotes;
+  const onDiagnosis = quotes.filter((q) => q.technicalCaseId === diagnosis.id);
+  if (onDiagnosis.length === 0) return quotes;
+  const withoutReservedOs = quotes.filter((q) => q.technicalCaseId !== reservedOs.id);
+  return withoutReservedOs.length > 0 ? withoutReservedOs : quotes;
+}
+
+export function pickQuoteForAttention(
   _attentionId: string,
-  caseIds: string[],
+  cases: QuoteLinkCasePick[],
   equipmentId: string,
   quotes: QuoteBandejaPick[],
 ) {
+  const caseIds = cases.map((row) => row.id);
   const linked = quotes.filter((q) => q.technicalCaseId && caseIds.includes(q.technicalCaseId));
   if (linked.length > 0) {
-    return pickBestQuoteForBandeja(linked);
+    return pickBestQuoteForBandeja(filterQuotesPreferDiagnosisOverReservedOs(linked, cases));
   }
   const byEquipment = quotes.filter((q) => q.equipmentId === equipmentId);
   return pickBestQuoteForBandeja(byEquipment);
@@ -276,12 +332,13 @@ function buildServicioRow(
   sellerName: string | null,
 ): ServicioBandejaRow {
   const quoteStatus = quote?.status ?? null;
+  const siblingPick = cases.map((c) => ({ id: c.id, kind: c.kind }));
+  const osRaw = cases.find((c) => c.kind === "OS") ?? null;
   const os =
-    cases.find((c) => c.kind === "OS")
-    ?? null;
+    osRaw && !isHiddenReservedOsStubInDiagnosisCycle(osRaw, siblingPick) ? osRaw : null;
   const diagnosis =
     cases.find((c) => c.kind === "DIAGNOSTICO")
-    ?? (os?.spawnedFromId ? cases.find((c) => c.id === os.spawnedFromId) : null)
+    ?? (osRaw?.spawnedFromId ? cases.find((c) => c.id === osRaw.spawnedFromId) : null)
     ?? null;
   const diagnosisActive =
     diagnosis != null && !(CLOSED_CASE as readonly string[]).includes(diagnosis.status);
@@ -438,7 +495,7 @@ async function mapCasesToBandejaRows(companyId: string, cases: CaseRecord[]): Pr
       const primary = attentionCases[0];
       const quote = pickQuoteForAttention(
         attentionId,
-        attentionCases.map((c) => c.id),
+        attentionCases.map((c) => ({ id: c.id, kind: c.kind, spawnedFromId: c.spawnedFromId })),
         primary.equipmentId,
         quotes,
       );
@@ -496,6 +553,7 @@ export async function listActiveServicios(
 
   const activeFilters = [
     technicianId ? technicianActiveCaseWhere(technicianId) : openOperationCaseWhere(),
+    hiddenReservedOsStubCaseWhere(),
     ...(clientOwnerUserId ? [clientOwnerScope(clientOwnerUserId)] : []),
     ...(attentionType ? [{ attention: { attentionType } }] : []),
     createdAtRange(options?.desde, options?.hasta),

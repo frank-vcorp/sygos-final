@@ -10,6 +10,7 @@ import {
   serviciosBandejaColumns,
   technicalStatusFromCase,
 } from "./servicios-bandeja";
+import { isHiddenReservedOsStubInDiagnosisCycle } from "./servicios-supervisor";
 
 describe("technicalStatusFromCase", () => {
   it("agrupa refacciones bajo en proceso", () => {
@@ -20,6 +21,23 @@ describe("technicalStatusFromCase", () => {
 
   it("mapea devuelto a en proceso", () => {
     assert.equal(technicalStatusFromCase("DEVUELTO").label, "En proceso");
+  });
+});
+
+describe("reserved OS stub visibility (Option B)", () => {
+  it("no trata OS autorizada como invisible", () => {
+    assert.equal(
+      isHiddenReservedOsStubInDiagnosisCycle(
+        {
+          kind: "OS",
+          spawnedFromId: "dx-1",
+          quotePending: false,
+          attention: { attentionType: "DIAGNOSTICO" },
+        },
+        [{ id: "dx-1", kind: "DIAGNOSTICO" }],
+      ),
+      false,
+    );
   });
 });
 

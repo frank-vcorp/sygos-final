@@ -4,12 +4,14 @@ import {
   physicalStatusFromCustody,
   type StackedStatus,
 } from "@/lib/servicios-bandeja";
+import { isHiddenReservedOsStubInDiagnosisCycle } from "@/lib/servicios-supervisor";
 
 type TechnicalCaseSlice = {
   id: string;
   folio: string;
   kind: string;
   spawnedFromId: string | null;
+  quotePending: boolean;
 };
 
 type AttentionSlice = {
@@ -55,10 +57,19 @@ export function mapEquipmentToAlmacenRow(
     ?? equipment.attentions[0]
     ?? null;
   const cases = attention?.technicalCases ?? [];
-  const os = cases.find((c) => c.kind === "OS") ?? null;
+  const siblingPick = cases.map((c) => ({ id: c.id, kind: c.kind }));
+  const osRaw = cases.find((c) => c.kind === "OS") ?? null;
+  const os =
+    osRaw
+    && !isHiddenReservedOsStubInDiagnosisCycle(
+      { ...osRaw, attention: { attentionType: attention?.attentionType ?? "" } },
+      siblingPick,
+    )
+      ? osRaw
+      : null;
   const diagnosis =
     cases.find((c) => c.kind === "DIAGNOSTICO")
-    ?? (os?.spawnedFromId ? cases.find((c) => c.id === os.spawnedFromId) : null)
+    ?? (osRaw?.spawnedFromId ? cases.find((c) => c.id === osRaw.spawnedFromId) : null)
     ?? null;
 
   const diagnosisFolio = diagnosis?.folio ?? null;

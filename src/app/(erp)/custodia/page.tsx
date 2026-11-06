@@ -54,7 +54,7 @@ export default async function CustodiaPage({ searchParams }: { searchParams: Pro
         sellerUserId: true,
         technicalCases: {
           orderBy: { createdAt: "asc" as const },
-          select: { id: true, folio: true, kind: true, spawnedFromId: true },
+          select: { id: true, folio: true, kind: true, spawnedFromId: true, quotePending: true },
         },
       },
     },
