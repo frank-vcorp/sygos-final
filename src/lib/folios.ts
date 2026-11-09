@@ -112,6 +112,24 @@ export async function ensureAttentionServiceNumber(
   });
   if (!attention) throw new FolioError("Atención no encontrada");
   if (attention.serviceNumber != null) return attention.serviceNumber;
+  const originQuoteId = (
+    await tx.attention.findUnique({
+      where: { id: attentionId },
+      select: { originQuoteId: true },
+    })
+  )?.originQuoteId;
+  if (originQuoteId) {
+    const reserved = (
+      await tx.quote.findUnique({
+        where: { id: originQuoteId },
+        select: { reservedServiceNumber: true },
+      })
+    )?.reservedServiceNumber;
+    if (reserved != null) {
+      await tx.attention.update({ where: { id: attentionId }, data: { serviceNumber: reserved } });
+      return reserved;
+    }
+  }
   const serviceNumber = await allocateServiceNumber(attention.serviceCompanyId, tx);
   await tx.attention.update({ where: { id: attentionId }, data: { serviceNumber } });
   return serviceNumber;
