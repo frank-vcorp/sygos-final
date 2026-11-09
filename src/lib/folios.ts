@@ -41,6 +41,14 @@ async function bootstrapServiceSequence(serviceCompanyId: string, tx: Tx): Promi
     maxUsed = attentionMax._max.serviceNumber;
   }
 
+  const reservedMax = await tx.quote.aggregate({
+    where: { companyId: serviceCompanyId, reservedServiceNumber: { not: null } },
+    _max: { reservedServiceNumber: true },
+  });
+  if (reservedMax._max.reservedServiceNumber != null && reservedMax._max.reservedServiceNumber > maxUsed) {
+    maxUsed = reservedMax._max.reservedServiceNumber;
+  }
+
   for (const folio of (
     await tx.quote.findMany({ where: { companyId: serviceCompanyId }, select: { folio: true } })
   ).map((row) => row.folio)) {

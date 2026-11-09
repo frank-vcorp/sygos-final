@@ -3,6 +3,7 @@ import { createEquiAction } from "../actions";
 import { ClientPicker } from "@/components/client-picker";
 import { EquipmentCatalogFields } from "@/components/equipment-catalog-fields";
 import { Button, controlClass, Field, FormActions, FormPanel, FormSection, PageHeader } from "@/components/ui";
+import { loadEquipmentCatalogByKind } from "@/lib/catalog";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
@@ -10,7 +11,7 @@ import { requireCompany } from "@/lib/session";
 export default async function NuevoEquiPage() {
   const session = await requireCompany();
   if (!can(session.role, "equi.create", session.activeCompanyCode)) redirect("/equipos");
-  const [clients, types, brands, models] = await Promise.all([
+  const [clients, catalog] = await Promise.all([
     prisma.client.findMany({
       where: {
         companyId: session.activeCompanyId,
@@ -20,9 +21,7 @@ export default async function NuevoEquiPage() {
       },
       orderBy: { name: "asc" },
     }),
-    prisma.catalogType.findMany({ orderBy: { name: "asc" } }),
-    prisma.catalogBrand.findMany({ orderBy: { name: "asc" } }),
-    prisma.catalogModel.findMany({ include: { type: true, brand: true } }),
+    loadEquipmentCatalogByKind(),
   ]);
   return (
     <>
@@ -37,7 +36,7 @@ export default async function NuevoEquiPage() {
           </div>
         </FormSection>
         <FormSection title="Identificación del equipo" description="Modelo, marca y tipo en el mismo bloque. Enter confirma; lo nuevo queda en catálogo al guardar.">
-          <div className="md:col-span-2"><EquipmentCatalogFields types={types.map((type) => type.name)} brands={brands.map((brand) => brand.name)} models={models.map((row) => ({ type: row.type.name, brand: row.brand.name, model: row.name }))} /></div>
+          <div className="md:col-span-2"><EquipmentCatalogFields types={catalog.EQUI.types} brands={catalog.EQUI.brands} models={catalog.EQUI.models} /></div>
           <Field label="Número de serie" hint="Opcional. La identidad principal es el folio EQUI."><input name="serial" className={controlClass} /></Field>
           <Field label="Descripción"><textarea name="description" rows={3} className={controlClass} /></Field>
         </FormSection>

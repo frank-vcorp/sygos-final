@@ -4,6 +4,7 @@ import { ClientPicker } from "@/components/client-picker";
 import { EquipmentCatalogFields } from "@/components/equipment-catalog-fields";
 import { ServiceTypePriority } from "@/components/service-type-priority";
 import { Button, controlClass, Field, FormActions, FormPanel, FormSection, PageHeader } from "@/components/ui";
+import { loadEquipmentCatalogByKind } from "@/lib/catalog";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { ATTENTION_LABEL, ATTENTION_TYPES, prioritySummary } from "@/lib/priorities";
@@ -12,7 +13,7 @@ import { requireCompany } from "@/lib/session";
 export default async function NuevoMotPage() {
   const session = await requireCompany();
   if (!can(session.role, "mot.create", session.activeCompanyCode) || !can(session.role, "attention.create", session.activeCompanyCode)) redirect("/motores");
-  const [clients, priorities, types, brands, models] = await Promise.all([
+  const [clients, priorities, catalog] = await Promise.all([
     prisma.client.findMany({
       where: {
         companyId: session.activeCompanyId,
@@ -23,9 +24,7 @@ export default async function NuevoMotPage() {
       orderBy: { name: "asc" },
     }),
     prisma.priority.findMany({ where: { companyId: session.activeCompanyId, active: true }, orderBy: [{ attentionType: "asc" }, { sortOrder: "asc" }] }),
-    prisma.catalogType.findMany({ orderBy: { name: "asc" } }),
-    prisma.catalogBrand.findMany({ orderBy: { name: "asc" } }),
-    prisma.catalogModel.findMany({ include: { type: true, brand: true } }),
+    loadEquipmentCatalogByKind(),
   ]);
   return (
     <>
@@ -45,7 +44,7 @@ export default async function NuevoMotPage() {
               allowQuickClient={can(session.role, "client.create", session.activeCompanyCode)}
             />
           </div>
-          <div className="md:col-span-2"><EquipmentCatalogFields types={types.map((type) => type.name)} brands={brands.map((brand) => brand.name)} models={models.map((row) => ({ type: row.type.name, brand: row.brand.name, model: row.name }))} /></div>
+          <div className="md:col-span-2"><EquipmentCatalogFields types={catalog.MOT.types} brands={catalog.MOT.brands} models={catalog.MOT.models} typeLabel="Tipo de motor" /></div>
           <Field label="Número de serie" hint="Opcional."><input name="serial" className={controlClass} /></Field>
           <Field label="Descripción"><textarea name="description" rows={3} className={controlClass} /></Field>
         </FormSection>

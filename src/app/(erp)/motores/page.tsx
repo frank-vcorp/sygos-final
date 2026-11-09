@@ -3,12 +3,12 @@ import { ClientNameLink } from "@/components/client-entity-links";
 import { ActionLink, ActiveFilters, Badge, Button, controlClass, Empty, FilterBar, ListCap, MobileCard, PageHeader, RecordLink, ResponsiveData, Table, Td, Th, TextLink } from "@/components/ui";
 import { CUSTODY_LABEL, type Custody } from "@/lib/custody";
 import { prisma } from "@/lib/db";
-import { can } from "@/lib/permissions";
+import { can, canListMotors } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
 
 export default async function MotoresPage({ searchParams }: { searchParams: Promise<{ q?: string }> }) {
   const session = await requireCompany();
-  if (!can(session.role, "equipment.catalog", session.activeCompanyCode) || !can(session.role, "mot.view", session.activeCompanyCode)) redirect("/panel");
+  if (!canListMotors(session.role, session.activeCompanyCode)) redirect("/panel");
   const { q } = await searchParams;
   const query = (q ?? "").trim();
   const systron = session.activeCompanyCode === "SERVOMOTORES"

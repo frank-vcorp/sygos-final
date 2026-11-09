@@ -87,6 +87,7 @@ export const SYSTRON_NAV: Partial<Record<Role, readonly string[]>> = {
   ],
   COORDINACION_ADMINISTRACION: [
     "/panel?vista=pendientes",
+    "/servicios/activos",
     "/finanzas?vista=ingresos",
     "/finanzas?vista=egresos",
     "/cobranza?vista=cxc",

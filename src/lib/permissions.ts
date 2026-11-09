@@ -100,7 +100,8 @@ export function can(role: Role, action: Action, companyCode?: string | null): bo
     case "mot.view":
       if (role === "ALMACEN" || role === "AYUDANTE_GENERAL" || role === "KIOSCO_ASISTENCIA") return false;
       if (companyCode === "SERVOMOTORES") return admin || ceo || coord || gerenteSm;
-      return companyCode === "SYSTRON" && (admin || ceo || coord || sales || gerenteSy || role === "SUPERVISOR_TECNICO" || role === "TECNICO");
+      // En Systron los ven Ventas, Coordinación y CEO. El gerente, el supervisor y el técnico no.
+      return companyCode === "SYSTRON" && (admin || ceo || coord || sales);
     case "mot.create":
       if (companyCode === "SYSTRON") return admin || ceo || coord || sales;
       if (companyCode === "SERVOMOTORES") return admin || ceo || coord || gerenteSm;
@@ -215,6 +216,19 @@ export function can(role: Role, action: Action, companyCode?: string | null): bo
     default:
       return false;
   }
+}
+
+/** Listado de motores (menú Motores) sin abrir el catálogo de taller al resto de roles. */
+export function canListMotors(role: Role, companyCode?: string | null): boolean {
+  if (!can(role, "mot.view", companyCode)) return false;
+  if (role === "COORDINACION_ADMINISTRACION" || role === "VENTAS") return true;
+  return can(role, "equipment.catalog", companyCode);
+}
+
+/** Activos de Systron con el corte Equipos / Motores. Coordinación no entra al resto del taller. */
+export function canOpenActivos(role: Role, companyCode?: string | null): boolean {
+  if (can(role, "attention.catalog", companyCode)) return true;
+  return role === "COORDINACION_ADMINISTRACION" && companyCode === "SYSTRON";
 }
 
 export function canSeeUser(viewer: Role, target: Role): boolean {

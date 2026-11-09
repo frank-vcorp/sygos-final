@@ -58,7 +58,7 @@ export async function createEqui(
 ) {
   if (actor.activeCompanyCode !== "SYSTRON") throw new Error("EQUI solo se crea en SYSTRON.");
   const client = await ownClient(actor, input.clientId);
-  const identity = await rememberCatalog(input.typeName, input.brandName, input.model);
+  const identity = await rememberCatalog(input.typeName, input.brandName, input.model, "EQUI");
   const folio = await allocateFolio(actor.activeCompanyId, "EQUI");
   const equipment = await prisma.equipment.create({
     data: {
@@ -98,7 +98,7 @@ export async function createMotIdentity(
   },
 ) {
   const client = await ownClient(actor, input.clientId);
-  const identity = await rememberCatalog(input.typeName, input.brandName, input.model);
+  const identity = await rememberCatalog(input.typeName, input.brandName, input.model, "MOT");
   const folio = await allocateFolio(actor.activeCompanyId, "MOT");
   const equipment = await prisma.equipment.create({
     data: {
@@ -147,7 +147,7 @@ export async function createMot(
   }
   if (!isAttentionType(input.attentionType)) throw new Error("Selecciona el tipo de atención.");
   const client = await ownClient(actor, input.clientId);
-  const identity = await rememberCatalog(input.typeName, input.brand ?? "", input.model);
+  const identity = await rememberCatalog(input.typeName, input.brand ?? "", input.model, "MOT");
   const priority = await resolveFrozenPriority(actor.activeCompanyId, input.attentionType, input.priorityId);
   const servomotores = await prisma.company.findUnique({ where: { code: "SERVOMOTORES" } });
   if (!servomotores) throw new Error("Falta la empresa Servomotores.");
@@ -378,7 +378,7 @@ export async function startService(
       equipmentId = equipment.id;
     } else if (input.equipmentKind === "MOT") {
       const client = await ownClient(actor, clientId);
-      const identity = await rememberCatalog(input.typeName ?? "", input.brandName ?? "", input.model);
+      const identity = await rememberCatalog(input.typeName ?? "", input.brandName ?? "", input.model, "MOT");
       const folio = await allocateFolio(actor.activeCompanyId, "MOT");
       const equipment = await prisma.equipment.create({
         data: {

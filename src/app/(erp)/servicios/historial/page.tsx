@@ -16,6 +16,8 @@ export default async function ServiciosHistorialPage({
   }
   const { estado, q, desde, hasta, equipo } = await searchParams;
   const equipoKind = parseServiciosEquipoKind(equipo);
+  const seesMotors = can(session.role, "mot.view", session.activeCompanyCode);
+  const systron = session.activeCompanyCode === "SYSTRON";
 
   return (
     <ServiciosTecnicoBandeja
@@ -29,8 +31,10 @@ export default async function ServiciosHistorialPage({
       query={(q ?? "").trim()}
       desde={desde}
       hasta={hasta}
-      equipoKind={equipoKind}
-      showEquipoKindFilter={session.activeCompanyCode === "SYSTRON"}
+      equipoKind={systron && seesMotors ? equipoKind : "todos"}
+      showEquipoKindFilter={systron && seesMotors}
+      hideMotors={systron && !seesMotors}
+      originMotors={systron && seesMotors}
     />
   );
 }

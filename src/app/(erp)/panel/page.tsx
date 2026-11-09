@@ -242,6 +242,7 @@ async function Technician({ companyId, userId, history }: { companyId: string; u
   const rows = await prisma.technicalCase.findMany({
     where: {
       serviceCompanyId: companyId,
+      equipment: { kind: { not: "MOT" } },
       ...(history
         ? {
             status: { in: CLOSED },
@@ -290,7 +291,7 @@ async function GerenteSystronPanel({
   const bandejaHistorial = serviciosBandejaHref({ vista: "historial" });
 
   if (history) {
-    const rows = await listHistorialServicios(companyId, "");
+    const rows = await listHistorialServicios(companyId, "", { hideMotors: true });
     const servicioRows = rows.filter((row): row is ServicioBandejaRow => row.kind === "servicio");
     return (
       <>
@@ -324,7 +325,7 @@ async function GerenteSystronPanel({
     accounts,
     shoppingLists,
   ] = await Promise.all([
-    listActiveServicios(companyId, ""),
+    listActiveServicios(companyId, "", { hideMotors: true }),
     loadGerenteServicioPanelContext(companyId),
     prisma.requirement.findMany({
       where: { companyId, kind: "REFACCION", status: "PENDIENTE" },
@@ -451,9 +452,9 @@ async function GerenteSystronPanel({
 async function SupervisorShop({ companyId, userId }: { companyId: string; userId: string }) {
   const role: Role = "SUPERVISOR_TECNICO";
   const [activeRows, assignedAttentions] = await Promise.all([
-    listActiveServicios(companyId, ""),
+    listActiveServicios(companyId, "", { hideMotors: true }),
     prisma.technicalCase.findMany({
-      where: { serviceCompanyId: companyId, assigneeUserId: userId, status: { notIn: CLOSED } },
+      where: { serviceCompanyId: companyId, assigneeUserId: userId, status: { notIn: CLOSED }, equipment: { kind: { not: "MOT" } } },
       select: { attentionId: true },
       distinct: ["attentionId"],
     }),

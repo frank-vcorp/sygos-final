@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { startServiceAction } from "../../actions";
 import { ServiceStartForm } from "@/components/service-start-form";
 import { PageHeader } from "@/components/ui";
+import { loadEquipmentCatalogByKind } from "@/lib/catalog";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { loadDiagnosisPriorityOptions } from "@/lib/diagnosis-priorities";
@@ -28,7 +29,7 @@ export default async function NuevoServicioPage({
   const attentionType = TYPES[tipo as keyof typeof TYPES];
   if (!attentionType) notFound();
   const warranty = attentionType === "DIAGNOSTICO_GARANTIA";
-  const [clients, equipment, priorities, types, brands, models, repairs] = await Promise.all([
+  const [clients, equipment, priorities, catalog, repairs] = await Promise.all([
     prisma.client.findMany({
       where: { companyId: session.activeCompanyId, active: true, isSystem: false, ...(session.role === "VENTAS" ? { ownerUserId: session.userId } : {}) },
       orderBy: { name: "asc" },
@@ -41,9 +42,7 @@ export default async function NuevoServicioPage({
     attentionType === "DIAGNOSTICO"
       ? loadDiagnosisPriorityOptions(session.activeCompanyId, session.activeCompanyCode)
       : prisma.priority.findMany({ where: { companyId: session.activeCompanyId, attentionType, active: true }, orderBy: { sortOrder: "asc" } }).then((rows) => rows.map((row) => ({ id: row.id, name: row.name, equipmentKind: "EQUI" as const, label: row.name }))),
-    prisma.catalogType.findMany({ orderBy: { name: "asc" } }),
-    prisma.catalogBrand.findMany({ orderBy: { name: "asc" } }),
-    prisma.catalogModel.findMany({ include: { type: true, brand: true } }),
+    loadEquipmentCatalogByKind(),
     warranty
       ? prisma.technicalCase.findMany({
           where: { kind: "OS", status: "TERMINADA", paidAt: { not: null }, attention: { attentionType: { not: "DIAGNOSTICO_GARANTIA" } }, equipment: { originCompanyId: session.activeCompanyId } },
@@ -70,9 +69,10 @@ export default async function NuevoServicioPage({
         clients={clients}
         equipment={equipment}
         priorities={priorities}
-        types={types.map((type) => type.name)}
-        brands={brands.map((brand) => brand.name)}
-        models={models.map((row) => ({ type: row.type.name, brand: row.brand.name, model: row.name }))}
+        types={catalog.EQUI.types}
+        brands={catalog.EQUI.brands}
+        models={catalog.EQUI.models}
+        catalogByKind={catalog}
         repairs={repairs}
         defaultClientId={defaultClientId}
         companyCode={session.activeCompanyCode ?? "SYSTRON"}

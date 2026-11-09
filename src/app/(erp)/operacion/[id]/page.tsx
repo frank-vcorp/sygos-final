@@ -80,11 +80,12 @@ export default async function OperacionDetallePage({ params }: { params: Promise
   const reflected = session.activeCompanyCode === "SYSTRON" && row.serviceCompany.code === "SERVOMOTORES" && row.equipment.originCompanyId === session.activeCompanyId;
   const owns = row.serviceCompanyId === session.activeCompanyId;
   if (!owns && !reflected) notFound();
-  if (!can(session.role, row.equipment.kind === "EQUI" ? "equi.view" : "mot.view", session.activeCompanyCode) && !reflected) notFound();
+  if (row.equipment.kind === "MOT" && !can(session.role, "mot.view", session.activeCompanyCode)) notFound();
+  if (row.equipment.kind !== "MOT" && !can(session.role, "equi.view", session.activeCompanyCode) && !reflected) notFound();
   await redirectIfSalesNotAssigned(session, row.equipment.client.ownerUserId, "/operacion");
   const technicianOwned = row.assigneeUserId === session.userId || row.finishedByUserId === session.userId;
   if (session.role === "TECNICO" && !technicianOwned) notFound();
-  const readOnly = !owns;
+  const readOnly = !owns || session.role === "COORDINACION_ADMINISTRACION";
   const authors = await prisma.user.findMany({
     where: { id: { in: row.logs.map((item) => item.authorUserId) } },
     select: { id: true, name: true },
@@ -248,7 +249,9 @@ export default async function OperacionDetallePage({ params }: { params: Promise
   const inventoryPickerEnabled = row.serviceCompany.inventoryEnabled;
   const canEditClient = can(session.role, "client.edit", session.activeCompanyCode);
   const slaOverdue = row.slaDueAt != null && row.slaDueAt.getTime() < Date.now() && !closed;
-  const back = can(session.role, "attention.catalog", session.activeCompanyCode)
+  const back = session.role === "COORDINACION_ADMINISTRACION" && session.activeCompanyCode === "SYSTRON"
+    ? { href: "/servicios/activos", label: "Activos" }
+    : can(session.role, "attention.catalog", session.activeCompanyCode)
     ? { href: serviciosBandejaHref({ vista: historial ? "historial" : "activos" }), label: "Servicios" }
     : { href: "/operacion", label: "En proceso" };
   const equipmentIdentity = [row.equipment.typeName, row.equipment.brandName, row.equipment.model].filter(Boolean).join(" · ");

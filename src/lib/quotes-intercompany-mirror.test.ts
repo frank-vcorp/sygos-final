@@ -132,16 +132,21 @@ describe("cotización espejo MOT Servomotores → SYSTRON", () => {
       1,
     );
 
+    const unpricedBase = await prisma.quote.findUnique({ where: { id: servQuote.id }, include: { lines: true } });
+    assert.equal(intercompanyReferenceAmount(unpricedBase, null), null);
+
     const servWithLines = await prisma.quote.findUnique({ where: { id: servQuote.id }, include: { lines: true } });
     await setPrices(
       { userId: diego.id, role: "GERENTE_OPERATIVO_SERVOMOTORES", activeCompanyId: servomotores.id, activeCompanyCode: "SERVOMOTORES" },
       servQuote.id,
       1,
       [{ lineId: servWithLines!.lines[0]!.id, amount: 10000 }],
-      7,
+      10,
     );
     const pricedBase = await prisma.quote.findUnique({ where: { id: servQuote.id }, include: { lines: true } });
     assert.equal(intercompanyReferenceAmount(pricedBase, attention), 10000);
+    const mirrorAfterPrice = await prisma.quote.findFirst({ where: { companyId: systron.id, linkedQuoteId: servQuote.id } });
+    assert.equal(mirrorAfterPrice!.deliveryBusinessDays, 10);
 
     const os = await prisma.technicalCase.create({
       data: {
@@ -159,5 +164,118 @@ describe("cotización espejo MOT Servomotores → SYSTRON", () => {
     const mirrorAfterOs = await prisma.quote.findFirst({ where: { companyId: systron.id, technicalCaseId: dx.id } });
     assert.ok(mirrorAfterOs);
     assert.equal(mirrorAfterOs!.quoteType, "DIAGNOSTICO");
+  });
+
+  it("con el DX ya abierto, cotizar aparta el siguiente SRV de Servomotores", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "sygos-ic-folio-"));
+    process.env.DATABASE_URL = `file:${join(dir, "test.db")}`;
+    const { execSync } = await import("child_process");
+    execSync("npx prisma db push --skip-generate", {
+      cwd: join(import.meta.dirname, "../.."),
+      env: process.env,
+      stdio: "ignore",
+    });
+    const { prisma } = await import("./db");
+    const { ensureQuoteFromCase } = await import("./quotes");
+    const { openCase } = await import("./technical");
+
+    const systron = await prisma.company.create({ data: { code: "SYFOL", name: "Systron folio" } });
+    const servomotores = await prisma.company.create({ data: { code: "SMFOL", name: "Servomotores folio" } });
+    const diego = await prisma.user.create({
+      data: { username: "diego-folio", name: "Diego", passwordHash: "x", role: "GERENTE_OPERATIVO_SERVOMOTORES", companyId: servomotores.id },
+    });
+    const client = await prisma.client.create({
+      data: {
+        companyId: systron.id,
+        name: "Cliente",
+        active: true,
+        isSystem: false,
+        requiresInvoice: true,
+        rfc: "XAXX010101000",
+        cfdiUse: "G03",
+        paymentMethod: "PUE",
+      },
+    });
+    const adminClient = await prisma.client.create({
+      data: {
+        companyId: servomotores.id,
+        name: "SYSTRON",
+        active: true,
+        isSystem: true,
+        requiresInvoice: true,
+        rfc: "XAXX010101001",
+        cfdiUse: "G03",
+        paymentMethod: "PUE",
+      },
+    });
+    await prisma.folioSequence.create({
+      data: { companyId: servomotores.id, series: "SRV", nextNumber: 10 },
+    });
+    const motor = await prisma.equipment.create({
+      data: {
+        folio: "MOT-F-10",
+        kind: "MOT",
+        originCompanyId: systron.id,
+        clientId: client.id,
+        model: "M",
+        custody: "EN_RESGUARDO",
+        holderCompanyId: servomotores.id,
+        createdByUserId: diego.id,
+      },
+    });
+    const attention = await prisma.attention.create({
+      data: {
+        equipmentId: motor.id,
+        originCompanyId: systron.id,
+        serviceCompanyId: servomotores.id,
+        adminClientId: adminClient.id,
+        attentionType: "DIAGNOSTICO",
+        priorityName: "Alta",
+        prioritySlaMaxDays: 7,
+        reportedFault: "Falla",
+        status: "EN_PROCESO",
+        slaStartedAt: new Date(),
+      },
+    });
+    const dx = await openCase(attention.id, new Date());
+    assert.equal(dx!.folio, "DX-10");
+    await prisma.technicalCase.update({ where: { id: dx!.id }, data: { status: "VALIDADO", quotePending: true } });
+
+    const quote = await ensureQuoteFromCase({ userId: diego.id, activeCompanyId: servomotores.id }, dx!.id);
+    assert.equal(quote.folio, "COT-10");
+    assert.equal((await prisma.quote.findUnique({ where: { id: quote.id } }))!.reservedServiceNumber, 11);
+
+    const again = await ensureQuoteFromCase({ userId: diego.id, activeCompanyId: servomotores.id }, dx!.id);
+    assert.equal(again.id, quote.id);
+    assert.equal((await prisma.quote.findUnique({ where: { id: quote.id } }))!.reservedServiceNumber, 11);
+
+    const other = await prisma.equipment.create({
+      data: {
+        folio: "MOT-F-NEXT",
+        kind: "MOT",
+        originCompanyId: servomotores.id,
+        clientId: adminClient.id,
+        model: "M",
+        custody: "EN_RESGUARDO",
+        holderCompanyId: servomotores.id,
+        createdByUserId: diego.id,
+      },
+    });
+    const nextAttention = await prisma.attention.create({
+      data: {
+        equipmentId: other.id,
+        originCompanyId: servomotores.id,
+        serviceCompanyId: servomotores.id,
+        adminClientId: adminClient.id,
+        attentionType: "DIAGNOSTICO",
+        priorityName: "Normal",
+        prioritySlaMaxDays: 5,
+        reportedFault: "Otro",
+        status: "EN_PROCESO",
+        slaStartedAt: new Date(),
+      },
+    });
+    const nextDx = await openCase(nextAttention.id, new Date());
+    assert.equal(nextDx!.folio, "DX-12");
   });
 });

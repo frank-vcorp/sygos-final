@@ -41,6 +41,16 @@ export const COORDINATION_NAV_GROUPS: NavGroupDef[] = [
     ],
   },
   {
+    title: "Servicios",
+    links: [
+      {
+        href: "/servicios/activos",
+        label: "Activos",
+        show: (role, code) => showCoord(role) && code === "SYSTRON",
+      },
+    ],
+  },
+  {
     title: "Comercial",
     links: [
       { href: "/prospectos", label: "Prospectos", show: showCoord },

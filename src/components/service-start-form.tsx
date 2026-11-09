@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import type { EquipmentCatalogByKind } from "@/lib/catalog";
 import { filterDiagnosisPrioritiesForEquipment, type DiagnosisPriorityOption } from "@/lib/diagnosis-priorities-shared";
 import { ClientPicker } from "@/components/client-picker";
 import { ServiceEquipmentPicker, type ServiceEquipmentOption } from "@/components/service-equipment-picker";
@@ -18,6 +19,7 @@ export function ServiceStartForm({
   types,
   brands,
   models,
+  catalogByKind,
   repairs,
   defaultClientId,
   companyCode,
@@ -35,6 +37,7 @@ export function ServiceStartForm({
   types: string[];
   brands: string[];
   models: Array<{ type: string; brand: string; model: string }>;
+  catalogByKind?: EquipmentCatalogByKind;
   repairs: RepairOption[];
   defaultClientId: string;
   companyCode: string;
@@ -78,6 +81,7 @@ export function ServiceStartForm({
             types={types}
             brands={brands}
             models={models}
+            catalogByKind={catalogByKind}
             warranty={warranty}
             allowQuickEquipment={allowQuickEquipment}
             quickEquipmentKinds={quickEquipmentKinds}

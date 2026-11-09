@@ -3,6 +3,7 @@ import { createQuoteAction } from "@/app/(erp)/cotizaciones/actions";
 import { QuoteDraft } from "@/components/quote-draft";
 import { SubmitButton } from "@/components/submit-button";
 import { FormActions, FormPanel, PageHeader } from "@/components/ui";
+import { loadEquipmentCatalogByKind } from "@/lib/catalog";
 import { prisma } from "@/lib/db";
 import { homePath } from "@/lib/home";
 import { can } from "@/lib/permissions";
@@ -14,7 +15,7 @@ export default async function NuevaVentaEquipoPage({ searchParams }: { searchPar
     redirect(homePath(session.role, session.activeCompanyCode));
   }
   const { clientId } = await searchParams;
-  const [clients, equipment, types, brands, models] = await Promise.all([
+  const [clients, equipment, catalog] = await Promise.all([
     prisma.client.findMany({
       where: { companyId: session.activeCompanyId, active: true, isSystem: false, ...(session.role === "VENTAS" ? { ownerUserId: session.userId } : {}) },
       include: { contacts: { where: { active: true }, orderBy: [{ isPrimary: "desc" }, { name: "asc" }] } },
@@ -25,9 +26,7 @@ export default async function NuevaVentaEquipoPage({ searchParams }: { searchPar
       orderBy: { createdAt: "desc" },
       select: { id: true, folio: true, model: true, clientId: true, kind: true, typeName: true, brandName: true, serial: true },
     }),
-    prisma.catalogType.findMany({ orderBy: { name: "asc" } }),
-    prisma.catalogBrand.findMany({ orderBy: { name: "asc" } }),
-    prisma.catalogModel.findMany({ include: { type: true, brand: true } }),
+    loadEquipmentCatalogByKind(),
   ]);
   const allowQuickEquipment = can(session.role, "equi.create", session.activeCompanyCode);
   return (
@@ -53,9 +52,10 @@ export default async function NuevaVentaEquipoPage({ searchParams }: { searchPar
             defaultClientId={clients.some((client) => client.id === clientId) ? clientId : ""}
             clients={clients.map((client) => ({ id: client.id, name: client.name, contacts: client.contacts.map((contact) => ({ id: contact.id, name: contact.name, isPrimary: contact.isPrimary })) }))}
             equipment={equipment}
-            types={types.map((type) => type.name)}
-            brands={brands.map((brand) => brand.name)}
-            models={models.map((row) => ({ type: row.type.name, brand: row.brand.name, model: row.name }))}
+            types={catalog.EQUI.types}
+            brands={catalog.EQUI.brands}
+            models={catalog.EQUI.models}
+            catalogByKind={{ EQUI: catalog.EQUI, MOT: { types: [], brands: [], models: [] } }}
           />
         </div>
         <FormActions note="Al autorizarla, la propuesta aparece en tu bandeja de ventas de equipos.">

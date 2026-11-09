@@ -2,6 +2,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "fs";
 import { randomBytes } from "crypto";
 import { PrismaClient } from "@prisma/client";
 import { catalogKey } from "../src/lib/catalog-key";
+import { MOTOR_CATALOG_SEED } from "../src/lib/motor-catalog-seed";
 import { hashPassword, verifyPassword } from "../src/lib/crypto";
 import { initialPriorities } from "../src/lib/priorities";
 import { DEFAULT_MONTHLY_PURCHASE, DEFAULT_PURCHASE_LIMIT, isPurchaseManager, type Role } from "../src/lib/roles";
@@ -186,20 +187,48 @@ async function seedEquipmentCatalog() {
     const modelKey = catalogKey(row.model);
     let typeId = types.get(typeKey);
     if (!typeId) {
-      const type = await prisma.catalogType.upsert({ where: { key: typeKey }, update: {}, create: { name: row.type, key: typeKey } });
+      const type = await prisma.catalogType.upsert({
+        where: { key_equipmentKind: { key: typeKey, equipmentKind: "EQUI" } },
+        update: {},
+        create: { name: row.type, key: typeKey, equipmentKind: "EQUI" },
+      });
       typeId = type.id;
       types.set(typeKey, typeId);
     }
     let brandId = brands.get(brandKey);
     if (!brandId) {
-      const brand = await prisma.catalogBrand.upsert({ where: { key: brandKey }, update: {}, create: { name: row.brand, key: brandKey } });
+      const brand = await prisma.catalogBrand.upsert({
+        where: { key_equipmentKind: { key: brandKey, equipmentKind: "EQUI" } },
+        update: {},
+        create: { name: row.brand, key: brandKey, equipmentKind: "EQUI" },
+      });
       brandId = brand.id;
       brands.set(brandKey, brandId);
     }
     await prisma.catalogModel.upsert({
       where: { typeId_brandId_key: { typeId, brandId, key: modelKey } },
       update: {},
-      create: { typeId, brandId, name: row.model, key: modelKey },
+      create: { typeId, brandId, name: row.model, key: modelKey, equipmentKind: "EQUI" },
+    });
+  }
+  for (const row of MOTOR_CATALOG_SEED) {
+    const typeKey = catalogKey(row.type);
+    const brandKey = catalogKey(row.brand);
+    const modelKey = catalogKey(row.model);
+    const type = await prisma.catalogType.upsert({
+      where: { key_equipmentKind: { key: typeKey, equipmentKind: "MOT" } },
+      update: {},
+      create: { name: row.type, key: typeKey, equipmentKind: "MOT" },
+    });
+    const brand = await prisma.catalogBrand.upsert({
+      where: { key_equipmentKind: { key: brandKey, equipmentKind: "MOT" } },
+      update: {},
+      create: { name: row.brand, key: brandKey, equipmentKind: "MOT" },
+    });
+    await prisma.catalogModel.upsert({
+      where: { typeId_brandId_key: { typeId: type.id, brandId: brand.id, key: modelKey } },
+      update: { equipmentKind: "MOT" },
+      create: { typeId: type.id, brandId: brand.id, name: row.model, key: modelKey, equipmentKind: "MOT" },
     });
   }
 }

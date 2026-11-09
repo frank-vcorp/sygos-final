@@ -16,7 +16,7 @@ import { allowedMovements, CUSTODY_LABEL, isInitialWarehouseReceipt, isReceipt, 
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
 import { historyFor } from "@/lib/history";
-import { can } from "@/lib/permissions";
+import { can, canListMotors } from "@/lib/permissions";
 import { openPendingCases } from "@/lib/technical";
 import { ATTENTION_LABEL, type AttentionType } from "@/lib/priorities";
 import { redirectIfSalesNotAssigned } from "@/lib/sales-assignment";
@@ -48,7 +48,7 @@ export async function EquipmentDetail({
   const mayEquiList =
     can(session.role, "equi.view", session.activeCompanyCode)
     && (session.role === "VENTAS" || can(session.role, "equipment.catalog", session.activeCompanyCode));
-  const mayMotList = can(session.role, "equipment.catalog", session.activeCompanyCode) && can(session.role, "mot.view", session.activeCompanyCode);
+  const mayMotList = canListMotors(session.role, session.activeCompanyCode);
   let listHref = expectedKind === "EQUI" ? (mayEquiList ? "/equipos" : "/custodia") : (mayMotList ? "/motores" : "/custodia");
   if (almacenUx && listHref === "/custodia" && fromCustodiaVista) {
     listHref = `/custodia?vista=${fromCustodiaVista}`;

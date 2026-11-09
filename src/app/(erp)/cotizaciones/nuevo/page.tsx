@@ -3,6 +3,7 @@ import { createQuoteAction } from "../actions";
 import { QuoteDraft } from "@/components/quote-draft";
 import { SubmitButton } from "@/components/submit-button";
 import { FormActions, FormPanel, PageHeader } from "@/components/ui";
+import { loadEquipmentCatalogByKind } from "@/lib/catalog";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
@@ -12,7 +13,7 @@ export default async function NuevaCotizacionPage({ searchParams }: { searchPara
   const session = await requireCompany();
   if (!can(session.role, "quote.create", session.activeCompanyCode)) redirect("/cotizaciones");
   const { clientId } = await searchParams;
-  const [clients, equipment, types, brands, models, diagnosisPriorities] = await Promise.all([
+  const [clients, equipment, catalog, diagnosisPriorities] = await Promise.all([
     prisma.client.findMany({
       where: { companyId: session.activeCompanyId, active: true, isSystem: false, ...(session.role === "VENTAS" ? { ownerUserId: session.userId } : {}) },
       include: { contacts: { where: { active: true }, orderBy: [{ isPrimary: "desc" }, { name: "asc" }] } },
@@ -23,9 +24,7 @@ export default async function NuevaCotizacionPage({ searchParams }: { searchPara
       orderBy: { createdAt: "desc" },
       select: { id: true, folio: true, model: true, clientId: true, kind: true, typeName: true, brandName: true, serial: true },
     }),
-    prisma.catalogType.findMany({ orderBy: { name: "asc" } }),
-    prisma.catalogBrand.findMany({ orderBy: { name: "asc" } }),
-    prisma.catalogModel.findMany({ include: { type: true, brand: true } }),
+    loadEquipmentCatalogByKind(),
     loadDiagnosisPriorityOptions(session.activeCompanyId, session.activeCompanyCode),
   ]);
   const quickEquipmentKinds: Array<"EQUI" | "MOT"> = [
@@ -50,9 +49,10 @@ export default async function NuevaCotizacionPage({ searchParams }: { searchPara
             defaultClientId={clients.some((client) => client.id === clientId) ? clientId : ""}
             clients={clients.map((client) => ({ id: client.id, name: client.name, contacts: client.contacts.map((contact) => ({ id: contact.id, name: contact.name, isPrimary: contact.isPrimary })) }))}
             equipment={equipment}
-            types={types.map((type) => type.name)}
-            brands={brands.map((brand) => brand.name)}
-            models={models.map((row) => ({ type: row.type.name, brand: row.brand.name, model: row.name }))}
+            types={catalog.EQUI.types}
+            brands={catalog.EQUI.brands}
+            models={catalog.EQUI.models}
+            catalogByKind={catalog}
             diagnosisPriorities={diagnosisPriorities}
           />
         </div>

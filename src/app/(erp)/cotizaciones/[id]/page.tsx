@@ -25,6 +25,7 @@ import {
   MoneyInput,
   TextLink,
 } from "@/components/ui";
+import { loadEquipmentCatalogByKind } from "@/lib/catalog";
 import { prisma } from "@/lib/db";
 import { attentionMetrics, elapsedLabel } from "@/lib/attention-timing";
 import { formatWhen } from "@/lib/form";
@@ -117,21 +118,20 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
   const deliveryDaysRequired = quoteDeliveryDaysRequired(quote, caseContext);
   const referencePrice = intercompanyReferenceAmount(base, source?.attention);
   const servomotoresReference = intercompanyReferenceAmount(base, null);
+  const mirrorQuote = Boolean(quote.linkedQuoteId && base);
   const priced = quote.status !== "PENDIENTE_COTIZAR" || session.role !== "VENTAS";
   const totals = priced ? quoteTotals(linesForTotal(quote.lines, quote.quoteType, quote.status), quote.discountPct) : null;
   const waitingEquipment = quote.status === "AUTORIZADA_PENDIENTE_EQUIPO" && !quote.equipmentId && !quote.technicalCaseId && (quote.quoteType === "DIAGNOSTICO" || quote.quoteType === "REPARACION");
-  const [gear, priorities, types, brands, models] = waitingEquipment
+  const [gear, priorities, catalog] = waitingEquipment
     ? await Promise.all([
         prisma.equipment.findMany({ where: { originCompanyId: session.activeCompanyId, ...(session.role === "VENTAS" ? { client: { ownerUserId: session.userId } } : {}) }, orderBy: { createdAt: "desc" }, select: { id: true, folio: true, model: true, clientId: true, kind: true, typeName: true, brandName: true, serial: true } }),
         prisma.priority.findMany({
           where: { companyId: session.activeCompanyId, attentionType: commercialAttentionTypeForQuote(quote), active: true },
           orderBy: { sortOrder: "asc" },
         }),
-        prisma.catalogType.findMany({ orderBy: { name: "asc" } }),
-        prisma.catalogBrand.findMany({ orderBy: { name: "asc" } }),
-        prisma.catalogModel.findMany({ include: { type: true, brand: true } }),
+        loadEquipmentCatalogByKind(),
       ])
-    : [[], [], [], [], []];
+    : [[], [], null];
   const quickEquipmentKinds: Array<"EQUI" | "MOT"> = [
     ...(can(session.role, "equi.create", session.activeCompanyCode) ? ["EQUI" as const] : []),
     ...(can(session.role, "mot.create", session.activeCompanyCode) ? ["MOT" as const] : []),
@@ -164,7 +164,7 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
         <input type="hidden" name="version" value={quote.version} />
         {quote.lines.map((line, lineIndex) => {
           const baseLine = base?.lines[lineIndex];
-          const lineReference = baseLine?.basePrice ?? baseLine?.unitPrice ?? referencePrice;
+          const lineReference = mirrorQuote ? null : (baseLine?.basePrice ?? baseLine?.unitPrice ?? referencePrice);
           return (
           <label key={line.id} className="grid gap-1">
             <span className="text-xs font-semibold text-[var(--muted)]">{quote.lines.length === 1 ? "Precio" : line.concept}</span>
@@ -413,11 +413,7 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
               ))}
             </p>
           ) : <p className="mt-1 text-[var(--danger)]">Este cliente no tiene contactos activos.</p>}
-          {quote.status === "PENDIENTE_COTIZAR" && servomotoresReference != null && base ? (
-            <p className="mt-1">
-              Referencia Servomotores ({base.folio}): {money(servomotoresReference)}. Solo orientación; el precio comercial SYSTRON lo confirma CEO o Administrador.
-            </p>
-          ) : quote.status === "PENDIENTE_COTIZAR" && referencePrice != null ? (
+          {!mirrorQuote && quote.status === "PENDIENTE_COTIZAR" && referencePrice != null ? (
             <p className="mt-1">Referencia congelada de la prioridad: {money(referencePrice)}. El precio lo confirma CEO o Administrador.</p>
           ) : null}
           {quote.linkedQuoteId && base ? (
@@ -516,9 +512,9 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
               ) : null}
             </div>
           ) : null}
-          {base && quoteTotals(base.lines, base.discountPct)?.total != null ? (
+          {showBase && base && servomotoresReference != null ? (
             <p className="mt-3 text-[var(--muted)]">
-              Base Servomotores {base.folio}: {money(quoteTotals(base.lines, base.discountPct)!.total)} (referencia interna; el vendedor SYSTRON no ve este importe).
+              Base Servomotores {base.folio}: {money(servomotoresReference)} (referencia interna; no es el precio definitivo).
             </p>
           ) : null}
           </Card>
@@ -579,9 +575,10 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
               companyCode={session.activeCompanyCode}
               allowQuickEquipment={quickEquipmentKinds.length > 0}
               quickEquipmentKinds={quickEquipmentKinds}
-              types={types.map((type) => type.name)}
-              brands={brands.map((brand) => brand.name)}
-              models={models.map((row) => ({ type: row.type.name, brand: row.brand.name, model: row.name }))}
+              types={catalog?.EQUI.types ?? []}
+              brands={catalog?.EQUI.brands ?? []}
+              models={catalog?.EQUI.models ?? []}
+              catalogByKind={catalog ?? undefined}
               relateAction={relateEquipmentAction}
               frozenPriorityName={quote.priorityName}
             />

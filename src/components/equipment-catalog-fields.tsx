@@ -5,7 +5,7 @@ import { CatalogCombobox, type CatalogComboboxOption } from "@/components/catalo
 
 type ModelRow = { type: string; brand: string; model: string };
 
-export function EquipmentCatalogFields({ types, brands, models, initialValues }: { types: string[]; brands: string[]; models: ModelRow[]; initialValues?: { model: string; brand: string; typeName: string } }) {
+export function EquipmentCatalogFields({ types, brands, models, initialValues, typeLabel = "Tipo de equipo" }: { types: string[]; brands: string[]; models: ModelRow[]; initialValues?: { model: string; brand: string; typeName: string }; typeLabel?: string }) {
   const [model, setModel] = useState(initialValues?.model ?? "");
   const [brand, setBrand] = useState(initialValues?.brand ?? "");
   const [typeName, setTypeName] = useState(initialValues?.typeName ?? "");
@@ -69,7 +69,7 @@ export function EquipmentCatalogFields({ types, brands, models, initialValues }:
         inputRef={brandRef}
       />
       <CatalogCombobox
-        label="Tipo de equipo"
+        label={typeLabel}
         hint="Elige existente o confirma uno nuevo con Enter."
         name="typeName"
         required

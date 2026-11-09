@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { EquipmentCatalogFields } from "@/components/equipment-catalog-fields";
 import { SearchableEntityPicker } from "@/components/searchable-entity-picker";
 import { Button, controlClass, Field } from "@/components/ui";
+import type { EquipmentCatalogByKind } from "@/lib/catalog";
 import { quickCreateEquipmentAction } from "@/lib/quick-create-actions";
 import { readNamedFormFields, validateQuickEquipmentDraft, type QuickFormFieldMap } from "@/lib/quick-form-persist";
 
@@ -19,7 +20,7 @@ export type ServiceEquipmentOption = {
 };
 
 export function ServiceEquipmentPicker({
-  equipment, clientId, companyCode, types, brands, models, warranty = false,
+  equipment, clientId, companyCode, types, brands, models, catalogByKind, warranty = false,
   allowQuickEquipment = true, quickEquipmentKinds, emptyOptionLabel = "Selecciona", required = false,
   pickExistingFolio = false,
   onEquipmentChange,
@@ -31,6 +32,7 @@ export function ServiceEquipmentPicker({
   types: string[];
   brands: string[];
   models: Array<{ type: string; brand: string; model: string }>;
+  catalogByKind?: EquipmentCatalogByKind;
   warranty?: boolean;
   allowQuickEquipment?: boolean;
   quickEquipmentKinds?: Array<"EQUI" | "MOT">;
@@ -50,6 +52,11 @@ export function ServiceEquipmentPicker({
   const [template, setTemplate] = useState<{ sourceId: string; model: string; brand: string; typeName: string; kind?: string } | null>(null);
   const [pickerVersion, setPickerVersion] = useState(0);
   const allowedKinds: Array<"EQUI" | "MOT"> = quickEquipmentKinds ?? (companyCode === "SERVOMOTORES" ? ["MOT"] : ["EQUI", "MOT"]);
+  const [draftKind, setDraftKind] = useState<"EQUI" | "MOT">(allowedKinds[0] ?? "EQUI");
+  const activeCatalog = catalogByKind?.[draftKind] ?? { types, brands, models };
+  const suggestionModels = catalogByKind
+    ? allowedKinds.flatMap((kind) => catalogByKind[kind].models.map((row) => ({ ...row, kind })))
+    : models.map((row) => ({ ...row, kind: allowedKinds[0] ?? "EQUI" as const }));
 
   useEffect(() => {
     setEquipmentId("");
@@ -71,8 +78,13 @@ export function ServiceEquipmentPicker({
   }
 
   function openNewEquipment(values: { sourceId: string; model: string; brand: string; typeName: string; kind?: string }) {
+    const nextKind = values.kind === "MOT" || values.kind === "EQUI"
+      ? (allowedKinds.includes(values.kind) ? values.kind : allowedKinds[0] ?? "EQUI")
+      : allowedKinds[0] ?? "EQUI";
     pickEquipment("");
-    setTemplate(values);
+    setDraftKind(nextKind);
+    onEquipmentKindChange?.(nextKind);
+    setTemplate({ ...values, kind: nextKind });
     setError("");
     setShowNew(true);
     setPickerVersion((current) => current + 1);
@@ -80,8 +92,8 @@ export function ServiceEquipmentPicker({
 
   function selectFromCatalog(id: string) {
     if (id.startsWith("catalog-model:")) {
-      const row = models[Number(id.slice("catalog-model:".length))];
-      if (row) openNewEquipment({ sourceId: id, model: row.model, brand: row.brand, typeName: row.type });
+      const row = suggestionModels[Number(id.slice("catalog-model:".length))];
+      if (row) openNewEquipment({ sourceId: id, model: row.model, brand: row.brand, typeName: row.type, kind: row.kind });
       return;
     }
     if (pickExistingFolio) {
@@ -150,7 +162,7 @@ export function ServiceEquipmentPicker({
         const saved = [...byId.values()];
         const catalogOptions =
           allowQuickEquipment && allowedKinds.length > 0
-            ? models.map((row, index) => ({
+            ? suggestionModels.map((row, index) => ({
                 id: "catalog-model:" + index,
                 name: [row.model, row.brand, row.type].filter(Boolean).join(" · "),
               }))
@@ -173,7 +185,7 @@ export function ServiceEquipmentPicker({
         const clientOptions = [...byId.values()];
         const catalogOptions =
           allowQuickEquipment && allowedKinds.length > 0
-            ? models.map((row, index) => ({
+            ? suggestionModels.map((row, index) => ({
                 id: "catalog-model:" + index,
                 name: [row.model, row.brand, row.type].filter(Boolean).join(" · "),
               }))
@@ -255,12 +267,29 @@ export function ServiceEquipmentPicker({
             </div>
           ) : (
             <Field label="Tipo de registro">
-              <select key={template?.sourceId ?? "new"} name="equipmentKind" className={controlClass} defaultValue={template?.kind && allowedKinds.includes(template.kind as "EQUI" | "MOT") ? template.kind : allowedKinds[0]}>
+              <select
+                key={template?.sourceId ?? "new"}
+                name="equipmentKind"
+                className={controlClass}
+                value={draftKind}
+                onChange={(event) => {
+                  const next = event.target.value === "MOT" ? "MOT" : "EQUI";
+                  setDraftKind(next);
+                  onEquipmentKindChange?.(next);
+                }}
+              >
                 {allowedKinds.map((kind) => <option key={kind} value={kind}>{kind === "MOT" ? "Motor (MOT)" : "Equipo (EQUI)"}</option>)}
               </select>
             </Field>
           )}
-          <EquipmentCatalogFields key={template?.sourceId ?? "new"} types={types} brands={brands} models={models} initialValues={template ?? undefined} />
+          <EquipmentCatalogFields
+            key={`${template?.sourceId ?? "new"}-${draftKind}`}
+            types={activeCatalog.types}
+            brands={activeCatalog.brands}
+            models={activeCatalog.models}
+            typeLabel={draftKind === "MOT" ? "Tipo de motor" : "Tipo de equipo"}
+            initialValues={template?.kind === draftKind ? template : undefined}
+          />
           <Field label="Número de serie" hint="Opcional."><input name="serial" className={controlClass} /></Field>
           {error ? <p role="alert" className="text-sm text-[var(--danger)]">{error}</p> : null}
           <Button type="button" className="sticky bottom-3 z-40 shadow-[0_8px_22px_rgba(20,45,75,0.18)]" disabled={saving} onClick={() => void saveEquipment()}>{saving ? "Guardando…" : "Guardar equipo y continuar"}</Button>

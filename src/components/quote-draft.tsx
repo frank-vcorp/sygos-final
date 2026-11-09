@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import type { EquipmentCatalogByKind } from "@/lib/catalog";
 import { filterDiagnosisPrioritiesForEquipment, type DiagnosisPriorityOption } from "@/lib/diagnosis-priorities-shared";
 import { ContactNameLink } from "@/components/client-entity-links";
 import { ClientPicker } from "@/components/client-picker";
@@ -25,6 +26,7 @@ export function QuoteDraft({
   types,
   brands,
   models,
+  catalogByKind,
   fixedQuoteType,
   diagnosisPriorities = [],
 }: {
@@ -39,6 +41,7 @@ export function QuoteDraft({
   types: string[];
   brands: string[];
   models: Array<{ type: string; brand: string; model: string }>;
+  catalogByKind?: EquipmentCatalogByKind;
   fixedQuoteType?: QuoteType;
   diagnosisPriorities?: PriorityOption[];
 }) {
@@ -99,6 +102,7 @@ export function QuoteDraft({
           types={types}
           brands={brands}
           models={models}
+          catalogByKind={catalogByKind}
           allowQuickEquipment={allowQuickEquipment}
           quickEquipmentKinds={quickEquipmentKinds}
           onEquipmentKindChange={setEquipmentKind}

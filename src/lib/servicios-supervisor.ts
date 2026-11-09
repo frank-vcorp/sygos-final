@@ -76,7 +76,37 @@ type ListScope = {
   equipmentKind?: "EQUI" | "MOT" | null;
   desde?: string;
   hasta?: string;
+  /** Systron: incluye motores cuyo caso vive en Servomotores pero nacieron aquí. */
+  originMotors?: boolean;
+  /** Systron: gerente, supervisor y técnico no ven motores. */
+  hideMotors?: boolean;
 };
+
+/** Alcance de bandeja: taller de la empresa, o motores de origen cuando el caso lo ejecuta la otra. */
+export function servicioCompanyScope(
+  companyId: string,
+  options?: { equipmentKind?: "EQUI" | "MOT" | null; originMotors?: boolean; hideMotors?: boolean },
+) {
+  const kind = options?.equipmentKind ?? null;
+  const hideMotors = options?.hideMotors === true;
+  const originMotors = options?.originMotors === true && !hideMotors;
+  if (hideMotors || kind === "EQUI") {
+    return { serviceCompanyId: companyId, equipment: { kind: "EQUI" as const } };
+  }
+  if (kind === "MOT") {
+    if (originMotors) return { equipment: { kind: "MOT" as const, originCompanyId: companyId } };
+    return { serviceCompanyId: companyId, equipment: { kind: "MOT" as const } };
+  }
+  if (originMotors) {
+    return {
+      OR: [
+        { serviceCompanyId: companyId, equipment: { kind: { not: "MOT" } } },
+        { equipment: { kind: "MOT" as const, originCompanyId: companyId } },
+      ],
+    };
+  }
+  return { serviceCompanyId: companyId };
+}
 
 function clientOwnerScope(userId: string) {
   return { equipment: { client: { ownerUserId: userId, isSystem: false } } };
@@ -565,10 +595,14 @@ export async function listActiveServicios(
 
   const cases = await prisma.technicalCase.findMany({
     where: {
-      serviceCompanyId: companyId,
-      OR: [
-        { AND: activeFilters },
-        ...(pendingDecisionCaseIds.length > 0 ? [{ id: { in: pendingDecisionCaseIds } }] : []),
+      AND: [
+        servicioCompanyScope(companyId, options),
+        {
+          OR: [
+            { AND: activeFilters },
+            ...(pendingDecisionCaseIds.length > 0 ? [{ id: { in: pendingDecisionCaseIds } }] : []),
+          ],
+        },
       ],
     },
     include: caseInclude,
@@ -615,7 +649,7 @@ export async function listHistorialServicios(
       : null;
 
   const historialFilters = [
-    { serviceCompanyId: companyId },
+    servicioCompanyScope(companyId, options),
     { status: statusFilter ? statusFilter : { in: [...historialStatuses] } },
     ...(technicianId ? [technicianCaseScope(technicianId)] : []),
     ...(clientOwnerUserId ? [clientOwnerScope(clientOwnerUserId)] : []),
@@ -636,7 +670,7 @@ export async function listHistorialServicios(
       ? []
       : await prisma.attention.findMany({
           where: {
-            serviceCompanyId: companyId,
+            ...servicioCompanyScope(companyId, options),
             status: "CANCELADA",
             ...(attentionType ? { attentionType } : {}),
             ...(clientOwnerUserId

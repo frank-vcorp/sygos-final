@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { can, canSeeUser } from "./permissions";
+import { can, canListMotors, canOpenActivos, canSeeUser } from "./permissions";
 
 describe("permisos de fase 1", () => {
   it("separa el alta de clientes por empresa", () => {
@@ -44,6 +44,19 @@ describe("permisos de fase 1", () => {
     assert.equal(can("GERENTE_OPERATIVO_SERVOMOTORES", "equi.view", "SERVOMOTORES"), false);
     assert.equal(can("GERENTE_OPERATIVO_SERVOMOTORES", "equipment.catalog", "SERVOMOTORES"), true);
     assert.equal(can("GERENTE_OPERATIVO_SERVOMOTORES", "mot.view", "SERVOMOTORES"), true);
+    assert.equal(can("VENTAS", "mot.view", "SYSTRON"), true);
+    assert.equal(can("COORDINACION_ADMINISTRACION", "mot.view", "SYSTRON"), true);
+    assert.equal(can("CEO", "mot.view", "SYSTRON"), true);
+    assert.equal(can("ADMINISTRADOR", "mot.view", "SYSTRON"), true);
+    assert.equal(can("GERENTE_OPERATIVO_SYSTRON", "mot.view", "SYSTRON"), false);
+    assert.equal(can("SUPERVISOR_TECNICO", "mot.view", "SYSTRON"), false);
+    assert.equal(can("TECNICO", "mot.view", "SYSTRON"), false);
+    assert.equal(can("GERENTE_OPERATIVO_SERVOMOTORES", "mot.view", "SYSTRON"), false);
+    assert.equal(canListMotors("COORDINACION_ADMINISTRACION", "SYSTRON"), true);
+    assert.equal(canListMotors("GERENTE_OPERATIVO_SYSTRON", "SYSTRON"), false);
+    assert.equal(canOpenActivos("COORDINACION_ADMINISTRACION", "SYSTRON"), true);
+    assert.equal(canOpenActivos("COORDINACION_ADMINISTRACION", "SERVOMOTORES"), false);
+    assert.equal(canOpenActivos("TECNICO", "SYSTRON"), true);
     assert.equal(can("TECNICO", "inventory.operate", "SYSTRON"), false);
     assert.equal(can("TECNICO", "inventory.search", "SYSTRON"), true);
     assert.equal(can("ALMACEN", "inventory.operate", "SYSTRON"), true);

@@ -1,5 +1,6 @@
 "use client";
 
+import type { EquipmentCatalogByKind } from "@/lib/catalog";
 import { ServiceEquipmentPicker, type ServiceEquipmentOption } from "@/components/service-equipment-picker";
 import { SubmitButton } from "@/components/submit-button";
 import { controlClass, Field, FormActions, FormPanel, FormSection } from "@/components/ui";
@@ -18,6 +19,7 @@ export function RelateEquipmentForm({
   types,
   brands,
   models,
+  catalogByKind,
   relateAction,
   frozenPriorityName,
 }: {
@@ -32,6 +34,7 @@ export function RelateEquipmentForm({
   types: string[];
   brands: string[];
   models: ModelRow[];
+  catalogByKind?: EquipmentCatalogByKind;
   relateAction: (formData: FormData) => void | Promise<void>;
   /** Prioridad ya congelada en COTDX al alta. */
   frozenPriorityName?: string | null;
@@ -52,6 +55,7 @@ export function RelateEquipmentForm({
           types={types}
           brands={brands}
           models={models}
+          catalogByKind={catalogByKind}
           allowQuickEquipment={allowQuickEquipment}
           quickEquipmentKinds={quickEquipmentKinds}
           pickExistingFolio

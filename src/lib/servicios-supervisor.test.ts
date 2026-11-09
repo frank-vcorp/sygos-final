@@ -8,9 +8,24 @@ import {
   openOperationCaseWhere,
   pickBestQuoteForBandeja,
   pickQuoteForAttention,
+  servicioCompanyScope,
   technicianActiveCaseWhere,
   TECHNICIAN_HANDOFF_CASE,
 } from "./servicios-supervisor";
+
+describe("servicioCompanyScope", () => {
+  it("en Systron muestra motores de origen y esconde el taller ajeno cuando el rol no ve motores", () => {
+    assert.deepEqual(servicioCompanyScope("sy", { hideMotors: true }), {
+      serviceCompanyId: "sy",
+      equipment: { kind: "EQUI" },
+    });
+    assert.deepEqual(servicioCompanyScope("sy", { originMotors: true, equipmentKind: "MOT" }), {
+      equipment: { kind: "MOT", originCompanyId: "sy" },
+    });
+    const both = servicioCompanyScope("sy", { originMotors: true });
+    assert.equal("OR" in both && Array.isArray(both.OR) ? both.OR.length : 0, 2);
+  });
+});
 
 describe("openOperationCaseWhere", () => {
   it("mantiene operación abierta y diagnósticos validados con cotización pendiente", () => {

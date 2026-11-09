@@ -271,27 +271,35 @@ model EquipmentBrand {
 }
 
 model CatalogType {
-  id     String         @id @default(cuid())
-  name   String
-  key    String         @unique
-  models CatalogModel[]
+  id            String         @id @default(cuid())
+  name          String
+  key           String
+  /// EQUI = equipo electrónico. MOT = motor. El alta no mezcla los dos catálogos.
+  equipmentKind String         @default("EQUI")
+  models        CatalogModel[]
+
+  @@unique([key, equipmentKind])
 }
 
 model CatalogBrand {
-  id     String         @id @default(cuid())
-  name   String
-  key    String         @unique
-  models CatalogModel[]
+  id            String         @id @default(cuid())
+  name          String
+  key           String
+  equipmentKind String         @default("EQUI")
+  models        CatalogModel[]
+
+  @@unique([key, equipmentKind])
 }
 
 model CatalogModel {
-  id      String       @id @default(cuid())
-  typeId  String
-  type    CatalogType  @relation(fields: [typeId], references: [id])
-  brandId String
-  brand   CatalogBrand @relation(fields: [brandId], references: [id])
-  name    String
-  key     String
+  id            String       @id @default(cuid())
+  typeId        String
+  type          CatalogType  @relation(fields: [typeId], references: [id])
+  brandId       String
+  brand         CatalogBrand @relation(fields: [brandId], references: [id])
+  name          String
+  key           String
+  equipmentKind String       @default("EQUI")
 
   @@unique([typeId, brandId, key])
 }

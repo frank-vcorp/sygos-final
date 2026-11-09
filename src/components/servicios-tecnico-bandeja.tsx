@@ -122,6 +122,9 @@ export async function ServiciosTecnicoBandeja({
   panelFiltro,
   equipoKind = "todos",
   showEquipoKindFilter = false,
+  hideMotors = false,
+  originMotors = false,
+  showVistaToggle = true,
 }: {
   companyId: string;
   userId: string;
@@ -136,6 +139,12 @@ export async function ServiciosTecnicoBandeja({
   panelFiltro?: string;
   equipoKind?: ServiciosEquipoKindFilter;
   showEquipoKindFilter?: boolean;
+  /** Oculta motores (gerente, supervisor y técnico en Systron). */
+  hideMotors?: boolean;
+  /** Motores originados aquí cuyo caso ejecuta Servomotores. */
+  originMotors?: boolean;
+  /** Coordinación solo ve Activos, sin Historial. */
+  showVistaToggle?: boolean;
 }) {
   const gerentePanelFiltro = vista === "activos" ? parseGerenteServicioPanelFiltro(panelFiltro) : null;
   const estadoLabel =
@@ -151,7 +160,7 @@ export async function ServiciosTecnicoBandeja({
     filtro: gerentePanelFiltro ?? undefined,
     equipo: equipoKind !== "todos" ? equipoKind : undefined,
   };
-  const equipmentKindScope = equipoKind === "EQUI" || equipoKind === "MOT" ? equipoKind : null;
+  const equipmentKindScope = hideMotors ? null : equipoKind === "EQUI" || equipoKind === "MOT" ? equipoKind : null;
   const portfolioUserId = salesPortfolioUserId(role, userId);
   const listScope = {
     ...(technician ? { assigneeUserId: userId } : {}),
@@ -165,9 +174,11 @@ export async function ServiciosTecnicoBandeja({
           ...listScope,
           status: estado && estado !== "todos" ? estado : null,
           equipmentKind: equipmentKindScope,
+          hideMotors,
+          originMotors,
           ...dateRange,
         })
-      : await listActiveServicios(companyId, query, { ...listScope, equipmentKind: equipmentKindScope, ...dateRange });
+      : await listActiveServicios(companyId, query, { ...listScope, equipmentKind: equipmentKindScope, hideMotors, originMotors, ...dateRange });
 
   if (gerentePanelFiltro) {
     const servicioRows = rows.filter((row): row is ServicioBandejaRow => row.kind === "servicio");
@@ -185,6 +196,7 @@ export async function ServiciosTecnicoBandeja({
         subtitle={bandejaSubtitle(role, vista, technician)}
         action={canCreate ? <ActionLink href="/servicios/nuevo">Nuevo servicio</ActionLink> : null}
       />
+      {showVistaToggle ? (
       <SegmentedNav
         items={[
           {
@@ -199,6 +211,7 @@ export async function ServiciosTecnicoBandeja({
           },
         ]}
       />
+      ) : null}
       {showEquipoKindFilter ? (
         <div className="mt-3">
         <SegmentedNav
