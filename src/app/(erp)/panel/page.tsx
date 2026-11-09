@@ -30,6 +30,7 @@ import {
   servicioPendienteAutorizacionForSeller,
   servicioRowFromPendingQuote,
 } from "@/lib/sales-panel";
+import { mergeGerenteServomotoresPendientesAutorizacion } from "@/lib/gerente-servomotores-panel";
 import type { Role } from "@/lib/roles";
 import {
   GERENTE_SERVICIO_PANEL_FILTROS,
@@ -206,6 +207,7 @@ export default async function PanelPage({ searchParams }: { searchParams: Promis
       <GerenteServomotoresPanel
         companyId={companyId}
         companyCode={session.activeCompanyCode}
+        userId={session.userId}
         history={vista === "historial"}
       />
     );
@@ -490,10 +492,13 @@ async function SupervisorShop({ companyId, userId }: { companyId: string; userId
 
 async function GerenteServomotoresPanel({
   companyId,
+  companyCode,
+  userId,
   history,
 }: {
   companyId: string;
   companyCode: string | null;
+  userId: string;
   history: boolean;
 }) {
   const role: Role = "GERENTE_OPERATIVO_SERVOMOTORES";
@@ -520,12 +525,212 @@ async function GerenteServomotoresPanel({
     );
   }
 
-  const [activeRows, panelCtx] = await Promise.all([
+  await syncPendingPartRequestRequirements(companyId);
+  const canManageRequirements = can(role, "purchase.operate", companyCode);
+  const allowQuickSupplier = can(role, "supplier.operate", companyCode);
+
+  const [
+    activeRows,
+    panelCtx,
+    pendingDecisionQuotes,
+    osSinFacturaQuotes,
+    dxSinReparacionPendienteEmitir,
+    receivables,
+    assignedAttentions,
+    refaccionRows,
+    suppliers,
+    categories,
+    accounts,
+    shoppingLists,
+  ] = await Promise.all([
     listActiveServicios(companyId, ""),
     loadGerenteServicioPanelContext(companyId),
+    prisma.quote.findMany({
+      where: { companyId, status: "PENDIENTE_DECISION" },
+      include: {
+        client: { select: { id: true, name: true, isSystem: true, ownerUserId: true } },
+        equipment: {
+          select: {
+            id: true,
+            kind: true,
+            folio: true,
+            custody: true,
+            typeName: true,
+            brandName: true,
+            model: true,
+            client: { select: { id: true, name: true, isSystem: true } },
+          },
+        },
+        lines: { select: { quantity: true, unitPrice: true, authorized: true } },
+      },
+      take: 100,
+    }),
+    prisma.quote.findMany({
+      where: {
+        companyId,
+        technicalCaseId: { not: null },
+        billingDocuments: { none: { kind: { in: ["FACTURA", "FACTURA_LIBRE"] }, status: "EMITIDA" } },
+      },
+      select: { technicalCaseId: true },
+      take: 100,
+    }),
+    (async () => {
+      const pendingBillingCaseIds = (
+        await prisma.billingDocument.findMany({
+          where: {
+            companyId,
+            status: { in: ["SOLICITADA", "ERROR_FISCAL"] },
+            technicalCaseId: { not: null },
+          },
+          select: { technicalCaseId: true },
+          take: 200,
+        })
+      )
+        .map((row) => row.technicalCaseId)
+        .filter((id): id is string => Boolean(id));
+      if (pendingBillingCaseIds.length === 0) return [];
+      return prisma.technicalCase.findMany({
+        where: {
+          id: { in: [...new Set(pendingBillingCaseIds)] },
+          serviceCompanyId: companyId,
+          kind: "DIAGNOSTICO",
+          status: "VALIDADO",
+          noRepairAt: { not: null },
+          attention: { attentionType: "DIAGNOSTICO" },
+        },
+        select: { folio: true },
+        take: 100,
+      });
+    })(),
+    prisma.receivable.findMany({
+      where: { companyId, balance: { gt: 0 } },
+      include: {
+        document: { select: { folio: true, technicalCaseId: true, equipmentId: true } },
+        client: true,
+      },
+      take: 100,
+      orderBy: { dueAt: "asc" },
+    }),
+    prisma.technicalCase.findMany({
+      where: { serviceCompanyId: companyId, assigneeUserId: userId, status: { notIn: CLOSED } },
+      select: { attentionId: true },
+      distinct: ["attentionId"],
+    }),
+    canManageRequirements
+      ? prisma.requirement.findMany({
+          where: { companyId, kind: "REFACCION", status: "PENDIENTE" },
+          orderBy: { createdAt: "desc" },
+          take: 20,
+        })
+      : Promise.resolve([]),
+    canManageRequirements
+      ? prisma.supplier.findMany({
+          where: { companyId, active: true },
+          orderBy: { name: "asc" },
+          select: { id: true, name: true, currency: true },
+        })
+      : Promise.resolve([]),
+    canManageRequirements
+      ? prisma.expenseCategory.findMany({
+          where: { companyId, active: true },
+          include: { subcategories: { where: { active: true } } },
+          orderBy: { name: "asc" },
+        })
+      : Promise.resolve([]),
+    canManageRequirements
+      ? prisma.financeAccount.findMany({
+          where: { companyId, active: true },
+          orderBy: { name: "asc" },
+          select: treasuryAccountSelect,
+        })
+      : Promise.resolve([]),
+    canManageRequirements
+      ? prisma.shoppingList.findMany({
+          where: { companyId, status: "ABIERTA" },
+          include: { supplier: true, lines: { include: { requirement: { select: { kind: true } } } } },
+          orderBy: { createdAt: "desc" },
+        })
+      : Promise.resolve([]),
   ]);
+
+  const treasuryAccounts = mapTreasuryAccountOptions(accounts);
+  const [contexts, rowRequesters] = await Promise.all([
+    refaccionRows.length ? loadRequirementListContexts(companyId, refaccionRows) : Promise.resolve(new Map()),
+    refaccionRows.length
+      ? prisma.user.findMany({
+          where: { id: { in: refaccionRows.map((row) => row.requesterUserId) } },
+          select: { id: true, name: true },
+        })
+      : Promise.resolve([]),
+  ]);
+  const requesterName = new Map(rowRequesters.map((user) => [user.id, user.name]));
+  const refaccionListRows = refaccionRows.map((row) => ({
+    id: row.id,
+    quantity: row.quantity,
+    partNumber: row.partNumber,
+    description: row.description,
+    kind: row.kind,
+    status: row.status,
+    requesterName: requesterName.get(row.requesterUserId) ?? "—",
+    shoppingListId: row.shoppingListId,
+    purchaseId: row.purchaseId,
+    context: contexts.get(row.id)!,
+  }));
+
   const servicioRows = activeRows.filter((row): row is ServicioBandejaRow => row.kind === "servicio");
-  const sections = gerentePanelSections(servicioRows, panelCtx);
+  const motRows = servicioRows.filter((row) => row.equipmentKind === "MOT");
+  const sections = gerentePanelSections(motRows, panelCtx);
+  const assignedAttentionIds = new Set(assignedAttentions.map((row) => row.attentionId));
+  const asignadasAMi = motRows.filter((row) => assignedAttentionIds.has(row.id));
+
+  const osSinFacturaCaseIds = [
+    ...new Set(osSinFacturaQuotes.map((row) => row.technicalCaseId).filter((id): id is string => Boolean(id))),
+  ];
+  const osSinFacturaFolios = new Set(
+    osSinFacturaCaseIds.length
+      ? (
+          await prisma.technicalCase.findMany({
+            where: { id: { in: osSinFacturaCaseIds }, kind: "OS", status: "VALIDADO", serviceCompanyId: companyId },
+            select: { folio: true },
+          })
+        ).map((row) => row.folio)
+      : [],
+  );
+  const cotizadasSinAutorizacion = motRows.filter(servicioCotizadaSinAutorizacion);
+  const coveredPendingQuoteIds = new Set(
+    motRows
+      .filter((row) => row.quoteStatus === "PENDIENTE_DECISION" && row.quoteHref)
+      .map((row) => row.quoteHref!.replace("/cotizaciones/", "")),
+  );
+  const orphanPendingQuoteRows = pendingDecisionQuotes
+    .filter(
+      (quote) =>
+        (!quote.equipment || quote.equipment.kind === "MOT")
+        && (!quote.technicalCaseId || !coveredPendingQuoteIds.has(quote.id)),
+    )
+    .map((quote) => servicioRowFromPendingQuote(quote));
+  const pendientesAutorizacion = mergeGerenteServomotoresPendientesAutorizacion(motRows, orphanPendingQuoteRows);
+  const dxSinReparacionPendienteFolios = new Set(dxSinReparacionPendienteEmitir.map((row) => row.folio));
+  const facturacionPendiente = motRows.filter(
+    (row) =>
+      (servicioOsValidadaAutorizada(row) && row.osFolio != null && osSinFacturaFolios.has(row.osFolio))
+      || servicioDxSinReparacionPendienteEmitir(row, dxSinReparacionPendienteFolios),
+  );
+  const entregasOsValidadas = motRows.filter(servicioOsValidadaPendienteEntrega);
+  const cobranzaServicios = await listServiciosForBillingLinks(
+    companyId,
+    receivables.map((row) => ({
+      technicalCaseId: row.document.technicalCaseId,
+      equipmentId: row.document.equipmentId,
+    })),
+  );
+  const now = Date.now();
+  const vigenteEquipmentIds = new Set(
+    receivables
+      .filter((row) => receivableEsVigente(row.dueAt, row.balance, now) && row.document.equipmentId)
+      .map((row) => row.document.equipmentId as string),
+  );
+
   const emptyByFiltro: Record<keyof typeof GERENTE_SERVICIO_PANEL_FILTROS, string> = {
     validacion: "No hay diagnósticos por validar.",
     vencidos: "Nada vencido.",
@@ -533,36 +738,103 @@ async function GerenteServomotoresPanel({
     compras: "No hay compras pendientes ligadas a un servicio activo.",
     asignacion: "Todo lo activo tiene responsable o proveedor.",
   };
+  const bandejaActivos = serviciosBandejaHref({ vista: "activos" });
 
   return (
     <>
       <PageHeader
         title="Inicio"
-        subtitle="Pendientes del taller con el mismo detalle que Servicios activos. Reclama y ejecuta diagnósticos en Operación."
+        subtitle="Pendientes comerciales y operativos de Servomotores. Los motores en resguardo se asignan automáticamente; ejecuta en Operación."
         action={<TextLink href="/panel?vista=historial">Ver historial</TextLink>}
       />
-      <section className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard label="Motores (ingresos)" value="Abrir" href="/motores" />
-        <KpiCard label="Operación" value="Abrir" href="/operacion" />
-        <KpiCard label="Custodia" value="Abrir" href="/custodia" />
-        <KpiCard label="Cotizaciones" value="Abrir" href="/cotizaciones?vista=pendientes" />
-      </section>
       <section className="flex w-full max-w-none flex-col gap-4">
-        {sections.map(({ filtro, rows }) => (
-          <SalesPanelServiciosSection
-            key={filtro}
-            title={GERENTE_SERVICIO_PANEL_FILTROS[filtro]}
-            empty={emptyByFiltro[filtro]}
-            bandejaHref={serviciosBandejaHref({ vista: "activos", filtro })}
-            rows={rows}
-            role={role}
-            highlightRow={
-              filtro === "vencidos"
-                ? (row) => servicioRowHighlight(row, panelCtx.now).markers.includes("Vencido")
-                : undefined
-            }
-          />
-        ))}
+        <SalesPanelServiciosGrouped
+          title="Comercial (Servomotores)"
+          role={role}
+          columnOptions={{ quoteMonto: true, cotizacionFirst: true, tallerColumns: true }}
+          sections={[
+            {
+              subtitle: "Cotizadas / sin autorización",
+              empty: "No hay cotizaciones «Cotizado» sin decisión del cliente.",
+              bandejaHref: bandejaActivos,
+              rows: cotizadasSinAutorizacion.slice(0, 20),
+            },
+            {
+              subtitle: "Pendientes de autorización",
+              empty: "No hay cotizaciones pendientes de autorización.",
+              bandejaHref: "/cotizaciones?vista=decision",
+              rows: pendientesAutorizacion.slice(0, 20),
+            },
+          ]}
+        />
+        <SalesPanelServiciosSection
+          title="Facturación"
+          empty="No hay OS validadas sin factura ni DX sin reparación pendientes de emitir."
+          bandejaHref="/facturacion?vista=solicitudes"
+          rows={facturacionPendiente.slice(0, 20)}
+          role={role}
+        />
+        <SalesPanelServiciosSection
+          title="Cobranza"
+          empty="No hay servicios con saldo pendiente de cobro."
+          bandejaHref="/cobranza?vista=cxc"
+          rows={cobranzaServicios.slice(0, 20)}
+          role={role}
+          highlightRow={(row) => row.kind === "servicio" && vigenteEquipmentIds.has(row.equipmentId)}
+        />
+        <SalesPanelServiciosSection
+          title="Entregas pendientes"
+          empty="No hay OS validadas pendientes de entrega."
+          bandejaHref={bandejaActivos}
+          rows={entregasOsValidadas.slice(0, 20)}
+          role={role}
+        />
+        {sections.map(({ filtro, rows }) =>
+          filtro === "refacciones" ? (
+            <RequirementListSection
+              key={filtro}
+              title={GERENTE_SERVICIO_PANEL_FILTROS[filtro]}
+              empty={emptyByFiltro[filtro]}
+              bandejaHref="/compras/listas"
+              variant="panel"
+              rows={refaccionListRows}
+              canManage={canManageRequirements}
+              showRequester={canManageRequirements}
+              suppliers={suppliers}
+              categories={categories}
+              accounts={treasuryAccounts}
+              allowQuickSupplier={allowQuickSupplier}
+              shoppingLists={shoppingLists.map((list) => ({
+                id: list.id,
+                folio: list.folio,
+                kind: shoppingListKindFromList(list),
+                supplierId: list.supplierId,
+                supplierName: list.supplier?.name ?? null,
+              }))}
+            />
+          ) : (
+            <SalesPanelServiciosSection
+              key={filtro}
+              title={GERENTE_SERVICIO_PANEL_FILTROS[filtro]}
+              empty={emptyByFiltro[filtro]}
+              bandejaHref={serviciosBandejaHref({ vista: "activos", filtro })}
+              rows={rows.slice(0, 20)}
+              role={role}
+              highlightRow={
+                filtro === "vencidos"
+                  ? (row) => servicioRowHighlight(row, panelCtx.now).markers.includes("Vencido")
+                  : undefined
+              }
+            />
+          ),
+        )}
+        <SalesPanelServiciosSection
+          title="Asignadas a mí"
+          empty="No tienes operaciones activas asignadas."
+          bandejaHref={bandejaActivos}
+          rows={asignadasAMi.slice(0, 20)}
+          role={role}
+        />
       </section>
     </>
   );

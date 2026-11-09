@@ -8,6 +8,7 @@ import { rememberCatalog } from "./catalog";
 import { isAttentionType, isReparacionExpressAttentionType, REPARACION_RECEIPT_REASON, reparacionExpressFrozenPriority, type AttentionType } from "./priorities";
 import { SALES_NOT_ASSIGNED_MESSAGE } from "./sales-assignment";
 import { assertDefinitiveWarehouseExit, assertTestWarehouseExit } from "./warehouse-exit";
+import { autoIngresoMotIfServomotores } from "./mot-servomotores-auto-ingreso";
 import { assertWarrantyOrigin, openCase, openPendingCases, resolveWarrantyOriginForEquipment } from "./technical";
 
 type Actor = {
@@ -198,9 +199,17 @@ export async function createMot(
     action: "ALTA",
     summary:
       actor.activeCompanyCode === "SYSTRON"
-        ? `${folio} creado en SYSTRON. No entra a almacén SYSTRON; queda pendiente de ingreso en Servomotores.`
-        : `${folio} creado para un cliente de Servomotores. Pendiente de ingreso físico.`,
+        ? `${folio} creado en SYSTRON. No entra a almacén SYSTRON; ingreso automático en taller Servomotores.`
+        : `${folio} creado para un cliente de Servomotores. Ingreso automático en taller.`,
     authorUserId: actor.userId,
+  });
+  await autoIngresoMotIfServomotores(equipment.id, servomotores.id, actor.userId, {
+    preferredAssigneeUserId: actor.role === "GERENTE_OPERATIVO_SERVOMOTORES" ? actor.userId : null,
+    attentionId: (await prisma.attention.findFirst({
+      where: { equipmentId: equipment.id },
+      orderBy: { createdAt: "desc" },
+      select: { id: true },
+    }))?.id,
   });
   return equipment;
 }
@@ -293,7 +302,14 @@ export async function createAttention(
       },
     });
   });
-  if (attention.slaStartedAt) await openCase(attention.id, attention.slaStartedAt);
+  if (equipment.kind === "MOT" && !inServiceCustody && service.code === "SERVOMOTORES") {
+    await autoIngresoMotIfServomotores(equipment.id, service.id, actor.userId, {
+      preferredAssigneeUserId: actor.role === "GERENTE_OPERATIVO_SERVOMOTORES" ? actor.userId : null,
+      attentionId: attention.id,
+    });
+  } else if (attention.slaStartedAt) {
+    await openCase(attention.id, attention.slaStartedAt);
+  }
   await recordHistory({
     companyId: actor.activeCompanyId,
     entityType: "EQUIPO",
@@ -391,7 +407,7 @@ export async function startService(
     version = current.version;
     clientId = current.clientId;
   }
-  return createAttention(actor, {
+  const attention = await createAttention(actor, {
     equipmentId,
     attentionType: input.attentionType,
     priorityId: input.priorityId,
@@ -401,6 +417,19 @@ export async function startService(
     originalCaseId: input.originalCaseId,
     version,
   });
+  if (input.equipmentKind === "MOT") {
+    const eq = await prisma.equipment.findUnique({ where: { id: equipmentId }, select: { custody: true } });
+    if (eq?.custody === "PENDIENTE_INGRESO") {
+      const servomotores = await prisma.company.findUnique({ where: { code: "SERVOMOTORES" } });
+      if (servomotores) {
+        await autoIngresoMotIfServomotores(equipmentId, servomotores.id, actor.userId, {
+          preferredAssigneeUserId: actor.role === "GERENTE_OPERATIVO_SERVOMOTORES" ? actor.userId : null,
+          attentionId: attention.id,
+        });
+      }
+    }
+  }
+  return attention;
 }
 
 export async function registerMovement(

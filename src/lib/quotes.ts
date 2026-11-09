@@ -965,6 +965,13 @@ async function ensureCommercialAttentionBeforeWarehouse(
     summary: `Atención ${ATTENTION_LABEL[attentionType]} abierta para ingreso en almacén tras autorización.`,
     authorUserId: actor.userId,
   });
+  if (equipment.kind === "MOT") {
+    const { autoIngresoMotIfServomotores } = await import("./mot-servomotores-auto-ingreso");
+    await autoIngresoMotIfServomotores(equipment.id, service.id, actor.userId, {
+      preferredAssigneeUserId: actor.role === "GERENTE_OPERATIVO_SERVOMOTORES" ? actor.userId : null,
+      attentionId: attention.id,
+    });
+  }
 }
 
 export async function relateQuoteEquipment(actor: Actor, quoteId: string, version: number, equipmentId: string, priorityId: string) {
@@ -1043,7 +1050,19 @@ export async function relateQuoteEquipment(actor: Actor, quoteId: string, versio
       : `${equipment.folio} quedó relacionado. La operación arranca con la entrada física.`,
     authorUserId: actor.userId,
   });
-  if (!inShop) return;
+  let readyInShop = inShop;
+  if (!readyInShop && equipment.kind === "MOT") {
+    const { autoIngresoMotIfServomotores } = await import("./mot-servomotores-auto-ingreso");
+    const ingressed = await autoIngresoMotIfServomotores(equipment.id, service.id, actor.userId, {
+      preferredAssigneeUserId: actor.role === "GERENTE_OPERATIVO_SERVOMOTORES" ? actor.userId : null,
+      attentionId: attention.id,
+    });
+    if (ingressed) {
+      attention = (await prisma.attention.findUnique({ where: { id: attention.id } })) ?? attention;
+      readyInShop = true;
+    }
+  }
+  if (!readyInShop) return;
   const { openCase } = await import("./technical");
   const created = await openCase(attention.id, attention.slaStartedAt ?? new Date());
   if (!created) return;
