@@ -112,7 +112,7 @@ async function loadSession(token: string): Promise<AppSession | null> {
     activeCompanyName,
     realUserId: row.user.id,
     realRole: row.user.role,
-    impersonating: Boolean(impersonated),
+    impersonating: actor.id !== row.user.id,
   };
 }
 

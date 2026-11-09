@@ -52,10 +52,20 @@ export function sandboxBound() {
   return sandboxContext.getStore() === true;
 }
 
+export type SessionActorUser = {
+  id: string;
+  role: string;
+  active: boolean;
+  username: string;
+  name: string;
+  companyId: string | null;
+  company?: { code: string; name: string } | null;
+};
+
 export function sessionActor(row: {
-  user: { role: string; active: boolean };
-  impersonatedUser: { role: string; active: boolean } | null;
-}) {
+  user: SessionActorUser;
+  impersonatedUser: SessionActorUser | null;
+}): SessionActorUser {
   const impersonated =
     row.user.role === "ADMINISTRADOR" &&
     row.impersonatedUser?.active &&
