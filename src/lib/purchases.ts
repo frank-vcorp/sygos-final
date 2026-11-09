@@ -8,6 +8,25 @@ import { can } from "./permissions";
 import type { Role } from "./roles";
 import { requirementPartNumberRequired } from "./requirement-display";
 import { normalizeShoppingListKind, shoppingListKindFromList } from "./shopping-list-display";
+import {
+  assertPaymentMatchesAccountKind,
+  buildFinanceAccountStoredName,
+  financeAccountKindsForFilter,
+  isBankAccountKind,
+  isCashAccountKind,
+  isCreditCardAccountKind,
+  normalizeFinanceAccountKind,
+  normalizeOperationalPaymentType,
+  paymentTypeRequiresTreasuryAccount,
+  type FinanceAccountKind,
+} from "./finance-accounts";
+
+export {
+  accountRequiredForPayment,
+  normalizeOperationalPaymentType,
+  paymentTypeRequiresTreasuryAccount,
+  expectedFinanceAccountKindForPayment,
+} from "./finance-accounts";
 
 export { requirementPartNumberRequired } from "./requirement-display";
 
@@ -227,11 +246,11 @@ export async function cancelOrder(actor: Actor, purchaseId: string, version: num
 async function postMovement(companyId: string, accountId: string, direction: "INGRESO" | "EGRESO", amount: number, category: string, originType: string, originId: string, note: string, pendingProof = false) {
   const account = await prisma.financeAccount.findFirst({ where: { id: accountId, companyId, active: true } });
   if (!account) throw new Error("Selecciona una cuenta de esta empresa.");
-  if (account.kind === "TARJETA" && direction === "EGRESO") {
+  if (isCreditCardAccountKind(account.kind) && direction === "EGRESO") {
     await prisma.financeAccount.update({ where: { id: account.id }, data: { balance: account.balance + amount } });
-  } else if (account.kind !== "TARJETA") {
+  } else if (!isCreditCardAccountKind(account.kind)) {
     const delta = direction === "INGRESO" ? amount : -amount;
-    if (account.balance + delta < 0 && account.kind === "EFECTIVO") throw new Error("La caja no tiene saldo para ese egreso.");
+    if (account.balance + delta < 0 && isCashAccountKind(account.kind)) throw new Error("La caja no tiene saldo para ese egreso.");
     await prisma.financeAccount.update({ where: { id: account.id }, data: { balance: account.balance + delta } });
   }
   return prisma.financeMovement.create({
@@ -301,11 +320,39 @@ export async function payPayable(actor: Actor, payableId: string, accountId: str
   return movement;
 }
 
-export async function openAccount(actor: Actor, name: string, kind: "BANCO" | "EFECTIVO" | "TARJETA", opening: number) {
+export async function openAccount(
+  actor: Actor,
+  input: {
+    kind: FinanceAccountKind;
+    bankName?: string | null;
+    clabe?: string | null;
+    lastFour?: string | null;
+    cashName?: string | null;
+    fiscal?: boolean;
+    opening?: number;
+  },
+) {
+  const kind = normalizeFinanceAccountKind(input.kind);
+  const name = buildFinanceAccountStoredName({
+    kind,
+    bankName: input.bankName,
+    lastFour: input.lastFour,
+    cashName: input.cashName,
+  });
   const existing = await prisma.financeAccount.findFirst({ where: { companyId: actor.activeCompanyId, name } });
   if (existing) throw new Error("Ya existe una cuenta con ese nombre.");
+  const opening = input.opening ?? 0;
   return prisma.financeAccount.create({
-    data: { companyId: actor.activeCompanyId, name, kind, balance: kind === "TARJETA" ? Math.max(0, opening) : opening },
+    data: {
+      companyId: actor.activeCompanyId,
+      name,
+      kind,
+      bankName: kind === "EFECTIVO" ? null : input.bankName?.trim() ?? null,
+      clabe: kind === "BANCARIA" ? input.clabe ?? null : null,
+      lastFour: kind === "EFECTIVO" ? null : input.lastFour ?? null,
+      fiscal: input.fiscal ?? false,
+      balance: isCreditCardAccountKind(kind) ? Math.max(0, opening) : opening,
+    },
   });
 }
 
@@ -315,7 +362,9 @@ export async function transferAccounts(actor: Actor, fromId: string, toId: strin
     prisma.financeAccount.findFirst({ where: { id: fromId, companyId: actor.activeCompanyId } }),
     prisma.financeAccount.findFirst({ where: { id: toId, companyId: actor.activeCompanyId } }),
   ]);
-  if (!from || !to || from.kind !== "BANCO" || to.kind !== "BANCO") throw new Error("Solo se transfiere de banco a banco de la misma empresa.");
+  if (!from || !to || !isBankAccountKind(from.kind) || !isBankAccountKind(to.kind)) {
+    throw new Error("Solo se transfiere entre cuentas bancarias de la misma empresa.");
+  }
   if (!Number.isFinite(amount) || amount <= 0) throw new Error("El importe no es válido.");
   await prisma.financeAccount.update({ where: { id: from.id }, data: { balance: from.balance - amount } });
   await prisma.financeAccount.update({ where: { id: to.id }, data: { balance: to.balance + amount } });
@@ -377,16 +426,23 @@ export async function manualMovement(
 export async function recordCompanyCash(companyId: string, direction: "INGRESO" | "EGRESO", amount: number, method: string, note: string, originId: string) {
   const existing = await prisma.financeMovement.findFirst({ where: { companyId, originType: "PAGO", originId } });
   if (existing) return existing;
-  const kind = method === "EFECTIVO" ? "EFECTIVO" : "BANCO";
-  const account = await prisma.financeAccount.findFirst({ where: { companyId, kind, active: true }, orderBy: { name: "asc" } });
+  const kind = method === "EFECTIVO" ? "EFECTIVO" : "BANCARIA";
+  const account = await prisma.financeAccount.findFirst({
+    where: { companyId, kind: { in: financeAccountKindsForFilter(kind) }, active: true },
+    orderBy: { name: "asc" },
+  });
   if (!account) throw new Error("La empresa no tiene cuenta para registrar el movimiento.");
   return postMovement(companyId, account.id, direction, amount, direction === "INGRESO" ? "Cobro" : "Pago", "PAGO", originId, note);
 }
 
 export async function payCard(actor: Actor, cardId: string, bankId: string, amount: number) {
   const [card, bank] = await Promise.all([
-    prisma.financeAccount.findFirst({ where: { id: cardId, companyId: actor.activeCompanyId, kind: "TARJETA" } }),
-    prisma.financeAccount.findFirst({ where: { id: bankId, companyId: actor.activeCompanyId, kind: "BANCO" } }),
+    prisma.financeAccount.findFirst({
+      where: { id: cardId, companyId: actor.activeCompanyId, kind: { in: financeAccountKindsForFilter("CREDITO") } },
+    }),
+    prisma.financeAccount.findFirst({
+      where: { id: bankId, companyId: actor.activeCompanyId, kind: { in: financeAccountKindsForFilter("BANCARIA") } },
+    }),
   ]);
   if (!card || !bank) throw new Error("El pago de tarjeta sale de un banco de esta empresa.");
   if (!Number.isFinite(amount) || amount <= 0 || amount > card.balance) throw new Error("El abono no cubre la deuda de la tarjeta.");
@@ -442,15 +498,21 @@ export function purchaseConceptDefault(kind: "GENERAL" | "REFACCION", concept?: 
   return concept?.trim() || (kind === "REFACCION" ? "Compra de refacciones y componentes" : fallback?.trim() || "Compra urgente");
 }
 
-function accountRequired(paymentType: string) {
-  return ["TARJETA", "TRANSFERENCIA"].includes(paymentType);
-}
-
 async function validFinanceInput(actor: Actor, input: PurchaseFinanceInput, defaultsToRefacciones = false) {
+  const paymentType = normalizeOperationalPaymentType(input.paymentType);
   if (!Number.isFinite(input.amount) || input.amount <= 0) throw new Error("El monto no es válido.");
   if (!input.purchaseDate || Number.isNaN(input.purchaseDate.valueOf())) throw new Error("Indica una fecha de compra válida.");
   if (!input.paymentType.trim()) throw new Error("Indica la forma de pago.");
-  if (accountRequired(input.paymentType) && !input.accountId) throw new Error("Selecciona el banco o cuenta para esta forma de pago.");
+  if (paymentTypeRequiresTreasuryAccount(paymentType) && !input.accountId) {
+    throw new Error("Selecciona la cuenta de tesorería para esta forma de pago.");
+  }
+  if (input.accountId) {
+    const account = await prisma.financeAccount.findFirst({
+      where: { id: input.accountId, companyId: actor.activeCompanyId, active: true },
+    });
+    if (!account) throw new Error("La cuenta no es de esta empresa.");
+    assertPaymentMatchesAccountKind(paymentType, account.kind);
+  }
   const supplier = await supplierForPurchase(actor, input.supplierId);
   const category = await prisma.expenseCategory.findFirst({
     where: defaultsToRefacciones && !input.expenseCategoryId
@@ -544,7 +606,7 @@ export async function purchaseRequirement(actor: Actor, requirementId: string, i
         expenseSubcategory: finance.expenseSubcategory,
         expenseCategoryId: finance.expenseCategoryId,
         expenseSubcategoryId: finance.expenseSubcategoryId,
-        paymentType: input.paymentType.trim(),
+        paymentType: normalizeOperationalPaymentType(input.paymentType),
         accountId: input.accountId ?? null,
         purchaseDate: input.purchaseDate,
         concept: purchaseConceptDefault(
@@ -699,7 +761,7 @@ export async function convertShoppingListToPurchase(actor: Actor, listId: string
         shoppingListId: list.id, supplierId: finance.supplier.id, currency: finance.supplier.currency,
         expenseCategory: finance.expenseCategory, expenseSubcategory: finance.expenseSubcategory,
         expenseCategoryId: finance.expenseCategoryId, expenseSubcategoryId: finance.expenseSubcategoryId,
-        paymentType: input.paymentType.trim(), accountId: input.accountId ?? null, purchaseDate: input.purchaseDate,
+        paymentType: normalizeOperationalPaymentType(input.paymentType), accountId: input.accountId ?? null, purchaseDate: input.purchaseDate,
         concept, quantity: list.lines.length,
         amount: input.amount, destination: "LISTA_COMPRAS", destinationRef: list.id, requesterUserId: actor.userId,
         lines: { create: list.lines.map((line) => ({ requirementId: line.requirementId, shoppingListLineId: line.id, partNumber: line.partNumber, description: line.description, quantity: line.quantity, sourceType: line.sourceType, sourceId: line.sourceId })) },
@@ -795,7 +857,7 @@ export async function createPhaseOnePurchase(
       expenseSubcategory: finance.expenseSubcategory,
       expenseCategoryId: finance.expenseCategoryId,
       expenseSubcategoryId: finance.expenseSubcategoryId,
-      paymentType: input.paymentType.trim(),
+      paymentType: normalizeOperationalPaymentType(input.paymentType),
       accountId: input.accountId ?? null,
       purchaseDate: input.purchaseDate ?? null,
       concept,

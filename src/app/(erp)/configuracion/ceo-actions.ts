@@ -12,6 +12,16 @@ import {
   parseYearMonth,
 } from "@/lib/ceo-config";
 import { financeAccountDeleteBlockedMessage } from "@/lib/finance-account-ui";
+import {
+  buildFinanceAccountStoredName,
+  financeAccountDisplayName,
+  isBankAccountKind,
+  isCashAccountKind,
+  isCreditCardAccountKind,
+  normalizeFinanceAccountKind,
+  parseFinanceAccountKindFromForm,
+  parseLastFour,
+} from "@/lib/finance-accounts";
 import { financeCatalogDeleteBlockedMessage, type FinanceCatalogClase } from "@/lib/finance-catalog-ui";
 import { moneyFromForm } from "@/lib/money";
 import { requireCompany } from "@/lib/session";
@@ -133,37 +143,62 @@ export async function createFinanceAccountAction(formData: FormData) {
   try {
     const session = await requireCeo(back);
     const fiscal = formData.get("fiscal") === "si";
-    const kind = formData.get("kind") === "EFECTIVO" ? "EFECTIVO" : "BANCO";
-    if (kind === "BANCO") {
-      const bankName = requiredText(formData.get("bankName"), "Nombre del banco");
+    const kind = parseFinanceAccountKindFromForm(formData.get("kind"));
+    let data: {
+      companyId: string;
+      name: string;
+      kind: string;
+      bankName: string | null;
+      clabe: string | null;
+      lastFour: string | null;
+      fiscal: boolean;
+      balance: number;
+    };
+    if (kind === "BANCARIA") {
+      const bankName = requiredText(formData.get("bankName"), "Banco");
       const clabe = parseClabe(requiredText(formData.get("clabe"), "CLABE"));
-      const created = await prisma.financeAccount.create({
-        data: {
-          companyId: session.activeCompanyId,
-          name: bankName,
-          kind: "BANCO",
-          bankName,
-          clabe,
-          fiscal,
-          balance: 0,
-        },
-      });
-      createdId = created.id;
+      const lastFour = parseLastFour(optionalText(formData.get("lastFour")));
+      const name = buildFinanceAccountStoredName({ kind, bankName, lastFour });
+      data = {
+        companyId: session.activeCompanyId,
+        name,
+        kind,
+        bankName,
+        clabe,
+        lastFour,
+        fiscal,
+        balance: 0,
+      };
+    } else if (kind === "CREDITO") {
+      const bankName = requiredText(formData.get("bankName"), "Banco");
+      const lastFour = parseLastFour(formData.get("lastFour"), { required: true });
+      const name = buildFinanceAccountStoredName({ kind, bankName, lastFour });
+      data = {
+        companyId: session.activeCompanyId,
+        name,
+        kind,
+        bankName,
+        clabe: null,
+        lastFour,
+        fiscal,
+        balance: 0,
+      };
     } else {
-      const name = requiredText(formData.get("name"), "Nombre");
-      const created = await prisma.financeAccount.create({
-        data: {
-          companyId: session.activeCompanyId,
-          name,
-          kind: "EFECTIVO",
-          bankName: null,
-          clabe: null,
-          fiscal,
-          balance: 0,
-        },
-      });
-      createdId = created.id;
+      const cashName = optionalText(formData.get("cashName")) ?? optionalText(formData.get("name"));
+      const name = buildFinanceAccountStoredName({ kind, cashName });
+      data = {
+        companyId: session.activeCompanyId,
+        name,
+        kind,
+        bankName: null,
+        clabe: null,
+        lastFour: null,
+        fiscal,
+        balance: 0,
+      };
     }
+    const created = await prisma.financeAccount.create({ data });
+    createdId = created.id;
     await recordHistory({
       companyId: session.activeCompanyId,
       entityType: "CUENTA",
@@ -188,10 +223,28 @@ export async function updateFinanceAccountAction(formData: FormData) {
     const account = await prisma.financeAccount.findFirst({ where: { id, companyId: session.activeCompanyId } });
     if (!account) throw new Error("Esa cuenta no es de esta empresa.");
     const fiscal = formData.get("fiscal") === "si";
-    if (account.kind === "BANCO") {
-      const bankName = requiredText(formData.get("bankName"), "Nombre del banco");
+    const kind = normalizeFinanceAccountKind(account.kind);
+    if (isBankAccountKind(kind)) {
+      const bankName = requiredText(formData.get("bankName"), "Banco");
       const clabe = parseClabe(requiredText(formData.get("clabe"), "CLABE"));
-      await prisma.financeAccount.update({ where: { id: account.id }, data: { bankName, clabe, fiscal } });
+      const lastFour = parseLastFour(optionalText(formData.get("lastFour")));
+      const name = buildFinanceAccountStoredName({ kind: "BANCARIA", bankName, lastFour });
+      await prisma.financeAccount.update({
+        where: { id: account.id },
+        data: { name, bankName, clabe, lastFour, fiscal },
+      });
+    } else if (isCreditCardAccountKind(kind)) {
+      const bankName = requiredText(formData.get("bankName"), "Banco");
+      const lastFour = parseLastFour(formData.get("lastFour"), { required: true });
+      const name = buildFinanceAccountStoredName({ kind: "CREDITO", bankName, lastFour });
+      await prisma.financeAccount.update({
+        where: { id: account.id },
+        data: { name, bankName, lastFour, fiscal },
+      });
+    } else if (isCashAccountKind(kind)) {
+      const cashName = optionalText(formData.get("cashName")) ?? optionalText(formData.get("name"));
+      const name = buildFinanceAccountStoredName({ kind: "EFECTIVO", cashName });
+      await prisma.financeAccount.update({ where: { id: account.id }, data: { name, fiscal } });
     } else {
       await prisma.financeAccount.update({ where: { id: account.id }, data: { fiscal } });
     }
@@ -222,7 +275,7 @@ export async function deleteFinanceAccountAction(formData: FormData) {
 async function deleteFinanceAccount(companyId: string, id: string) {
   const account = await prisma.financeAccount.findFirst({ where: { id, companyId } });
   if (!account) throw new Error("Esa cuenta no es de esta empresa.");
-  const label = account.kind === "BANCO" ? account.bankName || account.name : account.name;
+  const label = financeAccountDisplayName(account);
   await prisma.$transaction(async (tx) => {
     const [movements, purchases, transferTargets, cardPayments] = await Promise.all([
       tx.financeMovement.count({ where: { companyId, accountId: account.id } }),

@@ -29,7 +29,22 @@ import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
-type FinanceAccountRow = { id: string; name: string; kind: string; balance: number };
+import { FinanceAccountCreateFields } from "@/components/finance-account-form-fields";
+import {
+  financeAccountDisplayName,
+  isBankAccountKind,
+  isCreditCardAccountKind,
+  mapTreasuryAccountOptions,
+} from "@/lib/finance-accounts";
+
+type FinanceAccountRow = {
+  id: string;
+  name: string;
+  kind: string;
+  bankName: string | null;
+  lastFour: string | null;
+  balance: number;
+};
 
 export default async function FinanzasPage({ searchParams }: { searchParams: Promise<{ mes?: string; vista?: string }> }) {
   const session = await requireCompany();
@@ -58,8 +73,9 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
   const cobrado = collected._sum.amount ?? 0;
   const egresos = movements.filter((row) => row.direction === "EGRESO").reduce((sum, row) => sum + row.amount, 0);
   const ingresos = movements.filter((row) => row.direction === "INGRESO").reduce((sum, row) => sum + row.amount, 0);
-  const cardDebt = accounts.filter((row) => row.kind === "TARJETA").reduce((sum, row) => sum + row.balance, 0);
-  const banks = accounts.filter((row) => row.kind === "BANCO");
+  const displayAccounts = mapTreasuryAccountOptions(accounts);
+  const cardDebt = accounts.filter((row) => isCreditCardAccountKind(row.kind)).reduce((sum, row) => sum + row.balance, 0);
+  const banks = accounts.filter((row) => isBankAccountKind(row.kind));
   const movementRows =
     focus === "ingresos"
       ? movements.filter((row) => row.direction === "INGRESO")
@@ -97,7 +113,7 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
   const focusedTransferView = !showSection("dashboard") && showSection("transferencias");
   const pageHeaderAction = focusedMovementView ? (
     <ManualMovementDialog
-      accounts={accounts}
+      accounts={displayAccounts}
       expenseCategories={expenseCategories}
       incomeCategories={incomeCategories}
       directionMode={movementDirectionMode}
@@ -170,10 +186,10 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
       {showSection("dashboard") ? (
         <section className="mt-6 grid gap-4 lg:grid-cols-2">
           <div id="fin-cuentas" className="scroll-mt-28">
-            <AccountsSummary accounts={accounts} cxc={cxc} cxp={cxp} cardDebt={cardDebt} />
+            <AccountsSummary accounts={displayAccounts} cxc={cxc} cxp={cxp} cardDebt={cardDebt} />
           </div>
           <ManualMovementDialog
-            accounts={accounts}
+            accounts={displayAccounts}
             expenseCategories={expenseCategories}
             incomeCategories={incomeCategories}
             directionMode="both"
@@ -183,7 +199,7 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
       ) : null}
       {showSection("cuentas") && !showSection("dashboard") ? (
         <div id="fin-cuentas" className="mt-4 scroll-mt-28">
-          <AccountsSummary accounts={accounts} cxc={cxc} cxp={cxp} cardDebt={cardDebt} />
+          <AccountsSummary accounts={displayAccounts} cxc={cxc} cxp={cxp} cardDebt={cardDebt} />
         </div>
       ) : null}
       {showSection("dashboard") && pending.length > 0 ? (
@@ -209,16 +225,8 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
       {(showSection("cuentas") || showSection("dashboard")) ? (
         <section className="mt-4 grid gap-4 lg:grid-cols-2">
           <FormPanel action={accountAction}>
-            <FormSection title="Nueva cuenta" description="Banco, efectivo o tarjeta con saldo o deuda inicial.">
-              <Field label="Nombre"><input name="name" required className={controlClass} /></Field>
-              <Field label="Tipo">
-                <select name="kind" className={controlClass}>
-                  <option value="BANCO">Banco</option>
-                  <option value="EFECTIVO">Efectivo</option>
-                  <option value="TARJETA">Tarjeta</option>
-                </select>
-              </Field>
-              <Field label="Saldo o deuda inicial"><MoneyInput name="opening" defaultValue="0" /></Field>
+            <FormSection title="Nueva cuenta" description="Bancaria, efectivo o crédito (tarjeta) con saldo o deuda inicial.">
+              <FinanceAccountCreateFields showOpening />
             </FormSection>
             <FormActions><Button type="submit" tone="ghost">Guardar cuenta</Button></FormActions>
           </FormPanel>
@@ -227,14 +235,22 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
           ) : null}
         </section>
       ) : null}
-      {showSection("dashboard") && accounts.some((row) => row.kind === "TARJETA" && row.balance > 0) ? (
+      {showSection("dashboard") && accounts.some((row) => isCreditCardAccountKind(row.kind) && row.balance > 0) ? (
         <FormPanel action={payCardAction} className="mt-4 max-w-xl">
           <FormSection title="Pagar tarjeta" description="Abono desde una cuenta banco hacia la deuda de tarjeta.">
             <Field label="Tarjeta">
-              <select name="cardId" className={controlClass}>{accounts.filter((row) => row.kind === "TARJETA").map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select>
+              <select name="cardId" className={controlClass}>
+                {displayAccounts.filter((row) => isCreditCardAccountKind(row.kind)).map((row) => (
+                  <option key={row.id} value={row.id}>{row.name}</option>
+                ))}
+              </select>
             </Field>
             <Field label="Banco">
-              <select name="bankId" className={controlClass}>{banks.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}</select>
+              <select name="bankId" className={controlClass}>
+                {mapTreasuryAccountOptions(banks).map((row) => (
+                  <option key={row.id} value={row.id}>{row.name}</option>
+                ))}
+              </select>
             </Field>
             <Field label="Importe"><MoneyInput name="amount" min="0.01" required /></Field>
           </FormSection>
@@ -255,7 +271,7 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
                   >
                     <Field label="Cuenta">
                       <select name="accountId" className={controlClass}>
-                        {accounts.filter((account) => account.kind !== "TARJETA").map((account) => (
+                        {displayAccounts.filter((account) => !isCreditCardAccountKind(account.kind)).map((account) => (
                           <option key={account.id} value={account.id}>{account.name}</option>
                         ))}
                       </select>
@@ -290,7 +306,7 @@ function AccountsSummary({
       <h2 className="font-medium">Cuentas</h2>
       <ul className="mt-2 space-y-1">
         {accounts.map((row) => (
-          <li key={row.id}>{row.name} · {row.kind === "TARJETA" ? "deuda" : "saldo"} {money(row.balance)}</li>
+          <li key={row.id}>{financeAccountDisplayName(row)} · {isCreditCardAccountKind(row.kind) ? "deuda" : "saldo"} {money(row.balance)}</li>
         ))}
       </ul>
       <p className="mt-2">CxC {money(cxc)} · CxP {money(cxp)} · Tarjetas {money(cardDebt)}</p>

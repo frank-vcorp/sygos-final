@@ -19,7 +19,7 @@ export function PurchaseOrderModal({
 }: {
   suppliers: PickerOption[];
   categories: ExpenseCategoryCatalogItem[];
-  accounts: Array<{ id: string; name: string }>;
+  accounts: import("@/components/operational-payment-fields").TreasuryAccountOption[];
   allowQuickSupplier: boolean;
   initiallyOpen?: boolean;
   showTrigger?: boolean;

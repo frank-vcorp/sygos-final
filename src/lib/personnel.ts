@@ -4,6 +4,7 @@ import { allocateFolio } from "./folios";
 import { ConcurrencyError } from "./form";
 import { recordHistory } from "./history";
 import { stampPayrollPeriod } from "./facturapi";
+import { financeAccountKindsForFilter } from "./finance-accounts";
 import { roundMoney } from "./money";
 import {
   companiesForRole,
@@ -1580,7 +1581,7 @@ export async function authorizePayroll(actor: Actor, periodId: string, version: 
   if (updated.count === 0) throw new ConcurrencyError();
   const transfer = roundMoney(period.lines.reduce((sum, line) => sum + line.transferTotal, 0));
   const cash = roundMoney(period.lines.reduce((sum, line) => sum + line.cashTotal, 0));
-  await payFromAccount(actor.activeCompanyId, "BANCO", transfer, period.folio, period.id);
+  await payFromAccount(actor.activeCompanyId, "BANCARIA", transfer, period.folio, period.id);
   await payFromAccount(actor.activeCompanyId, "EFECTIVO", cash, period.folio, period.id);
   const overtimeIds = await prisma.overtimeRequest.findMany({
     where: { status: "AUTORIZADA", collaborator: { companyId: actor.activeCompanyId }, workDate: { gte: period.periodStart, lte: period.periodEnd } },
@@ -1592,10 +1593,13 @@ export async function authorizePayroll(actor: Actor, periodId: string, version: 
   await recordHistory({ companyId: actor.activeCompanyId, entityType: "NOMINA", entityId: period.id, action: "AUTORIZACION", summary: `${period.folio} quedó autorizada y bloqueada.`, authorUserId: actor.userId });
 }
 
-async function payFromAccount(companyId: string, kind: "BANCO" | "EFECTIVO", amount: number, folio: string, originId: string) {
+async function payFromAccount(companyId: string, kind: "BANCARIA" | "EFECTIVO", amount: number, folio: string, originId: string) {
   if (amount <= 0) return;
-  const account = await prisma.financeAccount.findFirst({ where: { companyId, kind, active: true }, orderBy: { name: "asc" } });
-  if (!account) throw new Error(`Falta una cuenta de ${kind === "BANCO" ? "banco" : "efectivo"} para pagar la nómina.`);
+  const account = await prisma.financeAccount.findFirst({
+    where: { companyId, kind: { in: financeAccountKindsForFilter(kind) }, active: true },
+    orderBy: { name: "asc" },
+  });
+  if (!account) throw new Error(`Falta una cuenta de ${kind === "BANCARIA" ? "banco" : "efectivo"} para pagar la nómina.`);
   if (kind === "EFECTIVO" && account.balance < amount) throw new Error("La caja no tiene saldo para la parte en efectivo.");
   await prisma.financeAccount.update({ where: { id: account.id }, data: { balance: account.balance - amount } });
   await prisma.financeMovement.create({ data: { companyId, accountId: account.id, direction: "EGRESO", amount, category: "Nómina", note: folio, originType: "NOMINA", originId } });
@@ -1706,7 +1710,7 @@ export async function payCommissions(actor: Actor, runId: string, version: numbe
   const updated = await prisma.commissionRun.updateMany({ where: { id: run.id, version }, data: { status: "PAGADA", version: { increment: 1 } } });
   if (updated.count === 0) throw new ConcurrencyError();
   const total = roundMoney(run.lines.reduce((sum, line) => sum + line.finalAmount, 0));
-  await payFromAccount(actor.activeCompanyId, "BANCO", Math.max(0, total), `COMISION-${run.month}`, run.id);
+  await payFromAccount(actor.activeCompanyId, "BANCARIA", Math.max(0, total), `COMISION-${run.month}`, run.id);
 }
 
 export async function addLaborDocument(

@@ -9,8 +9,7 @@ import { Button, controlClass, Field, FormActions, FormPanel, FormSection, Money
 import { ExpenseCategorySubcategoryFields } from "@/components/expense-category-subcategory-fields";
 import type { ExpenseCategoryCatalogItem } from "@/lib/expense-catalog";
 import type { PickerOption } from "@/components/searchable-entity-picker";
-
-type AccountOption = { id: string; name: string };
+import { OperationalPaymentFields, type TreasuryAccountOption } from "@/components/operational-payment-fields";
 
 export function PurchaseRegistrationModal({
   suppliers,
@@ -23,7 +22,7 @@ export function PurchaseRegistrationModal({
 }: {
   suppliers: PickerOption[];
   categories: ExpenseCategoryCatalogItem[];
-  accounts: AccountOption[];
+  accounts: TreasuryAccountOption[];
   allowQuickSupplier: boolean;
   initiallyOpen?: boolean;
   showTrigger?: boolean;
@@ -85,20 +84,7 @@ export function PurchaseRegistrationModal({
             ) : (
               <ExpenseCategorySubcategoryFields categories={categories} />
             )}
-            <Field label="Forma de pago">
-              <select name="paymentType" required className={controlClass} defaultValue="CONTADO">
-                <option value="CONTADO">Contado</option>
-                <option value="CREDITO">Crédito</option>
-                <option value="TARJETA">Tarjeta</option>
-                <option value="TRANSFERENCIA">Transferencia</option>
-              </select>
-            </Field>
-            <Field label="Banco / cuenta, si aplica">
-              <select name="accountId" defaultValue="" className={controlClass}>
-                <option value="">No aplica</option>
-                {accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
-              </select>
-            </Field>
+            <OperationalPaymentFields accounts={accounts} defaultPaymentType="EFECTIVO" />
             <details className="group md:col-span-2 rounded-lg border border-[var(--line)] bg-[#f8fbfd]">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-[var(--ink)] [&::-webkit-details-marker]:hidden">
                 <span>Agregar detalle técnico opcional</span>

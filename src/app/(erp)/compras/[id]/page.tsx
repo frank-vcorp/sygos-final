@@ -23,6 +23,7 @@ import { money } from "@/lib/money";
 import { formatWhen } from "@/lib/form";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
+import { financeAccountKindsForFilter, mapTreasuryAccountOptions } from "@/lib/finance-accounts";
 
 const STATUS_LABEL: Record<string, string> = {
   PENDIENTE_VALIDAR: "Pendiente de validar",
@@ -43,7 +44,12 @@ export default async function CompraPage({ params }: { params: Promise<{ id: str
     include: { supplier: true, lines: true, shoppingList: true },
   });
   if (!row) notFound();
-  const accounts = await prisma.financeAccount.findMany({ where: { companyId: session.activeCompanyId, active: true, kind: { not: "TARJETA" } }, orderBy: { name: "asc" } });
+  const accounts = mapTreasuryAccountOptions(
+    await prisma.financeAccount.findMany({
+      where: { companyId: session.activeCompanyId, active: true, kind: { notIn: financeAccountKindsForFilter("CREDITO") } },
+      orderBy: { name: "asc" },
+    }),
+  );
   const suppliers = await prisma.supplier.findMany({ where: { companyId: session.activeCompanyId, active: true }, orderBy: { name: "asc" } });
   const history = await historyFor("COMPRA", row.id);
   const requester = await prisma.user.findUnique({ where: { id: row.requesterUserId }, select: { name: true } });

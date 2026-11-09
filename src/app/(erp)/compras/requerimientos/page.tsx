@@ -9,6 +9,7 @@ import { loadRequirementListContexts, syncPendingPartRequestRequirements } from 
 import { requirementStatusFilter } from "@/lib/requirement-filters";
 import { shoppingListKindFromList } from "@/lib/shopping-list-display";
 import { requireCompany } from "@/lib/session";
+import { mapTreasuryAccountOptions, treasuryAccountSelect } from "@/lib/finance-accounts";
 
 export default async function ComprasRequerimientosPage({ searchParams }: { searchParams: Promise<{ estado?: string; solicitante?: string; fecha?: string }> }) {
   const session = await requireCompany();
@@ -39,7 +40,7 @@ export default async function ComprasRequerimientosPage({ searchParams }: { sear
       ? prisma.expenseCategory.findMany({ where: { companyId: session.activeCompanyId, active: true }, include: { subcategories: { where: { active: true } } }, orderBy: { name: "asc" } })
       : Promise.resolve([]),
     canManage
-      ? prisma.financeAccount.findMany({ where: { companyId: session.activeCompanyId, active: true }, orderBy: { name: "asc" }, select: { id: true, name: true } })
+      ? prisma.financeAccount.findMany({ where: { companyId: session.activeCompanyId, active: true }, orderBy: { name: "asc" }, select: treasuryAccountSelect })
       : Promise.resolve([]),
     canManage
       ? prisma.shoppingList.findMany({
@@ -49,6 +50,7 @@ export default async function ComprasRequerimientosPage({ searchParams }: { sear
         })
       : Promise.resolve([]),
   ]);
+  const treasuryAccounts = mapTreasuryAccountOptions(accounts);
   const requesterName = new Map(rowRequesters.map((user) => [user.id, user.name]));
   const listRows = rows.map((row) => ({
     id: row.id,
@@ -94,7 +96,7 @@ export default async function ComprasRequerimientosPage({ searchParams }: { sear
             showRequester={canManage}
             suppliers={suppliers}
             categories={categories}
-            accounts={accounts}
+            accounts={treasuryAccounts}
             allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)}
             shoppingLists={shoppingLists.map((list) => ({
               id: list.id,

@@ -7,6 +7,7 @@ import { RequirementPurchaseFormFields, type SupplierWithCurrency } from "../req
 import { FormOverlayDialog } from "@/components/overlay-dialog";
 import { Button, FormActions } from "@/components/ui";
 import type { ExpenseCategoryCatalogItem } from "@/lib/expense-catalog";
+import type { TreasuryAccountOption } from "@/components/operational-payment-fields";
 
 const overlayInitial: RequirementOverlayState = { status: "idle" };
 
@@ -29,7 +30,7 @@ export function ShoppingListPurchaseDialog({
   supplierName: string | null;
   suppliers: SupplierWithCurrency[];
   categories: ExpenseCategoryCatalogItem[];
-  accounts: Array<{ id: string; name: string }>;
+  accounts: TreasuryAccountOption[];
   allowQuickSupplier: boolean;
   onClose: () => void;
 }) {

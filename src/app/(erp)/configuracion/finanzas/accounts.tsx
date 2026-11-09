@@ -24,6 +24,7 @@ import {
   Th,
 } from "@/components/ui";
 import { accountKindLabel } from "@/lib/ceo-config";
+import { financeAccountDisplayName, isBankAccountKind, isCashAccountKind, isCreditCardAccountKind, normalizeFinanceAccountKind } from "@/lib/finance-accounts";
 import { listHref } from "@/lib/list-url";
 import { money } from "@/lib/money";
 
@@ -33,6 +34,7 @@ type AccountRow = {
   kind: string;
   bankName: string | null;
   clabe: string | null;
+  lastFour: string | null;
   fiscal: boolean;
   balance: number;
 };
@@ -46,11 +48,18 @@ export function AccountsPanel({
   q: string;
   tipo: string;
 }) {
-  const kind = tipo === "BANCO" || tipo === "EFECTIVO" ? tipo : "";
+  const kind =
+    tipo === "BANCARIA" || tipo === "BANCO"
+      ? "BANCARIA"
+      : tipo === "EFECTIVO"
+        ? "EFECTIVO"
+        : tipo === "CREDITO" || tipo === "TARJETA"
+          ? "CREDITO"
+          : "";
   const visible = accounts.filter((account) => {
-    if (kind && account.kind !== kind) return false;
-    const label = account.kind === "BANCO" ? account.bankName || account.name : account.name;
-    return matchesText(q, [label, account.name, account.bankName, account.clabe, accountKindLabel(account.kind)]);
+    if (kind && normalizeFinanceAccountKind(account.kind) !== kind) return false;
+    const label = financeAccountDisplayName(account);
+    return matchesText(q, [label, account.name, account.bankName, account.clabe, account.lastFour, accountKindLabel(account.kind)]);
   });
 
   return (
@@ -60,8 +69,9 @@ export function AccountsPanel({
         <input name="q" defaultValue={q} placeholder="Nombre, banco o CLABE" className={`${controlClass} sm:min-w-[12rem] sm:flex-1`} />
         <select name="tipo" defaultValue={kind} className={`${controlClass} sm:w-auto`}>
           <option value="">Todos los tipos</option>
-          <option value="BANCO">Cuenta bancaria</option>
+          <option value="BANCARIA">Bancaria</option>
           <option value="EFECTIVO">Efectivo</option>
+          <option value="CREDITO">Crédito (tarjeta)</option>
         </select>
         <Button type="submit" tone="ghost">Buscar</Button>
       </FilterBar>
@@ -85,6 +95,7 @@ export function AccountsPanel({
                   <Th>Tipo</Th>
                   <Th>Banco</Th>
                   <Th>CLABE</Th>
+                  <Th>Últimos 4</Th>
                   <Th>Fiscal</Th>
                   <Th>Saldo</Th>
                   <Th>Acciones</Th>
@@ -92,13 +103,14 @@ export function AccountsPanel({
               </thead>
               <tbody>
                 {visible.map((account) => {
-                  const label = account.kind === "BANCO" ? account.bankName || account.name : account.name;
+                  const label = financeAccountDisplayName(account);
                   return (
                     <tr key={account.id}>
                       <Td className="font-semibold text-slate-900">{label}</Td>
                       <Td>{accountKindLabel(account.kind)}</Td>
                       <Td>{account.bankName || "—"}</Td>
                       <Td>{account.clabe || "—"}</Td>
+                      <Td>{account.lastFour || "—"}</Td>
                       <Td><Badge tone={account.fiscal ? "ok" : "neutral"}>{account.fiscal ? "Sí" : "No"}</Badge></Td>
                       <Td>{money(account.balance)}</Td>
                       <Td>
@@ -113,7 +125,7 @@ export function AccountsPanel({
             </Table>
           }
           cards={visible.map((account) => {
-            const label = account.kind === "BANCO" ? account.bankName || account.name : account.name;
+            const label = financeAccountDisplayName(account);
             return (
               <MobileCard
                 key={account.id}
@@ -139,7 +151,8 @@ export function AccountsPanel({
 }
 
 function AccountEditor({ account, q, tipo }: { account: AccountRow; q: string; tipo: string }) {
-  const label = account.kind === "BANCO" ? account.bankName || account.name : account.name;
+  const label = financeAccountDisplayName(account);
+  const kind = normalizeFinanceAccountKind(account.kind);
   return (
     <div className="space-y-3">
       <FormPanel action={updateFinanceAccountAction} className="max-w-none border-0 shadow-none">
@@ -155,13 +168,23 @@ function AccountEditor({ account, q, tipo }: { account: AccountRow; q: string; t
               <option value="no">No</option>
             </select>
           </Field>
-          {account.kind === "BANCO" ? (
+          {isCashAccountKind(kind) ? (
+            <Field label="Nombre">
+              <input name="cashName" defaultValue={account.name} className={controlClass} />
+            </Field>
+          ) : null}
+          {isBankAccountKind(kind) || isCreditCardAccountKind(kind) ? (
             <>
-              <Field label="Nombre del banco">
+              <Field label="Banco">
                 <input name="bankName" required defaultValue={account.bankName ?? ""} className={controlClass} />
               </Field>
-              <Field label="CLABE">
-                <input name="clabe" required defaultValue={account.clabe ?? ""} inputMode="numeric" autoComplete="off" className={controlClass} />
+              {isBankAccountKind(kind) ? (
+                <Field label="CLABE">
+                  <input name="clabe" required defaultValue={account.clabe ?? ""} inputMode="numeric" autoComplete="off" className={controlClass} />
+                </Field>
+              ) : null}
+              <Field label="Últimos 4">
+                <input name="lastFour" defaultValue={account.lastFour ?? ""} inputMode="numeric" maxLength={4} className={controlClass} />
               </Field>
             </>
           ) : null}

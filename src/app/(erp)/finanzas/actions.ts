@@ -3,9 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { setFlash } from "@/lib/flash";
-import { requiredText } from "@/lib/form";
+import { optionalText, requiredText } from "@/lib/form";
 import { moneyFromForm, optionalMoneyFromForm } from "@/lib/money";
 import { can } from "@/lib/permissions";
+import { parseClabe } from "@/lib/ceo-config";
+import { parseFinanceAccountKindFromForm, parseLastFour } from "@/lib/finance-accounts";
 import { attachProof, manualMovement, openAccount, payCard, payPayable, transferAccounts } from "@/lib/purchases";
 import { requireCompany } from "@/lib/session";
 
@@ -30,8 +32,17 @@ export async function accountAction(formData: FormData) {
   "use server";
   try {
     const session = await guard();
-    const kind = formData.get("kind") === "TARJETA" ? "TARJETA" : formData.get("kind") === "EFECTIVO" ? "EFECTIVO" : "BANCO";
-    await openAccount(session, requiredText(formData.get("name"), "Nombre"), kind, optionalMoneyFromForm(formData.get("opening")) ?? 0);
+    const kind = parseFinanceAccountKindFromForm(formData.get("kind"));
+    const opening = optionalMoneyFromForm(formData.get("opening")) ?? 0;
+    await openAccount(session, {
+      kind,
+      bankName: optionalText(formData.get("bankName")),
+      clabe: kind === "BANCARIA" ? parseClabe(requiredText(formData.get("clabe"), "CLABE")) : null,
+      lastFour: kind === "CREDITO" ? parseLastFour(formData.get("lastFour"), { required: true }) : parseLastFour(optionalText(formData.get("lastFour"))),
+      cashName: optionalText(formData.get("cashName")) ?? optionalText(formData.get("name")),
+      fiscal: formData.get("fiscal") === "si",
+      opening,
+    });
     await setFlash({ tone: "ok", message: "Cuenta registrada." });
   } catch (error) {
     await setFlash({ tone: "error", message: bubble(error) });

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { createFinanceAccountAction, saveExpenseCategoryAction, saveExpenseSubcategoryAction, saveIncomeCategoryAction } from "../ceo-actions";
 import { CreateDialog } from "../create-dialog";
+import { FinanceAccountCreateFields } from "@/components/finance-account-form-fields";
 import { Button, controlClass, Field, FormActions, FormSection } from "@/components/ui";
 
 function Keep({ name, value }: { name: string; value?: string }) {
@@ -19,39 +20,12 @@ export function NewAccountDialog({ q, tipo }: { q?: string; tipo?: string }) {
 }
 
 function AccountCreateForm({ q, tipo }: { q?: string; tipo?: string }) {
-  const [kind, setKind] = useState<"BANCO" | "EFECTIVO">("BANCO");
-  const bank = kind === "BANCO";
   return (
     <form action={createFinanceAccountAction}>
       <Keep name="q" value={q} />
       <Keep name="tipo" value={tipo} />
-      <FormSection title="Datos de la cuenta" description="La cuenta bancaria pide banco y CLABE. Efectivo no. El saldo inicia en cero." columns={1}>
-        <Field label="Tipo">
-          <select name="kind" value={kind} onChange={(event) => setKind(event.target.value === "EFECTIVO" ? "EFECTIVO" : "BANCO")} className={controlClass}>
-            <option value="BANCO">Cuenta bancaria</option>
-            <option value="EFECTIVO">Efectivo</option>
-          </select>
-        </Field>
-        <Field label="Fiscal">
-          <select name="fiscal" defaultValue="no" className={controlClass}>
-            <option value="si">Sí</option>
-            <option value="no">No</option>
-          </select>
-        </Field>
-        {bank ? (
-          <>
-            <Field label="Nombre del banco">
-              <input name="bankName" required autoFocus className={controlClass} />
-            </Field>
-            <Field label="CLABE">
-              <input name="clabe" required inputMode="numeric" autoComplete="off" className={controlClass} placeholder="18 dígitos" />
-            </Field>
-          </>
-        ) : (
-          <Field label="Nombre">
-            <input name="name" required autoFocus className={controlClass} placeholder="Caja" />
-          </Field>
-        )}
+      <FormSection title="Datos de la cuenta" description="Bancaria: banco, CLABE y últimos 4. Efectivo: nombre. Crédito: banco y últimos 4 (deuda)." columns={1}>
+        <FinanceAccountCreateFields />
       </FormSection>
       <FormActions>
         <Button type="submit">Crear cuenta</Button>

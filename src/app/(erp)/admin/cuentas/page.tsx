@@ -17,6 +17,7 @@ import {
   Th,
 } from "@/components/ui";
 import { accountKindLabel } from "@/lib/ceo-config";
+import { financeAccountDisplayName, isCreditCardAccountKind } from "@/lib/finance-accounts";
 import { prismaProd } from "@/lib/db";
 import { money } from "@/lib/money";
 import { requireCompany } from "@/lib/session";
@@ -52,10 +53,10 @@ export default async function AdminCuentasPage() {
             <tbody>
               {accounts.map((account) => (
                 <tr key={account.id}>
-                  <Td>{account.name}</Td>
+                  <Td>{financeAccountDisplayName(account)}</Td>
                   <Td>{accountKindLabel(account.kind)}</Td>
                   <Td>
-                    {account.kind === "TARJETA" ? (
+                    {isCreditCardAccountKind(account.kind) ? (
                       <span>
                         {money(account.balance)}{" "}
                         <Badge tone="neutral">deuda</Badge>
@@ -83,7 +84,7 @@ export default async function AdminCuentasPage() {
                   </option>
                   {accounts.map((account) => (
                     <option key={account.id} value={account.id}>
-                      {account.name} · {accountKindLabel(account.kind)} · {money(account.balance)}
+                      {financeAccountDisplayName(account)} · {accountKindLabel(account.kind)} · {money(account.balance)}
                     </option>
                   ))}
                 </select>

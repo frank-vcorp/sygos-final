@@ -26,7 +26,7 @@ export function ShoppingListDetailActions({
   lineCount: number;
   suppliers: SupplierWithCurrency[];
   categories: ExpenseCategoryCatalogItem[];
-  accounts: Array<{ id: string; name: string }>;
+  accounts: import("@/components/operational-payment-fields").TreasuryAccountOption[];
   allowQuickSupplier: boolean;
 }) {
   const [open, setOpen] = useState(false);

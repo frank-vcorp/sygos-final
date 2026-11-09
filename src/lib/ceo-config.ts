@@ -49,9 +49,4 @@ export function parseClabe(value: string): string {
   return digits;
 }
 
-export function accountKindLabel(kind: string) {
-  if (kind === "BANCO") return "Cuenta bancaria";
-  if (kind === "EFECTIVO") return "Efectivo";
-  if (kind === "TARJETA") return "Tarjeta";
-  return kind;
-}
+export { financeAccountKindLabel as accountKindLabel } from "./finance-accounts";

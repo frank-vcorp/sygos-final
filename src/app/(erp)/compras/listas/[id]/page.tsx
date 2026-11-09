@@ -8,6 +8,7 @@ import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { shoppingListKindFromList, shoppingListKindLabel, normalizeShoppingListKind } from "@/lib/shopping-list-display";
 import { requireCompany } from "@/lib/session";
+import { mapTreasuryAccountOptions, treasuryAccountSelect } from "@/lib/finance-accounts";
 
 export default async function ListaCompraPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await requireCompany();
@@ -21,8 +22,9 @@ export default async function ListaCompraPage({ params }: { params: Promise<{ id
     }),
     prisma.supplier.findMany({ where: { companyId: session.activeCompanyId, active: true }, orderBy: { name: "asc" }, select: { id: true, name: true, currency: true } }),
     prisma.expenseCategory.findMany({ where: { companyId: session.activeCompanyId, active: true }, include: { subcategories: { where: { active: true } } }, orderBy: { name: "asc" } }),
-    prisma.financeAccount.findMany({ where: { companyId: session.activeCompanyId, active: true }, orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    prisma.financeAccount.findMany({ where: { companyId: session.activeCompanyId, active: true }, orderBy: { name: "asc" }, select: treasuryAccountSelect }),
   ]);
+  const treasuryAccounts = mapTreasuryAccountOptions(accounts);
   if (!list) notFound();
   const open = list.status === "ABIERTA";
   const allowQuickSupplier = can(session.role, "supplier.operate", session.activeCompanyCode);
@@ -66,7 +68,7 @@ export default async function ListaCompraPage({ params }: { params: Promise<{ id
               lineCount={list.lines.length}
               suppliers={suppliers}
               categories={categories}
-              accounts={accounts}
+              accounts={treasuryAccounts}
               allowQuickSupplier={allowQuickSupplier}
             />
           ) : null}

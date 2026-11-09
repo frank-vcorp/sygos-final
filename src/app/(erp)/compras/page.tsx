@@ -9,6 +9,7 @@ import { coordFilterChips, coordPageSubtitle, coordPageTitle, coordUsesSidebarNa
 import { can } from "@/lib/permissions";
 import { purchaseListHref } from "@/lib/purchase-filter-links";
 import { requireCompany } from "@/lib/session";
+import { mapTreasuryAccountOptions, treasuryAccountSelect } from "@/lib/finance-accounts";
 
 const STATUS: Record<string, string> = {
   PENDIENTE_VALIDAR: "Pendiente de validar",
@@ -66,9 +67,10 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
   const [suppliers, categories, accounts, requesters] = await Promise.all([
     prisma.supplier.findMany({ where: { companyId: session.activeCompanyId, active: true }, orderBy: { name: "asc" } }),
     prisma.expenseCategory.findMany({ where: { companyId: session.activeCompanyId, active: true }, include: { subcategories: { where: { active: true } } }, orderBy: { name: "asc" } }),
-    prisma.financeAccount.findMany({ where: { companyId: session.activeCompanyId, active: true }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.financeAccount.findMany({ where: { companyId: session.activeCompanyId, active: true }, select: treasuryAccountSelect, orderBy: { name: "asc" } }),
     prisma.user.findMany({ where: { companyId: session.activeCompanyId, active: true }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);
+  const treasuryAccounts = mapTreasuryAccountOptions(accounts);
   const requesterName = new Map(requesters.map((user) => [user.id, user.name]));
   const filters = (omit?: "vista" | "q" | "estado" | "fecha" | "categoria" | "proveedor" | "solicitante") => purchaseListHref({
     vista: omit === "vista" ? undefined : view,
@@ -97,7 +99,7 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
               <PurchaseOrderModal
                 suppliers={suppliers.map((supplier) => ({ id: supplier.id, name: `${supplier.name} · ${supplier.currency}` }))}
                 categories={categories}
-                accounts={accounts}
+                accounts={treasuryAccounts}
                 allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)}
                 initiallyOpen={nueva === "1"}
                 returnHref={filters()}
@@ -107,7 +109,7 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
             <PurchaseRegistrationModal
               suppliers={suppliers.map((supplier) => ({ id: supplier.id, name: `${supplier.name} · ${supplier.currency}` }))}
               categories={categories}
-              accounts={accounts}
+              accounts={treasuryAccounts}
               allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)}
               returnHref={filters()}
             />

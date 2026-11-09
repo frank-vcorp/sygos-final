@@ -9,6 +9,7 @@ import {
 import { RequirementListSection } from "@/app/(erp)/compras/requerimientos/requirement-list-section";
 import { Card, KpiCard, PageHeader, RecordLink, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
+import { mapTreasuryAccountOptions, treasuryAccountSelect } from "@/lib/finance-accounts";
 import { money } from "@/lib/money";
 import { purchaseListHref } from "@/lib/purchase-filter-links";
 import { can } from "@/lib/permissions";
@@ -346,7 +347,7 @@ async function GerenteSystronPanel({
       ? prisma.financeAccount.findMany({
           where: { companyId, active: true },
           orderBy: { name: "asc" },
-          select: { id: true, name: true },
+          select: treasuryAccountSelect,
         })
       : Promise.resolve([]),
     canManageRequirements
@@ -357,6 +358,7 @@ async function GerenteSystronPanel({
         })
       : Promise.resolve([]),
   ]);
+  const treasuryAccounts = mapTreasuryAccountOptions(accounts);
 
   const [contexts, rowRequesters] = await Promise.all([
     loadRequirementListContexts(companyId, refaccionRows),
@@ -413,7 +415,7 @@ async function GerenteSystronPanel({
               showRequester={canManageRequirements}
               suppliers={suppliers}
               categories={categories}
-              accounts={accounts}
+              accounts={treasuryAccounts}
               allowQuickSupplier={allowQuickSupplier}
               shoppingLists={shoppingLists.map((list) => ({
                 id: list.id,

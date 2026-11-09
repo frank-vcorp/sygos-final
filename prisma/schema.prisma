@@ -886,6 +886,7 @@ model FinanceAccount {
   kind      String
   bankName  String?
   clabe     String?
+  lastFour  String?
   fiscal    Boolean  @default(false)
   balance   Float    @default(0)
   active    Boolean  @default(true)

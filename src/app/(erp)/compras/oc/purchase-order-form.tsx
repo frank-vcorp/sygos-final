@@ -8,6 +8,7 @@ import { SupplierPicker } from "@/components/supplier-picker";
 import { Button, controlClass, Field, FormPanel } from "@/components/ui";
 import type { ExpenseCategoryCatalogItem } from "@/lib/expense-catalog";
 import type { PickerOption } from "@/components/searchable-entity-picker";
+import { OperationalPaymentFields, type TreasuryAccountOption } from "@/components/operational-payment-fields";
 
 export function PurchaseOrderForm({
   suppliers,
@@ -17,7 +18,7 @@ export function PurchaseOrderForm({
 }: {
   suppliers: PickerOption[];
   categories: ExpenseCategoryCatalogItem[];
-  accounts: Array<{ id: string; name: string }>;
+  accounts: TreasuryAccountOption[];
   allowQuickSupplier: boolean;
 }) {
   const [purchaseKind, setPurchaseKind] = useState<"GENERAL" | "REFACCION">("GENERAL");
@@ -59,22 +60,7 @@ export function PurchaseOrderForm({
           </div>
         )}
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Forma de pago">
-            <select name="paymentType" required className={controlClass} defaultValue="CONTADO">
-              <option value="CONTADO">Contado</option>
-              <option value="CREDITO">Crédito</option>
-              <option value="TARJETA">Tarjeta</option>
-              <option value="TRANSFERENCIA">Transferencia</option>
-            </select>
-          </Field>
-          <Field label="Banco / cuenta">
-            <select name="accountId" defaultValue="" className={controlClass}>
-              <option value="">No aplica</option>
-              {accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
-            </select>
-          </Field>
-        </div>
+        <OperationalPaymentFields accounts={accounts} defaultPaymentType="EFECTIVO" />
 
         <div className="flex flex-col-reverse gap-3 border-t border-[var(--line)] pt-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs leading-5 text-[var(--muted)]">

@@ -110,7 +110,7 @@ export function RequirementListSection({
   showRequester?: boolean;
   suppliers: SupplierWithCurrency[];
   categories: ExpenseCategoryCatalogItem[];
-  accounts: Array<{ id: string; name: string }>;
+  accounts: import("@/components/operational-payment-fields").TreasuryAccountOption[];
   allowQuickSupplier: boolean;
   shoppingLists: ShoppingListOption[];
   bandejaHref?: string;
@@ -240,7 +240,7 @@ function RequirementPurchaseDialog({
   row: RequirementListRow;
   suppliers: SupplierWithCurrency[];
   categories: ExpenseCategoryCatalogItem[];
-  accounts: Array<{ id: string; name: string }>;
+  accounts: import("@/components/operational-payment-fields").TreasuryAccountOption[];
   allowQuickSupplier: boolean;
   onClose: () => void;
 }) {
