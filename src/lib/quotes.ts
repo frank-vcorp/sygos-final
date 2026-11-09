@@ -279,6 +279,31 @@ export async function createSellerQuote(
   return quote;
 }
 
+function isQuoteFolioUniqueConflict(error: unknown): boolean {
+  return typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "P2002";
+}
+
+/** Cotización de taller del ciclo SRV (mismo entero que DX/OS en la atención). */
+async function findWorkshopQuoteForAttention(
+  companyId: string,
+  attentionId: string,
+  serviceCompanyId: string,
+  siblingCaseIds: string[],
+) {
+  const byCase = await prisma.quote.findFirst({
+    where: {
+      companyId,
+      technicalCaseId: { in: siblingCaseIds },
+    },
+  });
+  if (byCase) return byCase;
+
+  const folio = await serviceFolioForAttention(attentionId, serviceCompanyId, "COT");
+  return prisma.quote.findUnique({
+    where: { companyId_folio: { companyId, folio } },
+  });
+}
+
 export async function prepareQuoteFromCase(actor: Actor, caseId: string) {
   return ensureQuoteFromCase(actor, caseId);
 }
@@ -289,16 +314,18 @@ export async function ensureQuoteFromCase(actor: { userId: string; activeCompany
     include: { attention: true, equipment: true },
   });
   if (!row) throw new Error("No se encontró la operación técnica.");
-  const siblingCaseIds = await prisma.technicalCase.findMany({
-    where: { attentionId: row.attentionId },
-    select: { id: true },
-  });
-  const existing = await prisma.quote.findFirst({
-    where: {
-      companyId: actor.activeCompanyId,
-      technicalCaseId: { in: siblingCaseIds.map((item) => item.id) },
-    },
-  });
+  const siblingCaseIds = (
+    await prisma.technicalCase.findMany({
+      where: { attentionId: row.attentionId },
+      select: { id: true },
+    })
+  ).map((item) => item.id);
+  const existing = await findWorkshopQuoteForAttention(
+    actor.activeCompanyId,
+    row.attentionId,
+    row.serviceCompanyId,
+    siblingCaseIds,
+  );
   if (existing) {
     if (row.equipment.kind === "MOT" && row.equipment.originCompanyId !== actor.activeCompanyId) {
       await ensureOriginQuote(row, existing.id, actor.userId);
@@ -321,26 +348,42 @@ export async function ensureQuoteFromCase(actor: { userId: string; activeCompany
   const repair = row.kind === "OS";
   const concept = automaticQuoteConcept(row);
   const folio = await serviceFolioForAttention(row.attentionId, row.serviceCompanyId, "COT");
-  const quote = await prisma.quote.create({
-    data: {
-      folio,
-      companyId: actor.activeCompanyId,
-      clientId,
-      quoteType: repair ? "REPARACION" : "DIAGNOSTICO",
-      status: "PENDIENTE_COTIZAR",
-      equipmentId: row.equipmentId,
-      technicalCaseId: row.id,
-      sellerUserId: resolveQuoteSellerUserId(row.attention.sellerUserId, client.ownerUserId),
-      reference: row.folio,
-      lines: {
-        create: [{
-          concept,
-          quantity: 1,
-          incrementPct: repair ? row.attention.priorityIncrementPct : null,
-        }],
+  let quote;
+  try {
+    quote = await prisma.quote.create({
+      data: {
+        folio,
+        companyId: actor.activeCompanyId,
+        clientId,
+        quoteType: repair ? "REPARACION" : "DIAGNOSTICO",
+        status: "PENDIENTE_COTIZAR",
+        equipmentId: row.equipmentId,
+        technicalCaseId: row.id,
+        sellerUserId: resolveQuoteSellerUserId(row.attention.sellerUserId, client.ownerUserId),
+        reference: row.folio,
+        lines: {
+          create: [{
+            concept,
+            quantity: 1,
+            incrementPct: repair ? row.attention.priorityIncrementPct : null,
+          }],
+        },
       },
-    },
-  });
+    });
+  } catch (error) {
+    if (!isQuoteFolioUniqueConflict(error)) throw error;
+    const raced = await findWorkshopQuoteForAttention(
+      actor.activeCompanyId,
+      row.attentionId,
+      row.serviceCompanyId,
+      siblingCaseIds,
+    );
+    if (!raced) throw error;
+    if (row.equipment.kind === "MOT" && row.equipment.originCompanyId !== actor.activeCompanyId) {
+      await ensureOriginQuote(row, raced.id, actor.userId);
+    }
+    return raced;
+  }
   const contactNames = client.contacts.map((contact) => contact.name).join(", ");
   await recordHistory({
     companyId: actor.activeCompanyId,
@@ -373,19 +416,22 @@ async function ensureOriginQuote(
   baseQuoteId: string,
   authorUserId: string,
 ) {
-  const siblingCaseIds = await prisma.technicalCase.findMany({
-    where: { attentionId: row.attentionId },
-    select: { id: true },
+  const siblingCaseIds = (
+    await prisma.technicalCase.findMany({
+      where: { attentionId: row.attentionId },
+      select: { id: true },
+    })
+  ).map((item) => item.id);
+  const byLink = await prisma.quote.findFirst({
+    where: { companyId: row.equipment.originCompanyId, linkedQuoteId: baseQuoteId },
   });
-  const existing = await prisma.quote.findFirst({
-    where: {
-      companyId: row.equipment.originCompanyId,
-      OR: [
-        { linkedQuoteId: baseQuoteId },
-        { technicalCaseId: { in: siblingCaseIds.map((item) => item.id) } },
-      ],
-    },
-  });
+  if (byLink) return byLink;
+  const existing = await findWorkshopQuoteForAttention(
+    row.equipment.originCompanyId,
+    row.attentionId,
+    row.serviceCompanyId,
+    siblingCaseIds,
+  );
   if (existing) return existing;
   const repair = row.kind === "OS";
   const concept = automaticQuoteConcept(row);
@@ -395,28 +441,41 @@ async function ensureOriginQuote(
     select: { ownerUserId: true },
   });
   const priorityFields = frozenPriorityFieldsFromAttention(row.attention);
-  const quote = await prisma.quote.create({
-    data: {
-      folio,
-      companyId: row.equipment.originCompanyId,
-      clientId: row.equipment.clientId,
-      quoteType: repair ? "REPARACION" : "DIAGNOSTICO",
-      status: "PENDIENTE_COTIZAR",
-      equipmentId: row.equipmentId,
-      technicalCaseId: row.id,
-      linkedQuoteId: baseQuoteId,
-      sellerUserId: resolveQuoteSellerUserId(row.attention.sellerUserId, originClient?.ownerUserId ?? null),
-      reference: row.folio,
-      ...priorityFields,
-      lines: {
-        create: [{
-          concept,
-          quantity: 1,
-          incrementPct: repair ? row.attention.priorityIncrementPct : null,
-        }],
+  let quote;
+  try {
+    quote = await prisma.quote.create({
+      data: {
+        folio,
+        companyId: row.equipment.originCompanyId,
+        clientId: row.equipment.clientId,
+        quoteType: repair ? "REPARACION" : "DIAGNOSTICO",
+        status: "PENDIENTE_COTIZAR",
+        equipmentId: row.equipmentId,
+        technicalCaseId: row.id,
+        linkedQuoteId: baseQuoteId,
+        sellerUserId: resolveQuoteSellerUserId(row.attention.sellerUserId, originClient?.ownerUserId ?? null),
+        reference: row.folio,
+        ...priorityFields,
+        lines: {
+          create: [{
+            concept,
+            quantity: 1,
+            incrementPct: repair ? row.attention.priorityIncrementPct : null,
+          }],
+        },
       },
-    },
-  });
+    });
+  } catch (error) {
+    if (!isQuoteFolioUniqueConflict(error)) throw error;
+    const raced = await findWorkshopQuoteForAttention(
+      row.equipment.originCompanyId,
+      row.attentionId,
+      row.serviceCompanyId,
+      siblingCaseIds,
+    );
+    if (!raced) throw error;
+    return raced;
+  }
   await recordHistory({
     companyId: row.equipment.originCompanyId,
     entityType: "COTIZACION",

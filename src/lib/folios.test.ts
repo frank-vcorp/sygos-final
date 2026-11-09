@@ -295,6 +295,11 @@ describe("folios", () => {
       1,
     );
 
+    await prisma.quote.update({ where: { id: cot.id }, data: { technicalCaseId: null } });
+    const recovered = await ensureQuoteFromCase(actor, dx.id);
+    assert.equal(recovered.id, cot.id);
+    assert.equal(await prisma.quote.count({ where: { companyId: company.id, folio: "COT-7" } }), 1);
+
     const quote = await prisma.quote.create({
       data: {
         folio: "COT-3",
