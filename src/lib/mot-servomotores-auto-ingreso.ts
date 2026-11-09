@@ -128,7 +128,7 @@ export async function applyMotServomotoresAutoIngreso(input: MotServomotoresAuto
     summary: `${folio} ingreso automático en taller Servomotores. Custodia: ${custody}.`,
     authorUserId: input.authorUserId,
   });
-  if (attention) {
+  if (attention?.id) {
     await recordHistory({
       companyId: service.id,
       entityType: "ATENCION",
