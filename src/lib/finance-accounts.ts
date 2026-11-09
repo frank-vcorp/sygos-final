@@ -78,9 +78,10 @@ export function formatAccountLastFour(lastFour?: string | null) {
 export function financeAccountDisplayName(account: FinanceAccountNameInput): string {
   const kind = normalizeFinanceAccountKind(account.kind);
   if (kind === "BANCARIA" || kind === "CREDITO") {
-    const bank = account.bankName?.trim() || account.name.trim();
-    const suffix = formatAccountLastFour(account.lastFour);
-    return suffix ? `${bank} ${suffix}` : bank;
+    const bank = account.bankName?.trim();
+    if (bank) return bank;
+    const legacy = account.name.trim();
+    return legacy.replace(/\s+····\d{4}$/, "").trim() || legacy;
   }
   const name = account.name.trim();
   return name || "Efectivo";
@@ -112,15 +113,9 @@ export function buildFinanceAccountStoredName(input: {
     const name = input.cashName?.trim();
     return name || "Efectivo";
   }
-  const lastFour =
-    input.lastFour
-    ?? (input.kind === "BANCARIA" ? lastFourFromClabe(input.clabe) : null);
-  return financeAccountDisplayName({
-    kind: input.kind,
-    name: input.bankName?.trim() ?? "",
-    bankName: input.bankName,
-    lastFour,
-  });
+  const bank = input.bankName?.trim();
+  if (!bank) throw new Error("Indica el nombre del banco.");
+  return bank;
 }
 
 export function normalizeOperationalPaymentType(value: string | null | undefined): OperationalPaymentType {

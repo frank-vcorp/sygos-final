@@ -20,17 +20,21 @@ describe("finance-accounts", () => {
     assert.equal(normalizeFinanceAccountKind("BANCARIA"), "BANCARIA");
   });
 
-  it("arma etiqueta de visualización con banco y últimos 4", () => {
+  it("usa el banco como nombre guardado y en listados", () => {
     assert.equal(
-      financeAccountDisplayName({ kind: "BANCARIA", name: "x", bankName: "BBVA", lastFour: "1234" }),
-      "BBVA ····1234",
+      financeAccountDisplayName({ kind: "BANCARIA", name: "BBVA ····1234", bankName: "BBVA", lastFour: "1234" }),
+      "BBVA",
     );
     assert.equal(buildFinanceAccountStoredName({ kind: "EFECTIVO", cashName: "" }), "Efectivo");
     assert.equal(buildFinanceAccountStoredName({ kind: "EFECTIVO", cashName: "Caja norte" }), "Caja norte");
     assert.equal(lastFourFromClabe("012180001234567897"), "7897");
     assert.equal(
       buildFinanceAccountStoredName({ kind: "BANCARIA", bankName: "BBVA", clabe: "012180001234567897" }),
-      "BBVA ····7897",
+      "BBVA",
+    );
+    assert.equal(
+      financeAccountDisplayName({ kind: "BANCARIA", name: "Banorte ····7897", bankName: null, lastFour: "7897" }),
+      "Banorte",
     );
   });
 

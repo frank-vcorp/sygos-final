@@ -164,10 +164,14 @@ export async function createFinanceAccountAction(formData: FormData) {
       const lastFour = parseLastFour(optionalText(formData.get("lastFour")));
       const resolvedLastFour = lastFour ?? clabe.slice(-4);
       const name = buildFinanceAccountStoredName({ kind, bankName, lastFour: resolvedLastFour, clabe });
+      const existingClabe = await prisma.financeAccount.findFirst({
+        where: { companyId: session.activeCompanyId, clabe },
+      });
+      if (existingClabe) throw new Error("Ya hay una cuenta con esa CLABE.");
       const existing = await prisma.financeAccount.findFirst({
         where: { companyId: session.activeCompanyId, name },
       });
-      if (existing) throw new Error(`Ya existe la cuenta «${name}». Usa otro banco o indica últimos 4 distintos.`);
+      if (existing) throw new Error(`Ya existe la cuenta «${name}». Usa otro nombre de banco o edita la existente.`);
       data = {
         companyId: session.activeCompanyId,
         name,
@@ -182,9 +186,18 @@ export async function createFinanceAccountAction(formData: FormData) {
       const lastFour = parseLastFour(formData.get("lastFour"), { required: true });
       const name = buildFinanceAccountStoredName({ kind, bankName, lastFour });
       const existing = await prisma.financeAccount.findFirst({
+        where: {
+          companyId: session.activeCompanyId,
+          kind: "CREDITO",
+          bankName,
+          lastFour,
+        },
+      });
+      if (existing) throw new Error(`Ya existe esa tarjeta «${bankName} ····${lastFour}».`);
+      const existingName = await prisma.financeAccount.findFirst({
         where: { companyId: session.activeCompanyId, name },
       });
-      if (existing) throw new Error(`Ya existe la cuenta «${name}». (El seed puede incluir «Tarjeta».)`);
+      if (existingName) throw new Error(`Ya existe la cuenta «${name}». (El seed puede incluir «Tarjeta».)`);
       data = {
         companyId: session.activeCompanyId,
         name,
