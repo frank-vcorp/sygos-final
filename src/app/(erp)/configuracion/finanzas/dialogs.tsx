@@ -11,17 +11,18 @@ function Keep({ name, value }: { name: string; value?: string }) {
   return <input type="hidden" name={name} value={value} />;
 }
 
-export function NewAccountDialog({ q, tipo }: { q?: string; tipo?: string }) {
+export function NewAccountDialog({ companyId, q, tipo }: { companyId: string; q?: string; tipo?: string }) {
   return (
     <CreateDialog label="Nueva cuenta" title="Nueva cuenta" titleId="nueva-cuenta">
-      <AccountCreateForm q={q} tipo={tipo} />
+      <AccountCreateForm companyId={companyId} q={q} tipo={tipo} />
     </CreateDialog>
   );
 }
 
-function AccountCreateForm({ q, tipo }: { q?: string; tipo?: string }) {
+function AccountCreateForm({ companyId, q, tipo }: { companyId: string; q?: string; tipo?: string }) {
   return (
     <form action={createFinanceAccountAction}>
+      <input type="hidden" name="companyId" value={companyId} />
       <Keep name="q" value={q} />
       <Keep name="tipo" value={tipo} />
       <FormSection title="Datos de la cuenta" description="Bancaria: banco, CLABE y últimos 4. Efectivo: nombre. Crédito: banco y últimos 4 (deuda)." columns={1}>

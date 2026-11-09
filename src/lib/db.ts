@@ -4,6 +4,7 @@ import { existsSync, readFileSync, unlinkSync, writeFileSync } from "fs";
 import { cookies } from "next/headers";
 import { resolve } from "path";
 import { hashToken } from "./crypto";
+import { isRole } from "./roles";
 import { SESSION_COOKIE } from "./session-cookie";
 
 const sandboxContext = new AsyncLocalStorage<boolean>();
@@ -51,23 +52,41 @@ export function sandboxBound() {
   return sandboxContext.getStore() === true;
 }
 
+export function sessionActor(row: {
+  user: { role: string; active: boolean };
+  impersonatedUser: { role: string; active: boolean } | null;
+}) {
+  const impersonated =
+    row.user.role === "ADMINISTRADOR" &&
+    row.impersonatedUser?.active &&
+    isRole(row.impersonatedUser.role) &&
+    row.impersonatedUser.role !== "ADMINISTRADOR"
+      ? row.impersonatedUser
+      : null;
+  return impersonated ?? row.user;
+}
+
 export async function inSandbox() {
-  if (sandboxBound()) return true;
   try {
     const token = (await cookies()).get(SESSION_COOKIE)?.value;
-    if (!token) return false;
+    if (!token) {
+      bindSandbox(false);
+      return false;
+    }
     const row = await prismaProd.session.findUnique({
       where: { tokenHash: hashToken(token) },
       include: { user: true, impersonatedUser: true },
     });
-    if (!row || row.expiresAt.getTime() < Date.now() || !row.user.active) return false;
-    const impersonated =
-      row.user.role === "ADMINISTRADOR" && row.impersonatedUser?.active && row.impersonatedUser.role !== "ADMINISTRADOR"
-        ? row.impersonatedUser
-        : null;
-    const actor = impersonated ?? row.user;
-    return sandboxFor(actor.id, actor.role);
+    if (!row || row.expiresAt.getTime() < Date.now() || !row.user.active) {
+      bindSandbox(false);
+      return false;
+    }
+    const actor = sessionActor(row);
+    const active = sandboxFor(actor.id, actor.role);
+    bindSandbox(active);
+    return active;
   } catch {
+    bindSandbox(false);
     return false;
   }
 }

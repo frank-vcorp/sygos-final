@@ -142,6 +142,12 @@ export async function createFinanceAccountAction(formData: FormData) {
   const back = accountReturn(formData, null);
   try {
     const session = await requireCeo(back);
+    const formCompanyId = optionalText(formData.get("companyId"));
+    if (formCompanyId && formCompanyId !== session.activeCompanyId) {
+      throw new Error(
+        `La empresa activa cambió (ahora es ${session.activeCompanyName ?? session.activeCompanyCode}). Cierra el diálogo y vuelve a crear la cuenta.`,
+      );
+    }
     const kind = parseFinanceAccountKindFromForm(formData.get("kind"));
     let data: {
       companyId: string;
@@ -209,7 +215,11 @@ export async function createFinanceAccountAction(formData: FormData) {
     const persisted = await prisma.financeAccount.findFirst({
       where: { id: created.id, companyId: session.activeCompanyId },
     });
-    if (!persisted) throw new Error("La cuenta no quedó guardada. Revisa la conexión e intenta de nuevo.");
+    if (!persisted) {
+      throw new Error(
+        "La cuenta no quedó visible en la empresa activa. Si ves el banner «Viendo como…» o modo de pruebas, vuelve al administrador o finaliza pruebas y reintenta.",
+      );
+    }
     revalidatePath("/configuracion/finanzas");
     revalidatePath("/finanzas");
     try {

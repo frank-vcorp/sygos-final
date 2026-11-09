@@ -51,7 +51,7 @@ export default async function FinanzasConfigPage({
           ? `${session.activeCompanyName} · Cuentas bancarias y de efectivo. El saldo no se edita aquí.`
           : `${session.activeCompanyName} · Las subcategorías de egreso quedan dentro de su categoría.`}
         action={vista === "cuentas"
-          ? <NewAccountDialog q={q || undefined} tipo={tipo || undefined} />
+          ? <NewAccountDialog companyId={session.activeCompanyId} q={q || undefined} tipo={tipo || undefined} />
           : <NewCatalogDialog categories={categories} q={q || undefined} tipo={tipo || undefined} />}
       />
       <SegmentedNav
