@@ -142,7 +142,6 @@ export async function createFinanceAccountAction(formData: FormData) {
   let createdId: string | null = null;
   try {
     const session = await requireCeo(back);
-    const fiscal = formData.get("fiscal") === "si";
     const kind = parseFinanceAccountKindFromForm(formData.get("kind"));
     let data: {
       companyId: string;
@@ -151,7 +150,6 @@ export async function createFinanceAccountAction(formData: FormData) {
       bankName: string | null;
       clabe: string | null;
       lastFour: string | null;
-      fiscal: boolean;
       balance: number;
     };
     if (kind === "BANCARIA") {
@@ -166,7 +164,6 @@ export async function createFinanceAccountAction(formData: FormData) {
         bankName,
         clabe,
         lastFour,
-        fiscal,
         balance: 0,
       };
     } else if (kind === "CREDITO") {
@@ -180,7 +177,6 @@ export async function createFinanceAccountAction(formData: FormData) {
         bankName,
         clabe: null,
         lastFour,
-        fiscal,
         balance: 0,
       };
     } else {
@@ -193,7 +189,6 @@ export async function createFinanceAccountAction(formData: FormData) {
         bankName: null,
         clabe: null,
         lastFour: null,
-        fiscal,
         balance: 0,
       };
     }
@@ -222,7 +217,6 @@ export async function updateFinanceAccountAction(formData: FormData) {
     const id = requiredText(formData.get("accountId"), "Cuenta");
     const account = await prisma.financeAccount.findFirst({ where: { id, companyId: session.activeCompanyId } });
     if (!account) throw new Error("Esa cuenta no es de esta empresa.");
-    const fiscal = formData.get("fiscal") === "si";
     const kind = normalizeFinanceAccountKind(account.kind);
     if (isBankAccountKind(kind)) {
       const bankName = requiredText(formData.get("bankName"), "Banco");
@@ -231,7 +225,7 @@ export async function updateFinanceAccountAction(formData: FormData) {
       const name = buildFinanceAccountStoredName({ kind: "BANCARIA", bankName, lastFour });
       await prisma.financeAccount.update({
         where: { id: account.id },
-        data: { name, bankName, clabe, lastFour, fiscal },
+        data: { name, bankName, clabe, lastFour },
       });
     } else if (isCreditCardAccountKind(kind)) {
       const bankName = requiredText(formData.get("bankName"), "Banco");
@@ -239,14 +233,12 @@ export async function updateFinanceAccountAction(formData: FormData) {
       const name = buildFinanceAccountStoredName({ kind: "CREDITO", bankName, lastFour });
       await prisma.financeAccount.update({
         where: { id: account.id },
-        data: { name, bankName, lastFour, fiscal },
+        data: { name, bankName, lastFour },
       });
     } else if (isCashAccountKind(kind)) {
       const cashName = optionalText(formData.get("cashName")) ?? optionalText(formData.get("name"));
       const name = buildFinanceAccountStoredName({ kind: "EFECTIVO", cashName });
-      await prisma.financeAccount.update({ where: { id: account.id }, data: { name, fiscal } });
-    } else {
-      await prisma.financeAccount.update({ where: { id: account.id }, data: { fiscal } });
+      await prisma.financeAccount.update({ where: { id: account.id }, data: { name } });
     }
     await setFlash({ tone: "ok", message: "Cuenta actualizada." });
   } catch (error) {

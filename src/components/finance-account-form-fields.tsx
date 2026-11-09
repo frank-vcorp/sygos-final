@@ -42,12 +42,6 @@ export function FinanceAccountCreateFields({ showOpening = false }: { showOpenin
           </Field>
         </>
       )}
-      <Field label="Fiscal">
-        <select name="fiscal" defaultValue="no" className={controlClass}>
-          <option value="si">Sí</option>
-          <option value="no">No</option>
-        </select>
-      </Field>
       {showOpening ? (
         <Field label="Saldo o deuda inicial">
           <MoneyInput name="opening" defaultValue="0" />

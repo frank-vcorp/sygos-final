@@ -40,7 +40,6 @@ export async function accountAction(formData: FormData) {
       clabe: kind === "BANCARIA" ? parseClabe(requiredText(formData.get("clabe"), "CLABE")) : null,
       lastFour: kind === "CREDITO" ? parseLastFour(formData.get("lastFour"), { required: true }) : parseLastFour(optionalText(formData.get("lastFour"))),
       cashName: optionalText(formData.get("cashName")) ?? optionalText(formData.get("name")),
-      fiscal: formData.get("fiscal") === "si",
       opening,
     });
     await setFlash({ tone: "ok", message: "Cuenta registrada." });

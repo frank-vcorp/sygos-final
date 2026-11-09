@@ -8,7 +8,6 @@ import { matchesText } from "../filters";
 import { HiddenFields } from "../pieces";
 import {
   ActiveFilters,
-  Badge,
   Button,
   controlClass,
   Empty,
@@ -35,7 +34,6 @@ type AccountRow = {
   bankName: string | null;
   clabe: string | null;
   lastFour: string | null;
-  fiscal: boolean;
   balance: number;
 };
 
@@ -96,7 +94,6 @@ export function AccountsPanel({
                   <Th>Banco</Th>
                   <Th>CLABE</Th>
                   <Th>Últimos 4</Th>
-                  <Th>Fiscal</Th>
                   <Th>Saldo</Th>
                   <Th>Acciones</Th>
                 </tr>
@@ -111,7 +108,6 @@ export function AccountsPanel({
                       <Td>{account.bankName || "—"}</Td>
                       <Td>{account.clabe || "—"}</Td>
                       <Td>{account.lastFour || "—"}</Td>
-                      <Td><Badge tone={account.fiscal ? "ok" : "neutral"}>{account.fiscal ? "Sí" : "No"}</Badge></Td>
                       <Td>{money(account.balance)}</Td>
                       <Td>
                         <ConfigEditDialog title={`Editar ${label}`} titleId={`editar-cuenta-${account.id}`}>
@@ -130,7 +126,7 @@ export function AccountsPanel({
               <MobileCard
                 key={account.id}
                 title={label}
-                meta={<Badge tone={account.fiscal ? "ok" : "neutral"}>{account.fiscal ? "Fiscal" : "No fiscal"}</Badge>}
+                meta={<span className="text-[var(--muted)]">{accountKindLabel(account.kind)}</span>}
                 footer={
                   <div className="flex justify-end">
                     <ConfigEditDialog title={`Editar ${label}`} titleId={`editar-cuenta-m-${account.id}`}>
@@ -162,12 +158,6 @@ function AccountEditor({ account, q, tipo }: { account: AccountRow; q: string; t
           description={`${accountKindLabel(account.kind)} · Saldo ${money(account.balance)}. El saldo no se edita aquí.`}
           columns={1}
         >
-          <Field label="Fiscal">
-            <select name="fiscal" defaultValue={account.fiscal ? "si" : "no"} className={controlClass}>
-              <option value="si">Sí</option>
-              <option value="no">No</option>
-            </select>
-          </Field>
           {isCashAccountKind(kind) ? (
             <Field label="Nombre">
               <input name="cashName" defaultValue={account.name} className={controlClass} />

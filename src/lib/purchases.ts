@@ -328,7 +328,6 @@ export async function openAccount(
     clabe?: string | null;
     lastFour?: string | null;
     cashName?: string | null;
-    fiscal?: boolean;
     opening?: number;
   },
 ) {
@@ -350,7 +349,6 @@ export async function openAccount(
       bankName: kind === "EFECTIVO" ? null : input.bankName?.trim() ?? null,
       clabe: kind === "BANCARIA" ? input.clabe ?? null : null,
       lastFour: kind === "EFECTIVO" ? null : input.lastFour ?? null,
-      fiscal: input.fiscal ?? false,
       balance: isCreditCardAccountKind(kind) ? Math.max(0, opening) : opening,
     },
   });
