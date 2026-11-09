@@ -87,6 +87,49 @@ function frozenPriorityFromQuote(quote: {
   };
 }
 
+type AttentionPriorityFreeze = {
+  priorityName: string;
+  priorityPrice: number | null;
+  priorityIncrementPct: number | null;
+  priorityTargetMin: number | null;
+  priorityTargetMax: number | null;
+  prioritySlaMaxDays: number | null;
+};
+
+function frozenPriorityFieldsFromAttention(attention: AttentionPriorityFreeze) {
+  const deliveryDefault = attention.prioritySlaMaxDays ?? attention.priorityTargetMax ?? null;
+  return {
+    priorityName: attention.priorityName,
+    priorityPrice: attention.priorityPrice,
+    priorityIncrementPct: attention.priorityIncrementPct,
+    priorityTargetMinDays: attention.priorityTargetMin,
+    priorityTargetMaxDays: attention.priorityTargetMax,
+    prioritySlaMaxDays: attention.prioritySlaMaxDays,
+    ...(deliveryDefault != null && deliveryDefault >= 1 ? { deliveryBusinessDays: deliveryDefault } : {}),
+  };
+}
+
+/** Precio referencia Servomotores (Diego) para que el CEO SYSTRON fije precio comercial. */
+export function intercompanyReferenceAmount(
+  baseQuote: { lines: Array<{ unitPrice: number | null; basePrice: number | null }> } | null | undefined,
+  attention: { priorityPrice: number | null } | null | undefined,
+): number | null {
+  const pricedLine = baseQuote?.lines.find((line) => line.unitPrice != null || line.basePrice != null);
+  if (pricedLine) return pricedLine.basePrice ?? pricedLine.unitPrice;
+  return attention?.priorityPrice ?? null;
+}
+
+export function intercompanyDeliveryDaysDefault(quote: {
+  deliveryBusinessDays: number | null;
+  prioritySlaMaxDays: number | null;
+  priorityTargetMaxDays: number | null;
+}): number | "" {
+  if (quote.deliveryBusinessDays != null) return quote.deliveryBusinessDays;
+  if (quote.prioritySlaMaxDays != null && quote.prioritySlaMaxDays >= 1) return quote.prioritySlaMaxDays;
+  if (quote.priorityTargetMaxDays != null && quote.priorityTargetMaxDays >= 1) return quote.priorityTargetMaxDays;
+  return "";
+}
+
 export function seesEconomicDetail(role: Role, companyCode: string, quoteCompanyCode: string, isBaseForOther: boolean): boolean {
   if (role === "VENTAS") return false;
   if (companyCode === "SERVOMOTORES" && quoteCompanyCode === "SYSTRON") return false;
@@ -209,7 +252,12 @@ export async function ensureQuoteFromCase(actor: { userId: string; activeCompany
       technicalCaseId: { in: siblingCaseIds.map((item) => item.id) },
     },
   });
-  if (existing) return existing;
+  if (existing) {
+    if (row.equipment.kind === "MOT" && row.equipment.originCompanyId !== actor.activeCompanyId) {
+      await ensureOriginQuote(row, existing.id, actor.userId);
+    }
+    return existing;
+  }
   const recoverValidatedDiagnosis =
     row.status === "VALIDADO" && row.kind === "DIAGNOSTICO" && row.attention.attentionType === "DIAGNOSTICO";
   if (!row.quotePending && !recoverValidatedDiagnosis) throw new Error("Esta operación no está pendiente de cotizar.");
@@ -272,33 +320,54 @@ async function ensureOriginQuote(
     kind: string;
     equipmentId: string;
     resultText: string | null;
-    attention: { attentionType: string; reportedFault: string; sellerUserId: string | null };
+    attention: AttentionPriorityFreeze & { attentionType: string; reportedFault: string; sellerUserId: string | null };
     equipment: { originCompanyId: string; clientId: string; typeName: string | null; brandName: string | null; model: string | null; serial: string | null };
   },
   baseQuoteId: string,
   authorUserId: string,
 ) {
-  const existing = await prisma.quote.findFirst({ where: { technicalCaseId: row.id, companyId: row.equipment.originCompanyId } });
+  const siblingCaseIds = await prisma.technicalCase.findMany({
+    where: { attentionId: row.attentionId },
+    select: { id: true },
+  });
+  const existing = await prisma.quote.findFirst({
+    where: {
+      companyId: row.equipment.originCompanyId,
+      OR: [
+        { linkedQuoteId: baseQuoteId },
+        { technicalCaseId: { in: siblingCaseIds.map((item) => item.id) } },
+      ],
+    },
+  });
   if (existing) return existing;
+  const repair = row.kind === "OS";
   const concept = automaticQuoteConcept(row);
   const folio = await serviceFolioForAttention(row.attentionId, row.serviceCompanyId, "COT");
   const originClient = await prisma.client.findUnique({
     where: { id: row.equipment.clientId },
     select: { ownerUserId: true },
   });
+  const priorityFields = frozenPriorityFieldsFromAttention(row.attention);
   const quote = await prisma.quote.create({
     data: {
       folio,
       companyId: row.equipment.originCompanyId,
       clientId: row.equipment.clientId,
-      quoteType: "DIAGNOSTICO",
+      quoteType: repair ? "REPARACION" : "DIAGNOSTICO",
       status: "PENDIENTE_COTIZAR",
       equipmentId: row.equipmentId,
       technicalCaseId: row.id,
       linkedQuoteId: baseQuoteId,
       sellerUserId: resolveQuoteSellerUserId(row.attention.sellerUserId, originClient?.ownerUserId ?? null),
       reference: row.folio,
-      lines: { create: [{ concept, quantity: 1 }] },
+      ...priorityFields,
+      lines: {
+        create: [{
+          concept,
+          quantity: 1,
+          incrementPct: repair ? row.attention.priorityIncrementPct : null,
+        }],
+      },
     },
   });
   await recordHistory({
@@ -306,7 +375,7 @@ async function ensureOriginQuote(
     entityType: "COTIZACION",
     entityId: quote.id,
     action: "ALTA",
-    summary: `${folio} quedó pendiente de cotizar en SYSTRON desde ${row.folio}. El precio base de Servomotores no se muestra al vendedor.`,
+    summary: `${folio} espejo en SYSTRON desde ${row.folio} (Servomotores). Prioridad ${row.attention.priorityName} congelada; el importe de Diego es solo referencia para CEO.`,
     authorUserId,
   });
   return quote;

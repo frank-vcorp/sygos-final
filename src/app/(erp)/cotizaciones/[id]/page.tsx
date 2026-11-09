@@ -33,7 +33,7 @@ import { linesForTotal, money, quoteTotals } from "@/lib/money";
 import { can } from "@/lib/permissions";
 import { PRESOLICITUD_LABEL } from "@/lib/part-presolicitud";
 import { ATTENTION_LABEL, type AttentionType } from "@/lib/priorities";
-import { QUOTE_STATUS_LABEL, QUOTE_TYPE_LABEL, commercialAttentionTypeForQuote, quoteDeliveryDaysRequired, quoteListSlaLabel, quoteRequiresDeliveryDays, quoteShowsDeliveryDaysField, seesEconomicDetail, type QuoteType } from "@/lib/quotes";
+import { QUOTE_STATUS_LABEL, QUOTE_TYPE_LABEL, commercialAttentionTypeForQuote, intercompanyDeliveryDaysDefault, intercompanyReferenceAmount, quoteDeliveryDaysRequired, quoteListSlaLabel, quoteRequiresDeliveryDays, quoteShowsDeliveryDaysField, seesEconomicDetail, type QuoteType } from "@/lib/quotes";
 import { FIELD_SERVICE_DEFAULT_HOURS, FIELD_SERVICE_STATUS_LABEL, fieldServiceTotal, quoteCampoDisplayTotal } from "@/lib/field-service";
 import { ClientNameLink, ContactNameLink } from "@/components/client-entity-links";
 import { redirectIfSalesNotAssigned } from "@/lib/sales-assignment";
@@ -115,7 +115,8 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
     : null;
   const showDeliveryDays = quoteShowsDeliveryDaysField(quote, caseContext);
   const deliveryDaysRequired = quoteDeliveryDaysRequired(quote, caseContext);
-  const referencePrice = source?.attention.priorityPrice;
+  const referencePrice = intercompanyReferenceAmount(base, source?.attention);
+  const servomotoresReference = intercompanyReferenceAmount(base, null);
   const priced = quote.status !== "PENDIENTE_COTIZAR" || session.role !== "VENTAS";
   const totals = priced ? quoteTotals(linesForTotal(quote.lines, quote.quoteType, quote.status), quote.discountPct) : null;
   const waitingEquipment = quote.status === "AUTORIZADA_PENDIENTE_EQUIPO" && !quote.equipmentId && !quote.technicalCaseId && (quote.quoteType === "DIAGNOSTICO" || quote.quoteType === "REPARACION");
@@ -161,7 +162,10 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
       <form action={setPricesAction} className="flex flex-wrap items-end gap-2">
         <input type="hidden" name="quoteId" value={quote.id} />
         <input type="hidden" name="version" value={quote.version} />
-        {quote.lines.map((line) => (
+        {quote.lines.map((line, lineIndex) => {
+          const baseLine = base?.lines[lineIndex];
+          const lineReference = baseLine?.basePrice ?? baseLine?.unitPrice ?? referencePrice;
+          return (
           <label key={line.id} className="grid gap-1">
             <span className="text-xs font-semibold text-[var(--muted)]">{quote.lines.length === 1 ? "Precio" : line.concept}</span>
             <input type="hidden" name="lineId" value={line.id} />
@@ -169,12 +173,13 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
               name="amount"
               required
               aria-label={`Precio de ${line.concept}`}
-              defaultValue={referencePrice ?? ""}
+              defaultValue={lineReference ?? ""}
               wrapperClassName="w-32"
               className="text-right"
             />
           </label>
-        ))}
+          );
+        })}
         {quote.quoteType === "CAMPO" ? (
           <label className="grid gap-1">
             <span className="text-xs font-semibold text-[var(--muted)]">Horas (CEO)</span>
@@ -200,7 +205,7 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
               required={deliveryDaysRequired}
               min={1}
               step={1}
-              defaultValue={quote.deliveryBusinessDays ?? ""}
+              defaultValue={intercompanyDeliveryDaysDefault(quote)}
               className={controlClass}
               aria-label="Tiempo de entrega en días hábiles"
             />
@@ -408,7 +413,16 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
               ))}
             </p>
           ) : <p className="mt-1 text-[var(--danger)]">Este cliente no tiene contactos activos.</p>}
-          {quote.status === "PENDIENTE_COTIZAR" && referencePrice != null ? <p className="mt-1">Referencia congelada de la prioridad: {money(referencePrice)}. El precio lo confirma CEO o Administrador.</p> : null}
+          {quote.status === "PENDIENTE_COTIZAR" && servomotoresReference != null && base ? (
+            <p className="mt-1">
+              Referencia Servomotores ({base.folio}): {money(servomotoresReference)}. Solo orientación; el precio comercial SYSTRON lo confirma CEO o Administrador.
+            </p>
+          ) : quote.status === "PENDIENTE_COTIZAR" && referencePrice != null ? (
+            <p className="mt-1">Referencia congelada de la prioridad: {money(referencePrice)}. El precio lo confirma CEO o Administrador.</p>
+          ) : null}
+          {quote.linkedQuoteId && base ? (
+            <p className="mt-1 text-[var(--muted)]">Espejo intercompañía ligado a cotización Servomotores {base.folio}. No se duplica diagnóstico en SYSTRON.</p>
+          ) : null}
           {quote.reference ? <p className="mt-1">Referencia: {quote.reference}</p> : null}
           {quote.creditDays != null ? <p className="mt-1">Crédito congelado: {quote.creditDays} días</p> : null}
           {quoteRequiresDeliveryDays(quote) && quote.deliveryBusinessDays != null ? (
@@ -502,7 +516,11 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
               ) : null}
             </div>
           ) : null}
-          {base ? <p className="mt-3 text-[var(--muted)]">Base Servomotores {base.folio}: {money(quoteTotals(base.lines, base.discountPct)?.total)}. El vendedor no ve este importe.</p> : null}
+          {base && quoteTotals(base.lines, base.discountPct)?.total != null ? (
+            <p className="mt-3 text-[var(--muted)]">
+              Base Servomotores {base.folio}: {money(quoteTotals(base.lines, base.discountPct)!.total)} (referencia interna; el vendedor SYSTRON no ve este importe).
+            </p>
+          ) : null}
           </Card>
           {session.role === "CEO" && executivePartItems.length > 0 ? (
             <Card className="p-5 text-sm">
@@ -569,16 +587,20 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
             />
             </div>
           ) : null}
-          {session.activeCompanyCode === "SYSTRON" && quote.equipment?.kind === "MOT" && can(session.role, "quote.price", session.activeCompanyCode) ? (
-            <FormPanel action={linkBaseAction}>
-              <input type="hidden" name="quoteId" value={quote.id} />
-              <FormSection title="Ligar cotización base" description="Vincula la cotización de Servomotores con esta venta SYSTRON." columns={1}>
-                <Field label="Cotización de Servomotores" hint="Pega el folio o el identificador de la cotización base.">
-                  <input name="baseQuoteId" required placeholder="COT-… o identificador" className={controlClass} />
-                </Field>
-              </FormSection>
-              <FormActions><SubmitButton tone="ghost">Ligar</SubmitButton></FormActions>
-            </FormPanel>
+          {session.activeCompanyCode === "SYSTRON" && quote.equipment?.kind === "MOT" && !quote.linkedQuoteId && can(session.role, "quote.price", session.activeCompanyCode) ? (
+            <details className="rounded-lg border border-[var(--line)] bg-white p-4 text-sm">
+              <summary className="cursor-pointer font-semibold text-[var(--muted)]">Ligar cotización base (respaldo manual)</summary>
+              <p className="mt-2 text-xs text-[var(--muted)]">Normalmente el espejo SYSTRON se crea solo al cotizar en Servomotores. Usa esto solo si no hay enlace automático.</p>
+              <FormPanel action={linkBaseAction} className="mt-3 border-0 p-0 shadow-none">
+                <input type="hidden" name="quoteId" value={quote.id} />
+                <FormSection title="" description="" columns={1}>
+                  <Field label="Cotización de Servomotores" hint="Pega el folio o el identificador de la cotización base.">
+                    <input name="baseQuoteId" required placeholder="COT-… o identificador" className={controlClass} />
+                  </Field>
+                </FormSection>
+                <FormActions><SubmitButton tone="ghost">Ligar</SubmitButton></FormActions>
+              </FormPanel>
+            </details>
           ) : null}
           <HistoryTimeline
             items={session.role === "CEO" && executiveAttentionHistoryItems.length > 0
