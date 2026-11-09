@@ -249,4 +249,142 @@ describe("commercial quote folios", () => {
     assert.equal(sca!.unitPrice, 1500);
     await prisma.$disconnect();
   });
+
+  it("COTDX comercial reserva SRV al crear y lo aplica al DX tras almacén", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "sygos-cot-srv-"));
+    process.env.DATABASE_URL = `file:${join(dir, "test.db")}`;
+    const { execSync } = await import("child_process");
+    execSync("npx prisma db push --skip-generate", {
+      cwd: join(import.meta.dirname, "../.."),
+      env: process.env,
+      stdio: "ignore",
+    });
+    const { prisma } = await import("./db");
+    const { createSellerQuote, setPrices, decideQuote, openWaitingRepairs } = await import("./quotes");
+    const { openPendingCases, openCase } = await import("./technical");
+    const { initialPriorities } = await import("./priorities");
+
+    const company = await prisma.company.create({ data: { code: "SYT4", name: "Systron" } });
+    for (const row of initialPriorities("SYSTRON")) {
+      await prisma.priority.create({ data: { companyId: company.id, ...row } });
+    }
+    const seller = await prisma.user.create({
+      data: { username: "v-srv", name: "V", passwordHash: "x", role: "VENTAS", companyId: company.id },
+    });
+    const ceo = await prisma.user.create({
+      data: { username: "c-srv", name: "CEO", passwordHash: "x", role: "CEO", companyId: company.id },
+    });
+    const client = await prisma.client.create({
+      data: {
+        companyId: company.id,
+        name: "Cliente",
+        ownerUserId: seller.id,
+        active: true,
+        isSystem: false,
+        requiresInvoice: true,
+        rfc: "XAXX010101000",
+        cfdiUse: "G03",
+        paymentMethod: "PUE",
+      },
+    });
+    const contact = await prisma.contact.create({ data: { clientId: client.id, name: "C", active: true, isPrimary: true } });
+    const priority = await prisma.priority.findFirst({
+      where: { companyId: company.id, attentionType: "DIAGNOSTICO", name: "Alta" },
+    });
+    assert.ok(priority);
+
+    const commercialEquipment = await prisma.equipment.create({
+      data: {
+        folio: "EQUI-COT",
+        kind: "EQUI",
+        originCompanyId: company.id,
+        clientId: client.id,
+        model: "M",
+        custody: "SIN_CUSTODIA",
+        createdByUserId: seller.id,
+      },
+    });
+    const quote = await createSellerQuote(
+      { userId: seller.id, role: "VENTAS", activeCompanyId: company.id, activeCompanyCode: "SYSTRON" },
+      {
+        clientId: client.id,
+        quoteType: "DIAGNOSTICO",
+        equipmentId: commercialEquipment.id,
+        reference: null,
+        concepts: [{ concept: "DX comercial", quantity: 1 }],
+        contactIds: [contact.id],
+        priorityId: priority!.id,
+      },
+    );
+    const reserved = (await prisma.quote.findUnique({ where: { id: quote.id } }))!.reservedServiceNumber;
+    assert.equal(reserved, 1);
+
+    const otherEquipment = await prisma.equipment.create({
+      data: {
+        folio: "EQUI-OTRO",
+        kind: "EQUI",
+        originCompanyId: company.id,
+        clientId: client.id,
+        model: "M",
+        custody: "EN_RESGUARDO",
+        holderCompanyId: company.id,
+        createdByUserId: seller.id,
+      },
+    });
+    const otherAttention = await prisma.attention.create({
+      data: {
+        equipmentId: otherEquipment.id,
+        originCompanyId: company.id,
+        serviceCompanyId: company.id,
+        adminClientId: client.id,
+        attentionType: "DIAGNOSTICO",
+        priorityName: "Normal",
+        prioritySlaMaxDays: 5,
+        reportedFault: "Otro",
+        slaStartedAt: new Date(),
+      },
+    });
+    const otherDx = await openCase(otherAttention.id, new Date());
+    assert.ok(otherDx);
+    assert.equal(otherDx!.folio, "DX-2");
+
+    const withLines = await prisma.quote.findUnique({ where: { id: quote.id }, include: { lines: true } });
+    await setPrices(
+      { userId: ceo.id, role: "CEO", activeCompanyId: company.id, activeCompanyCode: "SYSTRON" },
+      quote.id,
+      1,
+      [{ lineId: withLines!.lines[0]!.id, amount: 1000 }],
+    );
+    await decideQuote(
+      { userId: seller.id, role: "VENTAS", activeCompanyId: company.id, activeCompanyCode: "SYSTRON" },
+      quote.id,
+      2,
+      true,
+      [withLines!.lines[0]!.id],
+    );
+
+    const attention = await prisma.attention.findFirst({ where: { originQuoteId: quote.id } });
+    assert.ok(attention);
+    assert.equal(attention!.serviceNumber, 1);
+
+    const receivedAt = new Date();
+    await prisma.equipment.update({
+      where: { id: commercialEquipment.id },
+      data: { custody: "EN_RESGUARDO", holderCompanyId: company.id },
+    });
+    await prisma.attention.update({
+      where: { id: attention!.id },
+      data: { status: "EN_PROCESO", slaStartedAt: receivedAt },
+    });
+    await openPendingCases(commercialEquipment.id, receivedAt);
+    await openWaitingRepairs(commercialEquipment.id, seller.id);
+
+    const dx = await prisma.technicalCase.findFirst({
+      where: { attentionId: attention!.id, kind: "DIAGNOSTICO" },
+    });
+    assert.ok(dx);
+    assert.equal(dx!.folio, "DX-1");
+
+    await prisma.$disconnect();
+  });
 });
