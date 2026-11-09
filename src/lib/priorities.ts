@@ -38,8 +38,12 @@ export function isAttentionType(value: string): value is AttentionType {
   return (ATTENTION_TYPES as readonly string[]).includes(value);
 }
 
+export const PRIORITY_EQUIPMENT_KINDS = ["EQUI", "MOT"] as const;
+export type PriorityEquipmentKind = (typeof PRIORITY_EQUIPMENT_KINDS)[number];
+
 type PrioritySeed = {
   attentionType: AttentionType;
+  equipmentKind: PriorityEquipmentKind;
   name: string;
   price: number | null;
   incrementPct: number | null;
@@ -60,18 +64,41 @@ function row(
   name: "Normal" | "Alta" | "Exprés",
   price: number | null,
   incrementPct: number | null,
+  equipmentKind: PriorityEquipmentKind = "EQUI",
 ): PrioritySeed {
   const days = name === "Normal" ? DAYS.normal : name === "Alta" ? DAYS.alta : DAYS.expres;
-  return { attentionType, name, price, incrementPct, ...days };
+  return { attentionType, equipmentKind, name, price, incrementPct, ...days };
 }
 
-/** Initial catalogs. Diagnosis prices are the documented SYSTRON values; Servomotores starts without those prices. */
+/** Prioridad de diagnóstico por tipo físico (EQUI en SYSTRON, MOT en Servomotores). */
+export function diagnosisPriorityEquipmentKind(
+  companyCode: string | null | undefined,
+  equipmentKind: "EQUI" | "MOT",
+): PriorityEquipmentKind {
+  if (companyCode === "SERVOMOTORES") return "MOT";
+  return equipmentKind === "MOT" ? "MOT" : "EQUI";
+}
+
+/** Initial catalogs. EQUI diagnóstico en SYSTRON; MOT diagnóstico separado (SM y MOT en SYSTRON). */
 export function initialPriorities(companyCode: "SYSTRON" | "SERVOMOTORES"): PrioritySeed[] {
-  const diagnosisPrice = companyCode === "SYSTRON";
+  const equiDiagnosisPrice = companyCode === "SYSTRON";
+  const diagnosisMOT: PrioritySeed[] =
+    companyCode === "SERVOMOTORES"
+      ? [
+          row("DIAGNOSTICO", "Normal", null, null, "MOT"),
+          row("DIAGNOSTICO", "Alta", null, null, "MOT"),
+          row("DIAGNOSTICO", "Exprés", null, null, "MOT"),
+        ]
+      : [
+          row("DIAGNOSTICO", "Normal", null, null, "MOT"),
+          row("DIAGNOSTICO", "Alta", null, null, "MOT"),
+          row("DIAGNOSTICO", "Exprés", null, null, "MOT"),
+        ];
   return [
-    row("DIAGNOSTICO", "Normal", diagnosisPrice ? 0 : null, null),
-    row("DIAGNOSTICO", "Alta", diagnosisPrice ? 3500 : null, null),
-    row("DIAGNOSTICO", "Exprés", diagnosisPrice ? 4500 : null, null),
+    row("DIAGNOSTICO", "Normal", equiDiagnosisPrice ? 0 : null, null, "EQUI"),
+    row("DIAGNOSTICO", "Alta", equiDiagnosisPrice ? 3500 : null, null, "EQUI"),
+    row("DIAGNOSTICO", "Exprés", equiDiagnosisPrice ? 4500 : null, null, "EQUI"),
+    ...diagnosisMOT,
     row("REPARACION", "Normal", null, 0),
     row("REPARACION", "Alta", null, 10),
     row("REPARACION", "Exprés", null, 20),

@@ -1,5 +1,6 @@
 import type { NavGroupDef } from "@/lib/nav-links";
 import { requerimientosNavGroup } from "@/lib/nav-links";
+import { can } from "@/lib/permissions";
 import type { Role } from "@/lib/roles";
 
 const showCoord = (role: Role) => role === "COORDINACION_ADMINISTRACION";
@@ -45,6 +46,7 @@ export const COORDINATION_NAV_GROUPS: NavGroupDef[] = [
       { href: "/prospectos", label: "Prospectos", show: showCoord },
       { href: "/clientes", label: "Clientes", show: showCoord },
       { href: "/equipos", label: "Equipos", show: showCoord },
+      { href: "/motores", label: "Motores", show: (role, code) => showCoord(role) && can(role, "mot.view", code) },
       { href: "/cotizaciones", label: "Cotizaciones", show: showCoord },
       { href: "/ventas", label: "Venta de equipos", show: showCoord },
       { href: "/servicio-campo", label: "Servicio de campo", show: (role, code) => showCoord(role) && code === "SYSTRON" },

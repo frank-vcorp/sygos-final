@@ -516,6 +516,9 @@ async function savePriority(formData: FormData, attentionType: "DIAGNOSTICO" | "
     const name = requiredText(formData.get("name"), "Nombre");
     const active = activeFromForm(formData);
     const slaMaxDays = requiredSla(formData);
+    const equipmentKind = attentionType === "DIAGNOSTICO"
+      ? (optionalText(formData.get("equipmentKind")) === "MOT" ? "MOT" : "EQUI")
+      : "EQUI";
     const data = attentionType === "DIAGNOSTICO"
       ? { name, active, slaMaxDays, price: requiredNonNegative(formData, "price", "Costo fijo") }
       : { name, active, slaMaxDays, incrementPct: requiredPercent(formData) };
@@ -534,6 +537,7 @@ async function savePriority(formData: FormData, attentionType: "DIAGNOSTICO" | "
         data: {
           companyId: session.activeCompanyId,
           attentionType,
+          equipmentKind,
           sortOrder: (last._max.sortOrder ?? 0) + 1,
           targetMinDays: null,
           targetMaxDays: null,

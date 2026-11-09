@@ -6,7 +6,7 @@ import { FormActions, FormPanel, PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
-import { prioritySummary } from "@/lib/priorities";
+import { loadDiagnosisPriorityOptions } from "@/lib/diagnosis-priorities";
 
 export default async function NuevaCotizacionPage({ searchParams }: { searchParams: Promise<{ clientId?: string }> }) {
   const session = await requireCompany();
@@ -26,10 +26,7 @@ export default async function NuevaCotizacionPage({ searchParams }: { searchPara
     prisma.catalogType.findMany({ orderBy: { name: "asc" } }),
     prisma.catalogBrand.findMany({ orderBy: { name: "asc" } }),
     prisma.catalogModel.findMany({ include: { type: true, brand: true } }),
-    prisma.priority.findMany({
-      where: { companyId: session.activeCompanyId, attentionType: "DIAGNOSTICO", active: true },
-      orderBy: { sortOrder: "asc" },
-    }),
+    loadDiagnosisPriorityOptions(session.activeCompanyId, session.activeCompanyCode),
   ]);
   const quickEquipmentKinds: Array<"EQUI" | "MOT"> = [
     ...(can(session.role, "equi.create", session.activeCompanyCode) ? ["EQUI" as const] : []),
@@ -56,7 +53,7 @@ export default async function NuevaCotizacionPage({ searchParams }: { searchPara
             types={types.map((type) => type.name)}
             brands={brands.map((brand) => brand.name)}
             models={models.map((row) => ({ type: row.type.name, brand: row.brand.name, model: row.name }))}
-            diagnosisPriorities={diagnosisPriorities.map((row) => ({ id: row.id, label: prioritySummary(row) }))}
+            diagnosisPriorities={diagnosisPriorities}
           />
         </div>
         <FormActions note="La cotización se guarda sin precio; coordinación o gerencia la completa después.">

@@ -11,7 +11,7 @@ import { recordHistory } from "./history";
 import { ensureOsStubForDiagnosis } from "./technical";
 import { finalFromBase } from "./money";
 import { ATTENTION_LABEL, isReparacionExpressAttentionType, type AttentionType } from "./priorities";
-import { ensureReparacionTallerPriorities } from "./priority-catalog";
+import { ensureMotDiagnosisPriorities, ensureReparacionTallerPriorities } from "./priority-catalog";
 import { commercialSellerQuoteConcept, technicalServiceConcept } from "./quote-concept";
 import { commercialQuoteSeriesForType, isCotosQuote, isSellerCommercialQuote } from "./quote-folio-series";
 import { createFieldServiceCaseFromQuote, FIELD_SERVICE_DEFAULT_HOURS, parseFieldServicePricing } from "./field-service";
@@ -57,10 +57,12 @@ export function pickCommercialCaseForAttention(
 
 async function freezePriorityFromCatalog(
   companyId: string,
+  companyCode: string | null,
   attentionType: AttentionType,
   priorityId: string,
 ) {
   await ensureReparacionTallerPriorities(companyId);
+  await ensureMotDiagnosisPriorities(companyId, companyCode ?? "");
   const priority = await prisma.priority.findFirst({
     where: { id: priorityId, companyId, attentionType, active: true },
   });
@@ -184,7 +186,7 @@ export async function createSellerQuote(
   let frozenPriority: Awaited<ReturnType<typeof freezePriorityFromCatalog>> | null = null;
   if (input.quoteType === "DIAGNOSTICO") {
     if (!input.priorityId) throw new Error("Selecciona la prioridad del diagnóstico.");
-    frozenPriority = await freezePriorityFromCatalog(actor.activeCompanyId, "DIAGNOSTICO", input.priorityId);
+    frozenPriority = await freezePriorityFromCatalog(actor.activeCompanyId, actor.activeCompanyCode, "DIAGNOSTICO", input.priorityId);
   }
   if (input.contactIds.length === 0) throw new Error("Selecciona al menos un contacto.");
   const contacts = await prisma.contact.count({ where: { id: { in: input.contactIds }, clientId: client.id, active: true } });
@@ -918,7 +920,7 @@ export async function relateQuoteEquipment(actor: Actor, quoteId: string, versio
   const attentionType = commercialAttentionTypeForQuote(quote);
   const fromQuote = frozenPriorityFromQuote(quote);
   const priority = fromQuote
-    ?? await freezePriorityFromCatalog(actor.activeCompanyId, attentionType, priorityId);
+    ?? await freezePriorityFromCatalog(actor.activeCompanyId, actor.activeCompanyCode, attentionType, priorityId);
   if (!fromQuote && !priorityId) throw new Error("Selecciona una prioridad vigente de este servicio.");
   const service = equipment.kind === "MOT"
     ? await prisma.company.findUnique({ where: { code: "SERVOMOTORES" } })

@@ -200,7 +200,15 @@ export default async function PanelPage({ searchParams }: { searchParams: Promis
     );
   }
   if (session.role === "COORDINACION_ADMINISTRACION") return <Coordination companyId={companyId} code={session.activeCompanyCode} vista={vista} />;
-  if (session.role === "GERENTE_OPERATIVO_SERVOMOTORES") return <Servomotores companyId={companyId} />;
+  if (session.role === "GERENTE_OPERATIVO_SERVOMOTORES") {
+    return (
+      <GerenteServomotoresPanel
+        companyId={companyId}
+        companyCode={session.activeCompanyCode}
+        history={vista === "historial"}
+      />
+    );
+  }
   if (session.role === "SUPERVISOR_TECNICO") {
     return <SupervisorShop companyId={companyId} userId={session.userId} />;
   }
@@ -215,7 +223,14 @@ export default async function PanelPage({ searchParams }: { searchParams: Promis
   }
   if (session.role === "CEO") {
     if (vista) redirect("/panel");
-    return <CeoExecutive companyId={companyId} name={session.activeCompanyName ?? "Empresa"} />;
+    return (
+      <CeoExecutive
+        companyId={companyId}
+        companyCode={session.activeCompanyCode}
+        role={session.role}
+        name={session.activeCompanyName ?? "Empresa"}
+      />
+    );
   }
   return <Executive companyId={companyId} name={session.activeCompanyName} />;
 }
@@ -471,33 +486,82 @@ async function SupervisorShop({ companyId, userId }: { companyId: string; userId
   );
 }
 
-async function Servomotores({ companyId }: { companyId: string }) {
-  const [income, active, quotes, purchases, exits] = await Promise.all([
-    prisma.equipment.count({ where: { kind: "MOT", custody: "PENDIENTE_INGRESO", OR: [{ originCompanyId: companyId }, { originCompany: { code: "SYSTRON" } }] } }),
-    prisma.technicalCase.count({ where: { serviceCompanyId: companyId, status: { notIn: CLOSED } } }),
-    prisma.quote.count({ where: { companyId, status: "PENDIENTE_COTIZAR" } }),
-    prisma.purchase.count({ where: { companyId, status: { in: ["PENDIENTE_VALIDAR", "AUTORIZADA"] } } }),
-    prisma.equipment.count({ where: { kind: "MOT", custody: "EN_RESGUARDO", originCompanyId: { not: companyId } } }),
+async function GerenteServomotoresPanel({
+  companyId,
+  history,
+}: {
+  companyId: string;
+  companyCode: string | null;
+  history: boolean;
+}) {
+  const role: Role = "GERENTE_OPERATIVO_SERVOMOTORES";
+  const bandejaHistorial = serviciosBandejaHref({ vista: "historial" });
+
+  if (history) {
+    const rows = await listHistorialServicios(companyId, "");
+    const servicioRows = rows.filter((row): row is ServicioBandejaRow => row.kind === "servicio");
+    return (
+      <>
+        <PageHeader
+          title="Inicio"
+          subtitle="Servicios cerrados o concluidos. La ejecución técnica sigue en Operación."
+          action={<TextLink href="/panel">Ver activos</TextLink>}
+        />
+        <SalesPanelServiciosSection
+          title="Historial"
+          empty="No hay servicios en historial."
+          bandejaHref={bandejaHistorial}
+          rows={servicioRows}
+          role={role}
+        />
+      </>
+    );
+  }
+
+  const [activeRows, panelCtx] = await Promise.all([
+    listActiveServicios(companyId, ""),
+    loadGerenteServicioPanelContext(companyId),
   ]);
-  const links = [
-    { href: "/motores", label: "Ingresos físicos pendientes", detail: String(income) },
-    { href: "/operacion", label: "Diagnósticos y reparaciones activas", detail: String(active) },
-    { href: "/servicios/garantia", label: "Garantías", detail: "Abrir módulo" },
-    { href: "/cotizaciones?vista=cotizar", label: "Pendientes de cotizar", detail: String(quotes) },
-    { href: "/compras", label: "Compras", detail: String(purchases) },
-    { href: "/custodia", label: "Entregas y egresos", detail: String(exits) },
-  ];
+  const servicioRows = activeRows.filter((row): row is ServicioBandejaRow => row.kind === "servicio");
+  const sections = gerentePanelSections(servicioRows, panelCtx);
+  const emptyByFiltro: Record<keyof typeof GERENTE_SERVICIO_PANEL_FILTROS, string> = {
+    validacion: "No hay diagnósticos por validar.",
+    vencidos: "Nada vencido.",
+    refacciones: "No hay solicitudes de refacción abiertas.",
+    compras: "No hay compras pendientes ligadas a un servicio activo.",
+    asignacion: "Todo lo activo tiene responsable o proveedor.",
+  };
+
   return (
     <>
-      <PageHeader title="Panel de Servomotores" subtitle="Cada bloque abre el módulo real. No hay una copia de los registros." />
-      <section className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <KpiCard label="Ingresos físicos pendientes" value={String(income)} href="/motores" />
-        <KpiCard label="Operación activa" value={String(active)} href="/operacion" />
-        <KpiCard label="Pendientes de cotizar" value={String(quotes)} href="/cotizaciones?vista=pendientes" />
-        <KpiCard label="Compras por procesar" value={String(purchases)} href="/compras?vista=procesar" />
-        <KpiCard label="En resguardo (egresos)" value={String(exits)} href="/custodia?vista=resguardo" />
+      <PageHeader
+        title="Inicio"
+        subtitle="Pendientes del taller con el mismo detalle que Servicios activos. Reclama y ejecuta diagnósticos en Operación."
+        action={<TextLink href="/panel?vista=historial">Ver historial</TextLink>}
+      />
+      <section className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <KpiCard label="Motores (ingresos)" value="Abrir" href="/motores" />
+        <KpiCard label="Operación" value="Abrir" href="/operacion" />
+        <KpiCard label="Custodia" value="Abrir" href="/custodia" />
+        <KpiCard label="Cotizaciones" value="Abrir" href="/cotizaciones?vista=pendientes" />
       </section>
-      <Block title="Pendientes operativos" empty="Sin pendientes." rows={links} />
+      <section className="flex w-full max-w-none flex-col gap-4">
+        {sections.map(({ filtro, rows }) => (
+          <SalesPanelServiciosSection
+            key={filtro}
+            title={GERENTE_SERVICIO_PANEL_FILTROS[filtro]}
+            empty={emptyByFiltro[filtro]}
+            bandejaHref={serviciosBandejaHref({ vista: "activos", filtro })}
+            rows={rows}
+            role={role}
+            highlightRow={
+              filtro === "vencidos"
+                ? (row) => servicioRowHighlight(row, panelCtx.now).markers.includes("Vencido")
+                : undefined
+            }
+          />
+        ))}
+      </section>
     </>
   );
 }
@@ -858,8 +922,67 @@ async function Coordination({ companyId, code, vista }: { companyId: string; cod
   );
 }
 
-async function CeoExecutive({ companyId, name }: { companyId: string; name: string }) {
-  const [quotes, payrolls, overtime, vacations, leavePermissions, pendingJustifications, compensationRequests, commissions, activeServicios, exitWithoutDocPending] = await Promise.all([
+async function loadCoordinationFinanceSnapshot(companyId: string) {
+  const comprasPendientesHref = purchaseListHref({
+    vista: "compras",
+    q: "",
+    estado: "PENDIENTE_VALIDAR",
+    fecha: "",
+    categoria: "",
+    proveedor: "",
+    solicitante: "",
+  });
+  const [invoices, remissions, payments, purchases, openPayables, payableSum] = await Promise.all([
+    prisma.billingDocument.findMany({
+      where: { companyId, status: "SOLICITADA", kind: { not: "REMISION" } },
+      select: { id: true, folio: true, kind: true, technicalCaseId: true, quote: { select: { technicalCaseId: true } } },
+      take: 12,
+    }),
+    prisma.billingDocument.findMany({
+      where: { companyId, status: "SOLICITADA", kind: "REMISION" },
+      select: { id: true, folio: true, kind: true, technicalCaseId: true, quote: { select: { technicalCaseId: true } } },
+      take: 12,
+    }),
+    prisma.payment.findMany({ where: { companyId, status: "PENDIENTE" }, orderBy: { createdAt: "asc" }, take: 12 }),
+    prisma.purchase.findMany({ where: { companyId, kind: "DIRECTA", status: "PENDIENTE_VALIDAR" }, take: 12 }),
+    prisma.payable.findMany({
+      where: { companyId, balance: { gt: 0 } },
+      include: { supplier: true, document: true },
+      orderBy: { dueAt: "asc" },
+      take: 12,
+    }),
+    prisma.payable.aggregate({ where: { companyId, balance: { gt: 0 } }, _sum: { balance: true } }),
+  ]);
+  const billingServiceLinkMap = await batchLoadBillingDocumentServiceLinks([
+    ...invoices.map((row) => pickBillingDocumentTechnicalCaseId(row)),
+    ...remissions.map((row) => pickBillingDocumentTechnicalCaseId(row)),
+  ]);
+  return {
+    comprasPendientesHref,
+    billingPending: invoices.length + remissions.length,
+    invoices,
+    remissions,
+    payments,
+    purchases,
+    openPayables,
+    payableSum,
+    billingServiceLinkMap,
+  };
+}
+
+async function CeoExecutive({
+  companyId,
+  companyCode,
+  role,
+  name,
+}: {
+  companyId: string;
+  companyCode: string | null;
+  role: Role;
+  name: string;
+}) {
+  const showFinance = can(role, "finance.view", companyCode);
+  const [quotes, payrolls, overtime, vacations, leavePermissions, pendingJustifications, compensationRequests, commissions, activeServicios, exitWithoutDocPending, finance] = await Promise.all([
     prisma.quote.findMany({ where: { companyId, status: "PENDIENTE_COTIZAR" }, take: 20 }),
     prisma.payrollPeriod.findMany({
       where: { companyId, status: { in: ["PENDIENTE_VALIDACION", "PRELIMINAR"] } },
@@ -893,6 +1016,7 @@ async function CeoExecutive({ companyId, name }: { companyId: string; name: stri
     prisma.commissionRun.findMany({ where: { companyId, status: "PRELIMINAR" }, take: 10 }),
     listActiveServicios(companyId, ""),
     listExitWithoutDocumentPending(companyId, 20),
+    showFinance ? loadCoordinationFinanceSnapshot(companyId) : Promise.resolve(null),
   ]);
 
   const directRepairOsRows = activeServicios.filter(
@@ -946,6 +1070,21 @@ async function CeoExecutive({ companyId, name }: { companyId: string; name: stri
   return (
     <>
       <PageHeader title={`Panel ${name}`} subtitle="Solo esta empresa. No hay suma con la otra." />
+      {finance ? (
+        <>
+          <section className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <KpiCard label="Facturas y remisiones" value={String(finance.billingPending)} href="/facturacion?vista=solicitudes" />
+            <KpiCard label="Pagos por validar" value={String(finance.payments.length)} href="/pagos?vista=pendientes" />
+            <KpiCard label="Compras por validar" value={String(finance.purchases.length)} href={finance.comprasPendientesHref} />
+            <KpiCard label="CxP abierta" value={money(finance.payableSum._sum.balance ?? 0)} href="/finanzas?vista=cxp" />
+          </section>
+          <div className="mb-4 grid gap-3">
+            <Block title="Facturas solicitadas" empty="Sin solicitudes." bandejaHref="/facturacion?vista=solicitudes" rows={finance.invoices.map((row) => ({ href: `/facturacion/${row.id}`, label: row.folio, detail: billingDocumentPanelDetail(row, row.kind, finance.billingServiceLinkMap) }))} />
+            <Block title="Pagos por validar" empty="Sin pagos pendientes." bandejaHref="/pagos?vista=pendientes" rows={finance.payments.map((row) => ({ href: `/pagos/${row.id}`, label: row.folio, detail: money(row.amount) }))} />
+            <Block title="Compras por validar" empty="Nada pendiente de validación." bandejaHref={finance.comprasPendientesHref} rows={finance.purchases.map((row) => ({ href: `/compras/${row.id}`, label: row.folio, detail: money(row.amount) }))} />
+          </div>
+        </>
+      ) : null}
       <div className="grid gap-3">
         <Block
           title="Reparaciones directas en taller (OS sin cotizar)"

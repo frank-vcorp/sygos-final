@@ -119,6 +119,7 @@ export function servicioRowFromPendingQuote(quote: PendingQuotePanelInput): Serv
     kind: "servicio",
     id: `quote-${quote.id}`,
     equipmentId: equipment?.id ?? quote.client.id,
+    equipmentKind: equipment?.kind ?? "EQUI",
     equipmentHref: equipment ? equipmentDetailHref(equipment.kind, equipment.id) : `/clientes/${quote.client.id}`,
     equipmentLabel: equipment ? formatEquipmentBandejaLabel(equipment) : quote.client.name,
     diagnosisFolio: null,

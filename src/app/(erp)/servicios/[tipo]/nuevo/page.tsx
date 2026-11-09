@@ -4,6 +4,7 @@ import { ServiceStartForm } from "@/components/service-start-form";
 import { PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
+import { loadDiagnosisPriorityOptions } from "@/lib/diagnosis-priorities";
 import { ATTENTION_LABEL, type AttentionType } from "@/lib/priorities";
 import { requireCompany } from "@/lib/session";
 
@@ -37,7 +38,9 @@ export default async function NuevoServicioPage({
       orderBy: { createdAt: "desc" },
       select: { id: true, folio: true, model: true, clientId: true, kind: true, typeName: true, brandName: true, serial: true },
     }),
-    prisma.priority.findMany({ where: { companyId: session.activeCompanyId, attentionType, active: true }, orderBy: { sortOrder: "asc" } }),
+    attentionType === "DIAGNOSTICO"
+      ? loadDiagnosisPriorityOptions(session.activeCompanyId, session.activeCompanyCode)
+      : prisma.priority.findMany({ where: { companyId: session.activeCompanyId, attentionType, active: true }, orderBy: { sortOrder: "asc" } }).then((rows) => rows.map((row) => ({ id: row.id, name: row.name, equipmentKind: "EQUI" as const, label: row.name }))),
     prisma.catalogType.findMany({ orderBy: { name: "asc" } }),
     prisma.catalogBrand.findMany({ orderBy: { name: "asc" } }),
     prisma.catalogModel.findMany({ include: { type: true, brand: true } }),

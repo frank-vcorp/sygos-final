@@ -3,17 +3,19 @@ import { ServiciosTecnicoBandeja } from "@/components/servicios-tecnico-bandeja"
 import { homePath } from "@/lib/home";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
+import { parseServiciosEquipoKind } from "@/lib/servicios-catalog";
 
 export default async function ServiciosHistorialPage({
   searchParams,
 }: {
-  searchParams: Promise<{ estado?: string; q?: string; desde?: string; hasta?: string }>;
+  searchParams: Promise<{ estado?: string; q?: string; desde?: string; hasta?: string; equipo?: string }>;
 }) {
   const session = await requireCompany();
   if (!can(session.role, "attention.catalog", session.activeCompanyCode)) {
     redirect(homePath(session.role, session.activeCompanyCode));
   }
-  const { estado, q, desde, hasta } = await searchParams;
+  const { estado, q, desde, hasta, equipo } = await searchParams;
+  const equipoKind = parseServiciosEquipoKind(equipo);
 
   return (
     <ServiciosTecnicoBandeja
@@ -27,6 +29,8 @@ export default async function ServiciosHistorialPage({
       query={(q ?? "").trim()}
       desde={desde}
       hasta={hasta}
+      equipoKind={equipoKind}
+      showEquipoKindFilter={session.activeCompanyCode === "SYSTRON"}
     />
   );
 }

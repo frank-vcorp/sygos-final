@@ -100,10 +100,11 @@ async function seedPriorities(companyId: string, code: "SYSTRON" | "SERVOMOTORES
   for (const priority of initialPriorities(code)) {
     await prisma.priority.upsert({
       where: {
-        companyId_attentionType_name: {
+        companyId_attentionType_name_equipmentKind: {
           companyId,
           attentionType: priority.attentionType,
           name: priority.name,
+          equipmentKind: priority.equipmentKind,
         },
       },
       update: {},

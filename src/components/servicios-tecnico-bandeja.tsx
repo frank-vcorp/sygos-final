@@ -17,6 +17,7 @@ import {
   serviciosBandejaHref,
   SERVICIOS_BANDEJA_ACTIVOS,
   SERVICIOS_BANDEJA_HISTORIAL,
+  type ServiciosEquipoKindFilter,
   type ServiciosVista,
 } from "@/lib/servicios-catalog";
 import {
@@ -119,6 +120,8 @@ export async function ServiciosTecnicoBandeja({
   desde,
   hasta,
   panelFiltro,
+  equipoKind = "todos",
+  showEquipoKindFilter = false,
 }: {
   companyId: string;
   userId: string;
@@ -131,6 +134,8 @@ export async function ServiciosTecnicoBandeja({
   desde?: string;
   hasta?: string;
   panelFiltro?: string;
+  equipoKind?: ServiciosEquipoKindFilter;
+  showEquipoKindFilter?: boolean;
 }) {
   const gerentePanelFiltro = vista === "activos" ? parseGerenteServicioPanelFiltro(panelFiltro) : null;
   const estadoLabel =
@@ -144,7 +149,9 @@ export async function ServiciosTecnicoBandeja({
     hasta,
     estado: estado && estado !== "todos" ? estado : undefined,
     filtro: gerentePanelFiltro ?? undefined,
+    equipo: equipoKind !== "todos" ? equipoKind : undefined,
   };
+  const equipmentKindScope = equipoKind === "EQUI" || equipoKind === "MOT" ? equipoKind : null;
   const portfolioUserId = salesPortfolioUserId(role, userId);
   const listScope = {
     ...(technician ? { assigneeUserId: userId } : {}),
@@ -157,9 +164,10 @@ export async function ServiciosTecnicoBandeja({
       ? await listHistorialServicios(companyId, query, {
           ...listScope,
           status: estado && estado !== "todos" ? estado : null,
+          equipmentKind: equipmentKindScope,
           ...dateRange,
         })
-      : await listActiveServicios(companyId, query, { ...listScope, ...dateRange });
+      : await listActiveServicios(companyId, query, { ...listScope, equipmentKind: equipmentKindScope, ...dateRange });
 
   if (gerentePanelFiltro) {
     const servicioRows = rows.filter((row): row is ServicioBandejaRow => row.kind === "servicio");
@@ -191,6 +199,17 @@ export async function ServiciosTecnicoBandeja({
           },
         ]}
       />
+      {showEquipoKindFilter ? (
+        <div className="mt-3">
+        <SegmentedNav
+          items={[
+            { href: serviciosBandejaHref({ ...navBase, equipo: undefined }), label: "Todos", active: equipoKind === "todos" },
+            { href: serviciosBandejaHref({ ...navBase, equipo: "EQUI" }), label: "Equipos", active: equipoKind === "EQUI" },
+            { href: serviciosBandejaHref({ ...navBase, equipo: "MOT" }), label: "Motores", active: equipoKind === "MOT" },
+          ]}
+        />
+        </div>
+      ) : null}
       <FilterBar action={formAction}>
         <input
           name="q"
@@ -221,10 +240,16 @@ export async function ServiciosTecnicoBandeja({
       </FilterBar>
       <ActiveFilters
         items={[
+          ...(equipoKind !== "todos"
+            ? [{
+                label: equipoKind === "MOT" ? "Solo motores" : "Solo equipos",
+                clearHref: serviciosBandejaHref({ vista, q: query, desde, hasta, estado, filtro: gerentePanelFiltro ?? undefined }),
+              }]
+            : []),
           ...(panelFiltroLabel
             ? [{
                 label: panelFiltroLabel,
-                clearHref: serviciosBandejaHref({ vista, q: query, desde, hasta, estado }),
+                clearHref: serviciosBandejaHref({ vista, q: query, desde, hasta, estado, equipo: equipoKind !== "todos" ? equipoKind : undefined }),
               }]
             : []),
           ...(estadoLabel ? [{ label: estadoLabel, clearHref: serviciosBandejaHref({ vista, q: query, desde, hasta, filtro: gerentePanelFiltro ?? undefined }) }] : []),

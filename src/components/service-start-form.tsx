@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { filterDiagnosisPrioritiesForEquipment, type DiagnosisPriorityOption } from "@/lib/diagnosis-priorities-shared";
 import { ClientPicker } from "@/components/client-picker";
 import { ServiceEquipmentPicker, type ServiceEquipmentOption } from "@/components/service-equipment-picker";
 import { Button, controlClass, Field, FormActions, FormBlock, FormPanel } from "@/components/ui";
 
-type PriorityOption = { id: string; name: string };
+type PriorityOption = DiagnosisPriorityOption;
 type RepairOption = { id: string; folio: string };
 
 export function ServiceStartForm({
@@ -44,6 +45,11 @@ export function ServiceStartForm({
   hidePriority?: boolean;
 }) {
   const [clientId, setClientId] = useState(defaultClientId);
+  const [equipmentKind, setEquipmentKind] = useState<"EQUI" | "MOT">(quickEquipmentKinds?.[0] ?? "EQUI");
+  const visiblePriorities = useMemo(
+    () => (attentionType === "DIAGNOSTICO" ? filterDiagnosisPrioritiesForEquipment(priorities, companyCode, equipmentKind) : priorities),
+    [attentionType, priorities, companyCode, equipmentKind],
+  );
 
   return (
     <FormPanel action={action} className="mx-auto max-w-6xl">
@@ -75,6 +81,7 @@ export function ServiceStartForm({
             warranty={warranty}
             allowQuickEquipment={allowQuickEquipment}
             quickEquipmentKinds={quickEquipmentKinds}
+            onEquipmentKindChange={setEquipmentKind}
           />
         </FormBlock>
 
@@ -87,7 +94,7 @@ export function ServiceStartForm({
             <Field label="Prioridad">
               <select name="priorityId" required className={controlClass}>
                 <option value="">Selecciona</option>
-                {priorities.map((priority) => <option key={priority.id} value={priority.id}>{priority.name}</option>)}
+                {visiblePriorities.map((priority) => <option key={priority.id} value={priority.id}>{priority.label ?? priority.name}</option>)}
               </select>
             </Field>
           )}

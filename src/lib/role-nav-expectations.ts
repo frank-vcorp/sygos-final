@@ -10,6 +10,7 @@ export const SYSTRON_NAV: Partial<Record<Role, readonly string[]>> = {
     "/prospectos",
     "/clientes",
     "/equipos",
+    "/motores",
     "/cotizaciones",
     "/ventas",
     "/servicio-campo",
@@ -70,6 +71,7 @@ export const SYSTRON_NAV: Partial<Record<Role, readonly string[]>> = {
     "/prospectos",
     "/clientes",
     "/equipos",
+    "/motores",
     "/cotizaciones",
     "/ventas",
     "/servicio-campo",
@@ -101,6 +103,7 @@ export const SYSTRON_NAV: Partial<Record<Role, readonly string[]>> = {
     "/prospectos",
     "/clientes",
     "/equipos",
+    "/motores",
     "/cotizaciones",
     "/ventas",
     "/servicio-campo",
@@ -111,7 +114,7 @@ export const SYSTRON_NAV: Partial<Record<Role, readonly string[]>> = {
 };
 
 export const SYSTRON_NAV_FORBIDDEN: Partial<Record<Role, readonly string[]>> = {
-  VENTAS: ["/compras", "/finanzas", "/proveedores", "/usuarios", "/configuracion", "/inventario", "/custodia", "/nomina", "/produccion", "/operacion", "/motores", "/servicios/diagnostico", "/servicios/reparacion", "/servicios/garantia"],
+  VENTAS: ["/compras", "/finanzas", "/proveedores", "/usuarios", "/configuracion", "/inventario", "/custodia", "/nomina", "/produccion", "/operacion", "/servicios/diagnostico", "/servicios/reparacion", "/servicios/garantia"],
   TECNICO: [
     "/inicio",
     "/clientes",
@@ -150,7 +153,6 @@ export const SYSTRON_NAV_FORBIDDEN: Partial<Record<Role, readonly string[]>> = {
     "/servicios/reparacion",
     "/servicios/garantia",
     "/operacion",
-    "/motores",
     "/custodia",
     "/inventario",
     "/personal/asistencia",

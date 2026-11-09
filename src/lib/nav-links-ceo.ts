@@ -52,6 +52,7 @@ export const CEO_NAV_GROUPS: NavGroupDef[] = [
       { href: "/prospectos", label: "Prospectos", show: showCeo },
       { href: "/clientes", label: "Clientes", show: showCeo },
       { href: "/equipos", label: "Equipos", show: showCeo },
+      { href: "/motores", label: "Motores", show: (role, code) => showCeo(role) && can(role, "mot.view", code) },
       { href: "/cotizaciones", label: "Cotizaciones", show: showCeo },
       { href: "/ventas", label: "Venta de equipos", show: showCeo },
       { href: "/servicio-campo", label: "Servicio de campo", show: (role, code) => showCeo(role) && code === "SYSTRON" },

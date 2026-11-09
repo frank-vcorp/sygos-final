@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { filterDiagnosisPrioritiesForEquipment, type DiagnosisPriorityOption } from "@/lib/diagnosis-priorities-shared";
 import { ContactNameLink } from "@/components/client-entity-links";
 import { ClientPicker } from "@/components/client-picker";
 import { ServiceEquipmentPicker, type ServiceEquipmentOption } from "@/components/service-equipment-picker";
@@ -10,7 +11,7 @@ import { prioritySummary } from "@/lib/priorities";
 
 type Contact = { id: string; name: string; isPrimary: boolean };
 type Client = { id: string; name: string; contacts: Contact[] };
-type PriorityOption = { id: string; label: string };
+type PriorityOption = DiagnosisPriorityOption;
 
 export function QuoteDraft({
   clients,
@@ -44,6 +45,11 @@ export function QuoteDraft({
   const [clientId, setClientId] = useState(defaultClientId);
   const [createdClients, setCreatedClients] = useState<Client[]>([]);
   const [quoteType, setQuoteType] = useState<QuoteType>(fixedQuoteType ?? "DIAGNOSTICO");
+  const [equipmentKind, setEquipmentKind] = useState<"EQUI" | "MOT">(quickEquipmentKinds?.[0] ?? "EQUI");
+  const filteredDiagnosisPriorities = useMemo(
+    () => filterDiagnosisPrioritiesForEquipment(diagnosisPriorities, companyCode, equipmentKind),
+    [diagnosisPriorities, companyCode, equipmentKind],
+  );
   const client = [...clients, ...createdClients].find((row) => row.id === clientId);
   const contacts = client?.contacts ?? [];
   const requiresEquipment = quoteType === "DIAGNOSTICO" || quoteType === "REPARACION";
@@ -70,7 +76,7 @@ export function QuoteDraft({
           <Field label="Prioridad del diagnóstico" hint="Obligatoria en COTDX; se hereda al abrir el DX.">
             <select name="priorityId" className={controlClass} required defaultValue="">
               <option value="">Selecciona</option>
-              {diagnosisPriorities.map((item) => (
+              {filteredDiagnosisPriorities.map((item) => (
                 <option key={item.id} value={item.id}>{item.label}</option>
               ))}
             </select>
@@ -95,6 +101,7 @@ export function QuoteDraft({
           models={models}
           allowQuickEquipment={allowQuickEquipment}
           quickEquipmentKinds={quickEquipmentKinds}
+          onEquipmentKindChange={setEquipmentKind}
           emptyOptionLabel="Sin equipo físico"
           required={requiresEquipment}
         />

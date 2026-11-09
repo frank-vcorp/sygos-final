@@ -331,6 +331,8 @@ model Priority {
   companyId       String
   company         Company @relation(fields: [companyId], references: [id])
   attentionType   String
+  /// Catálogo de diagnóstico: EQUI vs MOT (reparación usa EQUI por defecto).
+  equipmentKind   String  @default("EQUI")
   name            String
   price           Float?
   incrementPct    Float?
@@ -340,7 +342,7 @@ model Priority {
   sortOrder       Int     @default(0)
   active          Boolean @default(true)
 
-  @@unique([companyId, attentionType, name])
+  @@unique([companyId, attentionType, name, equipmentKind])
 }
 
 /// Service episode over a physical identity. Diagnosis execution belongs to a later phase.

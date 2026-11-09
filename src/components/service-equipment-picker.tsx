@@ -23,6 +23,7 @@ export function ServiceEquipmentPicker({
   allowQuickEquipment = true, quickEquipmentKinds, emptyOptionLabel = "Selecciona", required = false,
   pickExistingFolio = false,
   onEquipmentChange,
+  onEquipmentKindChange,
 }: {
   equipment: ServiceEquipmentOption[];
   clientId: string;
@@ -38,6 +39,7 @@ export function ServiceEquipmentPicker({
   /** Si false, el buscador solo sugiere tipo/marca/modelo (catálogo); siempre alta de folio nuevo. */
   pickExistingFolio?: boolean;
   onEquipmentChange?: (equipmentId: string) => void;
+  onEquipmentKindChange?: (kind: "EQUI" | "MOT") => void;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const [equipmentId, setEquipmentId] = useState("");
@@ -59,7 +61,13 @@ export function ServiceEquipmentPicker({
   function pickEquipment(id: string) {
     setEquipmentId(id);
     onEquipmentChange?.(id);
-    if (id) setShowNew(false);
+    if (id) {
+      const row = [...equipment, ...extraEquipment].find((item) => item.id === id);
+      if (row?.kind === "MOT" || row?.kind === "EQUI") onEquipmentKindChange?.(row.kind);
+      setShowNew(false);
+    } else {
+      onEquipmentKindChange?.(allowedKinds[0] ?? "EQUI");
+    }
   }
 
   function openNewEquipment(values: { sourceId: string; model: string; brand: string; typeName: string; kind?: string }) {
@@ -107,6 +115,7 @@ export function ServiceEquipmentPicker({
       };
       setExtraEquipment((current) => [...current, row]);
       pickEquipment(created.equipmentId);
+      onEquipmentKindChange?.(created.kind === "MOT" ? "MOT" : "EQUI");
       setShowNew(false);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "No se pudo crear el equipo.");

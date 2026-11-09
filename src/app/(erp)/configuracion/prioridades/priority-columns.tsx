@@ -33,37 +33,53 @@ type PriorityRow = {
 
 export function PriorityColumns({
   diagnosis,
+  diagnosisMot = [],
   repair,
 }: {
   diagnosis: PriorityRow[];
+  diagnosisMot?: PriorityRow[];
   repair: PriorityRow[];
 }) {
   return (
-    <div className="grid items-start gap-8 lg:grid-cols-2">
-      <PriorityColumn mode="diagnostico" rows={diagnosis} />
-      <PriorityColumn mode="reparacion" rows={repair} />
+    <div className="grid items-start gap-8 lg:grid-cols-2 xl:grid-cols-3">
+      <PriorityColumn mode="diagnostico" equipmentKind="EQUI" title="Diagnóstico · equipos (EQUI)" rows={diagnosis} />
+      {diagnosisMot.length > 0 ? (
+        <PriorityColumn mode="diagnostico" equipmentKind="MOT" title="Diagnóstico · motores (MOT)" rows={diagnosisMot} />
+      ) : null}
+      <PriorityColumn mode="reparacion" equipmentKind="EQUI" title="Reparación / OS" rows={repair} />
     </div>
   );
 }
 
-function PriorityColumn({ mode, rows }: { mode: "diagnostico" | "reparacion"; rows: PriorityRow[] }) {
+function PriorityColumn({
+  mode,
+  rows,
+  title,
+  equipmentKind,
+}: {
+  mode: "diagnostico" | "reparacion";
+  rows: PriorityRow[];
+  title: string;
+  equipmentKind: "EQUI" | "MOT";
+}) {
   const diagnosis = mode === "diagnostico";
 
   return (
     <section className="min-w-0">
       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-lg font-bold tracking-tight text-slate-900">{diagnosis ? "Diagnóstico" : "Reparación / OS"}</h2>
+          <h2 className="text-lg font-bold tracking-tight text-slate-900">{title}</h2>
           <p className="mt-0.5 text-xs text-slate-500">
             {diagnosis ? "Nombre, activa, costo fijo y SLA en días." : "Nombre, activa, incremento % y SLA en días."}
           </p>
         </div>
         <CreateDialog
           label="Nueva"
-          title={diagnosis ? "Nueva prioridad de diagnóstico" : "Nueva prioridad de reparación / OS"}
-          titleId={diagnosis ? "nueva-prioridad-dx" : "nueva-prioridad-os"}
+          title={diagnosis ? `Nueva prioridad · ${equipmentKind}` : "Nueva prioridad de reparación / OS"}
+          titleId={diagnosis ? `nueva-prioridad-dx-${equipmentKind}` : "nueva-prioridad-os"}
         >
           <form action={diagnosis ? saveDiagnosisPriorityAction : saveRepairPriorityAction}>
+            {diagnosis ? <input type="hidden" name="equipmentKind" value={equipmentKind} /> : null}
             <FormSection title="Prioridad" description="No obliga a que exista el mismo nombre en el otro grupo." columns={1}>
               <Field label="Nombre"><input name="name" required autoFocus className={controlClass} /></Field>
               <Field label="Estado"><ActiveSelect /></Field>

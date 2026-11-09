@@ -33,6 +33,8 @@ export function parseServicioTipo(tipo: string | undefined): AttentionType | nul
 
 export type ServiciosVista = "activos" | "historial";
 
+export type ServiciosEquipoKindFilter = "todos" | "EQUI" | "MOT";
+
 export type ServiciosListParams = {
   vista?: ServiciosVista;
   tipo?: string;
@@ -40,10 +42,17 @@ export type ServiciosListParams = {
   estado?: string;
   /** Panel gerente SYSTRON sobre activos (validacion, vencidos, refacciones, compras, asignacion). */
   filtro?: string;
+  /** Filtra bandeja por identidad física EQUI vs MOT. */
+  equipo?: ServiciosEquipoKindFilter;
   q?: string;
   desde?: string;
   hasta?: string;
 };
+
+export function parseServiciosEquipoKind(value: string | undefined): ServiciosEquipoKindFilter {
+  if (value === "EQUI" || value === "MOT") return value;
+  return "todos";
+}
 
 export function parseServiciosVista(vista: string | undefined): ServiciosVista {
   return vista === "historial" ? "historial" : "activos";
@@ -68,6 +77,7 @@ function serviciosSearchParams(params: ServiciosListParams) {
   if (params.tipo && params.tipo !== "todos") search.set("tipo", params.tipo);
   if (params.estado && params.estado !== "todos") search.set("estado", params.estado);
   if (params.filtro?.trim()) search.set("filtro", params.filtro.trim());
+  if (params.equipo && params.equipo !== "todos") search.set("equipo", params.equipo);
   if (params.q?.trim()) search.set("q", params.q.trim());
   if (params.desde?.trim()) search.set("desde", params.desde.trim());
   if (params.hasta?.trim()) search.set("hasta", params.hasta.trim());

@@ -73,6 +73,7 @@ type ListScope = {
   /** Cartera de ventas: solo equipos de clientes asignados al vendedor. */
   clientOwnerUserId?: string;
   tipo?: ServicioTipoParam | null;
+  equipmentKind?: "EQUI" | "MOT" | null;
   desde?: string;
   hasta?: string;
 };
@@ -158,6 +159,7 @@ export type ServicioBandejaRow = {
   kind: "servicio";
   id: string;
   equipmentId: string;
+  equipmentKind: string;
   equipmentHref: string;
   equipmentLabel: string;
   diagnosisFolio: string | null;
@@ -370,6 +372,7 @@ function buildServicioRow(
     kind: "servicio",
     id: attentionId,
     equipmentId: equipment.id,
+    equipmentKind: equipment.kind,
     equipmentHref: equipmentDetailHref(equipment.kind, equipment.id),
     equipmentLabel: formatEquipmentBandejaLabel(equipment),
     diagnosisFolio,
@@ -572,7 +575,11 @@ export async function listActiveServicios(
     take: 200,
   });
 
-  const rows = await mapCasesToBandejaRows(companyId, cases as CaseRecord[]);
+  let rows = await mapCasesToBandejaRows(companyId, cases as CaseRecord[]);
+  const equipmentKind = options?.equipmentKind ?? null;
+  if (equipmentKind) {
+    rows = rows.filter((row) => row.kind !== "servicio" || row.equipmentKind === equipmentKind);
+  }
   return rows.sort((a, b) =>
     compareBySla(
       {
@@ -652,7 +659,11 @@ export async function listHistorialServicios(
           take: 80,
         });
 
-  const serviceRows = await mapCasesToBandejaRows(companyId, cases as CaseRecord[]);
+  let serviceRows = await mapCasesToBandejaRows(companyId, cases as CaseRecord[]);
+  const equipmentKind = options?.equipmentKind ?? null;
+  if (equipmentKind) {
+    serviceRows = serviceRows.filter((row) => row.equipmentKind === equipmentKind);
+  }
   const cancelledRows: CancelledServicioBandejaRow[] = cancelledAttentions.map((row) => ({
     kind: "cancelado",
     id: row.id,
@@ -667,7 +678,11 @@ export async function listHistorialServicios(
     priorityName: row.priorityName,
   }));
 
-  return [...serviceRows, ...cancelledRows].sort(
+  let merged: SupervisorServicioRow[] = [...serviceRows, ...cancelledRows];
+  if (equipmentKind) {
+    merged = merged.filter((row) => row.kind === "servicio" ? row.equipmentKind === equipmentKind : row.equipmentHref.startsWith(equipmentKind === "MOT" ? "/motores/" : "/equipos/"));
+  }
+  return merged.sort(
     (a, b) => (b.closedAt ?? b.createdAt).getTime() - (a.closedAt ?? a.createdAt).getTime(),
   );
 }
