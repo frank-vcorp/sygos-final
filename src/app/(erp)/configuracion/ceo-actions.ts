@@ -95,11 +95,11 @@ function queryBack(path: string, params: Record<string, string | null | undefine
   return qs ? `${path}?${qs}` : path;
 }
 
-function accountReturn(formData: FormData, id?: string | null) {
+function accountReturn(formData: FormData, id?: string | null, afterCreate = false) {
   return queryBack("/configuracion/finanzas", {
     vista: "cuentas",
-    q: optionalText(formData.get("q")),
-    tipo: optionalText(formData.get("tipo")),
+    q: afterCreate ? null : optionalText(formData.get("q")),
+    tipo: afterCreate ? null : optionalText(formData.get("tipo")),
     id,
   });
 }
@@ -176,6 +176,10 @@ export async function createFinanceAccountAction(formData: FormData) {
       const bankName = requiredText(formData.get("bankName"), "Banco");
       const lastFour = parseLastFour(formData.get("lastFour"), { required: true });
       const name = buildFinanceAccountStoredName({ kind, bankName, lastFour });
+      const existing = await prisma.financeAccount.findFirst({
+        where: { companyId: session.activeCompanyId, name },
+      });
+      if (existing) throw new Error(`Ya existe la cuenta «${name}». (El seed puede incluir «Tarjeta».)`);
       data = {
         companyId: session.activeCompanyId,
         name,
@@ -188,6 +192,10 @@ export async function createFinanceAccountAction(formData: FormData) {
     } else {
       const cashName = optionalText(formData.get("cashName")) ?? optionalText(formData.get("name"));
       const name = buildFinanceAccountStoredName({ kind, cashName });
+      const existing = await prisma.financeAccount.findFirst({
+        where: { companyId: session.activeCompanyId, name },
+      });
+      if (existing) throw new Error(`Ya existe la cuenta «${name}». (El seed puede incluir «Caja».)`);
       data = {
         companyId: session.activeCompanyId,
         name,
@@ -214,7 +222,7 @@ export async function createFinanceAccountAction(formData: FormData) {
   } catch (error) {
     await fail(back, error);
   }
-  redirect(accountReturn(formData, createdId));
+  redirect(accountReturn(formData, createdId, Boolean(createdId)));
 }
 
 export async function updateFinanceAccountAction(formData: FormData) {

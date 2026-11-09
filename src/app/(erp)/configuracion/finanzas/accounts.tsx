@@ -82,7 +82,10 @@ export function AccountsPanel({
       {accounts.length === 0 ? (
         <Empty title="Sin cuentas" body="Crea la primera cuenta con el botón del encabezado. Las que ya existen siguen en esta lista." />
       ) : visible.length === 0 ? (
-        <Empty title="Sin coincidencias" body="Ninguna cuenta coincide con el filtro." />
+        <Empty
+          title="Sin coincidencias"
+          body="Ninguna cuenta coincide con el filtro. Si acabas de crear una, quita búsqueda o tipo."
+        />
       ) : (
         <ResponsiveData
           table={

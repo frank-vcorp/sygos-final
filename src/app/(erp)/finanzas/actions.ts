@@ -36,7 +36,10 @@ export async function accountAction(formData: FormData) {
     const opening = optionalMoneyFromForm(formData.get("opening")) ?? 0;
     await openAccount(session, {
       kind,
-      bankName: optionalText(formData.get("bankName")),
+      bankName:
+        kind === "EFECTIVO"
+          ? null
+          : requiredText(formData.get("bankName"), "Banco"),
       clabe: kind === "BANCARIA" ? parseClabe(requiredText(formData.get("clabe"), "CLABE")) : null,
       lastFour: kind === "CREDITO" ? parseLastFour(formData.get("lastFour"), { required: true }) : parseLastFour(optionalText(formData.get("lastFour"))),
       cashName: optionalText(formData.get("cashName")) ?? optionalText(formData.get("name")),
