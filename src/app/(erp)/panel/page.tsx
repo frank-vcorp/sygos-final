@@ -511,7 +511,7 @@ async function GerenteServomotoresPanel({
       <>
         <PageHeader
           title="Inicio"
-          subtitle="Servicios cerrados o concluidos. La ejecución técnica sigue en Operación."
+          subtitle="Servicios cerrados o concluidos. El detalle completo está en Servicios."
           action={<TextLink href="/panel">Ver activos</TextLink>}
         />
         <SalesPanelServiciosSection
@@ -744,7 +744,7 @@ async function GerenteServomotoresPanel({
     <>
       <PageHeader
         title="Inicio"
-        subtitle="Pendientes comerciales y operativos de Servomotores. Los motores en resguardo se asignan automáticamente; ejecuta en Operación."
+        subtitle="Pendientes comerciales y operativos de Servomotores. Los motores en resguardo se asignan automáticamente; la ejecución técnica sigue en Servicios activos."
         action={<TextLink href="/panel?vista=historial">Ver historial</TextLink>}
       />
       <section className="flex w-full max-w-none flex-col gap-4">
