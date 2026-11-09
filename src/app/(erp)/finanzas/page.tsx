@@ -1,3 +1,4 @@
+import { unstable_noStore as noStore } from "next/cache";
 import { redirect } from "next/navigation";
 import { accountAction, payCardAction, payPayableAction } from "./actions";
 import { FinanzasProofDialog, FinanzasTransferDialog, ManualMovementDialog } from "./finanzas-movement-dialog";
@@ -46,7 +47,10 @@ type FinanceAccountRow = {
   balance: number;
 };
 
+export const dynamic = "force-dynamic";
+
 export default async function FinanzasPage({ searchParams }: { searchParams: Promise<{ mes?: string; vista?: string }> }) {
+  noStore();
   const session = await requireCompany();
   if (!can(session.role, "finance.view", session.activeCompanyCode)) redirect("/inicio");
   const { mes, vista } = await searchParams;

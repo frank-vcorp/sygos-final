@@ -140,7 +140,6 @@ function priorityReturn(formData: FormData, attentionType: "DIAGNOSTICO" | "REPA
 export async function createFinanceAccountAction(formData: FormData) {
   "use server";
   const back = accountReturn(formData, null);
-  let createdId: string | null = null;
   try {
     const session = await requireCeo(back);
     const kind = parseFinanceAccountKindFromForm(formData.get("kind"));
@@ -207,22 +206,29 @@ export async function createFinanceAccountAction(formData: FormData) {
       };
     }
     const created = await prisma.financeAccount.create({ data });
-    createdId = created.id;
+    const persisted = await prisma.financeAccount.findFirst({
+      where: { id: created.id, companyId: session.activeCompanyId },
+    });
+    if (!persisted) throw new Error("La cuenta no quedó guardada. Revisa la conexión e intenta de nuevo.");
     revalidatePath("/configuracion/finanzas");
     revalidatePath("/finanzas");
-    await recordHistory({
-      companyId: session.activeCompanyId,
-      entityType: "CUENTA",
-      entityId: session.activeCompanyId,
-      action: "ALTA",
-      summary: "Nueva cuenta financiera desde Configuración del CEO.",
-      authorUserId: session.userId,
-    });
+    try {
+      await recordHistory({
+        companyId: session.activeCompanyId,
+        entityType: "CUENTA",
+        entityId: created.id,
+        action: "ALTA",
+        summary: `Nueva cuenta financiera «${persisted.name}» desde Configuración del CEO.`,
+        authorUserId: session.userId,
+      });
+    } catch {
+      // El historial no debe bloquear el alta ni mostrar éxito falso.
+    }
     await setFlash({ tone: "ok", message: "Cuenta registrada." });
+    redirect(accountReturn(formData, created.id, true));
   } catch (error) {
     await fail(back, error);
   }
-  redirect(accountReturn(formData, createdId, Boolean(createdId)));
 }
 
 export async function updateFinanceAccountAction(formData: FormData) {

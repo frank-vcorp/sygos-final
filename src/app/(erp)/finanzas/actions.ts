@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { prisma } from "@/lib/db";
 import { setFlash } from "@/lib/flash";
 import { optionalText, requiredText } from "@/lib/form";
 import { moneyFromForm, optionalMoneyFromForm } from "@/lib/money";
@@ -34,7 +35,7 @@ export async function accountAction(formData: FormData) {
     const session = await guard();
     const kind = parseFinanceAccountKindFromForm(formData.get("kind"));
     const opening = optionalMoneyFromForm(formData.get("opening")) ?? 0;
-    await openAccount(session, {
+    const created = await openAccount(session, {
       kind,
       bankName:
         kind === "EFECTIVO"
@@ -45,13 +46,21 @@ export async function accountAction(formData: FormData) {
       cashName: optionalText(formData.get("cashName")) ?? optionalText(formData.get("name")),
       opening,
     });
+    const persisted = await prisma.financeAccount.findFirst({
+      where: { id: created.id, companyId: session.activeCompanyId, active: true },
+    });
+    if (!persisted) {
+      throw new Error("La cuenta no quedó guardada. Revisa la conexión e intenta de nuevo.");
+    }
     revalidatePath("/finanzas");
     revalidatePath("/configuracion/finanzas");
     await setFlash({ tone: "ok", message: "Cuenta registrada." });
+    redirect("/finanzas?vista=cuentas");
   } catch (error) {
-    await setFlash({ tone: "error", message: bubble(error) });
+    const message = bubble(error);
+    await setFlash({ tone: "error", message });
+    redirect("/finanzas?vista=cuentas");
   }
-  redirect("/finanzas?vista=cuentas");
 }
 
 async function runManualMovement(formData: FormData) {

@@ -1,15 +1,19 @@
 import { NewAccountDialog, NewCatalogDialog } from "./dialogs";
 import { AccountsPanel } from "./accounts";
 import { CatalogsPanel } from "./catalogs";
+import { unstable_noStore as noStore } from "next/cache";
 import { requireCeoConfig } from "../guard";
 import { PageHeader, SegmentedNav } from "@/components/ui";
 import { prisma } from "@/lib/db";
+
+export const dynamic = "force-dynamic";
 
 export default async function FinanzasConfigPage({
   searchParams,
 }: {
   searchParams: Promise<{ vista?: string; q?: string; tipo?: string; id?: string; clase?: string }>;
 }) {
+  noStore();
   const session = await requireCeoConfig();
   const sp = await searchParams;
   const vista = sp.vista === "catalogos" ? "catalogos" : "cuentas";
