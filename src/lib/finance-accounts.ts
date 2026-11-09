@@ -96,21 +96,30 @@ export function parseLastFour(value: FormDataEntryValue | string | null | undefi
   return digits;
 }
 
+export function lastFourFromClabe(clabe?: string | null): string | null {
+  const digits = (clabe ?? "").replace(/\D/g, "");
+  return digits.length >= 4 ? digits.slice(-4) : null;
+}
+
 export function buildFinanceAccountStoredName(input: {
   kind: FinanceAccountKind;
   bankName?: string | null;
   lastFour?: string | null;
+  clabe?: string | null;
   cashName?: string | null;
 }): string {
   if (input.kind === "EFECTIVO") {
     const name = input.cashName?.trim();
     return name || "Efectivo";
   }
+  const lastFour =
+    input.lastFour
+    ?? (input.kind === "BANCARIA" ? lastFourFromClabe(input.clabe) : null);
   return financeAccountDisplayName({
     kind: input.kind,
     name: input.bankName?.trim() ?? "",
     bankName: input.bankName,
-    lastFour: input.lastFour,
+    lastFour,
   });
 }
 

@@ -42,11 +42,13 @@ export async function accountAction(formData: FormData) {
       cashName: optionalText(formData.get("cashName")) ?? optionalText(formData.get("name")),
       opening,
     });
+    revalidatePath("/finanzas");
+    revalidatePath("/configuracion/finanzas");
     await setFlash({ tone: "ok", message: "Cuenta registrada." });
   } catch (error) {
     await setFlash({ tone: "error", message: bubble(error) });
   }
-  redirect("/finanzas");
+  redirect("/finanzas?vista=cuentas");
 }
 
 async function runManualMovement(formData: FormData) {

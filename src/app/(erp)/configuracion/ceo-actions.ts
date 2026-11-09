@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { setFlash } from "@/lib/flash";
@@ -156,14 +157,19 @@ export async function createFinanceAccountAction(formData: FormData) {
       const bankName = requiredText(formData.get("bankName"), "Banco");
       const clabe = parseClabe(requiredText(formData.get("clabe"), "CLABE"));
       const lastFour = parseLastFour(optionalText(formData.get("lastFour")));
-      const name = buildFinanceAccountStoredName({ kind, bankName, lastFour });
+      const resolvedLastFour = lastFour ?? clabe.slice(-4);
+      const name = buildFinanceAccountStoredName({ kind, bankName, lastFour: resolvedLastFour, clabe });
+      const existing = await prisma.financeAccount.findFirst({
+        where: { companyId: session.activeCompanyId, name },
+      });
+      if (existing) throw new Error(`Ya existe la cuenta «${name}». Usa otro banco o indica últimos 4 distintos.`);
       data = {
         companyId: session.activeCompanyId,
         name,
         kind,
         bankName,
         clabe,
-        lastFour,
+        lastFour: resolvedLastFour,
         balance: 0,
       };
     } else if (kind === "CREDITO") {
@@ -194,6 +200,8 @@ export async function createFinanceAccountAction(formData: FormData) {
     }
     const created = await prisma.financeAccount.create({ data });
     createdId = created.id;
+    revalidatePath("/configuracion/finanzas");
+    revalidatePath("/finanzas");
     await recordHistory({
       companyId: session.activeCompanyId,
       entityType: "CUENTA",

@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import {
   assertPaymentMatchesAccountKind,
   buildFinanceAccountStoredName,
+  lastFourFromClabe,
   expectedFinanceAccountKindForPayment,
   financeAccountDisplayName,
   financeAccountKindLabel,
@@ -26,6 +27,11 @@ describe("finance-accounts", () => {
     );
     assert.equal(buildFinanceAccountStoredName({ kind: "EFECTIVO", cashName: "" }), "Efectivo");
     assert.equal(buildFinanceAccountStoredName({ kind: "EFECTIVO", cashName: "Caja norte" }), "Caja norte");
+    assert.equal(lastFourFromClabe("012180001234567897"), "7897");
+    assert.equal(
+      buildFinanceAccountStoredName({ kind: "BANCARIA", bankName: "BBVA", clabe: "012180001234567897" }),
+      "BBVA ····7897",
+    );
   });
 
   it("normaliza formas de pago legacy", () => {

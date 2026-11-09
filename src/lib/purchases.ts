@@ -336,11 +336,17 @@ export async function openAccount(
     kind,
     bankName: input.bankName,
     lastFour: input.lastFour,
+    clabe: input.clabe,
     cashName: input.cashName,
   });
   const existing = await prisma.financeAccount.findFirst({ where: { companyId: actor.activeCompanyId, name } });
-  if (existing) throw new Error("Ya existe una cuenta con ese nombre.");
+  if (existing) throw new Error(`Ya existe la cuenta «${name}». El seed trae Caja, Banco y Tarjeta: usa otro nombre o últimos 4 distintos.`);
   const opening = input.opening ?? 0;
+  const lastFour =
+    kind === "EFECTIVO"
+      ? null
+      : input.lastFour
+        ?? (kind === "BANCARIA" && input.clabe ? input.clabe.replace(/\D/g, "").slice(-4) : null);
   return prisma.financeAccount.create({
     data: {
       companyId: actor.activeCompanyId,
@@ -348,7 +354,7 @@ export async function openAccount(
       kind,
       bankName: kind === "EFECTIVO" ? null : input.bankName?.trim() ?? null,
       clabe: kind === "BANCARIA" ? input.clabe ?? null : null,
-      lastFour: kind === "EFECTIVO" ? null : input.lastFour ?? null,
+      lastFour,
       balance: isCreditCardAccountKind(kind) ? Math.max(0, opening) : opening,
     },
   });
