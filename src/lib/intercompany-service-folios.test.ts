@@ -255,5 +255,73 @@ describe("folios de diagnóstico por empresa", () => {
     };
     assert.equal(shown(systronOsRows), "OS-23");
     assert.equal(shown(servOsRows), "OS-3");
+
+    const motorBlank = await prisma.equipment.create({
+      data: {
+        folio: "MOT-BLANK",
+        kind: "MOT",
+        originCompanyId: syOs.id,
+        clientId: clientOs.id,
+        model: "DRN",
+        custody: "EN_RESGUARDO",
+        holderCompanyId: smOs.id,
+        createdByUserId: diegoOs.id,
+      },
+    });
+    const attentionBlank = await prisma.attention.create({
+      data: {
+        equipmentId: motorBlank.id,
+        originCompanyId: syOs.id,
+        serviceCompanyId: smOs.id,
+        adminClientId: adminOs.id,
+        attentionType: "DIAGNOSTICO",
+        priorityName: "Normal",
+        prioritySlaMaxDays: 5,
+        reportedFault: "Columna vacía",
+        status: "EN_PROCESO",
+        slaStartedAt: new Date(),
+        serviceNumber: 8,
+        originServiceNumber: 23,
+      },
+    });
+    const dxBlank = await prisma.technicalCase.create({
+      data: {
+        folio: "DX-8",
+        attentionId: attentionBlank.id,
+        equipmentId: motorBlank.id,
+        serviceCompanyId: smOs.id,
+        kind: "DIAGNOSTICO",
+        status: "VALIDADO",
+        quotePending: true,
+      },
+    });
+    await prisma.technicalCase.create({
+      data: {
+        folio: "OS-8",
+        attentionId: attentionBlank.id,
+        equipmentId: motorBlank.id,
+        serviceCompanyId: smOs.id,
+        kind: "OS",
+        status: "EN_ESPERA",
+        spawnedFromId: dxBlank.id,
+        quotePending: true,
+      },
+    });
+    await prisma.quote.create({
+      data: {
+        folio: "COT-BLANK",
+        companyId: syOs.id,
+        clientId: clientOs.id,
+        quoteType: "DIAGNOSTICO",
+        status: "AUTORIZADA",
+        equipmentId: motorBlank.id,
+      },
+    });
+    const blankRows = await listActiveServicios(syOs.id, "", { originMotors: true, equipmentKind: "MOT" });
+    const blank = blankRows.find((item) => item.kind === "servicio" && item.equipmentId === motorBlank.id);
+    assert.ok(blank && blank.kind === "servicio");
+    assert.equal(blank.diagnosisFolio, "DX-23");
+    assert.equal(blank.osFolio, "OS-23");
+    assert.equal(blank.osHref?.startsWith("/operacion/"), true);
   });
 });

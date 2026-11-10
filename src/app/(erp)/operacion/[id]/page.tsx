@@ -94,7 +94,23 @@ export default async function OperacionDetallePage({ params }: { params: Promise
     where: { attentionId: row.attentionId, id: { not: row.id } },
     select: { id: true, folio: true, kind: true, quotePending: true },
   });
-  const linkedOs = siblingCases.find((item) => item.kind === "OS" && !item.quotePending) ?? null;
+  const linkedOsCandidate = siblingCases.find((item) => item.kind === "OS") ?? null;
+  const authorizedSiblingQuote = linkedOsCandidate && row.attention.originCompanyId !== row.attention.serviceCompanyId
+    ? await prisma.quote.findFirst({
+        where: {
+          quoteType: { in: ["DIAGNOSTICO", "REPARACION"] },
+          status: { in: ["AUTORIZADA", "AUTORIZADA_PENDIENTE_EQUIPO"] },
+          OR: [
+            { technicalCaseId: { in: [row.id, linkedOsCandidate.id] } },
+            { equipmentId: row.equipmentId, technicalCaseId: null },
+          ],
+        },
+        select: { id: true },
+      })
+    : null;
+  const linkedOs = linkedOsCandidate && (!linkedOsCandidate.quotePending || authorizedSiblingQuote)
+    ? linkedOsCandidate
+    : null;
   const linkedDx = siblingCases.find((item) => item.kind === "DIAGNOSTICO") ?? null;
   const reflected = session.activeCompanyCode === "SYSTRON" && row.serviceCompany.code === "SERVOMOTORES" && row.equipment.originCompanyId === session.activeCompanyId;
   const owns = row.serviceCompanyId === session.activeCompanyId;

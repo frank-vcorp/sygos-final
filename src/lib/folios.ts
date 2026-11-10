@@ -225,6 +225,7 @@ export async function revealAuthorizedIntercompanyOrders(): Promise<void> {
       id: true,
       spawnedFromId: true,
       attentionId: true,
+      equipmentId: true,
       attention: { select: { originCompanyId: true, serviceCompanyId: true } },
     },
     take: 100,
@@ -233,9 +234,12 @@ export async function revealAuthorizedIntercompanyOrders(): Promise<void> {
     if (!stub.spawnedFromId || stub.attention.originCompanyId === stub.attention.serviceCompanyId) continue;
     const authorized = await prisma.quote.findFirst({
       where: {
-        technicalCaseId: stub.spawnedFromId,
         quoteType: { in: ["DIAGNOSTICO", "REPARACION"] },
         status: { in: ["AUTORIZADA", "AUTORIZADA_PENDIENTE_EQUIPO"] },
+        OR: [
+          { technicalCaseId: { in: [stub.spawnedFromId, stub.id] } },
+          { equipmentId: stub.equipmentId, technicalCaseId: null },
+        ],
       },
       select: { id: true },
     });

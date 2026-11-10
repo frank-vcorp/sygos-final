@@ -382,8 +382,11 @@ function buildServicioRow(
   const quoteStatus = quote?.status ?? null;
   const siblingPick = cases.map((c) => ({ id: c.id, kind: c.kind }));
   const osRaw = cases.find((c) => c.kind === "OS") ?? null;
+  const quoteAuthorizesRepair = Boolean(quoteStatus?.startsWith("AUTORIZADA"));
   const os =
-    osRaw && !isHiddenReservedOsStubInDiagnosisCycle(osRaw, siblingPick) ? osRaw : null;
+    osRaw && (quoteAuthorizesRepair || !isHiddenReservedOsStubInDiagnosisCycle(osRaw, siblingPick))
+      ? osRaw
+      : null;
   const diagnosis =
     cases.find((c) => c.kind === "DIAGNOSTICO")
     ?? (osRaw?.spawnedFromId ? cases.find((c) => c.id === osRaw.spawnedFromId) : null)
@@ -512,16 +515,27 @@ async function attachParentDiagnoses(companyId: string, cases: CaseRecord[]): Pr
   return [...cases, ...(parents as CaseRecord[])];
 }
 
+async function attachMissingOrders(cases: CaseRecord[]): Promise<CaseRecord[]> {
+  const existing = new Set(cases.map((row) => row.id));
+  const diagnosisIds = cases.filter((row) => row.kind === "DIAGNOSTICO").map((row) => row.id);
+  if (diagnosisIds.length === 0) return cases;
+  const children = await prisma.technicalCase.findMany({
+    where: { kind: "OS", spawnedFromId: { in: diagnosisIds }, id: { notIn: [...existing] } },
+    include: caseInclude,
+  });
+  return [...cases, ...(children as CaseRecord[])];
+}
+
 async function mapCasesToBandejaRows(companyId: string, cases: CaseRecord[]): Promise<ServicioBandejaRow[]> {
   if (cases.length === 0) return [];
 
-  const originNumbers = await ensureOriginCompanyServiceNumbers(cases.map((row) => row.attentionId));
-  for (const row of cases) {
+  const casesWithOrders = await attachMissingOrders(cases);
+  const casesWithParents = await attachParentDiagnoses(companyId, casesWithOrders);
+  const originNumbers = await ensureOriginCompanyServiceNumbers(casesWithParents.map((row) => row.attentionId));
+  for (const row of casesWithParents) {
     const n = originNumbers.get(row.attentionId);
     if (n != null) row.attention.originServiceNumber = n;
   }
-
-  const casesWithParents = await attachParentDiagnoses(companyId, cases);
   const caseIds = casesWithParents.map((c) => c.id);
   const equipmentIds = [...new Set(casesWithParents.map((c) => c.equipmentId))];
   const sellerIds = [
