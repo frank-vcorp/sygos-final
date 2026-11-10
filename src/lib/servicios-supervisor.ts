@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { displayCompanyCaseFolio, ensureOriginCompanyServiceNumbers, serviceCycleNumberFromFolio } from "@/lib/folios";
+import { displayCompanyCaseFolio, ensureOriginCompanyServiceNumbers, revealAuthorizedIntercompanyOrders, serviceCycleNumberFromFolio } from "@/lib/folios";
 import { linesForTotal, money, quoteTotals } from "@/lib/money";
 import {
   administrativeStatus,
@@ -616,6 +616,7 @@ export async function listActiveServicios(
   const technicianId = options?.assigneeUserId;
   const clientOwnerUserId = options?.clientOwnerUserId;
 
+  await revealAuthorizedIntercompanyOrders();
   const pendingDecisionCaseIds = q
     ? []
     : await technicalCaseIdsPendingSellerDecision(companyId, clientOwnerUserId);
@@ -673,6 +674,7 @@ export async function listHistorialServicios(
   query: string,
   options?: ListScope & { status?: string | null },
 ): Promise<SupervisorServicioRow[]> {
+  await revealAuthorizedIntercompanyOrders();
   const tipo = options?.tipo ?? null;
   const attentionType = tipo ? (SERVICIO_TIPO_PARAM[tipo] as AttentionType) : null;
   const q = query.trim();

@@ -901,7 +901,10 @@ async function Sales({
     prisma.client.count({
       where: { companyId, ownerUserId: userId, isSystem: false, createdAt: { gte: monthStart } },
     }),
-    listActiveServicios(companyId, "", { clientOwnerUserId: userId }),
+    listActiveServicios(companyId, "", {
+      clientOwnerUserId: userId,
+      ...(companyCode === "SYSTRON" ? { originMotors: true } : {}),
+    }),
     prisma.quote.findMany({
       where: {
         companyId,
@@ -1289,7 +1292,7 @@ async function CeoExecutive({
       take: 20,
     }),
     prisma.commissionRun.findMany({ where: { companyId, status: "PRELIMINAR" }, take: 10 }),
-    listActiveServicios(companyId, ""),
+    listActiveServicios(companyId, "", companyCode === "SYSTRON" ? { originMotors: true } : {}),
     listExitWithoutDocumentPending(companyId, 20),
     showFinance ? loadCoordinationFinanceSnapshot(companyId) : Promise.resolve(null),
   ]);

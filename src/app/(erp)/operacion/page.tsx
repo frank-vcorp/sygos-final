@@ -4,7 +4,7 @@ import { parseGerenteServicioPanelFiltro } from "@/lib/gerente-servicios-panel-f
 import { ActiveFilters, Badge, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, SegmentedNav, Table, Td, Th } from "@/components/ui";
 import { homePath } from "@/lib/home";
 import { prisma } from "@/lib/db";
-import { displayCompanyCaseFolio, ensureOriginCompanyServiceNumbers } from "@/lib/folios";
+import { displayCompanyCaseFolio, ensureOriginCompanyServiceNumbers, revealAuthorizedIntercompanyOrders } from "@/lib/folios";
 import { can } from "@/lib/permissions";
 import { compareBySla } from "@/lib/sla";
 import { isReparacionExpressAttentionType } from "@/lib/priorities";
@@ -28,6 +28,7 @@ export default async function OperacionPage({ searchParams }: { searchParams: Pr
     redirect(serviciosBandejaHref({ vista: "activos" }));
   }
   const view = vista === "validacion" || vista === "cotizar" ? vista : "activas";
+  await revealAuthorizedIntercompanyOrders();
   const servomotores = await prisma.company.findUnique({ where: { code: "SERVOMOTORES" } });
   const rows = await prisma.technicalCase.findMany({
     where: {

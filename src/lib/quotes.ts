@@ -3,6 +3,7 @@ import {
   allocateFolio,
   allocateServiceNumber,
   ensureAttentionServiceNumber,
+  ensureOriginCompanyServiceNumber,
   formatServiceFolio,
   serviceCycleNumberFromFolio,
   serviceFolioForAttention,
@@ -1439,11 +1440,28 @@ async function openRepairOrder(diagnosisCaseId: string, authorUserId: string) {
     osCase = await prisma.technicalCase.findFirst({ where: { spawnedFromId: diagnosis.id, kind: "OS" } });
   }
   if (osCase) {
-    if (slaDueAt && osCase.slaDueAt == null) {
+    const wasPending = osCase.quotePending;
+    if (wasPending || (slaDueAt && osCase.slaDueAt == null)) {
       osCase = await prisma.technicalCase.update({
         where: { id: osCase.id },
-        data: { slaDueAt, quotePending: false },
+        data: {
+          quotePending: false,
+          ...(slaDueAt && osCase.slaDueAt == null ? { slaDueAt } : {}),
+        },
       });
+    }
+    if (diagnosis.attention.originCompanyId !== diagnosis.attention.serviceCompanyId) {
+      const originNumber = await ensureOriginCompanyServiceNumber(diagnosis.attentionId);
+      if (wasPending && originNumber != null) {
+        await recordHistory({
+          companyId: diagnosis.attention.originCompanyId,
+          entityType: "OPERACION",
+          entityId: osCase.id,
+          action: "ALTA",
+          summary: `${formatServiceFolio("OS", originNumber)} queda visible para la empresa de origen. La ejecución sigue en ${osCase.folio}.`,
+          authorUserId,
+        });
+      }
     }
     const { promotePartPresolicitudesToRepairOrder } = await import("./part-presolicitud");
     await promotePartPresolicitudesToRepairOrder(diagnosis.id, osCase.id, authorUserId);
@@ -1482,6 +1500,19 @@ async function openRepairOrder(diagnosisCaseId: string, authorUserId: string) {
     summary: `${created.folio} abierta porque la cotización fue autorizada y el equipo ya está en resguardo.`,
     authorUserId,
   });
+  if (diagnosis.attention.originCompanyId !== diagnosis.attention.serviceCompanyId) {
+    const originNumber = await ensureOriginCompanyServiceNumber(diagnosis.attentionId);
+    if (originNumber != null) {
+      await recordHistory({
+        companyId: diagnosis.attention.originCompanyId,
+        entityType: "OPERACION",
+        entityId: created.id,
+        action: "ALTA",
+        summary: `${formatServiceFolio("OS", originNumber)} queda visible para la empresa de origen. La ejecución sigue en ${created.folio}.`,
+        authorUserId,
+      });
+    }
+  }
   const { promotePartPresolicitudesToRepairOrder } = await import("./part-presolicitud");
   await promotePartPresolicitudesToRepairOrder(diagnosis.id, created.id, authorUserId);
   return created;

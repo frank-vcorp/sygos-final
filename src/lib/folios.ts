@@ -212,6 +212,42 @@ export async function ensureOriginCompanyServiceNumber(attentionId: string): Pro
   });
 }
 
+/** Si el cliente ya autorizó, la OS del taller deja de ser un stub y Systron aparta su propio número. */
+export async function revealAuthorizedIntercompanyOrders(): Promise<void> {
+  const stubs = await prisma.technicalCase.findMany({
+    where: {
+      kind: "OS",
+      quotePending: true,
+      spawnedFromId: { not: null },
+      attention: { attentionType: "DIAGNOSTICO" },
+    },
+    select: {
+      id: true,
+      spawnedFromId: true,
+      attentionId: true,
+      attention: { select: { originCompanyId: true, serviceCompanyId: true } },
+    },
+    take: 100,
+  });
+  for (const stub of stubs) {
+    if (!stub.spawnedFromId || stub.attention.originCompanyId === stub.attention.serviceCompanyId) continue;
+    const authorized = await prisma.quote.findFirst({
+      where: {
+        technicalCaseId: stub.spawnedFromId,
+        quoteType: { in: ["DIAGNOSTICO", "REPARACION"] },
+        status: { in: ["AUTORIZADA", "AUTORIZADA_PENDIENTE_EQUIPO"] },
+      },
+      select: { id: true },
+    });
+    if (!authorized) continue;
+    await prisma.technicalCase.updateMany({
+      where: { id: stub.id, quotePending: true },
+      data: { quotePending: false },
+    });
+    await ensureOriginCompanyServiceNumber(stub.attentionId);
+  }
+}
+
 export async function ensureOriginCompanyServiceNumbers(attentionIds: string[]): Promise<Map<string, number>> {
   const map = new Map<string, number>();
   const ids = [...new Set(attentionIds)];

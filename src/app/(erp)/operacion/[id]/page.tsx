@@ -44,7 +44,7 @@ import {
   TextLink,
 } from "@/components/ui";
 import { prisma } from "@/lib/db";
-import { displayCompanyCaseFolio, ensureOriginCompanyServiceNumber } from "@/lib/folios";
+import { displayCompanyCaseFolio, ensureOriginCompanyServiceNumber, revealAuthorizedIntercompanyOrders } from "@/lib/folios";
 import { formatWhen } from "@/lib/form";
 import { buildAttentionHistoryTimeline, seesFullAttentionHistory } from "@/lib/attention-history";
 import { isNormalDiagnosisPriority, isPaidDiagnosisPriority } from "@/lib/diagnosis-no-repair";
@@ -77,6 +77,11 @@ export default async function OperacionDetallePage({ params }: { params: Promise
     },
   });
   if (!loadedRow) notFound();
+  await revealAuthorizedIntercompanyOrders();
+  if (loadedRow.quotePending) {
+    const fresh = await prisma.technicalCase.findUnique({ where: { id }, select: { quotePending: true } });
+    if (fresh) loadedRow.quotePending = fresh.quotePending;
+  }
   if (
     loadedRow.attention.originCompanyId !== loadedRow.attention.serviceCompanyId
     && loadedRow.attention.originServiceNumber == null
@@ -85,6 +90,12 @@ export default async function OperacionDetallePage({ params }: { params: Promise
   }
   const row = loadedRow!;
   const displayFolio = displayCompanyCaseFolio(row.folio, row.attention, session.activeCompanyId);
+  const siblingCases = await prisma.technicalCase.findMany({
+    where: { attentionId: row.attentionId, id: { not: row.id } },
+    select: { id: true, folio: true, kind: true, quotePending: true },
+  });
+  const linkedOs = siblingCases.find((item) => item.kind === "OS" && !item.quotePending) ?? null;
+  const linkedDx = siblingCases.find((item) => item.kind === "DIAGNOSTICO") ?? null;
   const reflected = session.activeCompanyCode === "SYSTRON" && row.serviceCompany.code === "SERVOMOTORES" && row.equipment.originCompanyId === session.activeCompanyId;
   const owns = row.serviceCompanyId === session.activeCompanyId;
   if (!owns && !reflected) notFound();
@@ -600,6 +611,20 @@ export default async function OperacionDetallePage({ params }: { params: Promise
               </span>
             </EntityMetaItem>
             <EntityMetaItem label="Prioridad">{row.attention.priorityName}</EntityMetaItem>
+            {linkedOs ? (
+              <EntityMetaItem label="Orden de servicio">
+                <TextLink href={`/operacion/${linkedOs.id}`}>
+                  {displayCompanyCaseFolio(linkedOs.folio, row.attention, session.activeCompanyId)}
+                </TextLink>
+              </EntityMetaItem>
+            ) : null}
+            {row.kind === "OS" && linkedDx ? (
+              <EntityMetaItem label="Diagnóstico">
+                <TextLink href={`/operacion/${linkedDx.id}`}>
+                  {displayCompanyCaseFolio(linkedDx.folio, row.attention, session.activeCompanyId)}
+                </TextLink>
+              </EntityMetaItem>
+            ) : null}
             <EntityMetaItem label="SLA">{row.slaDueAt ? formatWhen(row.slaDueAt) : "Aún no inicia"}</EntityMetaItem>
             <EntityMetaItem label="Atención">
               {repairAfterDiagnosis ? "Reparación" : ATTENTION_LABEL[row.attention.attentionType as AttentionType] ?? row.attention.attentionType}

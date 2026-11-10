@@ -15,7 +15,7 @@ describe("folios de diagnóstico por empresa", () => {
       stdio: "ignore",
     });
     const { prisma } = await import("./db");
-    const { displayCompanyCaseFolio, ensureOriginCompanyServiceNumber } = await import("./folios");
+    const { displayCompanyCaseFolio, ensureOriginCompanyServiceNumber, revealAuthorizedIntercompanyOrders } = await import("./folios");
     const { openCase } = await import("./technical");
     const { ensureQuoteFromCase } = await import("./quotes");
     const { listActiveServicios } = await import("./servicios-supervisor");
@@ -159,5 +159,101 @@ describe("folios de diagnóstico por empresa", () => {
     assert.equal(originNumber, 5);
     assert.equal(displayCompanyCaseFolio(legacyCase!.folio, legacyStored!, systron.id), "DX-5");
     assert.equal(displayCompanyCaseFolio(legacyCase!.folio, legacyStored!, servomotores.id), "DX-9");
+
+    const syOs = await prisma.company.create({ data: { code: "SYOS", name: "Systron OS" } });
+    const smOs = await prisma.company.create({ data: { code: "SMOS", name: "Servomotores OS" } });
+    await prisma.folioSequence.create({ data: { companyId: syOs.id, series: "SRV", nextNumber: 23 } });
+    await prisma.folioSequence.create({ data: { companyId: smOs.id, series: "SRV", nextNumber: 3 } });
+    const diegoOs = await prisma.user.create({
+      data: { username: "diego-os", name: "Diego", passwordHash: "x", role: "GERENTE_OPERATIVO_SERVOMOTORES", companyId: smOs.id },
+    });
+    const clientOs = await prisma.client.create({
+      data: {
+        companyId: syOs.id,
+        name: "Aceros del norte",
+        active: true,
+        isSystem: false,
+        requiresInvoice: true,
+        rfc: "XAXX010101002",
+        cfdiUse: "G03",
+        paymentMethod: "PUE",
+      },
+    });
+    const adminOs = await prisma.client.create({
+      data: {
+        companyId: smOs.id,
+        name: "SYSTRON",
+        active: true,
+        isSystem: true,
+        requiresInvoice: true,
+        rfc: "XAXX010101003",
+        cfdiUse: "G03",
+        paymentMethod: "PUE",
+      },
+    });
+    const motorOs = await prisma.equipment.create({
+      data: {
+        folio: "MOT-OS-3",
+        kind: "MOT",
+        originCompanyId: syOs.id,
+        clientId: clientOs.id,
+        model: "DRN",
+        custody: "EN_RESGUARDO",
+        holderCompanyId: smOs.id,
+        createdByUserId: diegoOs.id,
+      },
+    });
+    const attentionOs = await prisma.attention.create({
+      data: {
+        equipmentId: motorOs.id,
+        originCompanyId: syOs.id,
+        serviceCompanyId: smOs.id,
+        adminClientId: adminOs.id,
+        attentionType: "DIAGNOSTICO",
+        priorityName: "Normal",
+        prioritySlaMaxDays: 5,
+        reportedFault: "Autorizada",
+        sellerUserId: diegoOs.id,
+        status: "EN_PROCESO",
+        slaStartedAt: new Date(),
+      },
+    });
+    const dxOs = await openCase(attentionOs.id, new Date());
+    assert.equal(dxOs!.folio, "DX-3");
+    const osBefore = await prisma.technicalCase.findFirst({ where: { attentionId: attentionOs.id, kind: "OS" } });
+    assert.equal(osBefore!.folio, "OS-3");
+    assert.equal(osBefore!.quotePending, true);
+    assert.equal(osBefore!.serviceCompanyId, smOs.id);
+    const hidden = await listActiveServicios(syOs.id, "", { originMotors: true, equipmentKind: "MOT" });
+    const hiddenRow = hidden.find((item) => item.kind === "servicio" && item.equipmentId === motorOs.id);
+    assert.equal(hiddenRow && hiddenRow.kind === "servicio" ? hiddenRow.osFolio : null, null);
+
+    await prisma.quote.create({
+      data: {
+        folio: "COT-23",
+        companyId: syOs.id,
+        clientId: clientOs.id,
+        quoteType: "DIAGNOSTICO",
+        status: "AUTORIZADA",
+        equipmentId: motorOs.id,
+        technicalCaseId: dxOs!.id,
+      },
+    });
+    await revealAuthorizedIntercompanyOrders();
+    const osCases = await prisma.technicalCase.findMany({ where: { attentionId: attentionOs.id, kind: "OS" } });
+    assert.equal(osCases.length, 1);
+    assert.equal(osCases[0]!.folio, "OS-3");
+    assert.equal(osCases[0]!.quotePending, false);
+    assert.equal(osCases[0]!.serviceCompanyId, smOs.id);
+    const numbered = await prisma.attention.findUnique({ where: { id: attentionOs.id } });
+    assert.equal(numbered!.originServiceNumber, 23);
+    const systronOsRows = await listActiveServicios(syOs.id, "", { originMotors: true, equipmentKind: "MOT" });
+    const servOsRows = await listActiveServicios(smOs.id, "", { equipmentKind: "MOT" });
+    const shown = (rows: typeof systronOsRows) => {
+      const row = rows.find((item) => item.kind === "servicio" && item.equipmentId === motorOs.id);
+      return row && row.kind === "servicio" ? row.osFolio : null;
+    };
+    assert.equal(shown(systronOsRows), "OS-23");
+    assert.equal(shown(servOsRows), "OS-3");
   });
 });
