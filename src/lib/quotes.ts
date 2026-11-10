@@ -449,25 +449,10 @@ export async function ensureQuoteFromCase(actor: { userId: string; activeCompany
       : `${folio} quedó pendiente de cotizar desde ${row.folio}. El cliente no tiene contactos activos.`,
     authorUserId: actor.userId,
   });
-  await reserveFollowingServiceNumber(quote.id, row.serviceCompanyId);
   if (row.equipment.kind === "MOT" && row.equipment.originCompanyId !== actor.activeCompanyId) {
     await ensureOriginQuote(row, quote.id, actor.userId);
   }
   return quote;
-}
-
-/** Al crear la cotización con el DX ya abierto, aparta el siguiente SRV (DX-10 aparta 11; el DX siguiente es 12). */
-async function reserveFollowingServiceNumber(quoteId: string, serviceCompanyId: string) {
-  const current = await prisma.quote.findUnique({
-    where: { id: quoteId },
-    select: { reservedServiceNumber: true, technicalCaseId: true },
-  });
-  if (!current?.technicalCaseId || current.reservedServiceNumber != null) return;
-  const reservedServiceNumber = await allocateServiceNumber(serviceCompanyId);
-  await prisma.quote.updateMany({
-    where: { id: quoteId, reservedServiceNumber: null },
-    data: { reservedServiceNumber },
-  });
 }
 
 async function ensureOriginQuote(

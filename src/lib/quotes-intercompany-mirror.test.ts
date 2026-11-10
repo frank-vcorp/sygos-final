@@ -166,7 +166,7 @@ describe("cotización espejo MOT Servomotores → SYSTRON", () => {
     assert.equal(mirrorAfterOs!.quoteType, "DIAGNOSTICO");
   });
 
-  it("con el DX ya abierto, cotizar aparta el siguiente SRV de Servomotores", async () => {
+  it("cotizar un DX-3 abierto no aparta el 4; el siguiente caso es DX-4", async () => {
     const dir = mkdtempSync(join(tmpdir(), "sygos-ic-folio-"));
     process.env.DATABASE_URL = `file:${join(dir, "test.db")}`;
     const { execSync } = await import("child_process");
@@ -209,11 +209,11 @@ describe("cotización espejo MOT Servomotores → SYSTRON", () => {
       },
     });
     await prisma.folioSequence.create({
-      data: { companyId: servomotores.id, series: "SRV", nextNumber: 10 },
+      data: { companyId: servomotores.id, series: "SRV", nextNumber: 3 },
     });
     const motor = await prisma.equipment.create({
       data: {
-        folio: "MOT-F-10",
+        folio: "MOT-F-3",
         kind: "MOT",
         originCompanyId: systron.id,
         clientId: client.id,
@@ -238,16 +238,16 @@ describe("cotización espejo MOT Servomotores → SYSTRON", () => {
       },
     });
     const dx = await openCase(attention.id, new Date());
-    assert.equal(dx!.folio, "DX-10");
+    assert.equal(dx!.folio, "DX-3");
     await prisma.technicalCase.update({ where: { id: dx!.id }, data: { status: "VALIDADO", quotePending: true } });
 
     const quote = await ensureQuoteFromCase({ userId: diego.id, activeCompanyId: servomotores.id }, dx!.id);
-    assert.equal(quote.folio, "COT-10");
-    assert.equal((await prisma.quote.findUnique({ where: { id: quote.id } }))!.reservedServiceNumber, 11);
+    assert.equal(quote.folio, "COT-3");
+    assert.equal((await prisma.quote.findUnique({ where: { id: quote.id } }))!.reservedServiceNumber, null);
 
     const again = await ensureQuoteFromCase({ userId: diego.id, activeCompanyId: servomotores.id }, dx!.id);
     assert.equal(again.id, quote.id);
-    assert.equal((await prisma.quote.findUnique({ where: { id: quote.id } }))!.reservedServiceNumber, 11);
+    assert.equal((await prisma.quote.findUnique({ where: { id: again.id } }))!.reservedServiceNumber, null);
 
     const other = await prisma.equipment.create({
       data: {
@@ -276,6 +276,6 @@ describe("cotización espejo MOT Servomotores → SYSTRON", () => {
       },
     });
     const nextDx = await openCase(nextAttention.id, new Date());
-    assert.equal(nextDx!.folio, "DX-12");
+    assert.equal(nextDx!.folio, "DX-4");
   });
 });
