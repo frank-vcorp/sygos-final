@@ -105,14 +105,28 @@ describe("folios de diagnóstico por empresa", () => {
     };
     assert.equal(folioOf(systronRows, motor.id), "DX-4");
     assert.equal(folioOf(servRows, motor.id), "DX-3");
+    const clientOf = (rows: typeof systronRows, equipmentId: string) => {
+      const row = rows.find((item) => item.kind === "servicio" && item.equipmentId === equipmentId);
+      return row && row.kind === "servicio" ? row.clientName : null;
+    };
+    assert.equal(clientOf(systronRows, motor.id), "Aceros del norte");
+    assert.equal(clientOf(servRows, motor.id), "SYSTRON");
 
     await prisma.technicalCase.update({ where: { id: dx!.id }, data: { status: "VALIDADO", quotePending: true } });
     const workshopQuote = await ensureQuoteFromCase({ userId: diego.id, activeCompanyId: servomotores.id }, dx!.id);
     const mirror = await prisma.quote.findFirst({ where: { companyId: systron.id, linkedQuoteId: workshopQuote.id } });
     assert.equal(workshopQuote.folio, "COT-3");
+    assert.equal(workshopQuote.clientId, adminClient.id);
     assert.equal(mirror!.folio, "COT-4");
+    assert.equal(mirror!.clientId, client.id);
     assert.equal(mirror!.technicalCaseId, dx!.id);
     assert.equal(mirror!.equipmentId, motor.id);
+    await prisma.quote.update({ where: { id: workshopQuote.id }, data: { clientId: client.id } });
+    await listActiveServicios(servomotores.id, "", { equipmentKind: "MOT" });
+    const correctedQuote = await prisma.quote.findUnique({ where: { id: workshopQuote.id } });
+    const mirrorAfter = await prisma.quote.findUnique({ where: { id: mirror!.id } });
+    assert.equal(correctedQuote!.clientId, adminClient.id);
+    assert.equal(mirrorAfter!.clientId, client.id);
 
     const legacyMotor = await prisma.equipment.create({
       data: {

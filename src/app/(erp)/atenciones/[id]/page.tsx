@@ -2,6 +2,7 @@ import { notFound, redirect } from "next/navigation";
 import { DetailAnchorButton, DetailGrid, EntityDetailHeader, EntityMetaItem, Card, Badge, TextLink } from "@/components/ui";
 import { ClientNameLink } from "@/components/client-entity-links";
 import { prisma } from "@/lib/db";
+import { serviceClientForCompany } from "@/lib/intercompany-client";
 import { formatWhen } from "@/lib/form";
 import { can } from "@/lib/permissions";
 import { ATTENTION_LABEL, type AttentionType } from "@/lib/priorities";
@@ -25,6 +26,7 @@ export default async function AtencionDetallePage({ params }: { params: Promise<
   const attention = await prisma.attention.findUnique({
     where: { id },
     include: {
+      adminClient: true,
       equipment: { include: { client: true, originCompany: true } },
       serviceCompany: true,
       technicalCases: { orderBy: { createdAt: "asc" }, select: { id: true, folio: true } },
@@ -39,6 +41,7 @@ export default async function AtencionDetallePage({ params }: { params: Promise<
     ? await prisma.user.findUnique({ where: { id: attention.sellerUserId }, select: { name: true } })
     : null;
   const equipmentHref = attention.equipment.kind === "MOT" ? `/motores/${attention.equipment.id}` : `/equipos/${attention.equipment.id}`;
+  const shownClient = serviceClientForCompany(session.activeCompanyId, attention, attention.equipment.client);
   const identity = [attention.equipment.typeName, attention.equipment.brandName, attention.equipment.model].filter(Boolean).join(" · ");
   const label = ATTENTION_LABEL[attention.attentionType as AttentionType] ?? attention.attentionType;
 
@@ -56,7 +59,7 @@ export default async function AtencionDetallePage({ params }: { params: Promise<
               <span className="block text-xs text-[var(--muted)]">{attention.equipment.folio}{attention.equipment.serial ? ` · Serie ${attention.equipment.serial}` : ""}</span>
             </EntityMetaItem>
             <EntityMetaItem label="Cliente">
-              <ClientNameLink clientId={attention.equipment.client.id} name={attention.equipment.client.name} isSystem={attention.equipment.client.isSystem} canEdit={can(session.role, "client.edit", session.activeCompanyCode)} />
+              <ClientNameLink clientId={shownClient.id} name={shownClient.name} isSystem={shownClient.isSystem} canEdit={can(session.role, "client.edit", session.activeCompanyCode) && !shownClient.isSystem} />
             </EntityMetaItem>
             <EntityMetaItem label="Vendedor">{seller?.name ?? "Sin vendedor asignado"}</EntityMetaItem>
             <EntityMetaItem label="Prioridad">{attention.priorityName}</EntityMetaItem>
@@ -68,7 +71,7 @@ export default async function AtencionDetallePage({ params }: { params: Promise<
         secondaryActions={
           <nav className="flex flex-wrap gap-2" aria-label="Relaciones de la atención">
             <TextLink href={equipmentHref}>Equipo</TextLink>
-            <TextLink href={`/clientes/${attention.equipment.client.id}`}>Cliente</TextLink>
+            <TextLink href={`/clientes/${shownClient.id}`}>Cliente</TextLink>
           </nav>
         }
       />

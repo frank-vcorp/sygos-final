@@ -6,6 +6,7 @@ import { ActiveFilters, Badge, Card, Empty, MobileCard, PageHeader, RecordLink, 
 import { mapEquipmentToAlmacenRow } from "@/lib/almacen-bandeja";
 import { CUSTODY_LABEL, type Custody } from "@/lib/custody";
 import { prisma } from "@/lib/db";
+import { serviceClientForCompany } from "@/lib/intercompany-client";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
 import { EntradaServicioCell } from "@/components/entrada-servicio-cell";
@@ -52,6 +53,9 @@ export default async function CustodiaPage({ searchParams }: { searchParams: Pro
         slaStartedAt: true,
         attentionType: true,
         sellerUserId: true,
+        originCompanyId: true,
+        serviceCompanyId: true,
+        adminClient: { select: { id: true, name: true, isSystem: true } },
         technicalCases: {
           orderBy: { createdAt: "asc" as const },
           select: { id: true, folio: true, kind: true, spawnedFromId: true, quotePending: true },
@@ -143,9 +147,14 @@ export default async function CustodiaPage({ searchParams }: { searchParams: Pro
     : new Map<string, string>();
   const almacenRows = almacenBandeja
     ? rows.map((row) => {
-      const hideClient = !systron && row.originCompany.code === "SYSTRON";
-      const mapped = mapEquipmentToAlmacenRow(row, { vistaQuery: vistaHref, hideClient });
       const attentionRow = row.attentions.find((a) => a.status === "ABIERTA" || a.status === "EN_PROCESO") ?? row.attentions[0];
+      const shownClient = attentionRow
+        ? serviceClientForCompany(session.activeCompanyId, attentionRow, row.client)
+        : row.client;
+      const mapped = mapEquipmentToAlmacenRow(
+        { ...row, client: shownClient },
+        { vistaQuery: vistaHref, hideClient: shownClient.isSystem },
+      );
       const sellerId = attentionRow?.sellerUserId ?? null;
       return { ...mapped, sellerName: sellerId ? sellers.get(sellerId) ?? null : null };
     })
@@ -186,7 +195,10 @@ export default async function CustodiaPage({ searchParams }: { searchParams: Pro
               </thead>
               <tbody>
                 {rows.map((row) => {
-                  const hideClient = !systron && row.originCompany.code === "SYSTRON";
+                  const attentionRow = row.attentions.find((a) => a.status === "ABIERTA" || a.status === "EN_PROCESO") ?? row.attentions[0];
+                  const shownClient = attentionRow
+                    ? serviceClientForCompany(session.activeCompanyId, attentionRow, row.client)
+                    : row.client;
                   return (
                     <tr key={row.id}>
                       <Td>
@@ -203,9 +215,9 @@ export default async function CustodiaPage({ searchParams }: { searchParams: Pro
                       {view === "pendientes" && almacenBandeja ? <Td><EntradaServicioCell attentionType={entradaAttentionType(row)} /></Td> : null}
                       <Td>
                         <ClientNameLink
-                          clientId={row.client.id}
-                          name={row.client.name}
-                          isSystem={hideClient}
+                          clientId={shownClient.id}
+                          name={shownClient.name}
+                          isSystem={shownClient.isSystem}
                         />
                       </Td>
                       <Td><Badge>{CUSTODY_LABEL[row.custody as Custody]}</Badge></Td>
@@ -216,7 +228,10 @@ export default async function CustodiaPage({ searchParams }: { searchParams: Pro
             </Table>
           }
           cards={rows.map((row) => {
-            const hideClient = !systron && row.originCompany.code === "SYSTRON";
+            const attentionRow = row.attentions.find((a) => a.status === "ABIERTA" || a.status === "EN_PROCESO") ?? row.attentions[0];
+            const shownClient = attentionRow
+              ? serviceClientForCompany(session.activeCompanyId, attentionRow, row.client)
+              : row.client;
             const href = row.kind === "MOT" ? `/motores/${row.id}${vistaQuery(view)}` : `/equipos/${row.id}${vistaQuery(view)}`;
             const attType = view === "pendientes" && almacenBandeja ? entradaAttentionType(row) : null;
             const series = attType ? serviceSeries(attType) : null;
@@ -234,7 +249,7 @@ export default async function CustodiaPage({ searchParams }: { searchParams: Pro
               >
                 {series ? <p className="font-medium">{row.folio}</p> : null}
                 <p>
-                  <ClientNameLink clientId={row.client.id} name={row.client.name} isSystem={hideClient} />
+                  <ClientNameLink clientId={shownClient.id} name={shownClient.name} isSystem={shownClient.isSystem} />
                 </p>
                 {series ? (
                   <p className="text-xs text-[var(--muted)]">

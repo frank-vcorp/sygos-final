@@ -1,5 +1,7 @@
 import { prisma } from "@/lib/db";
 import { displayCompanyCaseFolio, ensureOriginCompanyServiceNumbers, revealAuthorizedIntercompanyOrders, serviceCycleNumberFromFolio } from "@/lib/folios";
+import { serviceClientForCompany } from "@/lib/intercompany-client";
+import { alignIntercompanyWorkshopQuoteClients } from "@/lib/quotes";
 import { linesForTotal, money, quoteTotals } from "@/lib/money";
 import {
   administrativeStatus,
@@ -141,6 +143,7 @@ function caseSearchWhere(companyId: string, q: string) {
         : []),
       { equipment: { folio: { contains: q } } },
       { equipment: { client: { name: { contains: q } } } },
+      { attention: { adminClient: { name: { contains: q } } } },
       { attention: { reportedFault: { contains: q } } },
     ],
   };
@@ -196,6 +199,7 @@ type CaseRecord = {
     serviceCompanyId: string;
     serviceNumber: number | null;
     originServiceNumber: number | null;
+    adminClient: { id: string; name: string; isSystem: boolean } | null;
   };
   assignee: { name: string } | null;
 };
@@ -418,6 +422,7 @@ function buildServicioRow(
     && (diagnosis ?? primary).noRepairAt
     && (diagnosis ?? primary).status === "VALIDADO",
   );
+  const shownClient = serviceClientForCompany(viewingCompanyId, primary.attention, equipment.client);
 
   return {
     kind: "servicio",
@@ -430,9 +435,9 @@ function buildServicioRow(
     diagnosisHref,
     osFolio,
     osHref,
-    clientId: equipment.client.id,
-    clientName: equipment.client.name,
-    clientIsSystem: equipment.client.isSystem,
+    clientId: shownClient.id,
+    clientName: shownClient.name,
+    clientIsSystem: shownClient.isSystem,
     technical: technicalStatusFromCase(technicalSource.status),
     administrative: administrativeStatus({
       attentionType: primary.attention.attentionType,
@@ -493,6 +498,7 @@ const caseInclude = {
       serviceCompanyId: true,
       serviceNumber: true,
       originServiceNumber: true,
+      adminClient: { select: { id: true, name: true, isSystem: true } },
     },
   },
   assignee: { select: { name: true } },
@@ -631,6 +637,7 @@ export async function listActiveServicios(
   const clientOwnerUserId = options?.clientOwnerUserId;
 
   await revealAuthorizedIntercompanyOrders();
+  await alignIntercompanyWorkshopQuoteClients(companyId);
   const pendingDecisionCaseIds = q
     ? []
     : await technicalCaseIdsPendingSellerDecision(companyId, clientOwnerUserId);
@@ -694,6 +701,7 @@ export async function listHistorialServicios(
   const q = query.trim();
   const technicianId = options?.assigneeUserId;
   const clientOwnerUserId = options?.clientOwnerUserId;
+  await alignIntercompanyWorkshopQuoteClients(companyId);
   const historialStatuses = technicianId ? TECHNICIAN_HISTORIAL_CASE : HISTORIAL_CASE;
   const statusFilter =
     options?.status && options.status !== "todos" && (historialStatuses as readonly string[]).includes(options.status)
@@ -735,12 +743,16 @@ export async function listHistorialServicios(
                   OR: [
                     { equipment: { folio: { contains: q } } },
                     { equipment: { client: { name: { contains: q } } } },
+                    { adminClient: { name: { contains: q } } },
                     { reportedFault: { contains: q } },
                   ],
                 }
               : {}),
           },
-          include: { equipment: { include: { client: true } } },
+          include: {
+            adminClient: { select: { id: true, name: true, isSystem: true } },
+            equipment: { include: { client: true } },
+          },
           orderBy: { updatedAt: "desc" },
           take: 80,
         });
@@ -750,19 +762,22 @@ export async function listHistorialServicios(
   if (equipmentKind) {
     serviceRows = serviceRows.filter((row) => row.equipmentKind === equipmentKind);
   }
-  const cancelledRows: CancelledServicioBandejaRow[] = cancelledAttentions.map((row) => ({
+  const cancelledRows: CancelledServicioBandejaRow[] = cancelledAttentions.map((row) => {
+    const shownClient = serviceClientForCompany(companyId, row, row.equipment.client);
+    return {
     kind: "cancelado",
     id: row.id,
     equipmentId: row.equipment.id,
     equipmentHref: equipmentDetailHref(row.equipment.kind, row.equipment.id),
     equipmentLabel: formatEquipmentBandejaLabel(row.equipment),
-    clientId: row.equipment.client.id,
-    clientName: row.equipment.client.name,
-    clientIsSystem: row.equipment.client.isSystem,
+    clientId: shownClient.id,
+    clientName: shownClient.name,
+    clientIsSystem: shownClient.isSystem,
     closedAt: row.updatedAt,
     createdAt: row.createdAt,
     priorityName: row.priorityName,
-  }));
+    };
+  });
 
   let merged: SupervisorServicioRow[] = [...serviceRows, ...cancelledRows];
   if (equipmentKind) {

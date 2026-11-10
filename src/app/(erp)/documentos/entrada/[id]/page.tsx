@@ -4,6 +4,7 @@ import { PrintButton } from "@/components/print-button";
 import { ClientNameLink } from "@/components/client-entity-links";
 import { TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
+import { serviceClientForCompany } from "@/lib/intercompany-client";
 import { formatWhen } from "@/lib/form";
 import { MOVEMENT_LABEL, type MovementKind } from "@/lib/custody";
 import { can } from "@/lib/permissions";
@@ -16,7 +17,7 @@ export default async function EntradaDocumentoPage({ params }: { params: Promise
     where: { id, companyId: session.activeCompanyId },
     include: {
       company: true,
-      attention: true,
+      attention: { include: { adminClient: true } },
       equipment: { include: { client: true } },
     },
   });
@@ -30,6 +31,9 @@ export default async function EntradaDocumentoPage({ params }: { params: Promise
   if (!canPrint) notFound();
 
   const title = movement.kind === "INGRESO" ? "Ingreso físico" : "Entrada a almacén";
+  const shownClient = movement.attention
+    ? serviceClientForCompany(session.activeCompanyId, movement.attention, movement.equipment.client)
+    : movement.equipment.client;
   const issued = movement.occurredAt.toLocaleDateString("es-MX", { timeZone: "America/Mexico_City", dateStyle: "long" });
 
   return (
@@ -60,9 +64,9 @@ export default async function EntradaDocumentoPage({ params }: { params: Promise
               <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Cliente</p>
               <p className="mt-1 text-base font-semibold">
                 <ClientNameLink
-                  clientId={movement.equipment.client.id}
-                  name={movement.equipment.client.name}
-                  isSystem={movement.equipment.client.isSystem}
+                  clientId={shownClient.id}
+                  name={shownClient.name}
+                  isSystem={shownClient.isSystem}
                 />
               </p>
             </div>

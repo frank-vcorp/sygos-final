@@ -54,6 +54,7 @@ import {
 } from "@/lib/billing-document-service-links";
 import { requireCompany } from "@/lib/session";
 import { ADMIN_ESTADO, PHYSICAL_ESTADO } from "@/lib/servicios-bandeja";
+import { serviceClientForCompany } from "@/lib/intercompany-client";
 import { listExitWithoutDocumentPending } from "@/lib/warehouse-exit";
 import { CeoExitWithoutDocumentPanel } from "@/components/ceo-exit-without-document-panel";
 
@@ -1312,7 +1313,7 @@ async function CeoExecutive({
     version: row.version,
     folio: row.folio,
     equipmentFolio: row.equipment.folio,
-    clientName: row.equipment.client.name,
+    clientName: serviceClientForCompany(companyId, row.attention, row.equipment.client).name,
   }));
 
   const permisoRows: PanelRow[] = [

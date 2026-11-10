@@ -35,7 +35,7 @@ import { linesForTotal, money, quoteTotals } from "@/lib/money";
 import { can } from "@/lib/permissions";
 import { PRESOLICITUD_LABEL } from "@/lib/part-presolicitud";
 import { ATTENTION_LABEL, type AttentionType } from "@/lib/priorities";
-import { QUOTE_STATUS_LABEL, QUOTE_TYPE_LABEL, commercialAttentionTypeForQuote, intercompanyDeliveryDaysDefault, intercompanyReferenceAmount, quoteDeliveryDaysRequired, quoteListSlaLabel, quoteRequiresDeliveryDays, quoteShowsDeliveryDaysField, seesEconomicDetail, type QuoteType } from "@/lib/quotes";
+import { alignIntercompanyWorkshopQuoteClients, QUOTE_STATUS_LABEL, QUOTE_TYPE_LABEL, commercialAttentionTypeForQuote, intercompanyDeliveryDaysDefault, intercompanyReferenceAmount, quoteDeliveryDaysRequired, quoteListSlaLabel, quoteRequiresDeliveryDays, quoteShowsDeliveryDaysField, seesEconomicDetail, type QuoteType } from "@/lib/quotes";
 import { FIELD_SERVICE_DEFAULT_HOURS, FIELD_SERVICE_STATUS_LABEL, fieldServiceTotal, quoteCampoDisplayTotal } from "@/lib/field-service";
 import { ClientNameLink, ContactNameLink } from "@/components/client-entity-links";
 import { redirectIfSalesNotAssigned } from "@/lib/sales-assignment";
@@ -46,6 +46,7 @@ import { CASE_STATUS_LABEL } from "@/lib/technical";
 export default async function CotizacionDetallePage({ params }: { params: Promise<{ id: string }> }) {
   const session = await requireCompany();
   const { id } = await params;
+  await alignIntercompanyWorkshopQuoteClients(session.activeCompanyId);
   const quote = await prisma.quote.findFirst({
     where: { id, companyId: session.activeCompanyId },
     include: {

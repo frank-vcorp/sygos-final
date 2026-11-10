@@ -328,7 +328,7 @@ export async function listExitWithoutDocumentPending(serviceCompanyId: string, t
     },
     include: {
       equipment: { include: { client: true } },
-      attention: true,
+      attention: { include: { adminClient: true } },
     },
     orderBy: { exitWithoutDocumentRequestedAt: "desc" },
     take,

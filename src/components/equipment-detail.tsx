@@ -14,6 +14,7 @@ import { Badge, Card, DetailAnchorButton, EntityDetailHeader, EntityMetaItem, Mo
 import { buildAlmacenEntradaPreset, pickCustodyFlowAttention } from "@/lib/almacen-entrada";
 import { allowedMovements, CUSTODY_LABEL, isInitialWarehouseReceipt, isReceipt, isWarehouseExitDocument, MOVEMENT_LABEL, receiptReasonFromAttention, type Custody, type MovementKind } from "@/lib/custody";
 import { prisma } from "@/lib/db";
+import { serviceClientForCompany } from "@/lib/intercompany-client";
 import { formatWhen } from "@/lib/form";
 import { historyFor } from "@/lib/history";
 import { can, canListMotors } from "@/lib/permissions";
@@ -88,6 +89,10 @@ export async function EquipmentDetail({
     if (!linked) notFound();
   }
   const intercompany = expectedKind === "MOT" && session.activeCompanyCode === "SERVOMOTORES" && equipment.originCompany.code === "SYSTRON";
+  const workshopAttention = equipment.attentions.find((row) => row.originCompanyId !== row.serviceCompanyId) ?? equipment.attentions[0] ?? null;
+  const shownClient = workshopAttention
+    ? serviceClientForCompany(session.activeCompanyId, workshopAttention, equipment.client)
+    : equipment.client;
   const seller = equipment.attentions.find((row) => row.sellerUserId)?.sellerUserId;
   const sellerUser = seller ? await prisma.user.findUnique({ where: { id: seller } }) : null;
   const suppliers = can(session.role, "custody.confirm", session.activeCompanyCode)
@@ -168,7 +173,7 @@ export async function EquipmentDetail({
     ? buildAlmacenEntradaPreset({
         kind: expectedKind,
         custody: equipment.custody,
-        clientName: intercompany ? "SYSTRON · intercompañía" : equipment.client.name,
+        clientName: shownClient.name,
         attentions: equipment.attentions,
         quoteType: pendingQuote?.quoteType ?? null,
         quoteConcept: pendingQuote?.lines.find((line) => line.authorized)?.concept ?? pendingQuote?.lines[0]?.concept ?? null,
@@ -249,9 +254,9 @@ export async function EquipmentDetail({
           reason={almacenEntradaPreset.reason}
           serviceLabel={almacenEntradaPreset.serviceLabel}
           reportedFault={almacenEntradaPreset.reportedFault}
-          clientId={equipment.client.id}
-          clientName={equipment.client.name}
-          clientIsSystem={intercompany}
+          clientId={shownClient.id}
+          clientName={shownClient.name}
+          clientIsSystem={shownClient.isSystem}
         />
       )
       : null;
@@ -300,9 +305,9 @@ export async function EquipmentDetail({
             <EntityMetaItem label="Origen">{equipment.originCompany.name}</EntityMetaItem>
             <EntityMetaItem label="Cliente">
               <ClientNameLink
-                clientId={equipment.client.id}
-                name={equipment.client.name}
-                isSystem={intercompany || equipment.client.isSystem}
+                clientId={shownClient.id}
+                name={shownClient.name}
+                isSystem={shownClient.isSystem}
               />
             </EntityMetaItem>
             <EntityMetaItem label="Identificación">{[equipment.typeName, equipment.brandName, equipment.model].filter(Boolean).join(" · ") || "—"}</EntityMetaItem>
@@ -445,7 +450,6 @@ export async function EquipmentDetail({
                       {!caseRow ? <p className="font-medium text-[var(--accent)]">Ver detalle de la atención →</p> : null}
                       {attention.deliveryInstructions ? <p>Entrega: {attention.deliveryInstructions}</p> : null}
                       {attention.initialLog ? <p>Bitácora inicial: {attention.initialLog}</p> : null}
-                      {intercompany ? <p>Cliente administrativo: {attention.adminClient.name}</p> : null}
                     </MobileCard>
                   </li>
                   );

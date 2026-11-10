@@ -45,6 +45,7 @@ import {
 } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { displayCompanyCaseFolio, ensureOriginCompanyServiceNumber, revealAuthorizedIntercompanyOrders } from "@/lib/folios";
+import { serviceClientForCompany } from "@/lib/intercompany-client";
 import { formatWhen } from "@/lib/form";
 import { buildAttentionHistoryTimeline, seesFullAttentionHistory } from "@/lib/attention-history";
 import { isNormalDiagnosisPriority, isPaidDiagnosisPriority } from "@/lib/diagnosis-no-repair";
@@ -67,7 +68,7 @@ export default async function OperacionDetallePage({ params }: { params: Promise
   const loadedRow = await prisma.technicalCase.findUnique({
     where: { id },
     include: {
-      attention: true,
+      attention: { include: { adminClient: true } },
       equipment: { include: { originCompany: true, client: true } },
       serviceCompany: true,
       assignee: true,
@@ -293,8 +294,9 @@ export default async function OperacionDetallePage({ params }: { params: Promise
     ? { href: serviciosBandejaHref({ vista: historial ? "historial" : "activos" }), label: "Servicios" }
     : { href: "/operacion", label: "En proceso" };
   const equipmentIdentity = [row.equipment.typeName, row.equipment.brandName, row.equipment.model].filter(Boolean).join(" · ");
+  const shownClient = serviceClientForCompany(session.activeCompanyId, row.attention, row.equipment.client);
   const relatedLinks = [
-    { label: "Cliente", href: `/clientes/${row.equipment.client.id}` },
+    { label: "Cliente", href: `/clientes/${shownClient.id}` },
     { label: "Equipo", href: equipmentHref },
     ...(relatedQuotes.length > 0
       ? [{ label: `Cotizaciones${relatedQuotes.length > 1 ? ` (${relatedQuotes.length})` : ""}`, href: relatedQuotes.length === 1 ? `/cotizaciones/${relatedQuotes[0].id}` : "/cotizaciones" }]
@@ -605,10 +607,10 @@ export default async function OperacionDetallePage({ params }: { params: Promise
             </EntityMetaItem>
             <EntityMetaItem label="Cliente">
               <ClientNameLink
-                clientId={row.equipment.client.id}
-                name={row.equipment.client.name}
-                isSystem={row.equipment.client.isSystem}
-                canEdit={canEditClient}
+                clientId={shownClient.id}
+                name={shownClient.name}
+                isSystem={shownClient.isSystem}
+                canEdit={canEditClient && !shownClient.isSystem}
               />
             </EntityMetaItem>
             <EntityMetaItem label="Vendedor">{seller?.name ?? "Sin vendedor asignado"}</EntityMetaItem>

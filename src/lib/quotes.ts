@@ -308,6 +308,54 @@ export async function prepareQuoteFromCase(actor: Actor, caseId: string) {
   return ensureQuoteFromCase(actor, caseId);
 }
 
+/** La cotización del taller intercompañía queda a nombre de Systron, no del cliente final. */
+export async function alignIntercompanyWorkshopQuoteClients(companyId: string): Promise<number> {
+  const quotes = await prisma.quote.findMany({
+    where: { companyId, OR: [{ technicalCaseId: { not: null } }, { equipmentId: { not: null } }] },
+    select: { id: true, clientId: true, technicalCaseId: true, equipmentId: true },
+    orderBy: { updatedAt: "desc" },
+    take: 200,
+  });
+  const caseIds = quotes.flatMap((quote) => quote.technicalCaseId ? [quote.technicalCaseId] : []);
+  const cases = caseIds.length === 0
+    ? []
+    : await prisma.technicalCase.findMany({
+        where: { id: { in: caseIds } },
+        select: {
+          id: true,
+          attention: { select: { originCompanyId: true, serviceCompanyId: true, adminClientId: true } },
+        },
+      });
+  const caseAttention = new Map(cases.map((row) => [row.id, row.attention]));
+  const equipmentIds = quotes.flatMap((quote) => !quote.technicalCaseId && quote.equipmentId ? [quote.equipmentId] : []);
+  const equipments = equipmentIds.length === 0
+    ? []
+    : await prisma.equipment.findMany({
+        where: { id: { in: equipmentIds } },
+        select: {
+          id: true,
+          attentions: {
+            orderBy: { createdAt: "desc" },
+            take: 1,
+            select: { originCompanyId: true, serviceCompanyId: true, adminClientId: true },
+          },
+        },
+      });
+  const equipmentAttention = new Map(equipments.map((row) => [row.id, row.attentions[0] ?? null]));
+  let updated = 0;
+  for (const quote of quotes) {
+    const attention = (quote.technicalCaseId ? caseAttention.get(quote.technicalCaseId) : null)
+      ?? (quote.equipmentId ? equipmentAttention.get(quote.equipmentId) ?? null : null);
+    if (!attention) continue;
+    if (attention.originCompanyId === attention.serviceCompanyId) continue;
+    if (companyId !== attention.serviceCompanyId) continue;
+    if (quote.clientId === attention.adminClientId) continue;
+    await prisma.quote.update({ where: { id: quote.id }, data: { clientId: attention.adminClientId } });
+    updated += 1;
+  }
+  return updated;
+}
+
 export async function ensureQuoteFromCase(actor: { userId: string; activeCompanyId: string }, caseId: string) {
   const row = await prisma.technicalCase.findUnique({
     where: { id: caseId },
@@ -326,6 +374,14 @@ export async function ensureQuoteFromCase(actor: { userId: string; activeCompany
     siblingCaseIds,
   );
   if (existing) {
+    if (
+      row.equipment.originCompanyId !== row.serviceCompanyId
+      && actor.activeCompanyId === row.attention.serviceCompanyId
+      && existing.clientId !== row.attention.adminClientId
+    ) {
+      await prisma.quote.update({ where: { id: existing.id }, data: { clientId: row.attention.adminClientId } });
+      existing.clientId = row.attention.adminClientId;
+    }
     if (row.equipment.kind === "MOT" && row.equipment.originCompanyId !== actor.activeCompanyId) {
       await ensureOriginQuote(row, existing.id, actor.userId);
     }

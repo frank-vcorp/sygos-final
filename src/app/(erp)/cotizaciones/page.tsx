@@ -9,7 +9,7 @@ import { prisma } from "@/lib/db";
 import { linesForTotal, money, quoteTotals } from "@/lib/money";
 import { coordFilterChips, coordPageSubtitle, coordPageTitle, coordUsesSidebarNav } from "@/lib/coordination-ui";
 import { can } from "@/lib/permissions";
-import { ensureQuoteFromCase, quoteListSlaLabel, QUOTE_STATUS_LABEL, QUOTE_TYPE_LABEL, type QuoteType } from "@/lib/quotes";
+import { alignIntercompanyWorkshopQuoteClients, ensureQuoteFromCase, quoteListSlaLabel, QUOTE_STATUS_LABEL, QUOTE_TYPE_LABEL, type QuoteType } from "@/lib/quotes";
 import { requireCompany } from "@/lib/session";
 
 export default async function CotizacionesPage({ searchParams }: { searchParams: Promise<{ vista?: string; q?: string }> }) {
@@ -52,6 +52,7 @@ export default async function CotizacionesPage({ searchParams }: { searchParams:
       }
     }
   }
+  await alignIntercompanyWorkshopQuoteClients(session.activeCompanyId);
   const quotes = await prisma.quote.findMany({
     where: {
       companyId: session.activeCompanyId,

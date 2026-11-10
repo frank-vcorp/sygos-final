@@ -4,6 +4,7 @@ import { PrintButton } from "@/components/print-button";
 import { ClientNameLink } from "@/components/client-entity-links";
 import { TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
+import { serviceClientForCompany } from "@/lib/intercompany-client";
 import { formatWhen } from "@/lib/form";
 import { can } from "@/lib/permissions";
 import { ATTENTION_LABEL, type AttentionType } from "@/lib/priorities";
@@ -23,7 +24,7 @@ export default async function DxSinReparacionDocumentoPage({
   const row = await prisma.technicalCase.findFirst({
     where: { id, serviceCompanyId: session.activeCompanyId, kind: "DIAGNOSTICO" },
     include: {
-      attention: true,
+      attention: { include: { adminClient: true } },
       equipment: { include: { client: true } },
       serviceCompany: true,
     },
@@ -45,6 +46,7 @@ export default async function DxSinReparacionDocumentoPage({
       : null,
   ]);
   const backHref = row.equipment.kind === "MOT" ? `/motores/${row.equipmentId}` : `/equipos/${row.equipmentId}`;
+  const shownClient = serviceClientForCompany(session.activeCompanyId, row.attention, row.equipment.client);
   const validatedOn = row.validatedAt ?? row.noRepairAt;
   const issued = validatedOn.toLocaleDateString("es-MX", { timeZone: "America/Mexico_City", dateStyle: "long" });
 
@@ -85,9 +87,9 @@ export default async function DxSinReparacionDocumentoPage({
               <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Cliente</p>
               <p className="mt-1 text-base font-semibold">
                 <ClientNameLink
-                  clientId={row.equipment.client.id}
-                  name={row.equipment.client.name}
-                  isSystem={row.equipment.client.isSystem}
+                  clientId={shownClient.id}
+                  name={shownClient.name}
+                  isSystem={shownClient.isSystem}
                 />
               </p>
             </div>

@@ -3,6 +3,7 @@ import { ClientNameLink } from "@/components/client-entity-links";
 import { ActionLink, ActiveFilters, Badge, Button, controlClass, Empty, FilterBar, ListCap, MobileCard, PageHeader, RecordLink, ResponsiveData, Table, Td, Th, TextLink } from "@/components/ui";
 import { CUSTODY_LABEL, type Custody } from "@/lib/custody";
 import { prisma } from "@/lib/db";
+import { serviceClientForCompany } from "@/lib/intercompany-client";
 import { can, canListMotors } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
 
@@ -26,7 +27,19 @@ export default async function MotoresPage({ searchParams }: { searchParams: Prom
         ...(query ? [{ OR: [{ folio: { contains: query } }, { model: { contains: query } }, { serial: { contains: query } }] }] : []),
       ],
     },
-    include: { client: { select: { id: true, name: true, isSystem: true } }, originCompany: { select: { code: true, name: true } } },
+    include: {
+      client: { select: { id: true, name: true, isSystem: true } },
+      originCompany: { select: { code: true, name: true } },
+      attentions: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        select: {
+          originCompanyId: true,
+          serviceCompanyId: true,
+          adminClient: { select: { id: true, name: true, isSystem: true } },
+        },
+      },
+    },
     orderBy: { createdAt: "desc" },
     take: 100,
   });
@@ -53,16 +66,18 @@ export default async function MotoresPage({ searchParams }: { searchParams: Prom
           <thead><tr><Th>Folio</Th><Th>Origen</Th><Th>Cliente visible</Th><Th>Identificación</Th><Th>Custodia</Th></tr></thead>
           <tbody>
             {rows.map((row) => {
-              const intercompany = session.activeCompanyCode === "SERVOMOTORES" && row.originCompany.code === "SYSTRON";
+              const shownClient = row.attentions[0]
+                ? serviceClientForCompany(session.activeCompanyId, row.attentions[0], row.client)
+                : row.client;
               return (
                 <tr key={row.id}>
                   <Td><RecordLink href={`/motores/${row.id}`}>{row.folio}</RecordLink></Td>
                   <Td>{row.originCompany.name}</Td>
                   <Td>
                     <ClientNameLink
-                      clientId={row.client.id}
-                      name={row.client.name}
-                      isSystem={intercompany || row.client.isSystem}
+                      clientId={shownClient.id}
+                      name={shownClient.name}
+                      isSystem={shownClient.isSystem}
                     />
                   </Td>
                   <Td>{[row.brandName, row.model, row.serial].filter(Boolean).join(" · ")}</Td>
@@ -72,7 +87,9 @@ export default async function MotoresPage({ searchParams }: { searchParams: Prom
             })}
           </tbody>
         </Table>} cards={rows.map((row) => {
-          const intercompany = session.activeCompanyCode === "SERVOMOTORES" && row.originCompany.code === "SYSTRON";
+          const shownClient = row.attentions[0]
+            ? serviceClientForCompany(session.activeCompanyId, row.attentions[0], row.client)
+            : row.client;
           return (
             <MobileCard
               key={row.id}
@@ -81,9 +98,9 @@ export default async function MotoresPage({ searchParams }: { searchParams: Prom
               meta={<Badge>{CUSTODY_LABEL[row.custody as Custody] ?? row.custody}</Badge>}
               footer={
                 <ClientNameLink
-                  clientId={row.client.id}
-                  name={row.client.name}
-                  isSystem={intercompany || row.client.isSystem}
+                  clientId={shownClient.id}
+                  name={shownClient.name}
+                  isSystem={shownClient.isSystem}
                 />
               }
             >
