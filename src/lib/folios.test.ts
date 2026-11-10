@@ -423,4 +423,167 @@ describe("folios", () => {
 
     await prisma.$disconnect();
   });
+
+  it("una reserva del siguiente en un DX ya numerado se libera y el hueco 4 se reutiliza", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "sygos-srv-hole-"));
+    process.env.DATABASE_URL = `file:${join(dir, "test.db")}`;
+    const { execSync } = await import("child_process");
+    execSync("npx prisma db push --skip-generate", {
+      cwd: join(import.meta.dirname, "../.."),
+      env: process.env,
+      stdio: "ignore",
+    });
+
+    const { prisma } = await import("./db");
+    const { openCase } = await import("./technical");
+    const { allocateServiceNumber } = await import("./folios");
+
+    const company = await prisma.company.create({ data: { code: "HOLE", name: "Hueco" } });
+    const user = await prisma.user.create({
+      data: { username: "hole-test", name: "Test", passwordHash: "x", role: "CEO", companyId: company.id },
+    });
+    const client = await prisma.client.create({
+      data: {
+        companyId: company.id,
+        name: "Cliente",
+        active: true,
+        isSystem: false,
+        requiresInvoice: true,
+        rfc: "XAXX010101000",
+        cfdiUse: "G03",
+        paymentMethod: "PUE",
+      },
+    });
+    const equipment = await prisma.equipment.create({
+      data: {
+        folio: "EQUI-hole",
+        kind: "EQUI",
+        originCompanyId: company.id,
+        clientId: client.id,
+        model: "M",
+        custody: "EN_RESGUARDO",
+        holderCompanyId: company.id,
+        createdByUserId: user.id,
+      },
+    });
+    const used = [1, 2, 3, 5];
+    let caseThreeId = "";
+    for (const n of used) {
+      const attention = await prisma.attention.create({
+        data: {
+          equipmentId: equipment.id,
+          originCompanyId: company.id,
+          serviceCompanyId: company.id,
+          adminClientId: client.id,
+          attentionType: "DIAGNOSTICO",
+          priorityName: "Normal",
+          prioritySlaMaxDays: 5,
+          reportedFault: `Caso ${n}`,
+          serviceNumber: n,
+          slaStartedAt: new Date(),
+          status: "EN_PROCESO",
+        },
+      });
+      const dx = await prisma.technicalCase.create({
+        data: {
+          folio: `DX-${n}`,
+          attentionId: attention.id,
+          equipmentId: equipment.id,
+          serviceCompanyId: company.id,
+          kind: "DIAGNOSTICO",
+          status: "VALIDADO",
+          quotePending: false,
+        },
+      });
+      if (n === 3) caseThreeId = dx.id;
+    }
+    await prisma.folioSequence.create({ data: { companyId: company.id, series: "SRV", nextNumber: 6 } });
+    const stale = await prisma.quote.create({
+      data: {
+        folio: "COT-3",
+        companyId: company.id,
+        clientId: client.id,
+        quoteType: "DIAGNOSTICO",
+        status: "AUTORIZADA",
+        technicalCaseId: caseThreeId,
+        equipmentId: equipment.id,
+        reservedServiceNumber: 4,
+      },
+    });
+
+    const nextEquipment = await prisma.equipment.create({
+      data: {
+        folio: "EQUI-hole-next",
+        kind: "EQUI",
+        originCompanyId: company.id,
+        clientId: client.id,
+        model: "M",
+        custody: "EN_RESGUARDO",
+        holderCompanyId: company.id,
+        createdByUserId: user.id,
+      },
+    });
+    const nextAttention = await prisma.attention.create({
+      data: {
+        equipmentId: nextEquipment.id,
+        originCompanyId: company.id,
+        serviceCompanyId: company.id,
+        adminClientId: client.id,
+        attentionType: "DIAGNOSTICO",
+        priorityName: "Normal",
+        prioritySlaMaxDays: 5,
+        reportedFault: "Nuevo",
+        slaStartedAt: new Date(),
+        status: "EN_PROCESO",
+      },
+    });
+    const opened = await openCase(nextAttention.id, new Date());
+    assert.equal(opened!.folio, "DX-4");
+    assert.equal((await prisma.quote.findUnique({ where: { id: stale.id } }))!.reservedServiceNumber, null);
+
+    const after = await prisma.attention.create({
+      data: {
+        equipmentId: nextEquipment.id,
+        originCompanyId: company.id,
+        serviceCompanyId: company.id,
+        adminClientId: client.id,
+        attentionType: "REPARACION",
+        priorityName: "Express",
+        prioritySlaMaxDays: 0,
+        reportedFault: "Express",
+        slaStartedAt: new Date(),
+        status: "EN_PROCESO",
+        createdByUserId: user.id,
+      },
+    });
+    const express = await openCase(after.id, new Date());
+    assert.equal(express!.folio, "OS-6");
+
+    const keeper = await prisma.company.create({ data: { code: "KEEP", name: "Comercial" } });
+    const keeperClient = await prisma.client.create({
+      data: {
+        companyId: keeper.id,
+        name: "Cliente",
+        active: true,
+        isSystem: false,
+        requiresInvoice: true,
+        rfc: "XAXX010101009",
+        cfdiUse: "G03",
+        paymentMethod: "PUE",
+      },
+    });
+    const commercial = await prisma.quote.create({
+      data: {
+        folio: "COTDX-1",
+        companyId: keeper.id,
+        clientId: keeperClient.id,
+        quoteType: "DIAGNOSTICO",
+        status: "PENDIENTE_COTIZAR",
+        reservedServiceNumber: 4,
+      },
+    });
+    const keptAllocation = await allocateServiceNumber(keeper.id);
+    assert.notEqual(keptAllocation, 4);
+    assert.equal((await prisma.quote.findUnique({ where: { id: commercial.id } }))!.reservedServiceNumber, 4);
+  });
 });

@@ -111,11 +111,96 @@ async function nextSequenceNumber(scope: string, series: string, tx: Tx): Promis
   return number;
 }
 
-/** Reserva el siguiente entero de la serie interna SRV (una vez por servicio/atención). */
+/**
+ * La reserva “del siguiente” quedó en cotizaciones de un caso que ya tenía SRV.
+ * No cuenta y se borra. La reserva comercial previa al DX/OS se conserva.
+ */
+async function releaseStaleNextReservations(companyId: string, tx: Tx): Promise<number[]> {
+  const quotes = await tx.quote.findMany({
+    where: { companyId, reservedServiceNumber: { not: null }, technicalCaseId: { not: null } },
+    select: { id: true, companyId: true, reservedServiceNumber: true, technicalCaseId: true },
+  });
+  if (quotes.length === 0) return [];
+  const caseIds = quotes.flatMap((quote) => quote.technicalCaseId ? [quote.technicalCaseId] : []);
+  const cases = await tx.technicalCase.findMany({
+    where: { id: { in: caseIds } },
+    select: {
+      id: true,
+      folio: true,
+      attention: { select: { serviceNumber: true, originServiceNumber: true, serviceCompanyId: true, originCompanyId: true } },
+    },
+  });
+  const byCase = new Map(cases.map((row) => [row.id, row]));
+  const staleIds: string[] = [];
+  const freed: number[] = [];
+  for (const quote of quotes) {
+    if (quote.reservedServiceNumber == null || quote.technicalCaseId == null) continue;
+    const row = byCase.get(quote.technicalCaseId);
+    if (!row) continue;
+    const attention = row.attention;
+    const own = quote.companyId === attention.serviceCompanyId
+      ? (attention.serviceNumber ?? serviceCycleNumberFromFolio(row.folio))
+      : quote.companyId === attention.originCompanyId && attention.originCompanyId !== attention.serviceCompanyId
+        ? attention.originServiceNumber
+        : null;
+    if (own == null || own === quote.reservedServiceNumber) continue;
+    staleIds.push(quote.id);
+    freed.push(quote.reservedServiceNumber);
+  }
+  if (staleIds.length > 0) {
+    await tx.quote.updateMany({ where: { id: { in: staleIds } }, data: { reservedServiceNumber: null } });
+  }
+  return freed;
+}
+
+async function usedServiceNumbers(companyId: string, tx: Tx): Promise<Set<number>> {
+  const used = new Set<number>();
+  const add = (n: number | null | undefined) => {
+    if (n != null && n > 0) used.add(n);
+  };
+  for (const row of await tx.technicalCase.findMany({ where: { serviceCompanyId: companyId }, select: { folio: true } })) {
+    add(serviceCycleNumberFromFolio(row.folio));
+  }
+  for (const row of await tx.attention.findMany({
+    where: { serviceCompanyId: companyId, serviceNumber: { not: null } },
+    select: { serviceNumber: true },
+  })) {
+    add(row.serviceNumber);
+  }
+  for (const row of await tx.attention.findMany({
+    where: { originCompanyId: companyId, serviceCompanyId: { not: companyId }, originServiceNumber: { not: null } },
+    select: { originServiceNumber: true },
+  })) {
+    add(row.originServiceNumber);
+  }
+  for (const row of await tx.quote.findMany({
+    where: { companyId },
+    select: { folio: true, reservedServiceNumber: true },
+  })) {
+    add(serviceCycleNumberFromFolio(row.folio));
+    add(row.reservedServiceNumber);
+  }
+  for (const row of await tx.billingDocument.findMany({ where: { companyId }, select: { folio: true } })) {
+    add(serviceCycleNumberFromFolio(row.folio));
+  }
+  return used;
+}
+
+/** Reserva el siguiente entero libre de la serie interna SRV (una vez por servicio/atención). */
 export async function allocateServiceNumber(companyId: string, tx?: Tx): Promise<number> {
   if (!companyId) throw new FolioError("La serie SRV requiere empresa");
   if (tx) {
+    const freed = await releaseStaleNextReservations(companyId, tx);
     await bootstrapServiceSequence(companyId, tx);
+    if (freed.length > 0) {
+      const used = await usedServiceNumbers(companyId, tx);
+      const sequence = await tx.folioSequence.findUnique({
+        where: { companyId_series: { companyId, series: "SRV" } },
+      });
+      const ceiling = sequence?.nextNumber ?? Number.MAX_SAFE_INTEGER;
+      const reusable = [...freed].filter((n) => n < ceiling && !used.has(n)).sort((a, b) => a - b)[0];
+      if (reusable != null) return reusable;
+    }
     return nextSequenceNumber(companyId, "SRV", tx);
   }
   return prisma.$transaction(async (inner) => allocateServiceNumber(companyId, inner));
