@@ -14,6 +14,7 @@ import { Badge, Card, DetailAnchorButton, EntityDetailHeader, EntityMetaItem, Mo
 import { buildAlmacenEntradaPreset, pickCustodyFlowAttention } from "@/lib/almacen-entrada";
 import { allowedMovements, CUSTODY_LABEL, isInitialWarehouseReceipt, isReceipt, isWarehouseExitDocument, MOVEMENT_LABEL, receiptReasonFromAttention, type Custody, type MovementKind } from "@/lib/custody";
 import { prisma } from "@/lib/db";
+import { displayCompanyCaseFolio, ensureOriginCompanyServiceNumbers } from "@/lib/folios";
 import { serviceClientForCompany } from "@/lib/intercompany-client";
 import { formatWhen } from "@/lib/form";
 import { historyFor } from "@/lib/history";
@@ -78,6 +79,22 @@ export async function EquipmentDetail({
     },
   });
   if (!equipment) notFound();
+  const originNumbers = await ensureOriginCompanyServiceNumbers(
+    equipment.attentions
+      .filter((row) => row.originCompanyId !== row.serviceCompanyId)
+      .map((row) => row.id),
+  );
+  const companyCaseFolio = (attention: (typeof equipment.attentions)[number], folio: string) =>
+    displayCompanyCaseFolio(
+      folio,
+      {
+        originCompanyId: attention.originCompanyId,
+        serviceCompanyId: attention.serviceCompanyId,
+        serviceNumber: attention.serviceNumber,
+        originServiceNumber: originNumbers.get(attention.id) ?? attention.originServiceNumber,
+      },
+      session.activeCompanyId,
+    );
   await redirectIfSalesNotAssigned(session, equipment.client.ownerUserId, expectedKind === "EQUI" ? "/equipos" : "/motores");
   if (session.role === "TECNICO") {
     const linked = await prisma.technicalCase.findFirst({
@@ -134,8 +151,11 @@ export async function EquipmentDetail({
     : openAttention
       ? `/atenciones/${openAttention.id}`
       : null;
-  const activeServiceFolio = activeCase?.folio
-    ?? (openAttention ? (openAttention.attentionType === "REPARACION" ? "OS" : "DX") : null);
+  const activeServiceFolio = activeCase && openAttention
+    ? companyCaseFolio(openAttention, activeCase.folio)
+    : openAttention
+      ? (openAttention.attentionType === "REPARACION" ? "OS" : "DX")
+      : null;
   const activeServiceLabel = openAttention
     ? ATTENTION_LABEL[openAttention.attentionType as AttentionType] ?? openAttention.attentionType
     : null;
@@ -438,7 +458,7 @@ export async function EquipmentDetail({
                       {attention.technicalCases.length > 0 ? (
                         <p>
                           {attention.technicalCases.map((item) => (
-                            <span key={item.id} className="mr-2 text-[var(--muted)]">{item.folio}</span>
+                            <span key={item.id} className="mr-2 text-[var(--muted)]">{companyCaseFolio(attention, item.folio)}</span>
                           ))}
                         </p>
                       ) : null}
