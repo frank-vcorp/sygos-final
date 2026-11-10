@@ -1,3 +1,4 @@
+import { Prisma } from "@prisma/client";
 import { prisma } from "./db";
 import { allocateFolio, serviceFolioForAttention } from "./folios";
 import { recordCompanyCash } from "./purchases";
@@ -11,6 +12,10 @@ import { SALES_NOT_ASSIGNED_MESSAGE } from "./sales-assignment";
 type Actor = { userId: string; role: Role; activeCompanyId: string; activeCompanyCode: string };
 
 const CASH_INVOICE_LIMIT = 2000;
+const INTERCOMPANY_KIND = "FACTURA_INTERCOMPANIA";
+const INTERCOMPANY_SUPPLIER_ID = "supplier-intercompany-servomotores";
+const MIN_INTERCOMPANY_CFDI_USE = "G03";
+const MIN_INTERCOMPANY_PAYMENT_METHOD = "PPD";
 
 export function cashAllowedOnInvoice(amount: number, requiresInvoice: boolean | null): boolean {
   if (requiresInvoice !== true) return true;
@@ -106,6 +111,9 @@ export async function requestFromQuote(actor: Actor, quoteId: string, kind: "FAC
   if (remaining <= 0 && kind === "FACTURA") throw new Error("Esa operación ya no tiene saldo por facturar.");
   const total = kind === "REMISION" && (amount == null || amount === 0) ? 0 : roundMoney(amount ?? remaining);
   if (kind === "FACTURA" && (total <= 0 || total > remaining)) throw new Error("El importe no puede exceder el saldo permitido.");
+  if (kind === "FACTURA" && quote.linkedQuoteId && !quote.client.isSystem) {
+    await issueServomotoresInvoiceForEndClientRequest(actor, quote.linkedQuoteId);
+  }
   const ratio = totals.total === 0 ? 0 : total / totals.total;
   const subtotal = roundMoney(totals.subtotal * ratio);
   const iva = roundMoney(total - subtotal);
@@ -121,36 +129,47 @@ export async function requestFromQuote(actor: Actor, quoteId: string, kind: "FAC
     folio = await allocateFolio(actor.activeCompanyId, kind === "REMISION" ? "REM" : "FAC");
   }
   const concept = quote.lines.filter((line) => line.authorized || quote.quoteType !== "VENTA_EQUIPO").map((line) => line.concept).join("; ") || quote.folio;
-  const document = await prisma.billingDocument.create({
-    data: {
-      folio,
+  try {
+    const document = await prisma.billingDocument.create({
+      data: {
+        folio,
+        companyId: actor.activeCompanyId,
+        kind,
+        status: "SOLICITADA",
+        clientId: quote.clientId,
+        quoteId: quote.id,
+        technicalCaseId: quote.technicalCaseId,
+        equipmentId: quote.equipmentId,
+        concept,
+        subtotal,
+        iva,
+        total,
+        creditDays: quote.creditDays ?? quote.client.creditDays ?? 0,
+        rfcSnapshot: quote.client.rfc,
+        fiscalStatus: kind === "REMISION" ? "NO_APLICA" : "PENDIENTE",
+        requestedByUserId: actor.userId,
+        lines: { create: [{ concept, quantity: 1, unitPrice: total, amount: total }] },
+      },
+    });
+    await recordHistory({
       companyId: actor.activeCompanyId,
-      kind,
-      status: "SOLICITADA",
-      clientId: quote.clientId,
-      quoteId: quote.id,
-      technicalCaseId: quote.technicalCaseId,
-      equipmentId: quote.equipmentId,
-      concept,
-      subtotal,
-      iva,
-      total,
-      creditDays: quote.creditDays ?? quote.client.creditDays ?? 0,
-      rfcSnapshot: quote.client.rfc,
-      fiscalStatus: kind === "REMISION" ? "NO_APLICA" : "PENDIENTE",
-      requestedByUserId: actor.userId,
-      lines: { create: [{ concept, quantity: 1, unitPrice: total, amount: total }] },
-    },
-  });
-  await recordHistory({
-    companyId: actor.activeCompanyId,
-    entityType: "DOCUMENTO",
-    entityId: document.id,
-    action: "SOLICITUD",
-    summary: `${folio} quedó solicitado. Coordinación emite el documento.`,
-    authorUserId: actor.userId,
-  });
-  return document;
+      entityType: "DOCUMENTO",
+      entityId: document.id,
+      action: "SOLICITUD",
+      summary: `${folio} quedó solicitado. Coordinación emite el documento.`,
+      authorUserId: actor.userId,
+    });
+    return document;
+  } catch (error) {
+    if (!isPrismaUnique(error)) throw error;
+    const existing = await prisma.billingDocument.findFirst({
+      where: { companyId: actor.activeCompanyId, folio, quoteId: quote.id, status: { not: "CANCELADA" } },
+    });
+    if (existing) return existing;
+    throw new Error(kind === "FACTURA"
+      ? "Este servicio ya tiene una factura; no se permite otra FAC ligada a la atención."
+      : "No se pudo solicitar el documento.");
+  }
 }
 
 /** Facturación de servicio de campo (SCA): folio FAC/REM global de empresa, ligado al SCA (no ciclo SRV). */
@@ -310,7 +329,10 @@ export async function issueDocument(actor: Actor, documentId: string, overrides?
   });
   if (!document || document.status !== "SOLICITADA") throw new Error("Ese documento no está pendiente de emisión.");
   if (document.receivable) throw new Error("Ese documento ya generó una cuenta por cobrar.");
-  const fiscal = document.kind === "REMISION" ? null : fiscalForDocument(document.client, overrides);
+  const client = document.kind === INTERCOMPANY_KIND
+    ? await ensureIntercompanyClientFiscal(document.clientId)
+    : document.client;
+  const fiscal = document.kind === "REMISION" ? null : fiscalForDocument(client, overrides);
   const issuedAt = new Date();
   const dueAt = addDays(issuedAt, document.creditDays);
   await prisma.billingDocument.update({
@@ -344,7 +366,7 @@ export async function issueDocument(actor: Actor, documentId: string, overrides?
   }
   if (document.kind === "FACTURA_INTERCOMPANIA") {
     const systron = await prisma.company.findUnique({ where: { code: "SYSTRON" } });
-    const supplier = await prisma.supplier.findUnique({ where: { id: "supplier-intercompany-servomotores" } });
+    const supplier = await prisma.supplier.findUnique({ where: { id: INTERCOMPANY_SUPPLIER_ID } });
     if (!systron || !supplier) throw new Error("Falta el proveedor fijo Servomotores en SYSTRON.");
     await prisma.payable.create({
       data: {
@@ -457,6 +479,292 @@ export async function issueFreeInvoice(
   return document;
 }
 
+function isPrismaUnique(error: unknown) {
+  return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
+}
+
+async function intercompanyKeyForQuote(quote: { id: string; technicalCaseId: string | null }) {
+  if (!quote.technicalCaseId) return `quote:${quote.id}`;
+  const row = await prisma.technicalCase.findUnique({
+    where: { id: quote.technicalCaseId },
+    select: { attentionId: true },
+  });
+  return row?.attentionId ?? `quote:${quote.id}`;
+}
+
+async function findIntercompanyInvoice(baseQuoteId: string, key: string) {
+  const attentionId = key.startsWith("quote:") ? null : key;
+  const caseIds = attentionId
+    ? (await prisma.technicalCase.findMany({ where: { attentionId }, select: { id: true } })).map((row) => row.id)
+    : [];
+  return prisma.billingDocument.findFirst({
+    where: {
+      kind: INTERCOMPANY_KIND,
+      status: { not: "CANCELADA" },
+      OR: [
+        { intercompanyKey: key },
+        { quoteId: baseQuoteId },
+        ...(caseIds.length > 0 ? [{ technicalCaseId: { in: caseIds } }] : []),
+      ],
+    },
+    orderBy: { createdAt: "asc" },
+  });
+}
+
+/** Siguiente FAC de la empresa que no esté ocupado por otro documento (ciclo SRV u otro consecutivo). */
+async function allocateUniqueFacFolio(companyId: string) {
+  for (let attempt = 0; attempt < 25; attempt++) {
+    const folio = await allocateFolio(companyId, "FAC");
+    const taken = await prisma.billingDocument.findUnique({
+      where: { companyId_folio: { companyId, folio } },
+    });
+    if (!taken) return folio;
+  }
+  throw new Error("No hay un folio FAC libre en Servomotores.");
+}
+
+async function ensureIntercompanyClientFiscal(clientId: string) {
+  const client = await prisma.client.findUnique({ where: { id: clientId } });
+  if (!client) throw new Error("Falta el cliente fijo SYSTRON en Servomotores.");
+  if (client.cfdiUse && client.paymentMethod) return client;
+  return prisma.client.update({
+    where: { id: client.id },
+    data: {
+      cfdiUse: client.cfdiUse || MIN_INTERCOMPANY_CFDI_USE,
+      paymentMethod: client.paymentMethod || MIN_INTERCOMPANY_PAYMENT_METHOD,
+    },
+  });
+}
+
+async function intercompanyParties(clientId: string) {
+  const client = await ensureIntercompanyClientFiscal(clientId);
+  const fiscal = fiscalForDocument(client);
+  const systron = await prisma.company.findUnique({ where: { code: "SYSTRON" } });
+  const supplier = await prisma.supplier.findUnique({ where: { id: INTERCOMPANY_SUPPLIER_ID } });
+  if (!systron || !supplier || supplier.companyId !== systron.id) {
+    throw new Error("Falta el proveedor fijo Servomotores en SYSTRON.");
+  }
+  return { client, fiscal, systron, supplier };
+}
+
+function intercompanyLines(lines: Array<{ concept: string; quantity: number; unitPrice: number | null }>) {
+  return lines.map((line) => ({
+    concept: line.concept,
+    quantity: line.quantity,
+    unitPrice: line.unitPrice ?? 0,
+    amount: roundMoney(line.quantity * (line.unitPrice ?? 0)),
+  }));
+}
+
+/** Emite una solicitud intercompañía ya creada: CxC en Servomotores y CxP en Systron. Idempotente. */
+async function issueIntercompanyBalances(actor: Actor, documentId: string) {
+  const before = await prisma.billingDocument.findUnique({
+    where: { id: documentId },
+    include: { receivable: true, payable: true },
+  });
+  if (!before) throw new Error("No se encontró la factura a SYSTRON.");
+  if (before.status === "EMITIDA" && before.receivable && before.payable) return before;
+  const parties = await intercompanyParties(before.clientId);
+  const issuedAt = before.issuedAt ?? new Date();
+  const dueAt = before.dueAt ?? addDays(issuedAt, before.creditDays);
+  const key = before.intercompanyKey ?? await intercompanyKeyForQuote({
+    id: before.quoteId ?? before.id,
+    technicalCaseId: before.technicalCaseId,
+  });
+  try {
+    await prisma.$transaction(async (tx) => {
+      const current = await tx.billingDocument.findUnique({
+        where: { id: documentId },
+        include: { receivable: true, payable: true },
+      });
+      if (!current) return;
+      if (current.status !== "EMITIDA") {
+        await tx.billingDocument.update({
+          where: { id: current.id },
+          data: {
+            status: "EMITIDA",
+            fiscalStatus: "PENDIENTE",
+            fiscalError: null,
+            issuedAt,
+            dueAt,
+            issuedByUserId: actor.userId,
+            cfdiUseSnapshot: parties.fiscal.cfdiUse,
+            paymentMethodSnapshot: parties.fiscal.paymentMethod,
+            intercompanyKey: current.intercompanyKey ?? key,
+            version: { increment: 1 },
+          },
+        });
+      }
+      if (!current.receivable && current.total > 0) {
+        await tx.receivable.create({
+          data: {
+            companyId: current.companyId,
+            documentId: current.id,
+            clientId: current.clientId,
+            sellerUserId: parties.client.ownerUserId,
+            amount: current.total,
+            balance: current.total,
+            dueAt,
+            status: "ABIERTA",
+          },
+        });
+      }
+      if (!current.payable) {
+        await tx.payable.create({
+          data: {
+            companyId: parties.systron.id,
+            supplierId: parties.supplier.id,
+            documentId: current.id,
+            equipmentId: current.equipmentId,
+            amount: current.total,
+            balance: current.total,
+            dueAt,
+            status: "ABIERTA",
+          },
+        });
+      }
+    });
+  } catch (error) {
+    if (!isPrismaUnique(error)) throw error;
+    const raced = await prisma.billingDocument.findUnique({
+      where: { id: documentId },
+      include: { receivable: true, payable: true },
+    });
+    if (raced?.status === "EMITIDA" && raced.receivable && raced.payable) return raced;
+    throw error;
+  }
+  await stampBillingDocument(documentId);
+  await recordHistory({
+    companyId: before.companyId,
+    entityType: "DOCUMENTO",
+    entityId: before.id,
+    action: "EMISION",
+    summary: `${before.folio} emitida a SYSTRON al solicitar la factura del cliente final. Quedaron la cuenta por cobrar y la cuenta por pagar.`,
+    authorUserId: actor.userId,
+  });
+  return prisma.billingDocument.findUnique({ where: { id: documentId } });
+}
+
+/**
+ * Al solicitar la factura del cliente final, Servomotores emite la suya a SYSTRON.
+ * Una por atención. La segunda llamada devuelve la misma y no duplica CxC ni CxP.
+ */
+async function issueServomotoresInvoiceForEndClientRequest(actor: Actor, baseQuoteId: string) {
+  const quote = await prisma.quote.findUnique({
+    where: { id: baseQuoteId },
+    include: { lines: true, client: true, company: true },
+  });
+  if (!quote || quote.company.code !== "SERVOMOTORES" || !quote.client.isSystem) return;
+  const key = await intercompanyKeyForQuote(quote);
+  const existing = await findIntercompanyInvoice(quote.id, key);
+  if (existing) {
+    await issueIntercompanyBalances(actor, existing.id);
+    return;
+  }
+  const totals = quoteTotals(quote.lines, quote.discountPct);
+  if (!totals || totals.total <= 0) throw new Error("La cotización base no tiene importe.");
+  const parties = await intercompanyParties(quote.clientId);
+  const concept = quote.lines.map((line) => line.concept).join("; ") || quote.folio;
+  const creditDays = quote.creditDays ?? parties.client.creditDays ?? 0;
+  const lineData = intercompanyLines(quote.lines);
+
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const raced = await findIntercompanyInvoice(quote.id, key);
+    if (raced) {
+      await issueIntercompanyBalances(actor, raced.id);
+      return;
+    }
+    const folio = await allocateUniqueFacFolio(quote.companyId);
+    const issuedAt = new Date();
+    const dueAt = addDays(issuedAt, creditDays);
+    try {
+      const created = await prisma.$transaction(async (tx) => {
+        const again = await tx.billingDocument.findFirst({
+          where: {
+            kind: INTERCOMPANY_KIND,
+            status: { not: "CANCELADA" },
+            OR: [{ intercompanyKey: key }, { quoteId: quote.id }],
+          },
+        });
+        if (again) return null;
+        return tx.billingDocument.create({
+          data: {
+            folio,
+            companyId: quote.companyId,
+            kind: INTERCOMPANY_KIND,
+            status: "EMITIDA",
+            clientId: quote.clientId,
+            quoteId: quote.id,
+            technicalCaseId: quote.technicalCaseId,
+            equipmentId: quote.equipmentId,
+            intercompanyKey: key,
+            concept,
+            subtotal: totals.subtotal,
+            iva: totals.iva,
+            total: totals.total,
+            creditDays,
+            rfcSnapshot: parties.client.rfc,
+            cfdiUseSnapshot: parties.fiscal.cfdiUse,
+            paymentMethodSnapshot: parties.fiscal.paymentMethod,
+            issuedAt,
+            dueAt,
+            fiscalStatus: "PENDIENTE",
+            requestedByUserId: actor.userId,
+            issuedByUserId: actor.userId,
+            lines: { create: lineData },
+            receivable: {
+              create: {
+                companyId: quote.companyId,
+                clientId: quote.clientId,
+                sellerUserId: parties.client.ownerUserId,
+                amount: totals.total,
+                balance: totals.total,
+                dueAt,
+                status: "ABIERTA",
+              },
+            },
+            payable: {
+              create: {
+                companyId: parties.systron.id,
+                supplierId: parties.supplier.id,
+                equipmentId: quote.equipmentId,
+                amount: totals.total,
+                balance: totals.total,
+                dueAt,
+                status: "ABIERTA",
+              },
+            },
+          },
+        });
+      });
+      if (!created) {
+        const winner = await findIntercompanyInvoice(quote.id, key);
+        if (!winner) continue;
+        await issueIntercompanyBalances(actor, winner.id);
+        return;
+      }
+      await stampBillingDocument(created.id);
+      await recordHistory({
+        companyId: quote.companyId,
+        entityType: "DOCUMENTO",
+        entityId: created.id,
+        action: "EMISION",
+        summary: `${created.folio} emitida a SYSTRON al solicitar la factura del cliente final. Quedaron la cuenta por cobrar y la cuenta por pagar.`,
+        authorUserId: actor.userId,
+      });
+      return;
+    } catch (error) {
+      if (!isPrismaUnique(error)) throw error;
+      const winner = await findIntercompanyInvoice(quote.id, key);
+      if (winner) {
+        await issueIntercompanyBalances(actor, winner.id);
+        return;
+      }
+    }
+  }
+  throw new Error("No se pudo emitir la factura de Servomotores a SYSTRON.");
+}
+
 export async function requestIntercompany(actor: Actor, quoteId: string) {
   if (actor.activeCompanyCode !== "SERVOMOTORES") throw new Error("La factura a SYSTRON se solicita en Servomotores.");
   const quote = await prisma.quote.findFirst({
@@ -464,43 +772,55 @@ export async function requestIntercompany(actor: Actor, quoteId: string) {
     include: { lines: true, client: true },
   });
   if (!quote || !quote.client.isSystem) throw new Error("La base autorizada de Servomotores a SYSTRON es la que se factura.");
-  const existing = await prisma.billingDocument.findFirst({
-    where: { quoteId: quote.id, kind: "FACTURA_INTERCOMPANIA", status: { not: "CANCELADA" } },
-  });
+  const key = await intercompanyKeyForQuote(quote);
+  const existing = await findIntercompanyInvoice(quote.id, key);
   if (existing) return existing;
   const totals = quoteTotals(quote.lines, quote.discountPct);
   if (!totals || totals.total <= 0) throw new Error("La cotización base no tiene importe.");
-  const folio = await allocateFolio(actor.activeCompanyId, "FAC");
-  const document = await prisma.billingDocument.create({
-    data: {
-      folio,
-      companyId: actor.activeCompanyId,
-      kind: "FACTURA_INTERCOMPANIA",
-      status: "SOLICITADA",
-      clientId: quote.clientId,
-      quoteId: quote.id,
-      technicalCaseId: quote.technicalCaseId,
-      equipmentId: quote.equipmentId,
-      concept: quote.lines.map((line) => line.concept).join("; "),
-      subtotal: totals.subtotal,
-      iva: totals.iva,
-      total: totals.total,
-      creditDays: quote.creditDays ?? quote.client.creditDays ?? 0,
-      rfcSnapshot: quote.client.rfc,
-      fiscalStatus: "PENDIENTE",
-      requestedByUserId: actor.userId,
-      lines: { create: quote.lines.map((line) => ({ concept: line.concept, quantity: line.quantity, unitPrice: line.unitPrice ?? 0, amount: roundMoney(line.quantity * (line.unitPrice ?? 0)) })) },
-    },
-  });
-  await recordHistory({
-    companyId: actor.activeCompanyId,
-    entityType: "DOCUMENTO",
-    entityId: document.id,
-    action: "SOLICITUD",
-    summary: `${folio} solicita la factura de Servomotores a SYSTRON. No depende del cierre técnico ni de la factura al cliente final.`,
-    authorUserId: actor.userId,
-  });
-  return document;
+  await ensureIntercompanyClientFiscal(quote.clientId);
+  const concept = quote.lines.map((line) => line.concept).join("; ") || quote.folio;
+  const lineData = intercompanyLines(quote.lines);
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const folio = await allocateUniqueFacFolio(actor.activeCompanyId);
+    try {
+      const document = await prisma.billingDocument.create({
+        data: {
+          folio,
+          companyId: actor.activeCompanyId,
+          kind: INTERCOMPANY_KIND,
+          status: "SOLICITADA",
+          clientId: quote.clientId,
+          quoteId: quote.id,
+          technicalCaseId: quote.technicalCaseId,
+          equipmentId: quote.equipmentId,
+          intercompanyKey: key,
+          concept,
+          subtotal: totals.subtotal,
+          iva: totals.iva,
+          total: totals.total,
+          creditDays: quote.creditDays ?? quote.client.creditDays ?? 0,
+          rfcSnapshot: quote.client.rfc,
+          fiscalStatus: "PENDIENTE",
+          requestedByUserId: actor.userId,
+          lines: { create: lineData },
+        },
+      });
+      await recordHistory({
+        companyId: actor.activeCompanyId,
+        entityType: "DOCUMENTO",
+        entityId: document.id,
+        action: "SOLICITUD",
+        summary: `${folio} solicita la factura de Servomotores a SYSTRON. No depende del cierre técnico ni de la factura al cliente final.`,
+        authorUserId: actor.userId,
+      });
+      return document;
+    } catch (error) {
+      if (!isPrismaUnique(error)) throw error;
+      const winner = await findIntercompanyInvoice(quote.id, key);
+      if (winner) return winner;
+    }
+  }
+  throw new Error("No se pudo solicitar la factura a SYSTRON.");
 }
 
 export async function registerClientPayment(

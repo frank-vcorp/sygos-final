@@ -780,6 +780,8 @@ model BillingDocument {
   fiscalUuid        String?
   requestedByUserId String?
   issuedByUserId    String?
+  /// Una factura de Servomotores a SYSTRON por atención (o por cotización base si no hay atención).
+  intercompanyKey   String?   @unique
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt
   version           Int       @default(1)
