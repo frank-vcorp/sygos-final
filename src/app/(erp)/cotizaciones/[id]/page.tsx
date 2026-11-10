@@ -27,6 +27,7 @@ import {
 } from "@/components/ui";
 import { loadEquipmentCatalogByKind } from "@/lib/catalog";
 import { prisma } from "@/lib/db";
+import { displayCompanyCaseFolio, ensureOriginCompanyServiceNumber } from "@/lib/folios";
 import { attentionMetrics, elapsedLabel } from "@/lib/attention-timing";
 import { formatWhen } from "@/lib/form";
 import { historyFor } from "@/lib/history";
@@ -71,6 +72,15 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
       ? prisma.technicalCase.findUnique({ where: { id: quote.technicalCaseId }, include: { attention: true } })
       : null,
   ]);
+  if (
+    source
+    && source.attention.originCompanyId !== source.attention.serviceCompanyId
+    && source.attention.originServiceNumber == null
+  ) {
+    source.attention.originServiceNumber = await ensureOriginCompanyServiceNumber(source.attentionId);
+  }
+  const shownCaseFolio = (folio: string) =>
+    source ? displayCompanyCaseFolio(folio, source.attention, session.activeCompanyId) : folio;
   const executiveTimingAttention = session.role === "CEO" && source
     ? await prisma.attention.findUnique({
         where: { id: source.attentionId },
@@ -252,7 +262,7 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
   const executivePartItems = executiveTimingAttention?.technicalCases.flatMap((technicalCase) => [
     ...technicalCase.presolicitudes.map((item) => ({
       id: `presolicitud-${item.id}`,
-      caseFolio: technicalCase.folio,
+      caseFolio: shownCaseFolio(technicalCase.folio),
       stage: "Prevista en diagnóstico",
       partNumber: item.partNumber,
       description: item.description,
@@ -264,7 +274,7 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
     })),
     ...technicalCase.requests.map((item) => ({
       id: `request-${item.id}`,
-      caseFolio: technicalCase.folio,
+      caseFolio: shownCaseFolio(technicalCase.folio),
       stage: "Solicitud de refacción",
       partNumber: item.partNumber,
       description: item.description,
@@ -278,7 +288,7 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
   const executiveLogs = executiveTimingAttention?.technicalCases
     .flatMap((technicalCase) => technicalCase.logs.map((item) => ({
       id: item.id,
-      folio: technicalCase.folio,
+      folio: shownCaseFolio(technicalCase.folio),
       body: item.body,
       createdAt: item.createdAt,
       authorName: executiveAuthorNames.get(item.authorUserId),
@@ -317,7 +327,7 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
             ? [{
                 id: `case-${technicalCase.id}`,
                 createdAt: technicalCase.createdAt,
-                summary: `${technicalCase.folio} · ${technicalCase.kind === "OS" ? "Orden de servicio" : "Diagnóstico"} abierta. Estado actual: ${CASE_STATUS_LABEL[technicalCase.status] ?? technicalCase.status}.`,
+                summary: `${shownCaseFolio(technicalCase.folio)} · ${technicalCase.kind === "OS" ? "Orden de servicio" : "Diagnóstico"} abierta. Estado actual: ${CASE_STATUS_LABEL[technicalCase.status] ?? technicalCase.status}.`,
                 authorName: null,
               }]
             : []),
@@ -325,7 +335,7 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
         ...executiveOperationHistory.map((item) => ({
           id: `operation-history-${item.id}`,
           createdAt: item.createdAt,
-          summary: `${executiveCaseById.get(item.entityId)?.folio ?? "Operación"} · ${item.summary}`,
+          summary: `${shownCaseFolio(executiveCaseById.get(item.entityId)?.folio ?? "") || "Operación"} · ${item.summary}`,
           authorName: item.author?.name,
         })),
         ...history.map((item) => ({

@@ -199,6 +199,9 @@ export async function openCase(attentionId: string, receivedAt: Date) {
       });
       await tx.attention.update({ where: { id: attention.id }, data: { initialLog: null } });
     }
+    if (attention.originCompanyId !== attention.serviceCompanyId) {
+      await ensureAttentionServiceNumber(attention.id, attention.originCompanyId, tx);
+    }
     if (diagnosis && attention.attentionType === "DIAGNOSTICO") {
       let n = serviceCycleNumberFromFolio(technicalCase.folio);
       if (n == null) {
@@ -258,7 +261,7 @@ async function openDiagnosisOnExpressAttention(
 ) {
   const technicalCase = await prisma.$transaction(async (tx) => {
     const folio = await serviceFolioForAttention(attention.id, attention.serviceCompanyId, "DX", tx);
-    return tx.technicalCase.create({
+    const created = await tx.technicalCase.create({
       data: {
         folio,
         attentionId: attention.id,
@@ -271,6 +274,14 @@ async function openDiagnosisOnExpressAttention(
         quotePending: false,
       },
     });
+    const owner = await tx.attention.findUnique({
+      where: { id: attention.id },
+      select: { originCompanyId: true, serviceCompanyId: true },
+    });
+    if (owner && owner.originCompanyId !== owner.serviceCompanyId) {
+      await ensureAttentionServiceNumber(attention.id, owner.originCompanyId, tx);
+    }
+    return created;
   });
   await recordHistory({
     companyId: attention.serviceCompanyId,

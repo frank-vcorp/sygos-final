@@ -57,6 +57,7 @@ export default async function FacturacionPage({ searchParams }: { searchParams: 
   });
   const serviceLinkMap = await batchLoadBillingDocumentServiceLinks(
     rows.map((row) => pickBillingDocumentTechnicalCaseId(row)),
+    session.activeCompanyId,
   );
   const tabs: Array<{ href: string; label: string; active: boolean; key: Vista }> = [
     { href: "/facturacion", label: "Todas", active: vista === "todas", key: "todas" },

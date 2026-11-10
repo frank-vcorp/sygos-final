@@ -44,6 +44,7 @@ import {
   TextLink,
 } from "@/components/ui";
 import { prisma } from "@/lib/db";
+import { displayCompanyCaseFolio, ensureOriginCompanyServiceNumber } from "@/lib/folios";
 import { formatWhen } from "@/lib/form";
 import { buildAttentionHistoryTimeline, seesFullAttentionHistory } from "@/lib/attention-history";
 import { isNormalDiagnosisPriority, isPaidDiagnosisPriority } from "@/lib/diagnosis-no-repair";
@@ -76,7 +77,14 @@ export default async function OperacionDetallePage({ params }: { params: Promise
     },
   });
   if (!loadedRow) notFound();
+  if (
+    loadedRow.attention.originCompanyId !== loadedRow.attention.serviceCompanyId
+    && loadedRow.attention.originServiceNumber == null
+  ) {
+    loadedRow.attention.originServiceNumber = await ensureOriginCompanyServiceNumber(loadedRow.attentionId);
+  }
   const row = loadedRow!;
+  const displayFolio = displayCompanyCaseFolio(row.folio, row.attention, session.activeCompanyId);
   const reflected = session.activeCompanyCode === "SYSTRON" && row.serviceCompany.code === "SERVOMOTORES" && row.equipment.originCompanyId === session.activeCompanyId;
   const owns = row.serviceCompanyId === session.activeCompanyId;
   if (!owns && !reflected) notFound();
@@ -196,7 +204,10 @@ export default async function OperacionDetallePage({ params }: { params: Promise
       historyTimelineItems = buildAttentionHistoryTimeline({
         attention: attentionContext,
         movements: attentionContext.movements,
-        technicalCases: attentionContext.technicalCases,
+        technicalCases: attentionContext.technicalCases.map((item) => ({
+          ...item,
+          folio: displayCompanyCaseFolio(item.folio, attentionContext, session.activeCompanyId),
+        })),
         attentionHistory,
         operationHistory,
         quoteHistories,
@@ -554,7 +565,7 @@ export default async function OperacionDetallePage({ params }: { params: Promise
     <>
       <EntityDetailHeader
         back={back}
-        title={`Atención · ${row.folio}`}
+        title={`Atención · ${displayFolio}`}
         subtitle={`${row.kind === "OS" ? "Orden de servicio" : "Diagnóstico"} · ${row.serviceCompany.name}`}
         status={<Badge tone={row.quotePending || slaOverdue ? "warn" : "neutral"}>{CASE_STATUS_LABEL[row.status] ?? row.status}</Badge>}
         meta={

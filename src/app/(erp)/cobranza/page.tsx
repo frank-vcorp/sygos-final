@@ -41,6 +41,7 @@ export default async function CobranzaPage({ searchParams }: { searchParams: Pro
   });
   const serviceLinkMap = await batchLoadBillingDocumentServiceLinks(
     rows.map((row) => pickBillingDocumentTechnicalCaseId(row.document)),
+    session.activeCompanyId,
   );
   const payables = session.activeCompanyCode === "SYSTRON" && (session.role === "ADMINISTRADOR" || session.role === "CEO" || session.role === "COORDINACION_ADMINISTRACION")
     ? await prisma.payable.findMany({ where: { companyId: session.activeCompanyId }, include: { supplier: true, document: true }, orderBy: { dueAt: "asc" } })

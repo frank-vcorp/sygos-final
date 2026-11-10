@@ -41,6 +41,18 @@ async function bootstrapServiceSequence(serviceCompanyId: string, tx: Tx): Promi
     maxUsed = attentionMax._max.serviceNumber;
   }
 
+  const originMax = await tx.attention.aggregate({
+    where: {
+      originCompanyId: serviceCompanyId,
+      serviceCompanyId: { not: serviceCompanyId },
+      originServiceNumber: { not: null },
+    },
+    _max: { originServiceNumber: true },
+  });
+  if (originMax._max.originServiceNumber != null && originMax._max.originServiceNumber > maxUsed) {
+    maxUsed = originMax._max.originServiceNumber;
+  }
+
   const reservedMax = await tx.quote.aggregate({
     where: { companyId: serviceCompanyId, reservedServiceNumber: { not: null } },
     _max: { reservedServiceNumber: true },
@@ -109,6 +121,31 @@ export async function allocateServiceNumber(companyId: string, tx?: Tx): Promise
   return prisma.$transaction(async (inner) => allocateServiceNumber(companyId, inner));
 }
 
+export type CompanyFolioAttention = {
+  originCompanyId: string;
+  serviceCompanyId: string;
+  serviceNumber: number | null;
+  originServiceNumber: number | null;
+};
+
+/** Folio que muestra una empresa. El caso guarda el de quien ejecuta; el origen usa su propio SRV. */
+export function displayCompanyCaseFolio(
+  storedFolio: string,
+  attention: CompanyFolioAttention,
+  viewingCompanyId: string,
+): string {
+  const series = storedFolio.match(/^(DX|OS|COT|FAC|REM)-/)?.[1] as ServiceFolioSeries | undefined;
+  if (
+    series
+    && viewingCompanyId === attention.originCompanyId
+    && attention.originCompanyId !== attention.serviceCompanyId
+    && attention.originServiceNumber != null
+  ) {
+    return formatServiceFolio(series, attention.originServiceNumber);
+  }
+  return storedFolio;
+}
+
 export async function ensureAttentionServiceNumber(
   attentionId: string,
   companyId: string,
@@ -116,23 +153,42 @@ export async function ensureAttentionServiceNumber(
 ): Promise<number> {
   const attention = await tx.attention.findUnique({
     where: { id: attentionId },
-    select: { serviceNumber: true, serviceCompanyId: true },
+    select: {
+      serviceNumber: true,
+      originServiceNumber: true,
+      serviceCompanyId: true,
+      originCompanyId: true,
+      originQuoteId: true,
+    },
   });
   if (!attention) throw new FolioError("Atención no encontrada");
-  if (attention.serviceNumber != null) return attention.serviceNumber;
-  const originQuoteId = (
-    await tx.attention.findUnique({
+
+  const forOrigin = companyId === attention.originCompanyId && attention.originCompanyId !== attention.serviceCompanyId;
+  if (forOrigin) {
+    if (attention.originServiceNumber != null) return attention.originServiceNumber;
+    const originServiceNumber = await allocateServiceNumber(attention.originCompanyId, tx);
+    const claimed = await tx.attention.updateMany({
+      where: { id: attentionId, originServiceNumber: null },
+      data: { originServiceNumber },
+    });
+    if (claimed.count === 1) return originServiceNumber;
+    const again = await tx.attention.findUnique({
       where: { id: attentionId },
-      select: { originQuoteId: true },
-    })
-  )?.originQuoteId;
-  if (originQuoteId) {
+      select: { originServiceNumber: true },
+    });
+    if (again?.originServiceNumber == null) throw new FolioError("No se pudo apartar el folio de la empresa de origen");
+    return again.originServiceNumber;
+  }
+
+  if (attention.serviceNumber != null) return attention.serviceNumber;
+  if (attention.originQuoteId) {
     const reserved = (
       await tx.quote.findUnique({
-        where: { id: originQuoteId },
+        where: { id: attention.originQuoteId },
         select: { reservedServiceNumber: true },
       })
     )?.reservedServiceNumber;
+    // La reserva comercial se aparta en la empresa que ejecuta, aunque la cotización viva en el origen.
     if (reserved != null) {
       await tx.attention.update({ where: { id: attentionId }, data: { serviceNumber: reserved } });
       return reserved;
@@ -141,6 +197,39 @@ export async function ensureAttentionServiceNumber(
   const serviceNumber = await allocateServiceNumber(attention.serviceCompanyId, tx);
   await tx.attention.update({ where: { id: attentionId }, data: { serviceNumber } });
   return serviceNumber;
+}
+
+/** Aparta el SRV de origen de atenciones cuyo taller es otra empresa. No cambia el folio del caso. */
+export async function ensureOriginCompanyServiceNumber(attentionId: string): Promise<number | null> {
+  return prisma.$transaction(async (tx) => {
+    const attention = await tx.attention.findUnique({
+      where: { id: attentionId },
+      select: { originCompanyId: true, serviceCompanyId: true, originServiceNumber: true },
+    });
+    if (!attention || attention.originCompanyId === attention.serviceCompanyId) return null;
+    if (attention.originServiceNumber != null) return attention.originServiceNumber;
+    return ensureAttentionServiceNumber(attentionId, attention.originCompanyId, tx);
+  });
+}
+
+export async function ensureOriginCompanyServiceNumbers(attentionIds: string[]): Promise<Map<string, number>> {
+  const map = new Map<string, number>();
+  const ids = [...new Set(attentionIds)];
+  if (ids.length === 0) return map;
+  const rows = await prisma.attention.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, originCompanyId: true, serviceCompanyId: true, originServiceNumber: true },
+  });
+  for (const row of rows) {
+    if (row.originCompanyId === row.serviceCompanyId) continue;
+    if (row.originServiceNumber != null) {
+      map.set(row.id, row.originServiceNumber);
+      continue;
+    }
+    const n = await ensureOriginCompanyServiceNumber(row.id);
+    if (n != null) map.set(row.id, n);
+  }
+  return map;
 }
 
 /** Folio visible ligado al ciclo de servicio (mismo entero SRV, distinto prefijo). */

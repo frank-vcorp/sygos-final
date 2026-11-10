@@ -32,7 +32,7 @@ export default async function DocumentoPage({ params }: { params: Promise<{ id: 
   });
   if (!row) notFound();
   await redirectIfSalesNotAssigned(session, row.client.ownerUserId, "/facturacion");
-  const serviceLinks = await loadBillingDocumentServiceLinksForDocument(row);
+  const serviceLinks = await loadBillingDocumentServiceLinksForDocument(row, session.activeCompanyId);
   const canEditClient = can(session.role, "client.edit", session.activeCompanyCode);
   const canIssue = can(session.role, "invoice.issue", session.activeCompanyCode);
   const history = await historyFor("DOCUMENTO", row.id);

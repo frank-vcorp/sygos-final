@@ -4,6 +4,7 @@ import { parseGerenteServicioPanelFiltro } from "@/lib/gerente-servicios-panel-f
 import { ActiveFilters, Badge, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, SegmentedNav, Table, Td, Th } from "@/components/ui";
 import { homePath } from "@/lib/home";
 import { prisma } from "@/lib/db";
+import { displayCompanyCaseFolio, ensureOriginCompanyServiceNumbers } from "@/lib/folios";
 import { can } from "@/lib/permissions";
 import { compareBySla } from "@/lib/sla";
 import { isReparacionExpressAttentionType } from "@/lib/priorities";
@@ -45,19 +46,35 @@ export default async function OperacionPage({ searchParams }: { searchParams: Pr
     },
     include: {
       equipment: { select: { folio: true, kind: true, model: true, originCompanyId: true } },
-      attention: { select: { slaStartedAt: true, priorityName: true, attentionType: true } },
+      attention: {
+        select: {
+          slaStartedAt: true,
+          priorityName: true,
+          attentionType: true,
+          originCompanyId: true,
+          serviceCompanyId: true,
+          serviceNumber: true,
+          originServiceNumber: true,
+        },
+      },
       serviceCompany: { select: { code: true, name: true } },
       assignee: { select: { name: true } },
     },
     take: 200,
   });
+  const originNumbers = await ensureOriginCompanyServiceNumbers(rows.map((row) => row.attentionId));
   const ordered = rows
-    .map((row) => ({
-      ...row,
-      slaStartedAt: row.attention.slaStartedAt,
-      createdAt: row.createdAt,
-      express: isReparacionExpressAttentionType(row.attention.attentionType),
-    }))
+    .map((row) => {
+      const originServiceNumber = originNumbers.get(row.attentionId) ?? row.attention.originServiceNumber;
+      const attention = { ...row.attention, originServiceNumber };
+      return {
+        ...row,
+        folio: displayCompanyCaseFolio(row.folio, attention, session.activeCompanyId),
+        slaStartedAt: row.attention.slaStartedAt,
+        createdAt: row.createdAt,
+        express: isReparacionExpressAttentionType(row.attention.attentionType),
+      };
+    })
     .sort((a, b) => compareBySla(a, b));
   const tabs = [
     ["activas", "Activas"],

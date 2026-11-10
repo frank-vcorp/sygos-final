@@ -381,8 +381,10 @@ model Attention {
   originQuoteId       String?
   status              String    @default("ABIERTA")
   slaStartedAt        DateTime?
-  /** Consecutivo interno SRV (no mostrar en UI); DX/OS/COT/FAC/REM del ciclo comparten este entero. */
+  /** SRV de la empresa que ejecuta. El caso guarda DX/OS con este entero. */
   serviceNumber       Int?
+  /** SRV de la empresa de origen cuando otra empresa ejecuta. Esa empresa muestra su propio DX/OS/COT. */
+  originServiceNumber Int?
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
   version             Int       @default(1)

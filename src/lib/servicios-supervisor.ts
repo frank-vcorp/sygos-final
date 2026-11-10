@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { displayCompanyCaseFolio, ensureOriginCompanyServiceNumbers, serviceCycleNumberFromFolio } from "@/lib/folios";
 import { linesForTotal, money, quoteTotals } from "@/lib/money";
 import {
   administrativeStatus,
@@ -124,10 +125,20 @@ export function technicianActiveCaseWhere(userId: string) {
   };
 }
 
-function caseSearchWhere(q: string) {
+function caseSearchWhere(companyId: string, q: string) {
+  const parsed = serviceCycleNumberFromFolio(q.trim().toUpperCase());
   return {
     OR: [
       { folio: { contains: q } },
+      ...(parsed != null
+        ? [{
+            attention: {
+              originCompanyId: companyId,
+              serviceCompanyId: { not: companyId },
+              originServiceNumber: parsed,
+            },
+          }]
+        : []),
       { equipment: { folio: { contains: q } } },
       { equipment: { client: { name: { contains: q } } } },
       { attention: { reportedFault: { contains: q } } },
@@ -181,6 +192,10 @@ type CaseRecord = {
     sellerUserId: string | null;
     priorityName: string;
     createdAt: Date;
+    originCompanyId: string;
+    serviceCompanyId: string;
+    serviceNumber: number | null;
+    originServiceNumber: number | null;
   };
   assignee: { name: string } | null;
 };
@@ -362,6 +377,7 @@ function buildServicioRow(
   cases: CaseRecord[],
   quote: QuoteBandejaPick | null,
   sellerName: string | null,
+  viewingCompanyId: string,
 ): ServicioBandejaRow {
   const quoteStatus = quote?.status ?? null;
   const siblingPick = cases.map((c) => ({ id: c.id, kind: c.kind }));
@@ -378,9 +394,11 @@ function buildServicioRow(
   const equipment = primary.equipment;
   const technicalSource = diagnosisActive ? diagnosis : (os ?? diagnosis ?? primary);
 
-  const diagnosisFolio = diagnosis?.folio ?? null;
+  const diagnosisFolio = diagnosis
+    ? displayCompanyCaseFolio(diagnosis.folio, diagnosis.attention, viewingCompanyId)
+    : null;
   const diagnosisHref = diagnosis ? `/operacion/${diagnosis.id}` : null;
-  const osFolio = os?.folio ?? null;
+  const osFolio = os ? displayCompanyCaseFolio(os.folio, os.attention, viewingCompanyId) : null;
   const osHref = os ? `/operacion/${os.id}` : null;
 
   let technicianName: string | null = null;
@@ -461,7 +479,19 @@ function groupCasesByEquipment(cases: CaseRecord[]) {
 
 const caseInclude = {
   equipment: { include: { client: true } },
-  attention: { select: { priorityName: true, createdAt: true, slaStartedAt: true, attentionType: true, sellerUserId: true } },
+  attention: {
+    select: {
+      priorityName: true,
+      createdAt: true,
+      slaStartedAt: true,
+      attentionType: true,
+      sellerUserId: true,
+      originCompanyId: true,
+      serviceCompanyId: true,
+      serviceNumber: true,
+      originServiceNumber: true,
+    },
+  },
   assignee: { select: { name: true } },
 } as const;
 
@@ -484,6 +514,12 @@ async function attachParentDiagnoses(companyId: string, cases: CaseRecord[]): Pr
 
 async function mapCasesToBandejaRows(companyId: string, cases: CaseRecord[]): Promise<ServicioBandejaRow[]> {
   if (cases.length === 0) return [];
+
+  const originNumbers = await ensureOriginCompanyServiceNumbers(cases.map((row) => row.attentionId));
+  for (const row of cases) {
+    const n = originNumbers.get(row.attentionId);
+    if (n != null) row.attention.originServiceNumber = n;
+  }
 
   const casesWithParents = await attachParentDiagnoses(companyId, cases);
   const caseIds = casesWithParents.map((c) => c.id);
@@ -535,7 +571,7 @@ async function mapCasesToBandejaRows(companyId: string, cases: CaseRecord[]): Pr
       const sellerName = primary.attention.sellerUserId
         ? sellerMap.get(primary.attention.sellerUserId) ?? null
         : null;
-      rows.push(buildServicioRow(attentionId, attentionCases, quote, sellerName));
+      rows.push(buildServicioRow(attentionId, attentionCases, quote, sellerName, companyId));
     }
   }
 
@@ -590,7 +626,7 @@ export async function listActiveServicios(
     ...(clientOwnerUserId ? [clientOwnerScope(clientOwnerUserId)] : []),
     ...(attentionType ? [{ attention: { attentionType } }] : []),
     createdAtRange(options?.desde, options?.hasta),
-    ...(q ? [caseSearchWhere(q)] : []),
+    ...(q ? [caseSearchWhere(companyId, q)] : []),
   ].filter((part) => Object.keys(part).length > 0);
 
   const cases = await prisma.technicalCase.findMany({
@@ -655,7 +691,7 @@ export async function listHistorialServicios(
     ...(clientOwnerUserId ? [clientOwnerScope(clientOwnerUserId)] : []),
     ...(attentionType ? [{ attention: { attentionType } }] : []),
     updatedAtRange(options?.desde, options?.hasta),
-    ...(q ? [caseSearchWhere(q)] : []),
+    ...(q ? [caseSearchWhere(companyId, q)] : []),
   ].filter((part) => Object.keys(part).length > 0);
 
   const cases = await prisma.technicalCase.findMany({

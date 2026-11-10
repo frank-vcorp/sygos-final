@@ -1144,7 +1144,7 @@ async function Coordination({ companyId, code, vista }: { companyId: string; cod
   const billingServiceLinkMap = await batchLoadBillingDocumentServiceLinks([
     ...invoices.map((row) => pickBillingDocumentTechnicalCaseId(row)),
     ...remissions.map((row) => pickBillingDocumentTechnicalCaseId(row)),
-  ]);
+  ], companyId);
   const billingPending = invoices.length + remissions.length;
   const subtitle =
     vista === "pendientes"
@@ -1231,7 +1231,7 @@ async function loadCoordinationFinanceSnapshot(companyId: string) {
   const billingServiceLinkMap = await batchLoadBillingDocumentServiceLinks([
     ...invoices.map((row) => pickBillingDocumentTechnicalCaseId(row)),
     ...remissions.map((row) => pickBillingDocumentTechnicalCaseId(row)),
-  ]);
+  ], companyId);
   return {
     comprasPendientesHref,
     billingPending: invoices.length + remissions.length,

@@ -287,7 +287,6 @@ function isQuoteFolioUniqueConflict(error: unknown): boolean {
 async function findWorkshopQuoteForAttention(
   companyId: string,
   attentionId: string,
-  serviceCompanyId: string,
   siblingCaseIds: string[],
 ) {
   const byCase = await prisma.quote.findFirst({
@@ -298,7 +297,7 @@ async function findWorkshopQuoteForAttention(
   });
   if (byCase) return byCase;
 
-  const folio = await serviceFolioForAttention(attentionId, serviceCompanyId, "COT");
+  const folio = await serviceFolioForAttention(attentionId, companyId, "COT");
   return prisma.quote.findUnique({
     where: { companyId_folio: { companyId, folio } },
   });
@@ -323,7 +322,6 @@ export async function ensureQuoteFromCase(actor: { userId: string; activeCompany
   const existing = await findWorkshopQuoteForAttention(
     actor.activeCompanyId,
     row.attentionId,
-    row.serviceCompanyId,
     siblingCaseIds,
   );
   if (existing) {
@@ -375,7 +373,6 @@ export async function ensureQuoteFromCase(actor: { userId: string; activeCompany
     const raced = await findWorkshopQuoteForAttention(
       actor.activeCompanyId,
       row.attentionId,
-      row.serviceCompanyId,
       siblingCaseIds,
     );
     if (!raced) throw error;
@@ -444,13 +441,13 @@ async function ensureOriginQuote(
   const existing = await findWorkshopQuoteForAttention(
     row.equipment.originCompanyId,
     row.attentionId,
-    row.serviceCompanyId,
     siblingCaseIds,
   );
   if (existing) return existing;
   const repair = row.kind === "OS";
   const concept = automaticQuoteConcept(row);
-  const folio = await serviceFolioForAttention(row.attentionId, row.serviceCompanyId, "COT");
+  const folio = await serviceFolioForAttention(row.attentionId, row.equipment.originCompanyId, "COT");
+  const originCycle = serviceCycleNumberFromFolio(folio);
   const originClient = await prisma.client.findUnique({
     where: { id: row.equipment.clientId },
     select: { ownerUserId: true },
@@ -469,7 +466,7 @@ async function ensureOriginQuote(
         technicalCaseId: row.id,
         linkedQuoteId: baseQuoteId,
         sellerUserId: resolveQuoteSellerUserId(row.attention.sellerUserId, originClient?.ownerUserId ?? null),
-        reference: row.folio,
+        reference: originCycle != null ? formatServiceFolio(repair ? "OS" : "DX", originCycle) : row.folio,
         ...priorityFields,
         lines: {
           create: [{
@@ -485,7 +482,6 @@ async function ensureOriginQuote(
     const raced = await findWorkshopQuoteForAttention(
       row.equipment.originCompanyId,
       row.attentionId,
-      row.serviceCompanyId,
       siblingCaseIds,
     );
     if (!raced) throw error;

@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { ActiveFilters, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, Table, Td, TextLink, Th } from "@/components/ui";
 import { prisma } from "@/lib/db";
+import { displayCompanyCaseFolio, ensureOriginCompanyServiceNumbers, serviceCycleNumberFromFolio } from "@/lib/folios";
 import { can } from "@/lib/permissions";
 import { partInventorySearchWhere } from "@/lib/inventory-search";
 import { listHref } from "@/lib/list-url";
@@ -46,12 +47,38 @@ export default async function BuscarPage({ searchParams }: { searchParams: Promi
       : Promise.resolve([]),
     prisma.technicalCase.findMany({
       where: {
-        folio: { contains: query },
-        OR: [{ serviceCompanyId: session.activeCompanyId }, { equipment: { originCompanyId: session.activeCompanyId } }],
+        AND: [
+          { OR: [{ serviceCompanyId: session.activeCompanyId }, { equipment: { originCompanyId: session.activeCompanyId } }] },
+          {
+            OR: [
+              { folio: { contains: query } },
+              ...(serviceCycleNumberFromFolio(query.toUpperCase()) != null
+                ? [{
+                    attention: {
+                      originCompanyId: session.activeCompanyId,
+                      serviceCompanyId: { not: session.activeCompanyId },
+                      originServiceNumber: serviceCycleNumberFromFolio(query.toUpperCase())!,
+                    },
+                  }]
+                : []),
+            ],
+          },
+        ],
+      },
+      include: {
+        attention: {
+          select: {
+            originCompanyId: true,
+            serviceCompanyId: true,
+            serviceNumber: true,
+            originServiceNumber: true,
+          },
+        },
       },
       take: 20,
     }),
   ]);
+  const originNumbers = await ensureOriginCompanyServiceNumbers(operations.map((row) => row.attentionId));
   const rows = [
     ...clients.map((row) => ({ href: `/clientes/${row.id}`, kind: "Cliente", label: row.name })),
     ...prospects.map((row) => ({ href: `/prospectos/${row.id}`, kind: "Prospecto", label: row.name })),
@@ -62,7 +89,15 @@ export default async function BuscarPage({ searchParams }: { searchParams: Promi
       kind: "Refacción",
       label: `${row.partNumber} · ${row.description}`,
     })),
-    ...operations.map((row) => ({ href: `/operacion/${row.id}`, kind: row.kind === "OS" ? "Orden de servicio" : "Diagnóstico", label: row.folio })),
+    ...operations.map((row) => ({
+      href: `/operacion/${row.id}`,
+      kind: row.kind === "OS" ? "Orden de servicio" : "Diagnóstico",
+      label: displayCompanyCaseFolio(
+        row.folio,
+        { ...row.attention, originServiceNumber: originNumbers.get(row.attentionId) ?? row.attention.originServiceNumber },
+        session.activeCompanyId,
+      ),
+    })),
   ];
   return (
     <>

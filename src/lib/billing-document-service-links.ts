@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db";
+import { displayCompanyCaseFolio, ensureOriginCompanyServiceNumbers, type CompanyFolioAttention } from "@/lib/folios";
 
 export type TechnicalCaseLinkSlice = {
   id: string;
@@ -52,8 +53,16 @@ export function formatBillingDocumentServiceLinksDetail(links: BillingDocumentSe
   return parts.length ? parts.join(" · ") : null;
 }
 
+const attentionFolioSelect = {
+  originCompanyId: true,
+  serviceCompanyId: true,
+  serviceNumber: true,
+  originServiceNumber: true,
+} as const;
+
 export async function batchLoadBillingDocumentServiceLinks(
   caseIds: Iterable<string | null | undefined>,
+  viewingCompanyId?: string,
 ): Promise<Map<string, BillingDocumentServiceLinks>> {
   const ids = [...new Set([...caseIds].filter((id): id is string => Boolean(id)))];
   const result = new Map<string, BillingDocumentServiceLinks>();
@@ -61,18 +70,35 @@ export async function batchLoadBillingDocumentServiceLinks(
 
   const seedCases = await prisma.technicalCase.findMany({
     where: { id: { in: ids } },
-    select: { id: true, folio: true, kind: true, spawnedFromId: true, attentionId: true },
+    select: {
+      id: true,
+      folio: true,
+      kind: true,
+      spawnedFromId: true,
+      attentionId: true,
+      attention: { select: attentionFolioSelect },
+    },
   });
 
   const attentionIds = [...new Set(seedCases.map((c) => c.attentionId))];
+  const originNumbers = viewingCompanyId
+    ? await ensureOriginCompanyServiceNumbers(attentionIds)
+    : new Map<string, number>();
   const allCases = attentionIds.length
     ? await prisma.technicalCase.findMany({
         where: { attentionId: { in: attentionIds } },
-        select: { id: true, folio: true, kind: true, spawnedFromId: true, attentionId: true },
+        select: {
+          id: true,
+          folio: true,
+          kind: true,
+          spawnedFromId: true,
+          attentionId: true,
+          attention: { select: attentionFolioSelect },
+        },
       })
     : [];
 
-  const casesByAttention = new Map<string, TechnicalCaseLinkSlice[]>();
+  const casesByAttention = new Map<string, typeof allCases>();
   for (const c of allCases) {
     const list = casesByAttention.get(c.attentionId) ?? [];
     list.push(c);
@@ -80,7 +106,10 @@ export async function batchLoadBillingDocumentServiceLinks(
   }
 
   for (const seed of seedCases) {
-    const cases = casesByAttention.get(seed.attentionId) ?? [seed];
+    const cases = (casesByAttention.get(seed.attentionId) ?? [seed]).map((item) => ({
+      ...item,
+      folio: shownFolio(item.folio, item.attention, originNumbers.get(item.attentionId), viewingCompanyId),
+    }));
     result.set(seed.id, resolveServiceLinksFromAttentionCases(cases));
   }
 
@@ -100,12 +129,29 @@ export function linksForBillingDocument(
   return map.get(caseId) ?? EMPTY_LINKS;
 }
 
-export async function loadBillingDocumentServiceLinksForDocument(doc: {
-  technicalCaseId: string | null;
-  quote?: { technicalCaseId: string | null } | null;
-}): Promise<BillingDocumentServiceLinks> {
+function shownFolio(
+  folio: string,
+  attention: CompanyFolioAttention,
+  originServiceNumber: number | undefined,
+  viewingCompanyId: string | undefined,
+): string {
+  if (!viewingCompanyId) return folio;
+  return displayCompanyCaseFolio(
+    folio,
+    { ...attention, originServiceNumber: originServiceNumber ?? attention.originServiceNumber },
+    viewingCompanyId,
+  );
+}
+
+export async function loadBillingDocumentServiceLinksForDocument(
+  doc: {
+    technicalCaseId: string | null;
+    quote?: { technicalCaseId: string | null } | null;
+  },
+  viewingCompanyId?: string,
+): Promise<BillingDocumentServiceLinks> {
   const caseId = pickBillingDocumentTechnicalCaseId(doc);
   if (!caseId) return EMPTY_LINKS;
-  const map = await batchLoadBillingDocumentServiceLinks([caseId]);
+  const map = await batchLoadBillingDocumentServiceLinks([caseId], viewingCompanyId);
   return map.get(caseId) ?? EMPTY_LINKS;
 }
