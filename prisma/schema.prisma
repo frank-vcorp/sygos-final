@@ -23,6 +23,11 @@ model Company {
   registroPatronal String?
   employerCurp     String?
   employerState    String?
+  facturapiMode       String  @default("OFF")
+  fiscalSeriesPolicy  String  @default("SYGOS_FAC")
+  fiscalDefaultSeries String  @default("FAC")
+  fiscalLineMode      String  @default("LINE_BY_LINE")
+  fiscalConfigJson    String  @default("{}")
   /// Presupuesto mensual de compras de refacciones. No limita una compra individual.
   partsMonthlyBudget Float @default(100000)
   /// Presupuesto mensual de compras generales. No limita una compra individual.
@@ -125,11 +130,13 @@ model Client {
   requiresInvoice  Boolean?
   creditDays       Int?
   rfc              String?
+  satLegalName     String?
   taxRegime        String?
   cfdiUse          String?
   paymentMethod    String?
   fiscalZip        String?
   fiscalAddress    String?
+  fiscalEmail      String?
   deliveryAddress  String?
   active           Boolean  @default(true)
   isSystem         Boolean  @default(false)
@@ -772,12 +779,19 @@ model BillingDocument {
   rfcSnapshot       String?
   cfdiUseSnapshot   String?
   paymentMethodSnapshot String?
+  paymentFormSnapshot   String?
   issuedAt          DateTime?
   dueAt             DateTime?
   fiscalStatus      String    @default("NO_APLICA")
+  fiscalEnv         String?
   fiscalError       String?
+  fiscalIdempotencyKey String? @unique
   fiscalExternalId  String?
   fiscalUuid        String?
+  fiscalSeries      String?
+  fiscalFolioNumber Int?
+  verificationUrl   String?
+  stampedAt         DateTime?
   requestedByUserId String?
   issuedByUserId    String?
   /// Una factura de Servomotores a SYSTRON por atención (o por cotización base si no hay atención).
@@ -796,13 +810,20 @@ model BillingDocument {
 }
 
 model BillingLine {
-  id         String          @id @default(cuid())
-  documentId String
-  document   BillingDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  concept    String
-  quantity   Int
-  unitPrice  Float
-  amount     Float
+  id             String          @id @default(cuid())
+  documentId     String
+  document       BillingDocument @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  concept        String
+  quantity       Int
+  unitPrice      Float
+  discountAmount Float           @default(0)
+  amount         Float
+  taxIncluded    Boolean         @default(false)
+  satProductKey  String?
+  satUnitKey     String?
+  satUnitName    String?
+  taxability     String          @default("02")
+  quoteLineId    String?
 }
 
 model Receivable {

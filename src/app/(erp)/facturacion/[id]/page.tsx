@@ -3,10 +3,12 @@ import { issueDocumentAction, retryFiscalAction } from "../actions";
 import { HistoryTimeline } from "@/components/history-timeline";
 import { ClientNameLink } from "@/components/client-entity-links";
 import { IssueBillingDocumentForm } from "@/components/issue-billing-document-form";
-import { Badge, Button, Card, EntityDetailHeader, EntityMetaItem, TextLink } from "@/components/ui";
+import { Badge, Button, Card, EntityDetailHeader, EntityMetaItem, Table, Td, TextLink, Th } from "@/components/ui";
+import { fiscalBadgeInfo } from "@/lib/billing-badges";
 import { loadBillingDocumentServiceLinksForDocument } from "@/lib/billing-document-service-links";
 import { cfdiUseLabel } from "@/lib/sat-cfdi-use";
-import { paymentMethodLabel } from "@/lib/sat-payment-method";
+import { resolveClientSatLegalName } from "@/lib/sat-legal-name";
+import { paymentFormLabel, paymentMethodLabel } from "@/lib/sat-payment-method";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
 import { historyFor } from "@/lib/history";
@@ -37,10 +39,17 @@ export default async function DocumentoPage({ params }: { params: Promise<{ id: 
   const canIssue = can(session.role, "invoice.issue", session.activeCompanyCode);
   const history = await historyFor("DOCUMENTO", row.id);
   const statusLabel = row.status === "SOLICITADA" ? "Solicitada" : row.status === "EMITIDA" ? "Emitida" : row.status;
+  const fiscalBadge = fiscalBadgeInfo(row);
 
   const defaultCfdiUse = row.cfdiUseSnapshot ?? row.client.cfdiUse ?? "";
   const defaultPaymentMethod = row.paymentMethodSnapshot ?? row.client.paymentMethod ?? "";
+  const defaultPaymentForm = row.paymentFormSnapshot ?? (defaultPaymentMethod === "PPD" ? "99" : "03");
   const showFiscalFields = row.kind !== "REMISION";
+  const canRetry =
+    row.status === "EMITIDA"
+    && canIssue
+    && showFiscalFields
+    && (row.fiscalStatus === "ERROR" || row.fiscalStatus === "PENDIENTE" || row.fiscalStatus === "PROCESANDO");
 
   let primaryAction: React.ReactNode = null;
   if (row.status === "SOLICITADA" && canIssue) {
@@ -52,6 +61,7 @@ export default async function DocumentoPage({ params }: { params: Promise<{ id: 
           submitLabel="Emitir factura"
           cfdiUse={defaultCfdiUse}
           paymentMethod={defaultPaymentMethod}
+          paymentForm={defaultPaymentForm}
         />
       );
     } else {
@@ -62,14 +72,15 @@ export default async function DocumentoPage({ params }: { params: Promise<{ id: 
         </form>
       );
     }
-  } else if (row.fiscalStatus === "ERROR" && canIssue && showFiscalFields) {
+  } else if (canRetry) {
     primaryAction = (
       <IssueBillingDocumentForm
         documentId={row.id}
         action={retryFiscalAction}
-        submitLabel="Reintentar timbrado"
+        submitLabel={row.fiscalStatus === "PROCESANDO" ? "Consultar estatus" : "Reintentar timbrado"}
         cfdiUse={defaultCfdiUse}
         paymentMethod={defaultPaymentMethod}
+        paymentForm={defaultPaymentForm}
         buttonTone="ghost"
       />
     );
@@ -81,7 +92,12 @@ export default async function DocumentoPage({ params }: { params: Promise<{ id: 
         back={{ href: "/facturacion", label: "Facturación" }}
         title={row.folio}
         subtitle={KIND_LABEL[row.kind] ?? row.kind}
-        status={<Badge tone={row.status === "SOLICITADA" ? "warn" : "neutral"}>{statusLabel}</Badge>}
+        status={
+          <span className="flex flex-wrap gap-1.5">
+            <Badge tone={row.status === "SOLICITADA" ? "warn" : "neutral"}>{statusLabel}</Badge>
+            {fiscalBadge ? <Badge tone={fiscalBadge.tone}>{fiscalBadge.label}</Badge> : null}
+          </span>
+        }
         meta={
           <>
             <EntityMetaItem label="Cliente">
@@ -120,16 +136,65 @@ export default async function DocumentoPage({ params }: { params: Promise<{ id: 
         }
         primaryAction={primaryAction}
       />
-      <Card className="p-4 text-sm">
-        {row.rfcSnapshot ? <p>RFC congelado: {row.rfcSnapshot}</p> : null}
-        {row.cfdiUseSnapshot || row.paymentMethodSnapshot ? (
-          <p className={row.rfcSnapshot ? "mt-1" : ""}>
-            Uso CFDI: {cfdiUseLabel(row.cfdiUseSnapshot)} · Método de pago: {paymentMethodLabel(row.paymentMethodSnapshot)}
-          </p>
+
+      {row.fiscalEnv === "TEST" && row.fiscalStatus === "TIMBRADA" ? (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-900">
+          TIMBRE DE PRUEBA (SANDBOX): Este comprobante se timbró con una llave sk_test_ de Facturapi y no tiene validez fiscal ante el SAT.
+        </div>
+      ) : null}
+
+      <Card className="p-4 text-sm space-y-2">
+        {showFiscalFields ? (
+          <div className="grid gap-1 sm:grid-cols-2">
+            <p><span className="text-[var(--muted)]">Razón social SAT:</span> {resolveClientSatLegalName(row.client)}</p>
+            <p><span className="text-[var(--muted)]">RFC:</span> {row.rfcSnapshot || row.client.rfc || "Sin definir"}</p>
+            <p><span className="text-[var(--muted)]">Uso CFDI:</span> {cfdiUseLabel(row.cfdiUseSnapshot ?? row.client.cfdiUse)}</p>
+            <p>
+              <span className="text-[var(--muted)]">Método / Forma SAT:</span>{" "}
+              {paymentMethodLabel(row.paymentMethodSnapshot ?? row.client.paymentMethod)}
+              {row.paymentFormSnapshot ? ` · ${paymentFormLabel(row.paymentFormSnapshot)}` : ""}
+            </p>
+            {row.fiscalUuid ? (
+              <p className="sm:col-span-2"><span className="text-[var(--muted)]">UUID Fiscal:</span> <code className="text-xs">{row.fiscalUuid}</code></p>
+            ) : null}
+            {row.fiscalSeries && row.fiscalFolioNumber ? (
+              <p><span className="text-[var(--muted)]">Serie / Folio CFDI:</span> {row.fiscalSeries}-{row.fiscalFolioNumber}</p>
+            ) : null}
+          </div>
         ) : null}
-        <p className={row.rfcSnapshot || row.cfdiUseSnapshot ? "mt-1" : ""}>Subtotal {money(row.subtotal)} · IVA {money(row.iva)}</p>
-        {row.fiscalError ? <p className="mt-3 rounded-md bg-[var(--warn-soft)] px-3 py-2">{row.fiscalError}</p> : null}
-        <ul className="mt-3 space-y-1">{row.lines.map((line) => <li key={line.id}>{line.concept} · {money(line.amount)}</li>)}</ul>
+
+        <p className="pt-1 font-medium">Subtotal {money(row.subtotal)} · IVA {money(row.iva)} · Total {money(row.total)}</p>
+
+        {row.fiscalError ? <p className="mt-2 rounded-md bg-[var(--warn-soft)] px-3 py-2">{row.fiscalError}</p> : null}
+
+        <div className="pt-3">
+          <Table>
+            <thead>
+              <tr>
+                <Th>Concepto</Th>
+                <Th>Cant.</Th>
+                <Th>P. Unit. neto</Th>
+                <Th>Descuento</Th>
+                <Th>Clave SAT</Th>
+                <Th>Importe</Th>
+              </tr>
+            </thead>
+            <tbody>
+              {row.lines.map((line) => (
+                <tr key={line.id}>
+                  <Td>{line.concept}</Td>
+                  <Td>{line.quantity}</Td>
+                  <Td>{money(line.unitPrice)}</Td>
+                  <Td>{line.discountAmount > 0 ? money(line.discountAmount) : "—"}</Td>
+                  <Td className="text-xs text-[var(--muted)]">
+                    {line.satProductKey || "—"} · {line.satUnitKey || "E48"} · Obj {line.taxability || "02"}
+                  </Td>
+                  <Td>{money(line.amount)}</Td>
+                </tr>
+              ))}
+            </tbody>
+          </Table>
+        </div>
       </Card>
       <HistoryTimeline className="mt-6" items={history.map((item) => ({ id: item.id, createdAt: item.createdAt, summary: item.summary, authorName: item.author?.name }))} />
     </>

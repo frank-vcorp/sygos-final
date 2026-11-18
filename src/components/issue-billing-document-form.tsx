@@ -1,4 +1,8 @@
+"use client";
+
+import { useState } from "react";
 import { CfdiUseSelect } from "@/components/cfdi-use-select";
+import { PaymentFormSelect } from "@/components/payment-form-select";
 import { PaymentMethodSelect } from "@/components/payment-method-select";
 import { Button } from "@/components/ui";
 
@@ -19,6 +23,7 @@ export function IssueBillingDocumentForm({
   action,
   cfdiUse,
   paymentMethod,
+  paymentForm = "03",
   buttonTone,
 }: {
   documentId: string;
@@ -26,17 +31,35 @@ export function IssueBillingDocumentForm({
   action: IssueAction;
   cfdiUse: string;
   paymentMethod: string;
+  paymentForm?: string;
   buttonTone?: "ghost";
 }) {
+  const [method, setMethod] = useState(paymentMethod);
+  const [form, setForm] = useState(paymentForm && paymentForm !== "99" ? paymentForm : "03");
+
   return (
     <form action={action} className="w-full">
       <input type="hidden" name="documentId" value={documentId} />
-      <div className="grid gap-3 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,0.75fr)_auto] lg:items-end">
+      <div className="grid gap-3 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.85fr)_minmax(0,1fr)_auto] lg:items-end">
         <FiscalField label="Uso de CFDI">
           <CfdiUseSelect name="cfdiUse" defaultValue={cfdiUse} required />
         </FiscalField>
         <FiscalField label="Método de pago">
-          <PaymentMethodSelect name="paymentMethod" defaultValue={paymentMethod} required />
+          <PaymentMethodSelect
+            name="paymentMethod"
+            value={method}
+            onChange={(next) => setMethod(next)}
+            required
+          />
+        </FiscalField>
+        <FiscalField label="Forma de pago (c_FormaPago)">
+          <PaymentFormSelect
+            name="paymentForm"
+            paymentMethod={method}
+            value={form}
+            onChange={(next) => setForm(next)}
+            required
+          />
         </FiscalField>
         <Button type="submit" tone={buttonTone} className="w-full shrink-0 lg:w-auto lg:justify-self-end">
           {submitLabel}

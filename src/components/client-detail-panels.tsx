@@ -30,6 +30,7 @@ type ClientData = {
   id: string;
   version: number;
   name: string;
+  satLegalName: string | null;
   classification: string | null;
   requiresInvoice: boolean | null;
   rfc: string | null;
@@ -38,6 +39,7 @@ type ClientData = {
   paymentMethod: string | null;
   fiscalZip: string | null;
   fiscalAddress: string | null;
+  fiscalEmail: string | null;
   creditDays: number | null;
   deliveryAddress: string | null;
   active: boolean;
@@ -204,11 +206,13 @@ export function ClientProfileSection({
         <ClientInvoiceFields
           defaultRequires={client.requiresInvoice == null ? "" : client.requiresInvoice ? "si" : "no"}
           rfc={client.rfc ?? ""}
+          satLegalName={client.satLegalName ?? ""}
           taxRegime={client.taxRegime ?? ""}
           cfdiUse={client.cfdiUse ?? ""}
           paymentMethod={client.paymentMethod ?? ""}
           fiscalZip={client.fiscalZip ?? ""}
           fiscalAddress={client.fiscalAddress ?? ""}
+          fiscalEmail={client.fiscalEmail ?? ""}
         />
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Días de crédito"><input name="creditDays" defaultValue={client.creditDays ?? ""} className={controlClass} /></Field>

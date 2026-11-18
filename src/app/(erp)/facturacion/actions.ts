@@ -8,13 +8,14 @@ import { moneyFromForm } from "@/lib/money";
 import { can, type Action } from "@/lib/permissions";
 import { issueDocument, issueFreeInvoice, requestFromQuote, requestIntercompany, retryFiscal } from "@/lib/billing";
 import { parseCfdiUse } from "@/lib/sat-cfdi-use";
-import { parsePaymentMethod } from "@/lib/sat-payment-method";
+import { parsePaymentForm, parsePaymentMethod } from "@/lib/sat-payment-method";
 import { requireCompany } from "@/lib/session";
 
 function fiscalFromForm(formData: FormData) {
   const cfdiUse = parseCfdiUse(formData.get("cfdiUse"));
   const paymentMethod = parsePaymentMethod(formData.get("paymentMethod"));
-  return { cfdiUse, paymentMethod };
+  const paymentForm = parsePaymentForm(formData.get("paymentForm"));
+  return { cfdiUse, paymentMethod, paymentForm };
 }
 
 async function guard(action: Action) {
@@ -103,6 +104,9 @@ export async function freeInvoiceAction(formData: FormData) {
       concept: requiredText(formData.get("concept"), "Concepto"),
       amount: moneyFromForm(formData.get("amount")),
       creditDays: optionalText(formData.get("creditDays")) ? Number(formData.get("creditDays")) : null,
+      cfdiUse: parseCfdiUse(formData.get("cfdiUse")),
+      paymentMethod: parsePaymentMethod(formData.get("paymentMethod")),
+      paymentForm: parsePaymentForm(formData.get("paymentForm")),
     });
     await setFlash({ tone: "ok", message: `${document.folio} emitida como factura libre.` });
     redirect(`/facturacion/${document.id}`);

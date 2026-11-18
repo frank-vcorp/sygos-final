@@ -13,6 +13,7 @@ import {
   linksForBillingDocument,
   pickBillingDocumentTechnicalCaseId,
 } from "@/lib/billing-document-service-links";
+import { fiscalBadgeInfo } from "@/lib/billing-badges";
 import { requireCompany } from "@/lib/session";
 
 const KIND: Record<string, string> = {
@@ -88,10 +89,11 @@ export default async function FacturacionPage({ searchParams }: { searchParams: 
         <ResponsiveData
           table={
             <Table>
-              <thead><tr><Th>Folio</Th><Th>DX</Th><Th>OS</Th><Th>Tipo</Th><Th>Cliente</Th><Th>Estado</Th><Th>Total</Th></tr></thead>
+              <thead><tr><Th>Folio</Th><Th>DX</Th><Th>OS</Th><Th>Tipo</Th><Th>Cliente</Th><Th>Estado</Th><Th>Fiscal</Th><Th>Total</Th></tr></thead>
               <tbody>
                 {rows.map((row) => {
                   const statusLabel = row.status === "SOLICITADA" ? "Solicitada" : row.status === "EMITIDA" ? "Emitida" : row.status;
+                  const fiscalBadge = fiscalBadgeInfo(row);
                   const serviceLinks = linksForBillingDocument(row, serviceLinkMap);
                   return (
                     <tr key={row.id}>
@@ -101,6 +103,7 @@ export default async function FacturacionPage({ searchParams }: { searchParams: 
                       <Td>{KIND[row.kind] ?? row.kind}</Td>
                       <Td><ClientNameLink clientId={row.client.id} name={row.client.name} isSystem={row.client.isSystem} canEdit={canEditClient} /></Td>
                       <Td><Badge>{statusLabel}</Badge></Td>
+                      <Td>{fiscalBadge ? <Badge tone={fiscalBadge.tone}>{fiscalBadge.label}</Badge> : "—"}</Td>
                       <Td>{money(row.total)}</Td>
                     </tr>
                   );
@@ -110,13 +113,19 @@ export default async function FacturacionPage({ searchParams }: { searchParams: 
           }
           cards={rows.map((row) => {
             const statusLabel = row.status === "SOLICITADA" ? "Solicitada" : row.status === "EMITIDA" ? "Emitida" : row.status;
+            const fiscalBadge = fiscalBadgeInfo(row);
             const serviceLinks = linksForBillingDocument(row, serviceLinkMap);
             return (
               <MobileCard
                 key={row.id}
                 href={`/facturacion/${row.id}`}
                 title={row.folio}
-                meta={<Badge>{statusLabel}</Badge>}
+                meta={
+                  <span className="flex flex-wrap gap-1.5">
+                    <Badge>{statusLabel}</Badge>
+                    {fiscalBadge ? <Badge tone={fiscalBadge.tone}>{fiscalBadge.label}</Badge> : null}
+                  </span>
+                }
                 footer={<ClientNameLink clientId={row.client.id} name={row.client.name} isSystem={row.client.isSystem} canEdit={canEditClient} />}
               >
                 {serviceLinks.diagnosisFolio ? <p>DX: {serviceLinks.diagnosisFolio}</p> : null}

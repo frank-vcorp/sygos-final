@@ -3,7 +3,19 @@
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { encryptSecret, secretHint } from "@/lib/crypto";
-import { verifyFacturapi } from "@/lib/facturapi";
+import { inspectFacturapiOrganization, verifyFacturapi } from "@/lib/facturapi";
+import {
+  FISCAL_OPERATION_KINDS,
+  keyEnvironment,
+  loadFacturapiCompanySettings,
+  parseCompanyFiscalConfig,
+  parseFacturapiExtra,
+  serializeFiscalConfigJson,
+  syncIntercompanyPartiesFromCompany,
+  type FacturapiRunMode,
+  type FiscalOperationKind,
+  type SatLineDefaults,
+} from "@/lib/fiscal-config";
 import {
   DEFAULT_SMTP_HOST,
   DEFAULT_SMTP_USERNAME,
@@ -61,6 +73,7 @@ export async function updateCompanyAction(formData: FormData) {
       },
     });
     if (updated.count === 0) throw new ConcurrencyError();
+    await syncIntercompanyPartiesFromCompany(session.activeCompanyId);
     await recordHistory({
       companyId: session.activeCompanyId,
       entityType: "EMPRESA",
@@ -86,48 +99,271 @@ async function requireIntegrations(returnUrl = "/configuracion") {
   return session;
 }
 
+async function upsertFacturapiSlot(input: {
+  companyId: string;
+  provider: "FACTURAPI_TEST" | "FACTURAPI_LIVE";
+  secret: string | null;
+  webhookSecret: string | null;
+  payrollMeta: {
+    registroPatronal: string | null;
+    employerCurp: string | null;
+    employerState: string | null;
+  };
+  inspected?: Awaited<ReturnType<typeof inspectFacturapiOrganization>> | null;
+}) {
+  const existing = await prisma.integrationSetting.findFirst({
+    where: { provider: input.provider, companyId: input.companyId },
+  });
+  const currentExtra = parseFacturapiExtra(existing?.extra);
+  const nextExtra = {
+    ...currentExtra,
+    ...input.payrollMeta,
+    ...(input.webhookSecret
+      ? {
+          webhookSecretEnc: encryptSecret(input.webhookSecret),
+          webhookSecretHint: secretHint(input.webhookSecret),
+        }
+      : {}),
+    ...(input.inspected?.ok
+      ? {
+          organizationId: input.inspected.organizationId,
+          organizationName: input.inspected.organizationName,
+          taxId: input.inspected.taxId,
+          isProductionReady: input.inspected.isProductionReady,
+          hasCertificate: input.inspected.hasCertificate,
+          certificateSerial: input.inspected.certificateSerial,
+          certificateExpiresAt: input.inspected.certificateExpiresAt,
+          pendingSteps: input.inspected.pendingSteps,
+          verifiedAt: new Date().toISOString(),
+        }
+      : {}),
+  };
+
+  const payload = {
+    extra: JSON.stringify(nextExtra),
+    ...(input.secret
+      ? {
+          secretEnc: encryptSecret(input.secret),
+          secretHint: secretHint(input.secret),
+        }
+      : {}),
+  };
+
+  if (existing) {
+    await prisma.integrationSetting.update({ where: { id: existing.id }, data: payload });
+  } else if (input.secret || input.webhookSecret || input.inspected?.ok) {
+    await prisma.integrationSetting.create({
+      data: {
+        provider: input.provider,
+        companyId: input.companyId,
+        ...payload,
+      },
+    });
+  }
+}
+
 export async function saveFacturapiAction(formData: FormData) {
   "use server";
-  const back = safeReturnUrl(formData, "/configuracion#integraciones");
+  const back = safeReturnUrl(formData, "/configuracion/integraciones#facturapi");
   const session = await requireIntegrations(back);
-  const secret = optionalText(formData.get("secret"));
-  const extra = JSON.stringify({
+  const loaded = await loadFacturapiCompanySettings(session.activeCompanyId);
+
+  const requestedModeRaw = optionalText(formData.get("facturapiMode"));
+  const facturapiMode: FacturapiRunMode =
+    requestedModeRaw === "TEST" || requestedModeRaw === "LIVE" || requestedModeRaw === "OFF"
+      ? requestedModeRaw
+      : loaded.config.facturapiMode;
+
+  const testSecret = optionalText(formData.get("testSecret")) ?? optionalText(formData.get("secret"));
+  const liveSecret = optionalText(formData.get("liveSecret"));
+  const testWebhookSecret = optionalText(formData.get("testWebhookSecret"));
+  const liveWebhookSecret = optionalText(formData.get("liveWebhookSecret"));
+
+  if (testSecret && keyEnvironment(testSecret) !== "test") {
+    await setFlash({ tone: "error", message: "La llave Test debe empezar con sk_test_." });
+    redirect(back);
+  }
+  if (liveSecret && keyEnvironment(liveSecret) !== "live") {
+    await setFlash({ tone: "error", message: "La llave Live debe empezar con sk_live_." });
+    redirect(back);
+  }
+
+  const effectiveTestSecret = testSecret ?? loaded.test.secret;
+  const effectiveLiveSecret = liveSecret ?? loaded.live.secret;
+
+  let inspectedTest: Awaited<ReturnType<typeof inspectFacturapiOrganization>> | null = null;
+  let inspectedLive: Awaited<ReturnType<typeof inspectFacturapiOrganization>> | null = null;
+
+  if (testSecret) {
+    inspectedTest = await inspectFacturapiOrganization(testSecret);
+  }
+  if (liveSecret) {
+    inspectedLive = await inspectFacturapiOrganization(liveSecret);
+  }
+
+  if (facturapiMode === "TEST" && !effectiveTestSecret) {
+    await setFlash({ tone: "error", message: "Para activar modo Test guarda una llave sk_test_." });
+    redirect(back);
+  }
+  if (facturapiMode === "LIVE") {
+    if (!effectiveLiveSecret) {
+      await setFlash({ tone: "error", message: "Para activar modo Live guarda una llave sk_live_." });
+      redirect(back);
+    }
+    const orgCheck = inspectedLive ?? await inspectFacturapiOrganization(effectiveLiveSecret);
+    inspectedLive = orgCheck;
+    if (!orgCheck.ok || !orgCheck.isProductionReady) {
+      await setFlash({
+        tone: "error",
+        message: orgCheck.ok
+          ? `No se puede activar modo Live todavía: ${orgCheck.message}`
+          : orgCheck.message,
+      });
+      redirect(back);
+    }
+  }
+
+  const fiscalSeriesPolicy = formData.get("fiscalSeriesPolicy") === "FACTURAPI_AUTO" ? "FACTURAPI_AUTO" : "SYGOS_FAC";
+  const fiscalDefaultSeries = optionalText(formData.get("fiscalDefaultSeries"))?.slice(0, 25) || "FAC";
+  const fiscalLineMode = formData.get("fiscalLineMode") === "CONSOLIDATED" ? "CONSOLIDATED" : "LINE_BY_LINE";
+
+  const baseDefaults = loaded.config.satDefaults;
+  const satDefaults = {} as Record<FiscalOperationKind, SatLineDefaults>;
+  for (const op of FISCAL_OPERATION_KINDS) {
+    const rawKey = optionalText(formData.get(`sat_${op.key}_productKey`))?.replace(/\D/g, "") ?? "";
+    if (rawKey && rawKey.length !== 8) {
+      await setFlash({ tone: "error", message: `La clave SAT de ${op.label} debe tener 8 dígitos.` });
+      redirect(back);
+    }
+    satDefaults[op.key] = {
+      productKey: rawKey.length === 8 ? rawKey : baseDefaults[op.key].productKey,
+      unitKey: optionalText(formData.get(`sat_${op.key}_unitKey`))?.toUpperCase().slice(0, 6) || baseDefaults[op.key].unitKey,
+      unitName: optionalText(formData.get(`sat_${op.key}_unitName`))?.slice(0, 20) || baseDefaults[op.key].unitName,
+      taxability: optionalText(formData.get(`sat_${op.key}_taxability`)) || baseDefaults[op.key].taxability,
+    };
+  }
+
+  const toggles = {
+    autoEmailOnStamp: formData.get("autoEmailOnStamp") === "auto",
+    autoWhatsAppOnStamp: formData.get("autoWhatsAppOnStamp") === "auto",
+    autoRepOnPaymentValidation: formData.get("autoRepOnPaymentValidation") === "auto",
+    cancelWithPaymentsPolicy:
+      formData.get("cancelWithPaymentsPolicy") === "ALLOW_GUIDED_SUBSTITUTION"
+        ? ("ALLOW_GUIDED_SUBSTITUTION" as const)
+        : ("BLOCK_UNTIL_REP_CANCELED" as const),
+  };
+
+  const payrollMeta = {
     registroPatronal: optionalText(formData.get("registroPatronal")),
     employerCurp: optionalText(formData.get("employerCurp")),
     employerState: optionalText(formData.get("employerState")),
-  });
+  };
+
   await prisma.company.update({
     where: { id: session.activeCompanyId },
     data: {
-      registroPatronal: optionalText(formData.get("registroPatronal")),
-      employerCurp: optionalText(formData.get("employerCurp")),
-      employerState: optionalText(formData.get("employerState")),
+      ...payrollMeta,
+      facturapiMode,
+      fiscalSeriesPolicy,
+      fiscalDefaultSeries,
+      fiscalLineMode,
+      fiscalConfigJson: serializeFiscalConfigJson({ satDefaults, toggles }),
     },
   });
-  const existing = await prisma.integrationSetting.findFirst({ where: { provider: "FACTURAPI", companyId: session.activeCompanyId } });
-  if (secret) {
-    const data = { secretEnc: encryptSecret(secret), secretHint: secretHint(secret), extra };
-    if (existing) await prisma.integrationSetting.update({ where: { id: existing.id }, data });
-    else await prisma.integrationSetting.create({ data: { provider: "FACTURAPI", companyId: session.activeCompanyId, ...data } });
-  } else if (existing) {
-    await prisma.integrationSetting.update({ where: { id: existing.id }, data: { extra } });
-  }
-  await setFlash({ tone: "ok", message: secret ? "Llave de Facturapi guardada. El certificado de sello sigue en Facturapi, no aquí." : "Datos de nómina guardados. La llave no cambió." });
+
+  await upsertFacturapiSlot({
+    companyId: session.activeCompanyId,
+    provider: "FACTURAPI_TEST",
+    secret: testSecret,
+    webhookSecret: testWebhookSecret,
+    payrollMeta,
+    inspected: inspectedTest,
+  });
+  await upsertFacturapiSlot({
+    companyId: session.activeCompanyId,
+    provider: "FACTURAPI_LIVE",
+    secret: liveSecret,
+    webhookSecret: liveWebhookSecret,
+    payrollMeta,
+    inspected: inspectedLive,
+  });
+
+  const savedConfig = parseCompanyFiscalConfig({
+    code: session.activeCompanyCode,
+    facturapiMode,
+    fiscalSeriesPolicy,
+    fiscalDefaultSeries,
+    fiscalLineMode,
+    fiscalConfigJson: serializeFiscalConfigJson({ satDefaults, toggles }),
+  });
+
+  await recordHistory({
+    companyId: session.activeCompanyId,
+    entityType: "EMPRESA",
+    entityId: session.activeCompanyId,
+    action: "FACTURAPI_CONFIG",
+    summary: `Configuración Facturapi actualizada (modo ${savedConfig.facturapiMode}, folio ${savedConfig.fiscalSeriesPolicy}, partidas ${savedConfig.fiscalLineMode}).`,
+    authorUserId: session.userId,
+  });
+
+  await setFlash({
+    tone: "ok",
+    message: `Configuración Facturapi guardada (${savedConfig.facturapiMode === "LIVE" ? "Producción SAT" : savedConfig.facturapiMode === "TEST" ? "Pruebas Sandbox" : "Desactivado"}).`,
+  });
   redirect(back);
 }
 
 export async function verifyFacturapiAction(formData: FormData) {
   "use server";
-  const back = safeReturnUrl(formData, "/configuracion#integraciones");
+  const back = safeReturnUrl(formData, "/configuracion/integraciones#facturapi");
   const session = await requireIntegrations(back);
-  const row = await prisma.integrationSetting.findFirst({ where: { provider: "FACTURAPI", companyId: session.activeCompanyId } });
-  if (!row?.secretEnc) {
-    await setFlash({ tone: "error", message: "Esta empresa no tiene llave de Facturapi." });
+  const loaded = await loadFacturapiCompanySettings(session.activeCompanyId);
+  const target = optionalText(formData.get("verifyTarget"));
+  const preferLive = target === "LIVE" || (target !== "TEST" && loaded.config.facturapiMode === "LIVE");
+
+  const inputTest = optionalText(formData.get("testSecret"));
+  const inputLive = optionalText(formData.get("liveSecret"));
+  const secret = preferLive
+    ? (inputLive ?? loaded.live.secret)
+    : (inputTest ?? loaded.test.secret ?? loaded.live.secret);
+
+  if (!secret) {
+    await setFlash({
+      tone: "error",
+      message: preferLive
+        ? "Esta empresa no tiene llave Live (sk_live_) capturada ni guardada."
+        : "Esta empresa no tiene llave de Facturapi capturada ni guardada.",
+    });
     redirect(back);
   }
-  const { decryptSecret } = await import("@/lib/crypto");
-  const result = await verifyFacturapi(decryptSecret(row.secretEnc));
-  await setFlash({ tone: result.ok ? "ok" : "error", message: result.message });
+
+  const keyCheck = await verifyFacturapi(secret);
+  if (!keyCheck.ok) {
+    await setFlash({ tone: "error", message: keyCheck.message });
+    redirect(back);
+  }
+
+  const org = await inspectFacturapiOrganization(secret);
+  const modeEnv = keyEnvironment(secret);
+  if (org.ok && modeEnv) {
+    await upsertFacturapiSlot({
+      companyId: session.activeCompanyId,
+      provider: modeEnv === "live" ? "FACTURAPI_LIVE" : "FACTURAPI_TEST",
+      secret: null,
+      webhookSecret: null,
+      payrollMeta: {
+        registroPatronal: loaded.company?.registroPatronal ?? null,
+        employerCurp: loaded.company?.employerCurp ?? null,
+        employerState: loaded.company?.employerState ?? null,
+      },
+      inspected: org,
+    });
+  }
+
+  await setFlash({
+    tone: org.ok && (!preferLive || org.isProductionReady) ? "ok" : "error",
+    message: org.ok ? `${keyCheck.message} ${org.message}` : keyCheck.message,
+  });
   redirect(back);
 }
 

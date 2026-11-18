@@ -3,11 +3,17 @@ import { prisma } from "./db";
 import { allocateFolio, serviceFolioForAttention } from "./folios";
 import { recordCompanyCash } from "./purchases";
 import { stampBillingDocument } from "./facturapi";
+import {
+  parseCompanyFiscalConfig,
+  resolveSatDefaultsForDocument,
+  syncIntercompanyPartiesFromCompany,
+} from "./fiscal-config";
 import { ConcurrencyError } from "./form";
 import { recordHistory } from "./history";
 import { linesForTotal, quoteTotals, roundMoney } from "./money";
 import type { Role } from "./roles";
 import { SALES_NOT_ASSIGNED_MESSAGE } from "./sales-assignment";
+import { resolvePaymentFormForDocument } from "./sat-payment-method";
 
 type Actor = { userId: string; role: Role; activeCompanyId: string; activeCompanyCode: string };
 
@@ -79,10 +85,81 @@ async function serviceBillingFolio(
   return serviceFolioForAttention(attentionId, companyId, series);
 }
 
+export function buildQuoteBillingLines(input: {
+  lines: Array<{ id?: string; concept: string; quantity: number; unitPrice: number | null }>;
+  discountPct: number;
+  targetSubtotal: number;
+  satDefaults: { productKey: string; unitKey: string; unitName: string; taxability: string };
+  lineMode: "LINE_BY_LINE" | "CONSOLIDATED";
+  isPartial: boolean;
+  consolidatedConcept: string;
+}) {
+  if (input.isPartial || input.lineMode === "CONSOLIDATED" || input.lines.length === 0) {
+    return [
+      {
+        concept: input.consolidatedConcept,
+        quantity: 1,
+        unitPrice: input.targetSubtotal,
+        discountAmount: 0,
+        amount: input.targetSubtotal,
+        taxIncluded: false,
+        satProductKey: input.satDefaults.productKey,
+        satUnitKey: input.satDefaults.unitKey,
+        satUnitName: input.satDefaults.unitName,
+        taxability: input.satDefaults.taxability,
+        quoteLineId: null as string | null,
+      },
+    ];
+  }
+
+  const built = input.lines.map((line) => {
+    const unitPrice = roundMoney(line.unitPrice ?? 0);
+    const gross = roundMoney(line.quantity * unitPrice);
+    const discountAmount = input.discountPct > 0 ? roundMoney(gross * (input.discountPct / 100)) : 0;
+    const amount = roundMoney(gross - discountAmount);
+    return {
+      concept: line.concept,
+      quantity: line.quantity,
+      unitPrice,
+      discountAmount,
+      amount,
+      taxIncluded: false,
+      satProductKey: input.satDefaults.productKey,
+      satUnitKey: input.satDefaults.unitKey,
+      satUnitName: input.satDefaults.unitName,
+      taxability: input.satDefaults.taxability,
+      quoteLineId: line.id ?? null,
+    };
+  });
+
+  const sumNet = roundMoney(built.reduce((sum, row) => sum + row.amount, 0));
+  const drift = roundMoney(input.targetSubtotal - sumNet);
+  if (drift !== 0 && built.length > 0) {
+    const last = built[built.length - 1]!;
+    last.discountAmount = roundMoney(Math.max(0, last.discountAmount - drift));
+    last.amount = roundMoney(last.amount + drift);
+  }
+  return built;
+}
+
+async function safeStampBillingDocument(documentId: string) {
+  try {
+    await stampBillingDocument(documentId);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Error inesperado al timbrar en Facturapi.";
+    await prisma.billingDocument
+      .update({
+        where: { id: documentId },
+        data: { fiscalStatus: "ERROR", fiscalError: `${message} El reintento usa este mismo documento.` },
+      })
+      .catch(() => undefined);
+  }
+}
+
 export async function requestFromQuote(actor: Actor, quoteId: string, kind: "FACTURA" | "REMISION", amount: number | null) {
   const quote = await prisma.quote.findFirst({
     where: { id: quoteId, companyId: actor.activeCompanyId },
-    include: { lines: true, client: true, fieldServiceCase: true },
+    include: { lines: true, client: true, fieldServiceCase: true, company: true, equipment: { select: { kind: true } } },
   });
   if (!quote || quote.status !== "AUTORIZADA") throw new Error("Solo se solicita documento de una cotización autorizada.");
   if (quote.quoteType === "CAMPO") {
@@ -104,7 +181,8 @@ export async function requestFromQuote(actor: Actor, quoteId: string, kind: "FAC
     if (!linkedCase) throw new Error("No se encontró la operación ligada a la cotización.");
     await assertAtMostOneServiceInvoice(linkedCase.attentionId, kind);
   }
-  const totals = quoteTotals(linesForTotal(quote.lines, quote.quoteType, quote.status), quote.discountPct);
+  const chosenLines = linesForTotal(quote.lines, quote.quoteType, quote.status);
+  const totals = quoteTotals(chosenLines, quote.discountPct);
   if (!totals) throw new Error("La cotización no tiene importe.");
   const used = await invoicedTotal(quote.id);
   const remaining = roundMoney(totals.total - used);
@@ -115,7 +193,7 @@ export async function requestFromQuote(actor: Actor, quoteId: string, kind: "FAC
     await issueServomotoresInvoiceForEndClientRequest(actor, quote.linkedQuoteId);
   }
   const ratio = totals.total === 0 ? 0 : total / totals.total;
-  const subtotal = roundMoney(totals.subtotal * ratio);
+  const subtotal = roundMoney(totals.base * ratio);
   const iva = roundMoney(total - subtotal);
   let folio: string;
   if (quote.technicalCaseId) {
@@ -128,7 +206,24 @@ export async function requestFromQuote(actor: Actor, quoteId: string, kind: "FAC
   } else {
     folio = await allocateFolio(actor.activeCompanyId, kind === "REMISION" ? "REM" : "FAC");
   }
-  const concept = quote.lines.filter((line) => line.authorized || quote.quoteType !== "VENTA_EQUIPO").map((line) => line.concept).join("; ") || quote.folio;
+  const concept = chosenLines.map((line) => line.concept).join("; ") || quote.folio;
+  const fiscalConfig = parseCompanyFiscalConfig(quote.company);
+  const satDefaults = resolveSatDefaultsForDocument(fiscalConfig, {
+    companyCode: quote.company.code,
+    documentKind: kind,
+    quoteType: quote.quoteType,
+    equipmentKind: quote.equipment?.kind ?? null,
+  });
+  const isPartial = total < totals.total && totals.total > 0;
+  const billingLines = buildQuoteBillingLines({
+    lines: chosenLines,
+    discountPct: quote.discountPct,
+    targetSubtotal: subtotal,
+    satDefaults,
+    lineMode: fiscalConfig.fiscalLineMode,
+    isPartial,
+    consolidatedConcept: concept,
+  });
   try {
     const document = await prisma.billingDocument.create({
       data: {
@@ -148,7 +243,7 @@ export async function requestFromQuote(actor: Actor, quoteId: string, kind: "FAC
         rfcSnapshot: quote.client.rfc,
         fiscalStatus: kind === "REMISION" ? "NO_APLICA" : "PENDIENTE",
         requestedByUserId: actor.userId,
-        lines: { create: [{ concept, quantity: 1, unitPrice: total, amount: total }] },
+        lines: { create: billingLines },
       },
     });
     await recordHistory({
@@ -181,7 +276,7 @@ export async function requestFromFieldServiceCase(
 ) {
   const row = await prisma.fieldServiceCase.findFirst({
     where: { id: fieldServiceCaseId, companyId: actor.activeCompanyId },
-    include: { client: true, quote: { include: { lines: true } } },
+    include: { client: true, company: true, quote: { include: { lines: true } } },
   });
   if (!row) throw new Error("No se encontró el servicio de campo.");
   if (row.quote.status !== "AUTORIZADA") throw new Error("La cotización COTSC debe estar autorizada.");
@@ -213,6 +308,13 @@ export async function requestFromFieldServiceCase(
   const iva = roundMoney(total - subtotal);
   const folio = await allocateFolio(actor.activeCompanyId, kind === "REMISION" ? "REM" : "FAC");
   const concept = `${row.concept} · ${row.folio}${row.description.trim() ? `: ${row.description.trim()}` : ""}`;
+  const fiscalConfig = parseCompanyFiscalConfig(row.company);
+  const satDefaults = resolveSatDefaultsForDocument(fiscalConfig, {
+    companyCode: row.company.code,
+    documentKind: kind,
+    quoteType: "CAMPO",
+    hasFieldServiceCase: true,
+  });
   const document = await prisma.billingDocument.create({
     data: {
       folio,
@@ -230,7 +332,22 @@ export async function requestFromFieldServiceCase(
       rfcSnapshot: row.client.rfc,
       fiscalStatus: kind === "REMISION" ? "NO_APLICA" : "PENDIENTE",
       requestedByUserId: actor.userId,
-      lines: { create: [{ concept, quantity: 1, unitPrice: total, amount: total }] },
+      lines: {
+        create: [
+          {
+            concept,
+            quantity: 1,
+            unitPrice: subtotal,
+            discountAmount: 0,
+            amount: subtotal,
+            taxIncluded: false,
+            satProductKey: satDefaults.productKey,
+            satUnitKey: satDefaults.unitKey,
+            satUnitName: satDefaults.unitName,
+            taxability: satDefaults.taxability,
+          },
+        ],
+      },
     },
   });
   await recordHistory({
@@ -249,6 +366,7 @@ export async function requestFromDiagnosisNoRepair(actor: Actor, diagnosisCaseId
     where: { id: diagnosisCaseId, serviceCompanyId: actor.activeCompanyId, kind: "DIAGNOSTICO" },
     include: {
       attention: true,
+      serviceCompany: true,
       equipment: { include: { client: true } },
     },
   });
@@ -277,6 +395,13 @@ export async function requestFromDiagnosisNoRepair(actor: Actor, diagnosisCaseId
   const iva = roundMoney(total - subtotal);
   const folio = await serviceBillingFolio(row.attentionId, actor.activeCompanyId, kind);
   const concept = "DX sin reparación";
+  const fiscalConfig = parseCompanyFiscalConfig(row.serviceCompany);
+  const satDefaults = resolveSatDefaultsForDocument(fiscalConfig, {
+    companyCode: row.serviceCompany.code,
+    documentKind: kind,
+    quoteType: "DIAGNOSTICO",
+    equipmentKind: row.equipment.kind,
+  });
   const document = await prisma.billingDocument.create({
     data: {
       folio,
@@ -294,7 +419,22 @@ export async function requestFromDiagnosisNoRepair(actor: Actor, diagnosisCaseId
       rfcSnapshot: client.rfc,
       fiscalStatus: kind === "REMISION" ? "NO_APLICA" : "PENDIENTE",
       requestedByUserId: actor.userId,
-      lines: { create: [{ concept, quantity: 1, unitPrice: total, amount: total }] },
+      lines: {
+        create: [
+          {
+            concept,
+            quantity: 1,
+            unitPrice: subtotal,
+            discountAmount: 0,
+            amount: subtotal,
+            taxIncluded: false,
+            satProductKey: satDefaults.productKey,
+            satUnitKey: satDefaults.unitKey,
+            satUnitName: satDefaults.unitName,
+            taxability: satDefaults.taxability,
+          },
+        ],
+      },
     },
   });
   await recordHistory({
@@ -308,18 +448,23 @@ export async function requestFromDiagnosisNoRepair(actor: Actor, diagnosisCaseId
   return document;
 }
 
-export type DocumentFiscalOverrides = { cfdiUse: string | null; paymentMethod: string | null };
+export type DocumentFiscalOverrides = {
+  cfdiUse: string | null;
+  paymentMethod: string | null;
+  paymentForm?: string | null;
+};
 
 function fiscalForDocument(
   client: { cfdiUse: string | null; paymentMethod: string | null },
   overrides?: DocumentFiscalOverrides,
-): { cfdiUse: string; paymentMethod: string } {
+): { cfdiUse: string; paymentMethod: string; paymentForm: string } {
   const cfdiUse = overrides?.cfdiUse ?? client.cfdiUse;
   const paymentMethod = overrides?.paymentMethod ?? client.paymentMethod;
   if (!cfdiUse || !paymentMethod) {
     throw new Error("Define el uso de CFDI y el método de pago antes de emitir (heredan del cliente si están capturados).");
   }
-  return { cfdiUse, paymentMethod };
+  const paymentForm = resolvePaymentFormForDocument(paymentMethod, overrides?.paymentForm);
+  return { cfdiUse, paymentMethod, paymentForm };
 }
 
 export async function issueDocument(actor: Actor, documentId: string, overrides?: DocumentFiscalOverrides) {
@@ -344,12 +489,14 @@ export async function issueDocument(actor: Actor, documentId: string, overrides?
       issuedAt,
       dueAt,
       issuedByUserId: actor.userId,
+      rfcSnapshot: client.rfc ?? document.rfcSnapshot,
       cfdiUseSnapshot: fiscal?.cfdiUse ?? null,
       paymentMethodSnapshot: fiscal?.paymentMethod ?? null,
+      paymentFormSnapshot: fiscal?.paymentForm ?? null,
       version: { increment: 1 },
     },
   });
-  if (document.kind !== "REMISION") await stampBillingDocument(document.id);
+  if (document.kind !== "REMISION") await safeStampBillingDocument(document.id);
   if (document.kind !== "REMISION" && document.total > 0) {
     await prisma.receivable.create({
       data: {
@@ -381,6 +528,7 @@ export async function issueDocument(actor: Actor, documentId: string, overrides?
       },
     });
   }
+  const latest = await prisma.billingDocument.findUnique({ where: { id: document.id }, select: { fiscalStatus: true } });
   await recordHistory({
     companyId: actor.activeCompanyId,
     entityType: "DOCUMENTO",
@@ -388,7 +536,9 @@ export async function issueDocument(actor: Actor, documentId: string, overrides?
     action: "EMISION",
     summary: document.kind === "REMISION"
       ? `${document.folio} generada. Habilita la salida física cuando corresponda.`
-      : `${document.folio} emitida. La cuenta por cobrar quedó abierta. El timbrado sigue pendiente.`,
+      : latest?.fiscalStatus === "TIMBRADA"
+        ? `${document.folio} emitida y timbrada. La cuenta por cobrar quedó abierta.`
+        : `${document.folio} emitida. La cuenta por cobrar quedó abierta (estado fiscal: ${latest?.fiscalStatus ?? "PENDIENTE"}).`,
     authorUserId: actor.userId,
   });
 }
@@ -398,18 +548,36 @@ export async function retryFiscal(actor: Actor, documentId: string, overrides?: 
     where: { id: documentId, companyId: actor.activeCompanyId },
     include: { client: true },
   });
-  if (!document || document.fiscalStatus === "TIMBRADA" || document.fiscalStatus === "NO_APLICA") throw new Error("Ese documento no tiene un timbrado por reintentar.");
+  if (
+    !document
+    || document.status === "CANCELADA"
+    || document.fiscalStatus === "TIMBRADA"
+    || document.fiscalStatus === "NO_APLICA"
+    || document.fiscalStatus === "CANCELADA"
+  ) {
+    throw new Error("Ese documento no tiene un timbrado por reintentar.");
+  }
+  const client = document.kind === INTERCOMPANY_KIND
+    ? await ensureIntercompanyClientFiscal(document.clientId)
+    : document.client;
   if (document.kind !== "REMISION") {
-    const fiscal = fiscalForDocument(document.client, {
+    const fiscal = fiscalForDocument(client, {
       cfdiUse: overrides?.cfdiUse ?? document.cfdiUseSnapshot,
       paymentMethod: overrides?.paymentMethod ?? document.paymentMethodSnapshot,
+      paymentForm: overrides?.paymentForm ?? document.paymentFormSnapshot,
     });
     await prisma.billingDocument.update({
       where: { id: document.id },
-      data: { cfdiUseSnapshot: fiscal.cfdiUse, paymentMethodSnapshot: fiscal.paymentMethod, fiscalError: null },
+      data: {
+        rfcSnapshot: client.rfc ?? document.rfcSnapshot,
+        cfdiUseSnapshot: fiscal.cfdiUse,
+        paymentMethodSnapshot: fiscal.paymentMethod,
+        paymentFormSnapshot: fiscal.paymentForm,
+        fiscalError: null,
+      },
     });
   }
-  await stampBillingDocument(document.id);
+  await safeStampBillingDocument(document.id);
   await recordHistory({
     companyId: actor.activeCompanyId,
     entityType: "DOCUMENTO",
@@ -422,11 +590,25 @@ export async function retryFiscal(actor: Actor, documentId: string, overrides?: 
 
 export async function issueFreeInvoice(
   actor: Actor,
-  input: { clientId: string; concept: string; amount: number; creditDays: number | null },
+  input: {
+    clientId: string;
+    concept: string;
+    amount: number;
+    creditDays: number | null;
+    cfdiUse?: string | null;
+    paymentMethod?: string | null;
+    paymentForm?: string | null;
+  },
 ) {
   const client = await prisma.client.findFirst({ where: { id: input.clientId, companyId: actor.activeCompanyId, active: true, isSystem: false } });
   if (!client) throw new Error("Selecciona un cliente activo de esta empresa.");
   if (!Number.isFinite(input.amount) || input.amount <= 0) throw new Error("El importe no es válido.");
+  const company = await prisma.company.findUnique({ where: { id: actor.activeCompanyId } });
+  const fiscalConfig = parseCompanyFiscalConfig(company ?? { code: actor.activeCompanyCode });
+  const satDefaults = resolveSatDefaultsForDocument(fiscalConfig, {
+    companyCode: actor.activeCompanyCode,
+    documentKind: "FACTURA_LIBRE",
+  });
   const total = roundMoney(input.amount);
   const subtotal = roundMoney(total / 1.16);
   const iva = roundMoney(total - subtotal);
@@ -434,6 +616,10 @@ export async function issueFreeInvoice(
   const issuedAt = new Date();
   const creditDays = input.creditDays ?? client.creditDays ?? 0;
   const dueAt = addDays(issuedAt, creditDays);
+  const cfdiUse = input.cfdiUse ?? client.cfdiUse;
+  const paymentMethod = input.paymentMethod ?? client.paymentMethod;
+  const paymentForm = paymentMethod ? resolvePaymentFormForDocument(paymentMethod, input.paymentForm) : null;
+
   const document = await prisma.billingDocument.create({
     data: {
       folio,
@@ -447,12 +633,30 @@ export async function issueFreeInvoice(
       total,
       creditDays,
       rfcSnapshot: client.rfc,
+      cfdiUseSnapshot: cfdiUse,
+      paymentMethodSnapshot: paymentMethod,
+      paymentFormSnapshot: paymentForm,
       issuedAt,
       dueAt,
       fiscalStatus: "PENDIENTE",
       fiscalError: null,
       issuedByUserId: actor.userId,
-      lines: { create: [{ concept: input.concept, quantity: 1, unitPrice: subtotal, amount: subtotal }] },
+      lines: {
+        create: [
+          {
+            concept: input.concept,
+            quantity: 1,
+            unitPrice: subtotal,
+            discountAmount: 0,
+            amount: subtotal,
+            taxIncluded: false,
+            satProductKey: satDefaults.productKey,
+            satUnitKey: satDefaults.unitKey,
+            satUnitName: satDefaults.unitName,
+            taxability: satDefaults.taxability,
+          },
+        ],
+      },
     },
   });
   await prisma.receivable.create({
@@ -467,7 +671,7 @@ export async function issueFreeInvoice(
       status: "ABIERTA",
     },
   });
-  await stampBillingDocument(document.id);
+  await safeStampBillingDocument(document.id);
   await recordHistory({
     companyId: actor.activeCompanyId,
     entityType: "DOCUMENTO",
@@ -524,6 +728,10 @@ async function allocateUniqueFacFolio(companyId: string) {
 }
 
 async function ensureIntercompanyClientFiscal(clientId: string) {
+  const systron = await prisma.company.findUnique({ where: { code: "SYSTRON" } });
+  if (systron) {
+    await syncIntercompanyPartiesFromCompany(systron.id);
+  }
   const client = await prisma.client.findUnique({ where: { id: clientId } });
   if (!client) throw new Error("Falta el cliente fijo SYSTRON en Servomotores.");
   if (client.cfdiUse && client.paymentMethod) return client;
@@ -547,13 +755,28 @@ async function intercompanyParties(clientId: string) {
   return { client, fiscal, systron, supplier };
 }
 
-function intercompanyLines(lines: Array<{ concept: string; quantity: number; unitPrice: number | null }>) {
-  return lines.map((line) => ({
-    concept: line.concept,
-    quantity: line.quantity,
-    unitPrice: line.unitPrice ?? 0,
-    amount: roundMoney(line.quantity * (line.unitPrice ?? 0)),
-  }));
+function intercompanyLines(input: {
+  company: { code?: string | null; fiscalLineMode?: string | null; fiscalConfigJson?: string | null };
+  lines: Array<{ id?: string; concept: string; quantity: number; unitPrice: number | null }>;
+  discountPct: number;
+  targetSubtotal: number;
+  consolidatedConcept: string;
+}) {
+  const config = parseCompanyFiscalConfig(input.company);
+  const satDefaults = resolveSatDefaultsForDocument(config, {
+    companyCode: "SERVOMOTORES",
+    documentKind: INTERCOMPANY_KIND,
+    equipmentKind: "MOT",
+  });
+  return buildQuoteBillingLines({
+    lines: input.lines,
+    discountPct: input.discountPct,
+    targetSubtotal: input.targetSubtotal,
+    satDefaults,
+    lineMode: config.fiscalLineMode,
+    isPartial: false,
+    consolidatedConcept: input.consolidatedConcept,
+  });
 }
 
 /** Emite una solicitud intercompañía ya creada: CxC en Servomotores y CxP en Systron. Idempotente. */
@@ -588,8 +811,10 @@ async function issueIntercompanyBalances(actor: Actor, documentId: string) {
             issuedAt,
             dueAt,
             issuedByUserId: actor.userId,
+            rfcSnapshot: parties.client.rfc ?? current.rfcSnapshot,
             cfdiUseSnapshot: parties.fiscal.cfdiUse,
             paymentMethodSnapshot: parties.fiscal.paymentMethod,
+            paymentFormSnapshot: parties.fiscal.paymentForm,
             intercompanyKey: current.intercompanyKey ?? key,
             version: { increment: 1 },
           },
@@ -633,7 +858,7 @@ async function issueIntercompanyBalances(actor: Actor, documentId: string) {
     if (raced?.status === "EMITIDA" && raced.receivable && raced.payable) return raced;
     throw error;
   }
-  await stampBillingDocument(documentId);
+  await safeStampBillingDocument(documentId);
   await recordHistory({
     companyId: before.companyId,
     entityType: "DOCUMENTO",
@@ -666,7 +891,13 @@ async function issueServomotoresInvoiceForEndClientRequest(actor: Actor, baseQuo
   const parties = await intercompanyParties(quote.clientId);
   const concept = quote.lines.map((line) => line.concept).join("; ") || quote.folio;
   const creditDays = quote.creditDays ?? parties.client.creditDays ?? 0;
-  const lineData = intercompanyLines(quote.lines);
+  const lineData = intercompanyLines({
+    company: quote.company,
+    lines: quote.lines,
+    discountPct: quote.discountPct,
+    targetSubtotal: totals.base,
+    consolidatedConcept: concept,
+  });
 
   for (let attempt = 0; attempt < 8; attempt++) {
     const raced = await findIntercompanyInvoice(quote.id, key);
@@ -699,13 +930,14 @@ async function issueServomotoresInvoiceForEndClientRequest(actor: Actor, baseQuo
             equipmentId: quote.equipmentId,
             intercompanyKey: key,
             concept,
-            subtotal: totals.subtotal,
+            subtotal: totals.base,
             iva: totals.iva,
             total: totals.total,
             creditDays,
             rfcSnapshot: parties.client.rfc,
             cfdiUseSnapshot: parties.fiscal.cfdiUse,
             paymentMethodSnapshot: parties.fiscal.paymentMethod,
+            paymentFormSnapshot: parties.fiscal.paymentForm,
             issuedAt,
             dueAt,
             fiscalStatus: "PENDIENTE",
@@ -743,7 +975,7 @@ async function issueServomotoresInvoiceForEndClientRequest(actor: Actor, baseQuo
         await issueIntercompanyBalances(actor, winner.id);
         return;
       }
-      await stampBillingDocument(created.id);
+      await safeStampBillingDocument(created.id);
       await recordHistory({
         companyId: quote.companyId,
         entityType: "DOCUMENTO",
@@ -769,7 +1001,7 @@ export async function requestIntercompany(actor: Actor, quoteId: string) {
   if (actor.activeCompanyCode !== "SERVOMOTORES") throw new Error("La factura a SYSTRON se solicita en Servomotores.");
   const quote = await prisma.quote.findFirst({
     where: { id: quoteId, companyId: actor.activeCompanyId, status: "AUTORIZADA" },
-    include: { lines: true, client: true },
+    include: { lines: true, client: true, company: true },
   });
   if (!quote || !quote.client.isSystem) throw new Error("La base autorizada de Servomotores a SYSTRON es la que se factura.");
   const key = await intercompanyKeyForQuote(quote);
@@ -777,9 +1009,15 @@ export async function requestIntercompany(actor: Actor, quoteId: string) {
   if (existing) return existing;
   const totals = quoteTotals(quote.lines, quote.discountPct);
   if (!totals || totals.total <= 0) throw new Error("La cotización base no tiene importe.");
-  await ensureIntercompanyClientFiscal(quote.clientId);
+  const syncedClient = await ensureIntercompanyClientFiscal(quote.clientId);
   const concept = quote.lines.map((line) => line.concept).join("; ") || quote.folio;
-  const lineData = intercompanyLines(quote.lines);
+  const lineData = intercompanyLines({
+    company: quote.company,
+    lines: quote.lines,
+    discountPct: quote.discountPct,
+    targetSubtotal: totals.base,
+    consolidatedConcept: concept,
+  });
   for (let attempt = 0; attempt < 8; attempt++) {
     const folio = await allocateUniqueFacFolio(actor.activeCompanyId);
     try {
@@ -795,11 +1033,11 @@ export async function requestIntercompany(actor: Actor, quoteId: string) {
           equipmentId: quote.equipmentId,
           intercompanyKey: key,
           concept,
-          subtotal: totals.subtotal,
+          subtotal: totals.base,
           iva: totals.iva,
           total: totals.total,
-          creditDays: quote.creditDays ?? quote.client.creditDays ?? 0,
-          rfcSnapshot: quote.client.rfc,
+          creditDays: quote.creditDays ?? syncedClient.creditDays ?? 0,
+          rfcSnapshot: syncedClient.rfc,
           fiscalStatus: "PENDIENTE",
           requestedByUserId: actor.userId,
           lines: { create: lineData },
