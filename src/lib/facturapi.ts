@@ -1,9 +1,14 @@
+import { Prisma } from "@prisma/client";
+import { ensureBillingDocumentArtifacts } from "./billing-artifacts";
+import { maybeAutoDeliverStampedDocument } from "./billing-delivery";
 import { inSandbox, prisma, prismaProd } from "./db";
 import {
+  loadWebhookSlotForEnvironment,
   parseCompanyFiscalConfig,
   resolveFacturapiRuntimeCredential,
   resolveSatDefaultsForDocument,
 } from "./fiscal-config";
+import { recordHistory } from "./history";
 import { resolveClientSatLegalName } from "./sat-legal-name";
 import { resolvePaymentFormForDocument } from "./sat-payment-method";
 
@@ -282,6 +287,11 @@ function nextIdempotencyAttemptKey(documentId: string, currentKey: string | null
   return `sygos-${documentId}-a${nextAttempt}`;
 }
 
+async function finalizeStampedArtifactsAndDelivery(documentId: string, fetchFn: typeof fetch) {
+  await ensureBillingDocumentArtifacts(documentId, { fetchFn }).catch(() => undefined);
+  await maybeAutoDeliverStampedDocument(documentId, { fetchFn }).catch(() => undefined);
+}
+
 export async function stampBillingDocument(
   documentId: string,
   options?: { fetchFn?: typeof fetch; forceNewIdempotencyKey?: boolean },
@@ -350,6 +360,7 @@ export async function stampBillingDocument(
             fiscalError: null,
           },
         });
+        await finalizeStampedArtifactsAndDelivery(document.id, fetchFn);
         return;
       }
       if (current.ok && current.body.status === "pending") {
@@ -432,6 +443,9 @@ export async function stampBillingDocument(
                 : "Facturapi ya tiene este documento. No se creó otro.",
         },
       });
+      if (existing.status === "valid") {
+        await finalizeStampedArtifactsAndDelivery(document.id, fetchFn);
+      }
       return;
     }
 
@@ -548,6 +562,9 @@ export async function stampBillingDocument(
                   : "Facturapi ya registró este documento (409).",
           },
         });
+        if (match.status === "valid") {
+          await finalizeStampedArtifactsAndDelivery(document.id, fetchFn);
+        }
         return;
       }
       await prisma.billingDocument.update({
@@ -605,6 +622,9 @@ export async function stampBillingDocument(
             : "Facturapi recibió el documento y aún no lo marca como vigente. No se creará otro.",
       },
     });
+    if (created.body.status === "valid") {
+      await finalizeStampedArtifactsAndDelivery(document.id, fetchFn);
+    }
   } catch (error) {
     const message = error instanceof Error ? error.message : "Error de red al contactar a Facturapi.";
     await prisma.billingDocument.update({
@@ -743,4 +763,315 @@ export async function stampPayrollPeriod(periodId: string) {
         ? { fiscalStatus: "ERROR", fiscalError: errors.join(". ") }
         : { fiscalStatus: "TIMBRADA", fiscalError: null },
   });
+}
+
+type WebhookRecord = {
+  id?: string;
+  url?: string;
+  status?: string;
+  enabled_events?: string[];
+  secret?: string;
+};
+
+const REQUIRED_WEBHOOK_EVENTS = [
+  "invoice.status_updated",
+  "invoice.cancellation_status_updated",
+] as const;
+
+export async function registerOrVerifyFacturapiWebhook(input: {
+  secret: string;
+  targetUrl: string;
+  hasLocalWebhookSecret: boolean;
+  fetchFn?: typeof fetch;
+}): Promise<{
+  ok: boolean;
+  webhookId: string | null;
+  url: string;
+  secret: string | null;
+  created: boolean;
+  message: string;
+}> {
+  const fetchFn = input.fetchFn ?? fetch;
+  const listed = await facturapiFetch<{ data?: WebhookRecord[]; message?: string }>(
+    input.secret,
+    "/webhooks?limit=100",
+    undefined,
+    fetchFn,
+  );
+  if (!listed.ok) {
+    return {
+      ok: false,
+      webhookId: null,
+      url: input.targetUrl,
+      secret: null,
+      created: false,
+      message: listed.body.message || "Facturapi rechazó la consulta de webhooks.",
+    };
+  }
+
+  const normalizedTarget = input.targetUrl.trim().replace(/\/+$/, "");
+  const existing = (listed.body.data ?? []).find((row) => {
+    const rowUrl = (row.url ?? "").trim().replace(/\/+$/, "");
+    if (rowUrl !== normalizedTarget || row.status !== "enabled") return false;
+    const events = new Set(row.enabled_events ?? []);
+    return REQUIRED_WEBHOOK_EVENTS.every((ev) => events.has(ev) || events.has("*"));
+  });
+
+  if (existing?.id && input.hasLocalWebhookSecret) {
+    return {
+      ok: true,
+      webhookId: existing.id,
+      url: normalizedTarget,
+      secret: null,
+      created: false,
+      message: `Webhook activo y verificado en Facturapi (${normalizedTarget}).`,
+    };
+  }
+
+  if (existing?.id && !input.hasLocalWebhookSecret) {
+    await facturapiFetch(input.secret, `/webhooks/${existing.id}`, { method: "DELETE" }, fetchFn).catch(() => undefined);
+  }
+
+  const created = await facturapiFetch<WebhookRecord & { message?: string }>(
+    input.secret,
+    "/webhooks",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        url: normalizedTarget,
+        enabled_events: [...REQUIRED_WEBHOOK_EVENTS],
+        description: "SYGOS 3.0 ERP",
+      }),
+    },
+    fetchFn,
+  );
+
+  if (!created.ok || !created.body.id) {
+    return {
+      ok: false,
+      webhookId: null,
+      url: normalizedTarget,
+      secret: null,
+      created: false,
+      message: created.body.message || "Facturapi no pudo registrar el webhook.",
+    };
+  }
+
+  return {
+    ok: true,
+    webhookId: created.body.id,
+    url: normalizedTarget,
+    secret: created.body.secret ?? null,
+    created: true,
+    message: created.body.secret
+      ? `Webhook registrado en Facturapi (${normalizedTarget}) y secreto guardado cifrado.`
+      : `Webhook registrado en Facturapi (${normalizedTarget}).`,
+  };
+}
+
+export type WebhookProcessResult = {
+  status: number;
+  body: {
+    ok: boolean;
+    duplicate?: boolean;
+    ignored?: boolean;
+    reason?: string;
+    message?: string;
+  };
+};
+
+type WebhookPayloadShape = {
+  id?: string;
+  type?: string;
+  livemode?: boolean;
+  organization?: string;
+  related_resource_messages?: Array<{
+    resource_type?: string;
+    resource_id?: string;
+    severity?: string;
+    message?: string;
+  }>;
+  data?: {
+    type?: string;
+    object?: InvoiceResponse;
+  };
+};
+
+export async function processFacturapiWebhook(input: {
+  companyCode: string;
+  rawBody: string;
+  signature: string | null;
+  fetchFn?: typeof fetch;
+}): Promise<WebhookProcessResult> {
+  const fetchFn = input.fetchFn ?? fetch;
+  const code = input.companyCode.trim().toUpperCase();
+  const company = await prisma.company.findUnique({ where: { code } });
+  if (!company) {
+    return { status: 404, body: { ok: false, message: "Empresa no encontrada." } };
+  }
+
+  let event: WebhookPayloadShape;
+  try {
+    event = JSON.parse(input.rawBody) as WebhookPayloadShape;
+  } catch {
+    return { status: 400, body: { ok: false, message: "JSON de webhook inválido." } };
+  }
+
+  if (!event.id || !event.type || typeof event.livemode !== "boolean") {
+    return { status: 400, body: { ok: false, message: "Evento de webhook incompleto." } };
+  }
+
+  const eventEnv: "TEST" | "LIVE" = event.livemode ? "LIVE" : "TEST";
+  const slot = await loadWebhookSlotForEnvironment(company.id, eventEnv);
+
+  if (!input.signature?.trim()) {
+    return { status: 401, body: { ok: false, message: "Falta el encabezado Facturapi-Signature." } };
+  }
+  if (!slot.webhookSecret || !slot.apiSecret) {
+    return { status: 401, body: { ok: false, message: "Webhook o llave de Facturapi no configurada para este ambiente." } };
+  }
+
+  const sigCheck = await facturapiFetch<{ valid?: boolean; message?: string }>(
+    slot.apiSecret,
+    "/webhooks/validate-signature",
+    {
+      method: "POST",
+      body: JSON.stringify({
+        secret: slot.webhookSecret,
+        payload: input.rawBody,
+        signature: input.signature.trim(),
+      }),
+    },
+    fetchFn,
+  );
+  if (!sigCheck.ok) {
+    return { status: 401, body: { ok: false, message: sigCheck.body.message || "Firma de webhook inválida." } };
+  }
+
+  if (slot.organizationId && event.organization && event.organization !== slot.organizationId) {
+    return { status: 403, body: { ok: false, message: "El evento pertenece a otra organización de Facturapi." } };
+  }
+
+  const expectedLivemode =
+    slot.config.facturapiMode === "LIVE"
+      ? true
+      : slot.config.facturapiMode === "TEST"
+        ? false
+        : null;
+
+  if (expectedLivemode === null || event.livemode !== expectedLivemode) {
+    return {
+      status: 200,
+      body: { ok: true, ignored: true, reason: "mode_mismatch" },
+    };
+  }
+
+  const existingEvent = await prisma.facturapiWebhookEvent.findUnique({ where: { id: event.id } });
+  if (existingEvent) {
+    return { status: 200, body: { ok: true, duplicate: true } };
+  }
+
+  try {
+    await prisma.facturapiWebhookEvent.create({
+      data: {
+        id: event.id,
+        companyId: company.id,
+        eventType: event.type,
+        livemode: event.livemode,
+        resourceId: event.data?.object?.id ?? null,
+        payloadJson: input.rawBody,
+      },
+    });
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return { status: 200, body: { ok: true, duplicate: true } };
+    }
+    throw error;
+  }
+
+  if (event.type === "invoice.status_updated" && event.data?.object) {
+    const inv = event.data.object;
+    const orFilters: Array<{ fiscalExternalId?: string; id?: string }> = [];
+    if (inv.id) orFilters.push({ fiscalExternalId: inv.id });
+    if (inv.external_id) orFilters.push({ id: inv.external_id });
+
+    if (orFilters.length > 0) {
+      const doc = await prisma.billingDocument.findFirst({
+        where: {
+          companyId: company.id,
+          OR: orFilters,
+        },
+      });
+      if (doc && (!doc.fiscalEnv || doc.fiscalEnv === eventEnv)) {
+        if (inv.status === "valid") {
+          await prisma.billingDocument.update({
+            where: { id: doc.id },
+            data: {
+              fiscalEnv: eventEnv,
+              fiscalExternalId: inv.id ?? doc.fiscalExternalId,
+              fiscalUuid: inv.uuid ?? doc.fiscalUuid,
+              fiscalSeries: inv.series ?? doc.fiscalSeries,
+              fiscalFolioNumber: inv.folio_number ?? doc.fiscalFolioNumber,
+              verificationUrl: inv.verification_url ?? doc.verificationUrl,
+              stampedAt: doc.stampedAt ?? new Date(),
+              fiscalStatus: "TIMBRADA",
+              fiscalError: null,
+            },
+          });
+          await finalizeStampedArtifactsAndDelivery(doc.id, fetchFn);
+          await recordHistory({
+            companyId: company.id,
+            entityType: "DOCUMENTO",
+            entityId: doc.id,
+            action: "TIMBRADO_WEBHOOK",
+            summary: `${doc.folio} quedó timbrada vía webhook Facturapi (${eventEnv}).`,
+          });
+        } else if (inv.status === "failed") {
+          const errorDetail =
+            event.related_resource_messages
+              ?.filter((m) => m.message && (!m.severity || m.severity === "error"))
+              .map((m) => m.message)
+              .join(" · ")
+            || inv.message
+            || "Facturapi marcó el timbrado asíncrono como fallido.";
+          await prisma.billingDocument.update({
+            where: { id: doc.id },
+            data: {
+              fiscalEnv: eventEnv,
+              fiscalStatus: "ERROR",
+              fiscalExternalId: null,
+              fiscalIdempotencyKey: nextIdempotencyAttemptKey(doc.id, doc.fiscalIdempotencyKey),
+              fiscalError: errorDetail,
+            },
+          });
+          await recordHistory({
+            companyId: company.id,
+            entityType: "DOCUMENTO",
+            entityId: doc.id,
+            action: "ERROR_TIMBRADO_WEBHOOK",
+            summary: `Webhook Facturapi reportó error en ${doc.folio}: ${errorDetail}`,
+          });
+        } else if (inv.status === "pending") {
+          await prisma.billingDocument.update({
+            where: { id: doc.id },
+            data: {
+              fiscalEnv: eventEnv,
+              fiscalExternalId: inv.id ?? doc.fiscalExternalId,
+              fiscalStatus: "PROCESANDO",
+            },
+          });
+        } else if (inv.status === "canceled") {
+          await prisma.billingDocument.update({
+            where: { id: doc.id },
+            data: {
+              fiscalEnv: eventEnv,
+              fiscalStatus: "CANCELADA",
+            },
+          });
+        }
+      }
+    }
+  }
+
+  return { status: 200, body: { ok: true } };
 }

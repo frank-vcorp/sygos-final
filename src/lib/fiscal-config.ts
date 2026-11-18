@@ -42,6 +42,7 @@ export type FacturapiEnvExtra = {
   organizationName?: string | null;
   taxId?: string | null;
   webhookId?: string | null;
+  webhookUrl?: string | null;
   webhookSecretEnc?: string | null;
   webhookSecretHint?: string | null;
   isProductionReady?: boolean | null;
@@ -469,6 +470,47 @@ export async function resolveFacturapiRuntimeCredential(companyId: string): Prom
     legacySecret: loaded.legacy.secret,
     liveIsProductionReady: loaded.live.extra.isProductionReady ?? null,
   });
+}
+
+/**
+ * Resuelve la llave exacta para un ambiente histórico del documento ("TEST" o "LIVE")
+ * para descargar XML/PDF de Facturapi aunque la empresa haya cambiado de modo después.
+ */
+export async function resolveFacturapiSecretForEnv(
+  companyId: string,
+  env: string | null | undefined,
+): Promise<{ secret: string; env: "TEST" | "LIVE" } | null> {
+  if (env === "SIMULATED") return null;
+  if (await inSandbox()) return null;
+  const loaded = await loadFacturapiCompanySettings(companyId);
+  if (env === "LIVE") {
+    return loaded.live.secret ? { secret: loaded.live.secret, env: "LIVE" } : null;
+  }
+  if (env === "TEST") {
+    return loaded.test.secret ? { secret: loaded.test.secret, env: "TEST" } : null;
+  }
+  const runtime = resolveCredentialFromInputs({
+    sandboxActive: false,
+    configuredMode: loaded.config.facturapiMode,
+    testSecret: loaded.test.secret,
+    liveSecret: loaded.live.secret,
+    legacySecret: loaded.legacy.secret,
+    liveIsProductionReady: loaded.live.extra.isProductionReady ?? null,
+  });
+  return runtime.status === "READY" ? { secret: runtime.secret, env: runtime.env } : null;
+}
+
+export async function loadWebhookSlotForEnvironment(companyId: string, env: "TEST" | "LIVE") {
+  const loaded = await loadFacturapiCompanySettings(companyId);
+  const slot = env === "LIVE" ? loaded.live : loaded.test;
+  const webhookSecret = safeDecrypt(slot.extra.webhookSecretEnc);
+  return {
+    config: loaded.config,
+    apiSecret: slot.secret,
+    webhookSecret,
+    webhookId: slot.extra.webhookId ?? null,
+    organizationId: slot.extra.organizationId ?? null,
+  };
 }
 
 /**

@@ -130,15 +130,29 @@ export default async function CobranzaPage({ searchParams }: { searchParams: Pro
         <section className="mt-6">
           <h2 className="mb-2 font-medium">Cuentas por pagar a Servomotores</h2>
           <Table>
-            <thead><tr><Th>Documento</Th><Th>Saldo</Th><Th>Estado</Th></tr></thead>
+            <thead><tr><Th>Documento</Th><Th>Saldo</Th><Th>Estado</Th><Th>CFDI</Th></tr></thead>
             <tbody>
-              {payables.map((row) => (
-                <tr key={row.id}>
-                  <Td>{row.document?.folio ?? "Compra"}</Td>
-                  <Td>{money(row.balance)}</Td>
-                  <Td><Badge>{row.status === "SALDADA" ? "Saldada" : row.status === "PARCIAL" ? "Parcial" : "Abierta"}</Badge></Td>
-                </tr>
-              ))}
+              {payables.map((row) => {
+                const canDownloadCfdi =
+                  row.document
+                  && (row.document.fiscalStatus === "TIMBRADA" || Boolean(row.document.fiscalExternalId));
+                return (
+                  <tr key={row.id}>
+                    <Td>{row.document?.folio ?? "Compra"}</Td>
+                    <Td>{money(row.balance)}</Td>
+                    <Td><Badge>{row.status === "SALDADA" ? "Saldada" : row.status === "PARCIAL" ? "Parcial" : "Abierta"}</Badge></Td>
+                    <Td>
+                      {canDownloadCfdi && row.document ? (
+                        <span className="flex flex-wrap gap-2 text-xs">
+                          <a href={`/api/billing/documents/${row.document.id}/pdf`} target="_blank" rel="noreferrer" className="font-medium text-[#0a477e] hover:underline">PDF</a>
+                          <a href={`/api/billing/documents/${row.document.id}/xml`} className="font-medium text-[#0a477e] hover:underline">XML</a>
+                          <a href={`/api/billing/documents/${row.document.id}/zip`} className="font-medium text-[#0a477e] hover:underline">ZIP</a>
+                        </span>
+                      ) : "—"}
+                    </Td>
+                  </tr>
+                );
+              })}
             </tbody>
           </Table>
         </section>

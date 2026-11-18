@@ -1,4 +1,8 @@
-import { saveFacturapiAction, verifyFacturapiAction } from "@/app/(erp)/configuracion/actions";
+import {
+  configureFacturapiWebhookAction,
+  saveFacturapiAction,
+  verifyFacturapiAction,
+} from "@/app/(erp)/configuracion/actions";
 import { Badge, Button, controlClass, Field, FormPanel, FormSection } from "@/components/ui";
 import {
   FISCAL_OPERATION_KINDS,
@@ -167,6 +171,11 @@ export function FacturapiSettingsCard({
                   Pasos pendientes en Facturapi: {liveSlot.extra.pendingSteps.join(" · ")}
                 </p>
               ) : null}
+              <p className="mt-1 text-slate-600">
+                Webhook Test: {testSlot.extra.webhookId ? `Activo (${testSlot.extra.webhookUrl ?? testSlot.extra.webhookId})` : "Sin configurar"}
+                {" · "}
+                Webhook Live: {liveSlot.extra.webhookId ? `Activo (${liveSlot.extra.webhookUrl ?? liveSlot.extra.webhookId})` : "Sin configurar"}
+              </p>
             </div>
             <div className="flex flex-wrap gap-2">
               <Button type="submit" formAction={verifyFacturapiAction} name="verifyTarget" value="TEST" tone="ghost">
@@ -174,6 +183,12 @@ export function FacturapiSettingsCard({
               </Button>
               <Button type="submit" formAction={verifyFacturapiAction} name="verifyTarget" value="LIVE" tone="ghost">
                 Verificar organización y CSD (Live)
+              </Button>
+              <Button type="submit" formAction={configureFacturapiWebhookAction} name="webhookTarget" value="TEST" tone="ghost">
+                Configurar / verificar webhook Test
+              </Button>
+              <Button type="submit" formAction={configureFacturapiWebhookAction} name="webhookTarget" value="LIVE" tone="ghost">
+                Configurar / verificar webhook Live
               </Button>
             </div>
           </div>

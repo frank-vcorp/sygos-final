@@ -792,6 +792,8 @@ model BillingDocument {
   fiscalFolioNumber Int?
   verificationUrl   String?
   stampedAt         DateTime?
+  xmlContent        String?
+  pdfContent        Bytes?
   requestedByUserId String?
   issuedByUserId    String?
   /// Una factura de Servomotores a SYSTRON por atención (o por cotización base si no hay atención).
@@ -1465,4 +1467,17 @@ model FunctionalHistory {
   createdAt    DateTime @default(now())
 
   @@index([entityType, entityId])
+}
+
+model FacturapiWebhookEvent {
+  id          String   @id
+  companyId   String
+  eventType   String
+  livemode    Boolean
+  resourceId  String?
+  payloadJson String
+  processedAt DateTime @default(now())
+  error       String?
+
+  @@index([companyId, processedAt])
 }

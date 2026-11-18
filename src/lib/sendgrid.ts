@@ -317,6 +317,12 @@ export async function verifySendGrid(
   }
 }
 
+export type EmailAttachment = {
+  filename: string;
+  content: Buffer;
+  contentType: string;
+};
+
 export type SendEmailOverrides = {
   host?: string | null;
   port?: number | null;
@@ -345,6 +351,7 @@ async function sendViaSmtp(input: {
   subject: string;
   text: string;
   html?: string;
+  attachments?: EmailAttachment[];
 }): Promise<SendEmailResult> {
   const transporter = createSmtpTransporter(input);
   const info = await transporter.sendMail({
@@ -353,6 +360,15 @@ async function sendViaSmtp(input: {
     subject: input.subject,
     text: input.text,
     ...(input.html ? { html: input.html } : {}),
+    ...(input.attachments?.length
+      ? {
+          attachments: input.attachments.map((att) => ({
+            filename: att.filename,
+            content: att.content,
+            contentType: att.contentType,
+          })),
+        }
+      : {}),
   });
   const rejected = Array.isArray(info.rejected) ? info.rejected.map(String).filter(Boolean) : [];
   const response = typeof info.response === "string" ? info.response : "";
@@ -383,6 +399,7 @@ async function sendViaSendGridApi(input: {
   subject: string;
   text: string;
   html?: string;
+  attachments?: EmailAttachment[];
 }): Promise<SendEmailResult> {
   const payload = sendgridBody({
     from: input.fromEmail,
@@ -395,13 +412,24 @@ async function sendViaSendGridApi(input: {
   if ("error" in payload && payload.error) {
     return { ok: false, channel: "api", message: payload.error };
   }
+  const requestBody = input.attachments?.length
+    ? {
+        ...payload.body,
+        attachments: input.attachments.map((att) => ({
+          content: att.content.toString("base64"),
+          filename: att.filename,
+          type: att.contentType,
+          disposition: "attachment",
+        })),
+      }
+    : payload.body;
   const response = await fetch("https://api.sendgrid.com/v3/mail/send", {
     method: "POST",
     headers: {
       Authorization: `Bearer ${input.secret}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(payload.body),
+    body: JSON.stringify(requestBody),
   });
   const messageId = response.headers.get("x-message-id");
   if (response.status === 202 || response.ok) {
@@ -429,6 +457,7 @@ export async function sendSystemEmail(input: {
   subject: string;
   text: string;
   html?: string;
+  attachments?: EmailAttachment[];
   ignoreEnabled?: boolean;
   overrides?: SendEmailOverrides;
 }): Promise<SendEmailResult> {
@@ -467,7 +496,19 @@ export async function sendSystemEmail(input: {
     };
   }
 
-  const mail = { host, port, username, secret, fromEmail, fromName, to, subject: input.subject, text: input.text, html: input.html };
+  const mail = {
+    host,
+    port,
+    username,
+    secret,
+    fromEmail,
+    fromName,
+    to,
+    subject: input.subject,
+    text: input.text,
+    html: input.html,
+    attachments: input.attachments,
+  };
   let smtpFailure = "";
   try {
     const smtp = await sendViaSmtp(mail);

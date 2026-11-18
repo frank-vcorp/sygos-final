@@ -271,8 +271,19 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
                   <input type="hidden" name="payableId" value={row.id} />
                   <FormSection
                     title={row.document?.folio ?? "Compra"}
-                    description={`${row.supplier.name} · saldo ${money(row.balance)}`}
+                    description={
+                      row.document && (row.document.fiscalStatus === "TIMBRADA" || row.document.fiscalExternalId)
+                        ? `${row.supplier.name} · saldo ${money(row.balance)} · CFDI disponible`
+                        : `${row.supplier.name} · saldo ${money(row.balance)}`
+                    }
                   >
+                    {row.document && (row.document.fiscalStatus === "TIMBRADA" || row.document.fiscalExternalId) ? (
+                      <div className="md:col-span-2 flex flex-wrap gap-3 text-xs">
+                        <a href={`/api/billing/documents/${row.document.id}/pdf`} target="_blank" rel="noreferrer" className="font-semibold text-[#0a477e] hover:underline">Descargar PDF</a>
+                        <a href={`/api/billing/documents/${row.document.id}/xml`} className="font-semibold text-[#0a477e] hover:underline">Descargar XML</a>
+                        <a href={`/api/billing/documents/${row.document.id}/zip`} className="font-semibold text-[#0a477e] hover:underline">Descargar ZIP</a>
+                      </div>
+                    ) : null}
                     <Field label="Cuenta">
                       <select name="accountId" className={controlClass}>
                         {displayAccounts.filter((account) => !isCreditCardAccountKind(account.kind)).map((account) => (

@@ -1,9 +1,14 @@
 "use server";
 
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { encryptSecret, secretHint } from "@/lib/crypto";
-import { inspectFacturapiOrganization, verifyFacturapi } from "@/lib/facturapi";
+import {
+  inspectFacturapiOrganization,
+  registerOrVerifyFacturapiWebhook,
+  verifyFacturapi,
+} from "@/lib/facturapi";
 import {
   FISCAL_OPERATION_KINDS,
   keyEnvironment,
@@ -364,6 +369,99 @@ export async function verifyFacturapiAction(formData: FormData) {
     tone: org.ok && (!preferLive || org.isProductionReady) ? "ok" : "error",
     message: org.ok ? `${keyCheck.message} ${org.message}` : keyCheck.message,
   });
+  redirect(back);
+}
+
+async function resolvePublicOrigin() {
+  const configured =
+    process.env.APP_URL?.trim()
+    || process.env.NEXT_PUBLIC_APP_URL?.trim();
+  if (configured) return configured.replace(/\/+$/, "");
+  const headerList = await headers();
+  const host = headerList.get("x-forwarded-host") || headerList.get("host");
+  const proto = headerList.get("x-forwarded-proto") || "https";
+  if (!host) return null;
+  return `${proto}://${host}`;
+}
+
+export async function configureFacturapiWebhookAction(formData: FormData) {
+  "use server";
+  const back = safeReturnUrl(formData, "/configuracion/integraciones#facturapi");
+  const session = await requireIntegrations(back);
+  const loaded = await loadFacturapiCompanySettings(session.activeCompanyId);
+  const target = optionalText(formData.get("webhookTarget"));
+  const preferLive = target === "LIVE" || (target !== "TEST" && loaded.config.facturapiMode === "LIVE");
+
+  const inputTest = optionalText(formData.get("testSecret"));
+  const inputLive = optionalText(formData.get("liveSecret"));
+  const secret = preferLive
+    ? (inputLive ?? loaded.live.secret)
+    : (inputTest ?? loaded.test.secret);
+
+  if (!secret) {
+    await setFlash({
+      tone: "error",
+      message: preferLive
+        ? "Guarda primero una llave Live (sk_live_) para registrar el webhook."
+        : "Guarda primero una llave Test (sk_test_) para registrar el webhook.",
+    });
+    redirect(back);
+  }
+
+  const origin = await resolvePublicOrigin();
+  if (!origin) {
+    await setFlash({ tone: "error", message: "No se pudo determinar la URL pública del ERP (configura APP_URL)." });
+    redirect(back);
+  }
+
+  const targetUrl = `${origin}/api/webhooks/facturapi/${session.activeCompanyCode.toLowerCase()}`;
+  const slot = preferLive ? loaded.live : loaded.test;
+  const hasLocalSecret = Boolean(slot.extra.webhookSecretEnc);
+  const res = await registerOrVerifyFacturapiWebhook({
+    secret,
+    targetUrl,
+    hasLocalWebhookSecret: hasLocalSecret,
+  });
+
+  if (!res.ok) {
+    await setFlash({ tone: "error", message: res.message });
+    redirect(back);
+  }
+
+  const provider = preferLive ? "FACTURAPI_LIVE" : "FACTURAPI_TEST";
+  const existing = await prisma.integrationSetting.findFirst({
+    where: { provider, companyId: session.activeCompanyId },
+  });
+  const currentExtra = parseFacturapiExtra(existing?.extra);
+  const nextExtra = {
+    ...currentExtra,
+    webhookId: res.webhookId,
+    webhookUrl: res.url,
+    ...(res.secret
+      ? {
+          webhookSecretEnc: encryptSecret(res.secret),
+          webhookSecretHint: secretHint(res.secret),
+        }
+      : {}),
+  };
+  if (existing) {
+    await prisma.integrationSetting.update({
+      where: { id: existing.id },
+      data: { extra: JSON.stringify(nextExtra) },
+    });
+  } else {
+    await prisma.integrationSetting.create({
+      data: {
+        provider,
+        companyId: session.activeCompanyId,
+        secretEnc: encryptSecret(secret),
+        secretHint: secretHint(secret),
+        extra: JSON.stringify(nextExtra),
+      },
+    });
+  }
+
+  await setFlash({ tone: "ok", message: res.message });
   redirect(back);
 }
 

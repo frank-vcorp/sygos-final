@@ -7,6 +7,8 @@ import { optionalText, requiredText } from "@/lib/form";
 import { moneyFromForm } from "@/lib/money";
 import { can, type Action } from "@/lib/permissions";
 import { issueDocument, issueFreeInvoice, requestFromQuote, requestIntercompany, retryFiscal } from "@/lib/billing";
+import { sendBillingDocumentByEmail, sendBillingDocumentByWhatsApp } from "@/lib/billing-delivery";
+import { prisma } from "@/lib/db";
 import { parseCfdiUse } from "@/lib/sat-cfdi-use";
 import { parsePaymentForm, parsePaymentMethod } from "@/lib/sat-payment-method";
 import { requireCompany } from "@/lib/session";
@@ -115,4 +117,64 @@ export async function freeInvoiceAction(formData: FormData) {
     await setFlash({ tone: "error", message: messageOf(error) });
     redirect("/facturacion/nuevo");
   }
+}
+
+async function guardDocumentDelivery(documentId: string) {
+  const session = await requireCompany();
+  if (
+    !can(session.role, "invoice.request", session.activeCompanyCode)
+    && !can(session.role, "invoice.issue", session.activeCompanyCode)
+  ) {
+    await setFlash({ tone: "error", message: "No tienes permiso para enviar este documento." });
+    redirect(`/facturacion/${documentId}`);
+  }
+  if (session.role === "VENTAS") {
+    const doc = await prisma.billingDocument.findFirst({
+      where: { id: documentId, companyId: session.activeCompanyId },
+      select: { client: { select: { ownerUserId: true } } },
+    });
+    if (!doc || doc.client.ownerUserId !== session.userId) {
+      await setFlash({ tone: "error", message: "Ese documento pertenece a un cliente asignado a otro vendedor." });
+      redirect("/facturacion");
+    }
+  }
+  return session;
+}
+
+export async function sendBillingEmailAction(formData: FormData) {
+  "use server";
+  const id = requiredText(formData.get("documentId"), "Documento");
+  try {
+    const session = await guardDocumentDelivery(id);
+    const result = await sendBillingDocumentByEmail({
+      companyId: session.activeCompanyId,
+      documentId: id,
+      toEmail: optionalText(formData.get("toEmail")),
+      authorUserId: session.userId,
+    });
+    await setFlash({ tone: result.ok ? "ok" : "error", message: result.message });
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    await setFlash({ tone: "error", message: messageOf(error) });
+  }
+  redirect(`/facturacion/${id}`);
+}
+
+export async function sendBillingWhatsAppAction(formData: FormData) {
+  "use server";
+  const id = requiredText(formData.get("documentId"), "Documento");
+  try {
+    const session = await guardDocumentDelivery(id);
+    const result = await sendBillingDocumentByWhatsApp({
+      companyId: session.activeCompanyId,
+      documentId: id,
+      phone: optionalText(formData.get("phone")),
+      authorUserId: session.userId,
+    });
+    await setFlash({ tone: result.ok ? "ok" : "error", message: result.message });
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    await setFlash({ tone: "error", message: messageOf(error) });
+  }
+  redirect(`/facturacion/${id}`);
 }

@@ -28,7 +28,10 @@ type BaileysSocketLike = {
   user?: { id?: string; name?: string; verifiedName?: string; notify?: string };
   logout?: () => Promise<void>;
   end?: (error?: Error) => void;
-  sendMessage?: (jid: string, content: { text: string }) => Promise<unknown>;
+  sendMessage?: (
+    jid: string,
+    content: { text: string } | { document: Buffer; mimetype: string; fileName: string; caption?: string },
+  ) => Promise<unknown>;
   onWhatsApp?: (...jids: string[]) => Promise<Array<{ jid: string; exists: boolean }> | undefined>;
   ev: { on: (event: string, handler: (...args: never[]) => void) => void };
 };
@@ -523,6 +526,74 @@ export async function sendWhatsAppMessage(
   } catch (error) {
     const errMsg = error instanceof Error ? error.message : "Error al enviar por Baileys.";
     return failedSend(`No se pudo enviar el WhatsApp vía Baileys: ${errMsg}`);
+  }
+}
+
+export type SendWhatsAppDocumentInput = {
+  companyId?: string | null;
+  phone: string;
+  document: Buffer;
+  fileName: string;
+  mimetype?: string;
+  caption?: string;
+};
+
+/**
+ * Envía un archivo (p. ej. PDF de CFDI) por la sesión Baileys ya vinculada.
+ * Si no hay sesión, devuelve ok: false con WHATSAPP_UNLINKED_MESSAGE sin lanzar error.
+ */
+export async function sendWhatsAppDocument(
+  input: SendWhatsAppDocumentInput,
+): Promise<SendWhatsAppMessageResult> {
+  const status = await getWhatsAppFullStatus(input.companyId);
+  const digits = formatWhatsAppPhone(input.phone, status.defaultCountryCode);
+
+  if (!digits || digits.length < 10) {
+    return failedSend("El número de teléfono de WhatsApp debe tener al menos 10 dígitos.");
+  }
+  if (!input.document || input.document.length === 0) {
+    return failedSend("El documento a enviar está vacío.");
+  }
+  if (await inSandbox()) {
+    return failedSend("PRUEBA / SIN VALIDEZ. En modo de pruebas no se envían mensajes de WhatsApp.");
+  }
+  if (!status.enabled) {
+    return failedSend("La integración de WhatsApp (Baileys) está deshabilitada en Configuración.");
+  }
+  const rt = runtime();
+  if (rt.current.state !== "vinculado" || !rt.socket?.sendMessage) {
+    return failedSend(WHATSAPP_UNLINKED_MESSAGE);
+  }
+  try {
+    let targetJid = `${digits}@s.whatsapp.net`;
+    if (typeof rt.socket.onWhatsApp === "function") {
+      try {
+        const lookup = await rt.socket.onWhatsApp(targetJid);
+        if (lookup && lookup[0]?.exists && lookup[0].jid) {
+          targetJid = lookup[0].jid;
+        }
+      } catch {
+        // Sigue con el JID armado a partir del teléfono.
+      }
+    }
+    const sent = await rt.socket.sendMessage(targetJid, {
+      document: input.document,
+      mimetype: input.mimetype || "application/pdf",
+      fileName: input.fileName,
+      ...(input.caption?.trim() ? { caption: input.caption.trim() } : {}),
+    });
+    const messageId = whatsAppMessageId(sent);
+    return {
+      ok: true,
+      sentViaBaileys: true,
+      message: messageId ? `Documento enviado por WhatsApp (${messageId}).` : "Documento enviado por WhatsApp.",
+      messageId,
+      fallbackUrl: null,
+      jid: targetJid,
+    };
+  } catch (error) {
+    const errMsg = error instanceof Error ? error.message : "Error al enviar por Baileys.";
+    return failedSend(`No se pudo enviar el documento vía WhatsApp: ${errMsg}`);
   }
 }
 

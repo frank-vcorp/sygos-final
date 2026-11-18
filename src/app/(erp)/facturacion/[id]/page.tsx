@@ -1,10 +1,14 @@
 import { notFound, redirect } from "next/navigation";
-import { issueDocumentAction, retryFiscalAction } from "../actions";
+import { issueDocumentAction, retryFiscalAction, sendBillingEmailAction, sendBillingWhatsAppAction } from "../actions";
 import { HistoryTimeline } from "@/components/history-timeline";
 import { ClientNameLink } from "@/components/client-entity-links";
 import { IssueBillingDocumentForm } from "@/components/issue-billing-document-form";
-import { Badge, Button, Card, EntityDetailHeader, EntityMetaItem, Table, Td, TextLink, Th } from "@/components/ui";
+import { Badge, Button, Card, controlClass, EntityDetailHeader, EntityMetaItem, Table, Td, TextLink, Th } from "@/components/ui";
 import { fiscalBadgeInfo } from "@/lib/billing-badges";
+import {
+  resolveBillingDocumentEmailRecipient,
+  resolveBillingDocumentWhatsAppPhone,
+} from "@/lib/billing-delivery";
 import { loadBillingDocumentServiceLinksForDocument } from "@/lib/billing-document-service-links";
 import { cfdiUseLabel } from "@/lib/sat-cfdi-use";
 import { resolveClientSatLegalName } from "@/lib/sat-legal-name";
@@ -30,7 +34,16 @@ export default async function DocumentoPage({ params }: { params: Promise<{ id: 
   const { id } = await params;
   const row = await prisma.billingDocument.findFirst({
     where: { id, companyId: session.activeCompanyId },
-    include: { client: true, quote: { select: { id: true, folio: true, technicalCaseId: true } }, receivable: true, lines: true },
+    include: {
+      client: {
+        include: {
+          contacts: { where: { active: true }, orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }] },
+        },
+      },
+      quote: { select: { id: true, folio: true, technicalCaseId: true } },
+      receivable: true,
+      lines: true,
+    },
   });
   if (!row) notFound();
   await redirectIfSalesNotAssigned(session, row.client.ownerUserId, "/facturacion");
@@ -50,6 +63,15 @@ export default async function DocumentoPage({ params }: { params: Promise<{ id: 
     && canIssue
     && showFiscalFields
     && (row.fiscalStatus === "ERROR" || row.fiscalStatus === "PENDIENTE" || row.fiscalStatus === "PROCESANDO");
+
+  const canDownloadAndDeliver =
+    showFiscalFields
+    && (row.fiscalStatus === "TIMBRADA"
+      || Boolean(row.xmlContent)
+      || Boolean(row.pdfContent)
+      || (Boolean(row.fiscalExternalId) && row.fiscalStatus === "CANCELADA"));
+  const defaultEmail = resolveBillingDocumentEmailRecipient(row) ?? "";
+  const defaultPhone = resolveBillingDocumentWhatsAppPhone(row) ?? "";
 
   let primaryAction: React.ReactNode = null;
   if (row.status === "SOLICITADA" && canIssue) {
@@ -196,6 +218,80 @@ export default async function DocumentoPage({ params }: { params: Promise<{ id: 
           </Table>
         </div>
       </Card>
+
+      {canDownloadAndDeliver ? (
+        <Card className="mt-4 p-4 text-sm space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="font-semibold text-slate-900">Comprobante CFDI 4.0 · Descargas y entrega</h2>
+              <p className="text-xs text-[var(--muted)]">
+                Descarga los archivos oficiales XML/PDF o envíalos manualmente al cliente.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <a
+                href={`/api/billing/documents/${row.id}/pdf?download=1`}
+                className="inline-flex min-h-9 items-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-800 hover:bg-slate-50"
+              >
+                Descargar PDF
+              </a>
+              <a
+                href={`/api/billing/documents/${row.id}/pdf`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex min-h-9 items-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-800 hover:bg-slate-50"
+              >
+                Ver PDF
+              </a>
+              <a
+                href={`/api/billing/documents/${row.id}/xml`}
+                className="inline-flex min-h-9 items-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-800 hover:bg-slate-50"
+              >
+                Descargar XML
+              </a>
+              <a
+                href={`/api/billing/documents/${row.id}/zip`}
+                className="inline-flex min-h-9 items-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-800 hover:bg-slate-50"
+              >
+                Descargar ZIP
+              </a>
+            </div>
+          </div>
+
+          <div className="grid gap-4 border-t border-slate-200/80 pt-4 md:grid-cols-2">
+            <form action={sendBillingEmailAction} className="flex flex-wrap items-end gap-2">
+              <input type="hidden" name="documentId" value={row.id} />
+              <label className="min-w-0 flex-1">
+                <span className="mb-1 block text-xs font-semibold text-[var(--ink)]">Correo destinatario (XML + PDF)</span>
+                <input
+                  name="toEmail"
+                  type="email"
+                  defaultValue={defaultEmail}
+                  placeholder="cliente@empresa.com"
+                  className={controlClass}
+                />
+              </label>
+              <Button type="submit" tone="ghost">Enviar por correo</Button>
+            </form>
+
+            <form action={sendBillingWhatsAppAction} className="flex flex-wrap items-end gap-2">
+              <input type="hidden" name="documentId" value={row.id} />
+              <label className="min-w-0 flex-1">
+                <span className="mb-1 block text-xs font-semibold text-[var(--ink)]">WhatsApp destinatario (PDF)</span>
+                <input
+                  name="phone"
+                  type="tel"
+                  defaultValue={defaultPhone}
+                  placeholder="10 dígitos o +52…"
+                  className={controlClass}
+                />
+              </label>
+              <Button type="submit" tone="ghost">Enviar por WhatsApp</Button>
+            </form>
+          </div>
+        </Card>
+      ) : null}
+
       <HistoryTimeline className="mt-6" items={history.map((item) => ({ id: item.id, createdAt: item.createdAt, summary: item.summary, authorName: item.author?.name }))} />
     </>
   );
