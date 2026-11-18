@@ -2,7 +2,13 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "./db";
 import { allocateFolio, serviceFolioForAttention } from "./folios";
 import { recordCompanyCash } from "./purchases";
-import { stampBillingDocument, triggerRepAfterPaymentValidation } from "./facturapi";
+import {
+  cancelBillingDocumentInFacturapi,
+  isValidSatCancelMotive,
+  stampBillingDocument,
+  triggerRepAfterPaymentValidation,
+} from "./facturapi";
+import { inSandbox } from "./db";
 import {
   parseCompanyFiscalConfig,
   resolveSatDefaultsForDocument,
@@ -42,14 +48,14 @@ function balanceStatus(balance: number, amount: number) {
 
 async function invoicedTotal(quoteId: string) {
   const rows = await prisma.billingDocument.findMany({
-    where: { quoteId, status: { in: ["SOLICITADA", "EMITIDA", "ERROR_FISCAL"] } },
+    where: { quoteId, kind: { not: "NOTA_CREDITO" }, status: { in: ["SOLICITADA", "EMITIDA", "ERROR_FISCAL"] } },
   });
   return roundMoney(rows.reduce((sum, row) => sum + row.total, 0));
 }
 
 async function invoicedTotalForFieldService(fieldServiceCaseId: string) {
   const rows = await prisma.billingDocument.findMany({
-    where: { fieldServiceCaseId, status: { in: ["SOLICITADA", "EMITIDA", "ERROR_FISCAL"] } },
+    where: { fieldServiceCaseId, kind: { not: "NOTA_CREDITO" }, status: { in: ["SOLICITADA", "EMITIDA", "ERROR_FISCAL"] } },
   });
   return roundMoney(rows.reduce((sum, row) => sum + row.total, 0));
 }
@@ -1230,4 +1236,306 @@ export async function addCollectionNote(actor: Actor, receivableId: string, note
   await prisma.collectionNote.create({
     data: { receivableId: row.id, note, followUpAt, authorUserId: actor.userId },
   });
+}
+
+export async function requestDocumentCancellation(
+  actor: Actor,
+  documentId: string,
+  input: { motive: string; substitutionDocId?: string | null },
+) {
+  if (!isValidSatCancelMotive(input.motive)) {
+    throw new Error("El motivo SAT de cancelación debe ser 01, 02, 03 o 04.");
+  }
+  const doc = await prisma.billingDocument.findFirst({
+    where: { id: documentId, companyId: actor.activeCompanyId },
+    include: { client: true },
+  });
+  if (!doc) throw new Error("No se encontró el documento en esta empresa.");
+  if (actor.role === "VENTAS" && doc.client.ownerUserId !== actor.userId) {
+    throw new Error(SALES_NOT_ASSIGNED_MESSAGE);
+  }
+  if (doc.status === "CANCELADA") throw new Error("Este documento ya está cancelado.");
+  if (doc.cancellationStatus === "pending" || doc.cancellationStatus === "verifying") {
+    throw new Error("Este documento ya tiene una cancelación en proceso ante el SAT.");
+  }
+
+  let substitutionDocId: string | null = null;
+  if (input.motive === "01" || input.motive === "04") {
+    const rawSub = input.substitutionDocId?.trim();
+    if (!rawSub) {
+      throw new Error(`El motivo ${input.motive} exige indicar la factura sustituta ya timbrada.`);
+    }
+    const subDoc = await prisma.billingDocument.findFirst({
+      where: { id: rawSub, companyId: actor.activeCompanyId },
+    });
+    if (!subDoc || subDoc.id === doc.id || subDoc.status !== "EMITIDA") {
+      throw new Error("La factura sustituta debe estar emitida en la misma empresa.");
+    }
+    const sandboxActive = await inSandbox();
+    if (
+      !sandboxActive
+      && subDoc.fiscalStatus !== "TIMBRADA"
+    ) {
+      throw new Error("La factura sustituta debe estar timbrada antes de solicitar cancelación 01 o 04.");
+    }
+    substitutionDocId = subDoc.id;
+  }
+
+  const updated = await prisma.billingDocument.update({
+    where: { id: doc.id },
+    data: {
+      cancelRequestedAt: new Date(),
+      cancelRequestedByUserId: actor.userId,
+      cancelAuthorizedByUserId: null,
+      cancelMotive: input.motive,
+      cancelSubstitutionDocId: substitutionDocId,
+      cancellationStatus: "none",
+    },
+  });
+
+  await recordHistory({
+    companyId: actor.activeCompanyId,
+    entityType: "DOCUMENTO",
+    entityId: doc.id,
+    action: "SOLICITUD_CANCELACION",
+    summary: `Solicitud de cancelación para ${doc.folio} (motivo SAT ${input.motive}). Requiere autorización de CEO o Administrador.`,
+    authorUserId: actor.userId,
+  });
+
+  return updated;
+}
+
+export async function authorizeDocumentCancellation(actor: Actor, documentId: string) {
+  if (actor.role !== "CEO" && actor.role !== "ADMINISTRADOR") {
+    throw new Error("Solo el CEO o Administrador puede autorizar la cancelación fiscal.");
+  }
+  const doc = await prisma.billingDocument.findFirst({
+    where: { id: documentId, companyId: actor.activeCompanyId },
+  });
+  if (!doc) throw new Error("No se encontró el documento en esta empresa.");
+  if (!doc.cancelRequestedAt || !doc.cancelMotive) {
+    throw new Error("Primero debe registrarse la solicitud y motivo de cancelación.");
+  }
+  if (doc.status === "CANCELADA") throw new Error("Este documento ya está cancelado.");
+
+  const updated = await prisma.billingDocument.update({
+    where: { id: doc.id },
+    data: { cancelAuthorizedByUserId: actor.userId },
+  });
+
+  await recordHistory({
+    companyId: actor.activeCompanyId,
+    entityType: "DOCUMENTO",
+    entityId: doc.id,
+    action: "AUTORIZACION_CANCELACION",
+    summary: `Cancelación fiscal de ${doc.folio} autorizada (motivo ${doc.cancelMotive}). Lista para ejecutar ante SAT.`,
+    authorUserId: actor.userId,
+  });
+
+  return updated;
+}
+
+export async function executeDocumentCancellation(
+  actor: Actor,
+  documentId: string,
+  options?: { fetchFn?: typeof fetch },
+) {
+  if (
+    actor.role !== "COORDINACION_ADMINISTRACION"
+    && actor.role !== "CEO"
+    && actor.role !== "ADMINISTRADOR"
+  ) {
+    throw new Error("Solo Coordinación, CEO o Administrador pueden ejecutar la cancelación fiscal.");
+  }
+  const doc = await prisma.billingDocument.findFirst({
+    where: { id: documentId, companyId: actor.activeCompanyId },
+  });
+  if (!doc) throw new Error("No se encontró el documento en esta empresa.");
+  if (!doc.cancelRequestedAt || !doc.cancelAuthorizedByUserId) {
+    throw new Error("La cancelación debe estar solicitada y autorizada por CEO o Administrador antes de ejecutarse.");
+  }
+
+  return cancelBillingDocumentInFacturapi(doc.id, {
+    actorUserId: actor.userId,
+    fetchFn: options?.fetchFn,
+  });
+}
+
+export async function authorizeAndExecuteDocumentCancellation(
+  actor: Actor,
+  documentId: string,
+  options?: { fetchFn?: typeof fetch },
+) {
+  await authorizeDocumentCancellation(actor, documentId);
+  return executeDocumentCancellation(actor, documentId, options);
+}
+
+export async function issueCreditNote(
+  actor: Actor,
+  targetDocumentId: string,
+  input: {
+    concept: string;
+    amount: number;
+    cfdiUse?: string | null;
+    paymentForm?: string | null;
+  },
+  options?: { fetchFn?: typeof fetch },
+) {
+  if (
+    actor.role !== "ADMINISTRADOR"
+    && actor.role !== "CEO"
+    && actor.role !== "COORDINACION_ADMINISTRACION"
+  ) {
+    throw new Error("Solo Coordinación, CEO o Administrador pueden emitir notas de crédito.");
+  }
+
+  const target = await prisma.billingDocument.findFirst({
+    where: { id: targetDocumentId, companyId: actor.activeCompanyId },
+    include: {
+      client: true,
+      company: true,
+      lines: true,
+      receivable: true,
+      payable: true,
+      creditNotes: { where: { kind: "NOTA_CREDITO", status: { not: "CANCELADA" } } },
+    },
+  });
+
+  if (!target) throw new Error("No se encontró la factura origen en esta empresa.");
+  if (target.kind === "REMISION" || target.kind === "NOTA_CREDITO" || target.status !== "EMITIDA") {
+    throw new Error("La nota de crédito solo puede emitirse sobre una factura emitida.");
+  }
+
+  const sandboxActive = await inSandbox();
+  if (!sandboxActive && target.fiscalStatus !== "TIMBRADA") {
+    throw new Error("La factura origen debe estar timbrada antes de emitir una nota de crédito.");
+  }
+  if (!sandboxActive && !target.fiscalUuid) {
+    throw new Error("La factura origen no tiene UUID fiscal.");
+  }
+
+  if (!Number.isFinite(input.amount) || input.amount <= 0) {
+    throw new Error("El importe de la nota de crédito debe ser mayor a cero.");
+  }
+
+  const total = roundMoney(input.amount);
+  const alreadyCredited = roundMoney(target.creditNotes.reduce((sum, nc) => sum + nc.total, 0));
+  const maxCreditable = roundMoney(target.total - alreadyCredited);
+  if (total > maxCreditable) {
+    throw new Error(`El importe excede el saldo acreditable disponible (${maxCreditable}).`);
+  }
+
+  const concept = input.concept.trim();
+  if (!concept) throw new Error("El concepto de la nota de crédito es obligatorio.");
+
+  const subtotal = roundMoney(total / 1.16);
+  const iva = roundMoney(total - subtotal);
+  const folio = await allocateFolio(actor.activeCompanyId, "NC");
+  const issuedAt = new Date();
+  const cfdiUse = input.cfdiUse?.trim() || "G02";
+  const paymentMethod = "PUE";
+  const paymentForm = resolvePaymentFormForDocument(paymentMethod, input.paymentForm ?? target.paymentFormSnapshot);
+
+  const fiscalConfig = parseCompanyFiscalConfig(target.company);
+  const satDefaults = resolveSatDefaultsForDocument(fiscalConfig, {
+    companyCode: target.company.code,
+    documentKind: target.kind,
+  });
+  const baseLine = target.lines[0];
+
+  const creditNote = await prisma.$transaction(async (tx) => {
+    const created = await tx.billingDocument.create({
+      data: {
+        folio,
+        companyId: actor.activeCompanyId,
+        kind: "NOTA_CREDITO",
+        status: "EMITIDA",
+        clientId: target.clientId,
+        relatedDocumentId: target.id,
+        satRelationType: "01",
+        concept,
+        subtotal,
+        iva,
+        total,
+        creditDays: 0,
+        rfcSnapshot: target.rfcSnapshot || target.client.rfc,
+        cfdiUseSnapshot: cfdiUse,
+        paymentMethodSnapshot: paymentMethod,
+        paymentFormSnapshot: paymentForm,
+        issuedAt,
+        dueAt: issuedAt,
+        fiscalStatus: "PENDIENTE",
+        requestedByUserId: actor.userId,
+        issuedByUserId: actor.userId,
+        lines: {
+          create: [
+            {
+              concept,
+              quantity: 1,
+              unitPrice: subtotal,
+              discountAmount: 0,
+              amount: subtotal,
+              taxIncluded: false,
+              satProductKey: baseLine?.satProductKey || satDefaults.productKey,
+              satUnitKey: baseLine?.satUnitKey || satDefaults.unitKey,
+              satUnitName: baseLine?.satUnitName || satDefaults.unitName,
+              taxability: baseLine?.taxability || satDefaults.taxability,
+            },
+          ],
+        },
+      },
+    });
+
+    if (target.receivable && target.receivable.status !== "CANCELADA" && target.receivable.balance > 0) {
+      const reduction = Math.min(target.receivable.balance, total);
+      const nextBal = roundMoney(target.receivable.balance - reduction);
+      await tx.receivable.update({
+        where: { id: target.receivable.id },
+        data: { balance: nextBal, status: balanceStatus(nextBal, target.receivable.amount) },
+      });
+    }
+
+    if (target.payable && target.payable.status !== "CANCELADA" && target.payable.balance > 0) {
+      const reductionP = Math.min(target.payable.balance, total);
+      const nextBalP = roundMoney(target.payable.balance - reductionP);
+      await tx.payable.update({
+        where: { id: target.payable.id },
+        data: { balance: nextBalP, status: balanceStatus(nextBalP, target.payable.amount) },
+      });
+    }
+
+    return created;
+  });
+
+  try {
+    await stampBillingDocument(creditNote.id, { fetchFn: options?.fetchFn });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Error inesperado al timbrar Nota de Crédito.";
+    await prisma.billingDocument
+      .update({
+        where: { id: creditNote.id },
+        data: { fiscalStatus: "ERROR", fiscalError: `${message} El reintento usa este mismo documento.` },
+      })
+      .catch(() => undefined);
+  }
+
+  await recordHistory({
+    companyId: actor.activeCompanyId,
+    entityType: "DOCUMENTO",
+    entityId: creditNote.id,
+    action: "EMISION_NOTA_CREDITO",
+    summary: `Nota de crédito ${folio} emitida sobre ${target.folio} por ${total} (relación 01).`,
+    authorUserId: actor.userId,
+  });
+
+  await recordHistory({
+    companyId: actor.activeCompanyId,
+    entityType: "DOCUMENTO",
+    entityId: target.id,
+    action: "NOTA_CREDITO_APLICADA",
+    summary: `Se aplicó nota de crédito ${folio} por ${total} a ${target.folio}.`,
+    authorUserId: actor.userId,
+  });
+
+  return creditNote;
 }

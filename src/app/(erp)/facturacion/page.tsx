@@ -21,6 +21,7 @@ const KIND: Record<string, string> = {
   REMISION: "Remisión",
   FACTURA_LIBRE: "Factura libre",
   FACTURA_INTERCOMPANIA: "Factura a SYSTRON",
+  NOTA_CREDITO: "Nota de crédito",
 };
 
 type Vista = "solicitudes" | "facturas" | "canceladas" | "remisiones" | "todas";

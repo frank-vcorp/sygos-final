@@ -309,3 +309,152 @@ export async function getPaymentComplementDownload(
   }
   return null;
 }
+
+export async function fetchCancellationReceiptFromFacturapi(
+  secret: string,
+  fiscalExternalId: string,
+  format: "xml" | "pdf",
+  fetchFn: typeof fetch = fetch,
+): Promise<Buffer | null> {
+  try {
+    const response = await fetchFn(
+      `${API}/invoices/${encodeURIComponent(fiscalExternalId)}/cancellation_receipt/${format}`,
+      { headers: { Authorization: `Bearer ${secret}` } },
+    );
+    if (!response.ok) return null;
+    const buf = Buffer.from(await response.arrayBuffer());
+    return buf.length > 0 ? buf : null;
+  } catch {
+    return null;
+  }
+}
+
+export async function ensureCancellationReceiptArtifacts(
+  documentId: string,
+  options?: { fetchFn?: typeof fetch },
+): Promise<{ folio: string; xml: string | null; pdf: Buffer | null }> {
+  const fetchFn = options?.fetchFn ?? fetch;
+  const doc = await prisma.billingDocument.findUnique({
+    where: { id: documentId },
+    select: {
+      id: true,
+      folio: true,
+      companyId: true,
+      fiscalEnv: true,
+      fiscalExternalId: true,
+      cancellationStatus: true,
+      cancelReceiptXml: true,
+      cancelReceiptPdf: true,
+    },
+  });
+  if (!doc) return { folio: "acuse", xml: null, pdf: null };
+
+  let xml: string | null = doc.cancelReceiptXml ?? null;
+  let pdf: Buffer | null = doc.cancelReceiptPdf ? Buffer.from(doc.cancelReceiptPdf) : null;
+
+  if (
+    (!xml || !pdf)
+    && doc.fiscalExternalId
+    && doc.fiscalEnv !== "SIMULATED"
+    && (doc.cancellationStatus === "accepted" || doc.cancellationStatus === "pending" || doc.cancellationStatus === "verifying")
+  ) {
+    const cred = await resolveFacturapiSecretForEnv(doc.companyId, doc.fiscalEnv);
+    if (cred) {
+      const [xmlBuf, pdfBuf] = await Promise.all([
+        !xml ? fetchCancellationReceiptFromFacturapi(cred.secret, doc.fiscalExternalId, "xml", fetchFn) : Promise.resolve(null),
+        !pdf ? fetchCancellationReceiptFromFacturapi(cred.secret, doc.fiscalExternalId, "pdf", fetchFn) : Promise.resolve(null),
+      ]);
+      const nextXml = xmlBuf ? xmlBuf.toString("utf8") : null;
+      const nextPdf = pdfBuf && pdfBuf.length > 0 ? pdfBuf : null;
+      if (nextXml || nextPdf) {
+        await prisma.billingDocument.update({
+          where: { id: doc.id },
+          data: {
+            ...(nextXml ? { cancelReceiptXml: nextXml } : {}),
+            ...(nextPdf ? { cancelReceiptPdf: Uint8Array.from(nextPdf) } : {}),
+          },
+        });
+      }
+      if (nextXml) xml = nextXml;
+      if (nextPdf) pdf = nextPdf;
+    }
+  }
+
+  return { folio: doc.folio, xml, pdf };
+}
+
+export async function getCancellationReceiptDownload(
+  documentId: string,
+  format: "xml" | "pdf",
+  options?: { fetchFn?: typeof fetch },
+): Promise<{ filename: string; contentType: string; buffer: Buffer } | null> {
+  const { folio, xml, pdf } = await ensureCancellationReceiptArtifacts(documentId, options);
+  const base = `${safeFileBaseName(folio)}-acuse-cancelacion`;
+  if (format === "xml") {
+    if (!xml) return null;
+    return {
+      filename: `${base}.xml`,
+      contentType: "application/xml; charset=utf-8",
+      buffer: Buffer.from(xml, "utf8"),
+    };
+  }
+  if (!pdf || pdf.length === 0) return null;
+  return {
+    filename: `${base}.pdf`,
+    contentType: "application/pdf",
+    buffer: pdf,
+  };
+}
+
+export async function ensureRepCancellationReceiptArtifacts(
+  complementId: string,
+  options?: { fetchFn?: typeof fetch },
+): Promise<{ xml: string | null; pdf: Buffer | null }> {
+  const fetchFn = options?.fetchFn ?? fetch;
+  const rep = await prisma.paymentComplement.findUnique({
+    where: { id: complementId },
+    select: {
+      id: true,
+      companyId: true,
+      fiscalEnv: true,
+      fiscalExternalId: true,
+      cancellationStatus: true,
+      cancelReceiptXml: true,
+      cancelReceiptPdf: true,
+    },
+  });
+  if (!rep) return { xml: null, pdf: null };
+
+  let xml: string | null = rep.cancelReceiptXml ?? null;
+  let pdf: Buffer | null = rep.cancelReceiptPdf ? Buffer.from(rep.cancelReceiptPdf) : null;
+
+  if (
+    (!xml || !pdf)
+    && rep.fiscalExternalId
+    && rep.fiscalEnv !== "SIMULATED"
+    && (rep.cancellationStatus === "accepted" || rep.cancellationStatus === "pending" || rep.cancellationStatus === "verifying")
+  ) {
+    const cred = await resolveFacturapiSecretForEnv(rep.companyId, rep.fiscalEnv);
+    if (cred) {
+      const [xmlBuf, pdfBuf] = await Promise.all([
+        !xml ? fetchCancellationReceiptFromFacturapi(cred.secret, rep.fiscalExternalId, "xml", fetchFn) : Promise.resolve(null),
+        !pdf ? fetchCancellationReceiptFromFacturapi(cred.secret, rep.fiscalExternalId, "pdf", fetchFn) : Promise.resolve(null),
+      ]);
+      const nextXml = xmlBuf ? xmlBuf.toString("utf8") : null;
+      const nextPdf = pdfBuf && pdfBuf.length > 0 ? pdfBuf : null;
+      if (nextXml || nextPdf) {
+        await prisma.paymentComplement.update({
+          where: { id: rep.id },
+          data: {
+            ...(nextXml ? { cancelReceiptXml: nextXml } : {}),
+            ...(nextPdf ? { cancelReceiptPdf: Uint8Array.from(nextPdf) } : {}),
+          },
+        });
+      }
+      if (nextXml) xml = nextXml;
+      if (nextPdf) pdf = nextPdf;
+    }
+  }
+
+  return { xml, pdf };
+}

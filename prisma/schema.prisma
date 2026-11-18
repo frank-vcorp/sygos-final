@@ -796,6 +796,17 @@ model BillingDocument {
   stampedAt         DateTime?
   xmlContent        String?
   pdfContent        Bytes?
+  cancelRequestedAt       DateTime?
+  cancelRequestedByUserId String?
+  cancelAuthorizedByUserId String?
+  cancelMotive            String?
+  cancelSubstitutionDocId String?
+  cancellationStatus      String?
+  canceledAt              DateTime?
+  cancelReceiptXml        String?
+  cancelReceiptPdf        Bytes?
+  relatedDocumentId       String?
+  satRelationType         String?
   requestedByUserId String?
   issuedByUserId    String?
   /// Una factura de Servomotores a SYSTRON por atención (o por cotización base si no hay atención).
@@ -804,6 +815,10 @@ model BillingDocument {
   updatedAt         DateTime  @updatedAt
   version           Int       @default(1)
 
+  relatedDocument     BillingDocument?  @relation("BillingDocumentRelation", fields: [relatedDocumentId], references: [id])
+  creditNotes         BillingDocument[] @relation("BillingDocumentRelation")
+  substitutionDocument BillingDocument? @relation("BillingDocumentSubstitution", fields: [cancelSubstitutionDocId], references: [id])
+  substitutedBy       BillingDocument[] @relation("BillingDocumentSubstitution")
   receivable Receivable?
   payable    Payable?
   lines      BillingLine[]
@@ -812,6 +827,7 @@ model BillingDocument {
   @@unique([companyId, folio])
   @@index([companyId, status])
   @@index([fieldServiceCaseId])
+  @@index([relatedDocumentId])
 }
 
 model BillingLine {
@@ -932,8 +948,15 @@ model PaymentComplement {
   totalAmount          Float
   xmlContent           String?
   pdfContent           Bytes?
-  cancellationStatus   String?
-  canceledAt           DateTime?
+  cancelRequestedAt       DateTime?
+  cancelRequestedByUserId String?
+  cancelAuthorizedByUserId String?
+  cancelMotive            String?
+  cancelSubstitutionRepId String?
+  cancellationStatus      String?
+  canceledAt              DateTime?
+  cancelReceiptXml        String?
+  cancelReceiptPdf        Bytes?
   stampedAt            DateTime?
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt

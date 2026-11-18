@@ -1,7 +1,9 @@
 import { Prisma } from "@prisma/client";
 import {
   ensureBillingDocumentArtifacts,
+  ensureCancellationReceiptArtifacts,
   ensurePaymentComplementArtifacts,
+  ensureRepCancellationReceiptArtifacts,
 } from "./billing-artifacts";
 import { maybeAutoDeliverStampedDocument } from "./billing-delivery";
 import { inSandbox, prisma, prismaProd } from "./db";
@@ -9,6 +11,7 @@ import {
   loadWebhookSlotForEnvironment,
   parseCompanyFiscalConfig,
   resolveFacturapiRuntimeCredential,
+  resolveFacturapiSecretForEnv,
   resolveSatDefaultsForDocument,
   syncIntercompanyPartiesFromCompany,
 } from "./fiscal-config";
@@ -52,6 +55,7 @@ export type InvoicePayloadLine = {
 };
 
 export function invoicePayload(input: {
+  type?: "I" | "E";
   externalId: string;
   idempotencyKey?: string | null;
   customerName: string;
@@ -65,6 +69,7 @@ export function invoicePayload(input: {
   email: string | null;
   series?: string | null;
   folioNumber?: number | null;
+  relatedDocuments?: Array<{ relationship: string; documents: string[] }>;
   lines: InvoicePayloadLine[];
   iva: number;
 }) {
@@ -90,14 +95,18 @@ export function invoicePayload(input: {
     satLegalName: input.satLegalName,
   });
   const taxed = input.iva > 0;
+  const cfdiType = input.type ?? "I";
 
   return {
     body: {
-      type: "I",
+      type: cfdiType,
       external_id: input.externalId,
       ...(input.idempotencyKey ? { idempotency_key: input.idempotencyKey.slice(0, 100) } : {}),
       ...(input.series ? { series: input.series.slice(0, 25) } : {}),
       ...(input.folioNumber && input.folioNumber > 0 ? { folio_number: input.folioNumber } : {}),
+      ...(input.relatedDocuments && input.relatedDocuments.length > 0
+        ? { related_documents: input.relatedDocuments }
+        : {}),
       customer: {
         legal_name: legalName,
         tax_id: input.rfc,
@@ -142,6 +151,7 @@ type InvoiceResponse = {
   id?: string;
   uuid?: string;
   status?: string;
+  cancellation_status?: string;
   external_id?: string;
   series?: string;
   folio_number?: number;
@@ -317,6 +327,7 @@ export async function stampBillingDocument(
       company: true,
       quote: { select: { quoteType: true } },
       fieldServiceCase: { select: { id: true } },
+      relatedDocument: { select: { id: true, folio: true, fiscalUuid: true, fiscalStatus: true } },
     },
   });
   if (!document || document.kind === "REMISION") return;
@@ -494,7 +505,29 @@ export async function stampBillingDocument(
       || document.client.contacts.find((c) => c.email?.trim())?.email?.trim()
       || null;
 
+    let relatedDocuments: Array<{ relationship: string; documents: string[] }> | undefined;
+    if (document.kind === "NOTA_CREDITO") {
+      if (!document.relatedDocument?.fiscalUuid) {
+        await prisma.billingDocument.update({
+          where: { id: document.id },
+          data: {
+            fiscalEnv,
+            fiscalStatus: "ERROR",
+            fiscalError: "La factura origen aún no tiene UUID fiscal para timbrar la Nota de Crédito.",
+          },
+        });
+        return;
+      }
+      relatedDocuments = [
+        {
+          relationship: document.satRelationType || "01",
+          documents: [document.relatedDocument.fiscalUuid],
+        },
+      ];
+    }
+
     const payload = invoicePayload({
+      type: document.kind === "NOTA_CREDITO" ? "E" : "I",
       externalId: document.id,
       idempotencyKey,
       customerName: document.client.name,
@@ -508,6 +541,7 @@ export async function stampBillingDocument(
       email: contactEmail,
       series: parsedFolio?.series ?? null,
       folioNumber: parsedFolio?.folioNumber ?? null,
+      relatedDocuments,
       lines: document.lines.map((line) => ({
         concept: line.concept,
         quantity: line.quantity,
@@ -1148,6 +1182,80 @@ export async function processFacturapiWebhook(input: {
                 fiscalStatus: "CANCELADA",
                 canceledAt: rep.canceledAt ?? new Date(),
               },
+            });
+          }
+        }
+      }
+    }
+  } else if (event.type === "invoice.cancellation_status_updated" && event.data?.object) {
+    const inv = event.data.object;
+    const orFilters: Array<{ fiscalExternalId?: string; id?: string }> = [];
+    if (inv.id) orFilters.push({ fiscalExternalId: inv.id });
+    if (inv.external_id) orFilters.push({ id: inv.external_id });
+
+    if (orFilters.length > 0) {
+      const doc = await prisma.billingDocument.findFirst({
+        where: { companyId: company.id, OR: orFilters },
+      });
+      if (doc && (!doc.fiscalEnv || doc.fiscalEnv === eventEnv)) {
+        const cancelStatus = inv.cancellation_status ?? (inv.status === "canceled" ? "accepted" : null);
+        if (inv.status === "canceled" || cancelStatus === "accepted") {
+          await finalizeDocumentCancellation(doc.id, { fetchFn, viaWebhook: true });
+        } else if (cancelStatus === "rejected" || cancelStatus === "expired") {
+          await prisma.billingDocument.update({
+            where: { id: doc.id },
+            data: {
+              cancellationStatus: cancelStatus,
+              fiscalError:
+                cancelStatus === "rejected"
+                  ? "El receptor rechazó la solicitud de cancelación ante el SAT."
+                  : "La solicitud de cancelación expiró sin respuesta del receptor.",
+            },
+          });
+          await recordHistory({
+            companyId: company.id,
+            entityType: "DOCUMENTO",
+            entityId: doc.id,
+            action: "CANCELACION_RECHAZADA",
+            summary: `Cancelación de ${doc.folio} terminó en estado ${cancelStatus} vía webhook.`,
+          });
+        } else if (cancelStatus === "pending" || cancelStatus === "verifying") {
+          await prisma.billingDocument.update({
+            where: { id: doc.id },
+            data: { cancellationStatus: cancelStatus },
+          });
+        }
+      } else {
+        const rep = await prisma.paymentComplement.findFirst({
+          where: { companyId: company.id, OR: orFilters },
+          include: { payment: true },
+        });
+        if (rep && (!rep.fiscalEnv || rep.fiscalEnv === eventEnv)) {
+          const cancelStatus = inv.cancellation_status ?? (inv.status === "canceled" ? "accepted" : null);
+          if (inv.status === "canceled" || cancelStatus === "accepted") {
+            await finalizeRepCancellation(rep.id, { fetchFn, viaWebhook: true });
+          } else if (cancelStatus === "rejected" || cancelStatus === "expired") {
+            await prisma.paymentComplement.update({
+              where: { id: rep.id },
+              data: {
+                cancellationStatus: cancelStatus,
+                fiscalError:
+                  cancelStatus === "rejected"
+                    ? "El receptor rechazó la cancelación del REP ante el SAT."
+                    : "La cancelación del REP expiró sin respuesta del receptor.",
+              },
+            });
+            await recordHistory({
+              companyId: company.id,
+              entityType: "PAGO",
+              entityId: rep.paymentId,
+              action: "CANCELACION_REP_RECHAZADA",
+              summary: `Cancelación del REP de ${rep.payment.folio} terminó en estado ${cancelStatus} vía webhook.`,
+            });
+          } else if (cancelStatus === "pending" || cancelStatus === "verifying") {
+            await prisma.paymentComplement.update({
+              where: { id: rep.id },
+              data: { cancellationStatus: cancelStatus },
             });
           }
         }
@@ -1884,4 +1992,546 @@ export async function stampPaymentComplement(
     });
     return { ok: false, status: "ERROR", complementId: rep.id, message: fullMsg };
   }
+}
+
+export const SAT_CANCEL_MOTIVES = [
+  { id: "01", label: "01 — Comprobante emitido con errores con relación (requiere sustitución)" },
+  { id: "02", label: "02 — Comprobante emitido con errores sin relación" },
+  { id: "03", label: "03 — No se llevó a cabo la operación" },
+  { id: "04", label: "04 — Operación nominativa relacionada en factura global (requiere sustitución)" },
+] as const;
+
+export type SatCancelMotive = (typeof SAT_CANCEL_MOTIVES)[number]["id"];
+
+export function isValidSatCancelMotive(value: string | null | undefined): value is SatCancelMotive {
+  return value === "01" || value === "02" || value === "03" || value === "04";
+}
+
+function docBalanceStatus(balance: number, amount: number) {
+  if (balance <= 0) return "SALDADA";
+  if (balance < amount) return "PARCIAL";
+  return "ABIERTA";
+}
+
+export async function finalizeDocumentCancellation(
+  documentId: string,
+  options?: { fetchFn?: typeof fetch; viaWebhook?: boolean; actorUserId?: string | null },
+) {
+  const doc = await prisma.billingDocument.findUnique({
+    where: { id: documentId },
+    include: {
+      receivable: {
+        include: {
+          applications: { include: { payment: { select: { status: true } } } },
+        },
+      },
+      payable: {
+        include: {
+          applications: { include: { payment: { select: { status: true } } } },
+        },
+      },
+      relatedDocument: {
+        include: {
+          receivable: true,
+          payable: true,
+        },
+      },
+    },
+  });
+  if (!doc) return;
+
+  await prisma.$transaction(async (tx) => {
+    await tx.billingDocument.update({
+      where: { id: doc.id },
+      data: {
+        status: "CANCELADA",
+        fiscalStatus: doc.kind === "REMISION" ? "NO_APLICA" : "CANCELADA",
+        cancellationStatus: "accepted",
+        canceledAt: doc.canceledAt ?? new Date(),
+        fiscalError: null,
+        version: { increment: 1 },
+      },
+    });
+
+    if (doc.receivable) {
+      const hasValidatedPayment = doc.receivable.applications.some(
+        (app) => Boolean(app.confirmedAt) && app.payment.status === "VALIDADO",
+      );
+      if (!hasValidatedPayment) {
+        await tx.receivable.update({
+          where: { id: doc.receivable.id },
+          data: { status: "CANCELADA", balance: 0 },
+        });
+      }
+    }
+
+    if (doc.payable) {
+      const hasValidatedPayablePayment = doc.payable.applications.some(
+        (app) => Boolean(app.confirmedAt) && app.payment.status === "VALIDADO",
+      );
+      if (!hasValidatedPayablePayment) {
+        await tx.payable.update({
+          where: { id: doc.payable.id },
+          data: { status: "CANCELADA", balance: 0 },
+        });
+      }
+    }
+
+    if (doc.kind === "NOTA_CREDITO" && doc.relatedDocument?.receivable) {
+      const targetRec = doc.relatedDocument.receivable;
+      if (targetRec.status !== "CANCELADA") {
+        const restored = roundMoney(Math.min(targetRec.amount, targetRec.balance + doc.total));
+        await tx.receivable.update({
+          where: { id: targetRec.id },
+          data: { balance: restored, status: docBalanceStatus(restored, targetRec.amount) },
+        });
+      }
+    }
+
+    if (doc.kind === "NOTA_CREDITO" && doc.relatedDocument?.payable) {
+      const targetPay = doc.relatedDocument.payable;
+      if (targetPay.status !== "CANCELADA") {
+        const restored = roundMoney(Math.min(targetPay.amount, targetPay.balance + doc.total));
+        await tx.payable.update({
+          where: { id: targetPay.id },
+          data: { balance: restored, status: docBalanceStatus(restored, targetPay.amount) },
+        });
+      }
+    }
+  });
+
+  if (doc.fiscalExternalId && doc.fiscalEnv !== "SIMULATED") {
+    await ensureCancellationReceiptArtifacts(doc.id, { fetchFn: options?.fetchFn }).catch(() => undefined);
+  }
+
+  await recordHistory({
+    companyId: doc.companyId,
+    entityType: "DOCUMENTO",
+    entityId: doc.id,
+    action: options?.viaWebhook ? "CANCELACION_SAT_WEBHOOK" : "CANCELACION_SAT",
+    summary: `${doc.folio} quedó cancelado${doc.cancelMotive ? ` (motivo ${doc.cancelMotive})` : ""}${options?.viaWebhook ? " vía webhook" : ""}.`,
+    authorUserId: options?.actorUserId ?? null,
+  });
+}
+
+export async function cancelBillingDocumentInFacturapi(
+  documentId: string,
+  options?: { actorUserId?: string | null; fetchFn?: typeof fetch },
+): Promise<{
+  ok: boolean;
+  status: string;
+  cancellationStatus: string;
+  message: string;
+}> {
+  const fetchFn = options?.fetchFn ?? fetch;
+  const doc = await prisma.billingDocument.findUnique({
+    where: { id: documentId },
+    include: {
+      company: true,
+      substitutionDocument: true,
+      paymentComplementItems: {
+        include: {
+          complement: {
+            include: { payment: { select: { folio: true } } },
+          },
+        },
+      },
+      receivable: {
+        include: {
+          applications: { include: { payment: { select: { status: true } } } },
+        },
+      },
+      payable: {
+        include: {
+          applications: { include: { payment: { select: { status: true } } } },
+        },
+      },
+    },
+  });
+
+  if (!doc) throw new Error("No se encontró el documento.");
+  if (doc.status === "CANCELADA") throw new Error("Este documento ya está cancelado.");
+  if (doc.cancellationStatus === "pending" || doc.cancellationStatus === "verifying") {
+    throw new Error("Ya existe una cancelación en proceso ante el SAT para este documento.");
+  }
+
+  const motive = doc.cancelMotive;
+  if (!isValidSatCancelMotive(motive)) {
+    throw new Error("Define un motivo de cancelación SAT válido (01, 02, 03 o 04).");
+  }
+
+  const sandboxActive = await inSandbox();
+  let substitutionIdParam: string | null = null;
+  if (motive === "01" || motive === "04") {
+    if (!doc.cancelSubstitutionDocId) {
+      throw new Error(`El motivo ${motive} exige seleccionar la factura que sustituye a este comprobante.`);
+    }
+    const subDoc =
+      doc.substitutionDocument
+      ?? (await prisma.billingDocument.findFirst({
+        where: { id: doc.cancelSubstitutionDocId, companyId: doc.companyId },
+      }));
+    if (!subDoc || subDoc.companyId !== doc.companyId || subDoc.id === doc.id) {
+      throw new Error("La factura sustituta no pertenece a la misma empresa o no es válida.");
+    }
+    const subAllowed = sandboxActive
+      ? subDoc.status === "EMITIDA" && (subDoc.fiscalStatus === "TIMBRADA" || subDoc.fiscalStatus === "SIMULADA")
+      : subDoc.status === "EMITIDA" && subDoc.fiscalStatus === "TIMBRADA" && Boolean(subDoc.fiscalUuid || subDoc.fiscalExternalId);
+    if (!subAllowed) {
+      throw new Error("La factura sustituta debe estar emitida y timbrada antes de cancelar con motivo 01 o 04.");
+    }
+    substitutionIdParam = subDoc.fiscalUuid || subDoc.fiscalExternalId || subDoc.id;
+  }
+
+  // Regla obligatoria SAT: si tiene un Complemento de Pago (REP) vigente, debe cancelarse primero el REP
+  const activeReps = doc.paymentComplementItems.filter(
+    (item) => item.complement.fiscalStatus !== "CANCELADA",
+  );
+  if (activeReps.length > 0) {
+    const folios = activeReps.map((item) => item.complement.payment.folio).join(", ");
+    throw new Error(
+      `Esta factura PPD tiene Complemento(s) de Pago (REP) vigente(s) (${folios}). Cancela primero el REP desde el detalle del pago antes de cancelar la factura.`,
+    );
+  }
+
+  // Verificar pagos validados en CxC / CxP según política del Administrador:
+  // Si el documento tenía REP(s) y ya fueron cancelados, se desbloquea el orden SAT.
+  const hasCancelledReps = doc.paymentComplementItems.length > 0 && activeReps.length === 0;
+  const hasValidatedRecPayments = Boolean(
+    doc.receivable?.applications.some((app) => Boolean(app.confirmedAt) && app.payment.status === "VALIDADO"),
+  );
+  const hasValidatedPayablePayments = Boolean(
+    doc.payable?.applications.some((app) => Boolean(app.confirmedAt) && app.payment.status === "VALIDADO"),
+  );
+  if ((hasValidatedRecPayments || hasValidatedPayablePayments) && !hasCancelledReps) {
+    const companyConfig = parseCompanyFiscalConfig(doc.company);
+    if (
+      companyConfig.toggles.cancelWithPaymentsPolicy === "BLOCK_UNTIL_REP_CANCELED"
+      && motive !== "01"
+    ) {
+      throw new Error(
+        "La factura tiene pagos validados aplicados. Usa sustitución (motivo 01) o regulariza los pagos antes de cancelar.",
+      );
+    }
+  }
+
+  const isLocalOnly =
+    doc.kind === "REMISION"
+    || !doc.fiscalExternalId
+    || doc.fiscalStatus === "PENDIENTE"
+    || doc.fiscalStatus === "ERROR"
+    || doc.fiscalStatus === "SIMULADA"
+    || doc.fiscalEnv === "SIMULATED"
+    || sandboxActive;
+
+  if (isLocalOnly) {
+    await finalizeDocumentCancellation(doc.id, {
+      fetchFn,
+      actorUserId: options?.actorUserId ?? null,
+    });
+    return {
+      ok: true,
+      status: "CANCELADA",
+      cancellationStatus: "accepted",
+      message:
+        sandboxActive || doc.fiscalEnv === "SIMULATED"
+          ? `${doc.folio} cancelado en modo de pruebas (simulado).`
+          : `${doc.folio} cancelado internamente.`,
+    };
+  }
+
+  const cred = await resolveFacturapiSecretForEnv(doc.companyId, doc.fiscalEnv);
+  if (!cred) {
+    const msg = "No se encontró la llave de Facturapi del ambiente en que se timbró este documento.";
+    await prisma.billingDocument.update({ where: { id: doc.id }, data: { fiscalError: msg } });
+    return { ok: false, status: doc.fiscalStatus, cancellationStatus: doc.cancellationStatus ?? "none", message: msg };
+  }
+
+  const params = new URLSearchParams({ motive });
+  if (substitutionIdParam) params.set("substitution", substitutionIdParam);
+
+  const res = await facturapiFetch(
+    cred.secret,
+    `/invoices/${encodeURIComponent(doc.fiscalExternalId!)}?${params.toString()}`,
+    { method: "DELETE" },
+    fetchFn,
+  );
+
+  if (!res.ok) {
+    const msg = res.body.message || "Facturapi rechazó la solicitud de cancelación ante el SAT.";
+    await prisma.billingDocument.update({ where: { id: doc.id }, data: { fiscalError: msg } });
+    return {
+      ok: false,
+      status: doc.fiscalStatus,
+      cancellationStatus: doc.cancellationStatus ?? "none",
+      message: msg,
+    };
+  }
+
+  const cancelStatus = res.body.cancellation_status ?? (res.body.status === "canceled" ? "accepted" : "pending");
+  if (res.body.status === "canceled" || cancelStatus === "accepted") {
+    await finalizeDocumentCancellation(doc.id, {
+      fetchFn,
+      actorUserId: options?.actorUserId ?? null,
+    });
+    return {
+      ok: true,
+      status: "CANCELADA",
+      cancellationStatus: "accepted",
+      message: `${doc.folio} cancelado ante el SAT.`,
+    };
+  }
+
+  await prisma.billingDocument.update({
+    where: { id: doc.id },
+    data: {
+      cancellationStatus: cancelStatus,
+      fiscalError: null,
+    },
+  });
+  await ensureCancellationReceiptArtifacts(doc.id, { fetchFn }).catch(() => undefined);
+  await recordHistory({
+    companyId: doc.companyId,
+    entityType: "DOCUMENTO",
+    entityId: doc.id,
+    action: "CANCELACION_EN_PROCESO",
+    summary: `Solicitud de cancelación SAT enviada para ${doc.folio} (motivo ${motive}, estado ${cancelStatus}).`,
+    authorUserId: options?.actorUserId ?? null,
+  });
+
+  return {
+    ok: true,
+    status: "EMITIDA",
+    cancellationStatus: cancelStatus,
+    message: `Cancelación en proceso (${cancelStatus}). El documento sigue vigente hasta que el SAT/receptor confirme.`,
+  };
+}
+
+export async function pollBillingDocumentCancellation(
+  documentId: string,
+  options?: { actorUserId?: string | null; fetchFn?: typeof fetch },
+): Promise<{ ok: boolean; status: string; cancellationStatus: string; message: string }> {
+  const fetchFn = options?.fetchFn ?? fetch;
+  const doc = await prisma.billingDocument.findUnique({ where: { id: documentId } });
+  if (!doc) throw new Error("Documento no encontrado.");
+  if (doc.status === "CANCELADA") {
+    return { ok: true, status: "CANCELADA", cancellationStatus: "accepted", message: "El documento ya está cancelado." };
+  }
+  if (!doc.fiscalExternalId || doc.fiscalEnv === "SIMULATED") {
+    return { ok: false, status: doc.fiscalStatus, cancellationStatus: doc.cancellationStatus ?? "none", message: "El documento no tiene solicitud activa en Facturapi." };
+  }
+  const cred = await resolveFacturapiSecretForEnv(doc.companyId, doc.fiscalEnv);
+  if (!cred) {
+    return { ok: false, status: doc.fiscalStatus, cancellationStatus: doc.cancellationStatus ?? "none", message: "No hay llave de Facturapi configurada para consultar." };
+  }
+
+  const res = await facturapiFetch(cred.secret, `/invoices/${encodeURIComponent(doc.fiscalExternalId)}`, undefined, fetchFn);
+  if (!res.ok) {
+    return { ok: false, status: doc.fiscalStatus, cancellationStatus: doc.cancellationStatus ?? "none", message: res.body.message || "Facturapi no devolvió el estado de cancelación." };
+  }
+
+  const cancelStatus = res.body.cancellation_status ?? (res.body.status === "canceled" ? "accepted" : "none");
+  if (res.body.status === "canceled" || cancelStatus === "accepted") {
+    await finalizeDocumentCancellation(doc.id, { fetchFn, actorUserId: options?.actorUserId ?? null });
+    return { ok: true, status: "CANCELADA", cancellationStatus: "accepted", message: "Cancelación confirmada ante el SAT." };
+  }
+
+  if (cancelStatus === "rejected" || cancelStatus === "expired") {
+    const errMsg =
+      cancelStatus === "rejected"
+        ? "El receptor rechazó la solicitud de cancelación ante el SAT."
+        : "La solicitud de cancelación expiró sin respuesta.";
+    await prisma.billingDocument.update({
+      where: { id: doc.id },
+      data: { cancellationStatus: cancelStatus, fiscalError: errMsg },
+    });
+    await recordHistory({
+      companyId: doc.companyId,
+      entityType: "DOCUMENTO",
+      entityId: doc.id,
+      action: "CANCELACION_RECHAZADA",
+      summary: `Cancelación de ${doc.folio}: ${errMsg}`,
+      authorUserId: options?.actorUserId ?? null,
+    });
+    return { ok: false, status: doc.fiscalStatus, cancellationStatus: cancelStatus, message: errMsg };
+  }
+
+  await prisma.billingDocument.update({
+    where: { id: doc.id },
+    data: { cancellationStatus: cancelStatus },
+  });
+  return { ok: true, status: doc.fiscalStatus, cancellationStatus: cancelStatus, message: `Cancelación aún en proceso (${cancelStatus}).` };
+}
+
+export async function finalizeRepCancellation(
+  complementId: string,
+  options?: { fetchFn?: typeof fetch; viaWebhook?: boolean; actorUserId?: string | null },
+) {
+  const rep = await prisma.paymentComplement.findUnique({
+    where: { id: complementId },
+    include: { payment: { select: { folio: true } } },
+  });
+  if (!rep) return;
+
+  await prisma.paymentComplement.update({
+    where: { id: rep.id },
+    data: {
+      fiscalStatus: "CANCELADA",
+      cancellationStatus: "accepted",
+      canceledAt: rep.canceledAt ?? new Date(),
+      fiscalError: null,
+    },
+  });
+
+  if (rep.fiscalExternalId && rep.fiscalEnv !== "SIMULATED") {
+    await ensureRepCancellationReceiptArtifacts(rep.id, { fetchFn: options?.fetchFn }).catch(() => undefined);
+  }
+
+  await recordHistory({
+    companyId: rep.companyId,
+    entityType: "PAGO",
+    entityId: rep.paymentId,
+    action: options?.viaWebhook ? "CANCELACION_REP_WEBHOOK" : "CANCELACION_REP",
+    summary: `REP de ${rep.payment.folio} quedó cancelado${rep.cancelMotive ? ` (motivo ${rep.cancelMotive})` : ""}.`,
+    authorUserId: options?.actorUserId ?? null,
+  });
+}
+
+export async function cancelPaymentComplement(
+  complementId: string,
+  options: { motive: string; actorUserId?: string | null; fetchFn?: typeof fetch },
+): Promise<{ ok: boolean; status: string; cancellationStatus: string; message: string }> {
+  const fetchFn = options.fetchFn ?? fetch;
+  if (!isValidSatCancelMotive(options.motive)) {
+    throw new Error("El motivo SAT de cancelación del REP debe ser 01, 02, 03 o 04.");
+  }
+  const rep = await prisma.paymentComplement.findUnique({
+    where: { id: complementId },
+    include: { payment: { select: { folio: true } } },
+  });
+  if (!rep) throw new Error("Complemento de pago no encontrado.");
+  if (rep.fiscalStatus === "CANCELADA") throw new Error("Este REP ya está cancelado.");
+  if (rep.cancellationStatus === "pending" || rep.cancellationStatus === "verifying") {
+    throw new Error("La cancelación de este REP ya está en proceso ante el SAT.");
+  }
+
+  await prisma.paymentComplement.update({
+    where: { id: rep.id },
+    data: {
+      cancelMotive: options.motive,
+      cancelRequestedAt: rep.cancelRequestedAt ?? new Date(),
+      cancelRequestedByUserId: rep.cancelRequestedByUserId ?? options.actorUserId ?? null,
+      cancelAuthorizedByUserId: options.actorUserId ?? rep.cancelAuthorizedByUserId ?? null,
+    },
+  });
+
+  const sandboxActive = await inSandbox();
+  if (
+    !rep.fiscalExternalId
+    || rep.fiscalStatus === "PENDIENTE"
+    || rep.fiscalStatus === "ERROR"
+    || rep.fiscalStatus === "SIMULADA"
+    || rep.fiscalEnv === "SIMULATED"
+    || sandboxActive
+  ) {
+    await finalizeRepCancellation(rep.id, { fetchFn, actorUserId: options.actorUserId ?? null });
+    return {
+      ok: true,
+      status: "CANCELADA",
+      cancellationStatus: "accepted",
+      message: `REP de ${rep.payment.folio} cancelado.`,
+    };
+  }
+
+  const cred = await resolveFacturapiSecretForEnv(rep.companyId, rep.fiscalEnv);
+  if (!cred) {
+    const msg = "No se encontró la llave de Facturapi para cancelar este REP.";
+    await prisma.paymentComplement.update({ where: { id: rep.id }, data: { fiscalError: msg } });
+    return { ok: false, status: rep.fiscalStatus, cancellationStatus: rep.cancellationStatus ?? "none", message: msg };
+  }
+
+  const res = await facturapiFetch(
+    cred.secret,
+    `/invoices/${encodeURIComponent(rep.fiscalExternalId)}?motive=${encodeURIComponent(options.motive)}`,
+    { method: "DELETE" },
+    fetchFn,
+  );
+  if (!res.ok) {
+    const msg = res.body.message || "Facturapi rechazó la cancelación del REP.";
+    await prisma.paymentComplement.update({ where: { id: rep.id }, data: { fiscalError: msg } });
+    return { ok: false, status: rep.fiscalStatus, cancellationStatus: rep.cancellationStatus ?? "none", message: msg };
+  }
+
+  const cancelStatus = res.body.cancellation_status ?? (res.body.status === "canceled" ? "accepted" : "pending");
+  if (res.body.status === "canceled" || cancelStatus === "accepted") {
+    await finalizeRepCancellation(rep.id, { fetchFn, actorUserId: options.actorUserId ?? null });
+    return { ok: true, status: "CANCELADA", cancellationStatus: "accepted", message: "REP cancelado ante el SAT." };
+  }
+
+  await prisma.paymentComplement.update({
+    where: { id: rep.id },
+    data: { cancellationStatus: cancelStatus, fiscalError: null },
+  });
+  await ensureRepCancellationReceiptArtifacts(rep.id, { fetchFn }).catch(() => undefined);
+  await recordHistory({
+    companyId: rep.companyId,
+    entityType: "PAGO",
+    entityId: rep.paymentId,
+    action: "CANCELACION_REP_EN_PROCESO",
+    summary: `Cancelación del REP de ${rep.payment.folio} en proceso (${cancelStatus}).`,
+    authorUserId: options.actorUserId ?? null,
+  });
+  return {
+    ok: true,
+    status: rep.fiscalStatus,
+    cancellationStatus: cancelStatus,
+    message: `Cancelación del REP en proceso (${cancelStatus}).`,
+  };
+}
+
+export async function pollPaymentComplementCancellation(
+  complementId: string,
+  options?: { actorUserId?: string | null; fetchFn?: typeof fetch },
+): Promise<{ ok: boolean; status: string; cancellationStatus: string; message: string }> {
+  const fetchFn = options?.fetchFn ?? fetch;
+  const rep = await prisma.paymentComplement.findUnique({
+    where: { id: complementId },
+    include: { payment: { select: { folio: true } } },
+  });
+  if (!rep) throw new Error("REP no encontrado.");
+  if (rep.fiscalStatus === "CANCELADA") {
+    return { ok: true, status: "CANCELADA", cancellationStatus: "accepted", message: "El REP ya está cancelado." };
+  }
+  if (!rep.fiscalExternalId || rep.fiscalEnv === "SIMULATED") {
+    return { ok: false, status: rep.fiscalStatus, cancellationStatus: rep.cancellationStatus ?? "none", message: "El REP no tiene solicitud en Facturapi." };
+  }
+  const cred = await resolveFacturapiSecretForEnv(rep.companyId, rep.fiscalEnv);
+  if (!cred) {
+    return { ok: false, status: rep.fiscalStatus, cancellationStatus: rep.cancellationStatus ?? "none", message: "No hay llave de Facturapi configurada." };
+  }
+  const res = await facturapiFetch(cred.secret, `/invoices/${encodeURIComponent(rep.fiscalExternalId)}`, undefined, fetchFn);
+  if (!res.ok) {
+    return { ok: false, status: rep.fiscalStatus, cancellationStatus: rep.cancellationStatus ?? "none", message: res.body.message || "Facturapi no devolvió el estado del REP." };
+  }
+  const cancelStatus = res.body.cancellation_status ?? (res.body.status === "canceled" ? "accepted" : "none");
+  if (res.body.status === "canceled" || cancelStatus === "accepted") {
+    await finalizeRepCancellation(rep.id, { fetchFn, actorUserId: options?.actorUserId ?? null });
+    return { ok: true, status: "CANCELADA", cancellationStatus: "accepted", message: "Cancelación del REP confirmada ante el SAT." };
+  }
+  if (cancelStatus === "rejected" || cancelStatus === "expired") {
+    const errMsg =
+      cancelStatus === "rejected"
+        ? "El receptor rechazó la cancelación del REP."
+        : "La cancelación del REP expiró sin respuesta.";
+    await prisma.paymentComplement.update({
+      where: { id: rep.id },
+      data: { cancellationStatus: cancelStatus, fiscalError: errMsg },
+    });
+    return { ok: false, status: rep.fiscalStatus, cancellationStatus: cancelStatus, message: errMsg };
+  }
+  await prisma.paymentComplement.update({
+    where: { id: rep.id },
+    data: { cancellationStatus: cancelStatus },
+  });
+  return { ok: true, status: rep.fiscalStatus, cancellationStatus: cancelStatus, message: `Cancelación del REP en proceso (${cancelStatus}).` };
 }

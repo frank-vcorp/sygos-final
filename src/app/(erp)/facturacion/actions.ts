@@ -6,9 +6,21 @@ import { clientIdFromForm } from "@/lib/form-quick-entities";
 import { optionalText, requiredText } from "@/lib/form";
 import { moneyFromForm } from "@/lib/money";
 import { can, type Action } from "@/lib/permissions";
-import { issueDocument, issueFreeInvoice, requestFromQuote, requestIntercompany, retryFiscal } from "@/lib/billing";
+import {
+  authorizeAndExecuteDocumentCancellation,
+  authorizeDocumentCancellation,
+  executeDocumentCancellation,
+  issueCreditNote,
+  issueDocument,
+  issueFreeInvoice,
+  requestDocumentCancellation,
+  requestFromQuote,
+  requestIntercompany,
+  retryFiscal,
+} from "@/lib/billing";
 import { sendBillingDocumentByEmail, sendBillingDocumentByWhatsApp } from "@/lib/billing-delivery";
 import { prisma } from "@/lib/db";
+import { pollBillingDocumentCancellation } from "@/lib/facturapi";
 import { parseCfdiUse } from "@/lib/sat-cfdi-use";
 import { parsePaymentForm, parsePaymentMethod } from "@/lib/sat-payment-method";
 import { requireCompany } from "@/lib/session";
@@ -177,4 +189,108 @@ export async function sendBillingWhatsAppAction(formData: FormData) {
     await setFlash({ tone: "error", message: messageOf(error) });
   }
   redirect(`/facturacion/${id}`);
+}
+
+export async function requestCancelDocumentAction(formData: FormData) {
+  "use server";
+  const id = requiredText(formData.get("documentId"), "Documento");
+  try {
+    const session = await requireCompany();
+    if (
+      !can(session.role, "invoice.request", session.activeCompanyCode)
+      && !can(session.role, "invoice.issue", session.activeCompanyCode)
+    ) {
+      throw new Error("No tienes permiso para solicitar cancelación.");
+    }
+    await requestDocumentCancellation(session, id, {
+      motive: requiredText(formData.get("motive"), "Motivo SAT"),
+      substitutionDocId: optionalText(formData.get("substitutionDocId")),
+    });
+    await setFlash({ tone: "ok", message: "Solicitud de cancelación registrada. Requiere autorización de CEO o Administrador." });
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    await setFlash({ tone: "error", message: messageOf(error) });
+  }
+  redirect(`/facturacion/${id}`);
+}
+
+export async function authorizeCancelDocumentAction(formData: FormData) {
+  "use server";
+  const id = requiredText(formData.get("documentId"), "Documento");
+  try {
+    const session = await guard("invoice.issue");
+    await authorizeDocumentCancellation(session, id);
+    await setFlash({ tone: "ok", message: "Cancelación autorizada. Ya se puede ejecutar ante el SAT." });
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    await setFlash({ tone: "error", message: messageOf(error) });
+  }
+  redirect(`/facturacion/${id}`);
+}
+
+export async function executeCancelDocumentAction(formData: FormData) {
+  "use server";
+  const id = requiredText(formData.get("documentId"), "Documento");
+  try {
+    const session = await guard("invoice.issue");
+    const result = await executeDocumentCancellation(session, id);
+    await setFlash({ tone: result.ok ? "ok" : "error", message: result.message });
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    await setFlash({ tone: "error", message: messageOf(error) });
+  }
+  redirect(`/facturacion/${id}`);
+}
+
+export async function authorizeAndExecuteCancelAction(formData: FormData) {
+  "use server";
+  const id = requiredText(formData.get("documentId"), "Documento");
+  try {
+    const session = await guard("invoice.issue");
+    const result = await authorizeAndExecuteDocumentCancellation(session, id);
+    await setFlash({ tone: result.ok ? "ok" : "error", message: result.message });
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    await setFlash({ tone: "error", message: messageOf(error) });
+  }
+  redirect(`/facturacion/${id}`);
+}
+
+export async function pollCancelStatusAction(formData: FormData) {
+  "use server";
+  const id = requiredText(formData.get("documentId"), "Documento");
+  try {
+    const session = await guard("invoice.issue");
+    const doc = await prisma.billingDocument.findFirst({
+      where: { id, companyId: session.activeCompanyId },
+      select: { id: true },
+    });
+    if (!doc) throw new Error("Documento no encontrado en esta empresa.");
+    const result = await pollBillingDocumentCancellation(doc.id, { actorUserId: session.userId });
+    await setFlash({ tone: result.ok ? "ok" : "error", message: result.message });
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    await setFlash({ tone: "error", message: messageOf(error) });
+  }
+  redirect(`/facturacion/${id}`);
+}
+
+export async function issueCreditNoteAction(formData: FormData) {
+  "use server";
+  const targetDocumentId = requiredText(formData.get("targetDocumentId"), "Factura origen");
+  try {
+    const session = await guard("invoice.issue");
+    const nc = await issueCreditNote(session, targetDocumentId, {
+      concept: requiredText(formData.get("concept"), "Concepto"),
+      amount: moneyFromForm(formData.get("amount"), "Importe"),
+      cfdiUse: parseCfdiUse(formData.get("cfdiUse")) ?? "G02",
+      paymentForm: parsePaymentForm(formData.get("paymentForm")),
+    });
+    await setFlash({ tone: "ok", message: `Nota de crédito ${nc.folio} emitida.` });
+    redirect(`/facturacion/${nc.id}`);
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    await setFlash({ tone: "error", message: messageOf(error) });
+    redirect(`/facturacion/${targetDocumentId}`);
+  }
 }

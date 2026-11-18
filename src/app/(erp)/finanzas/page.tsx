@@ -64,7 +64,7 @@ export default async function FinanzasPage({ searchParams }: { searchParams: Pro
   const [accounts, movements, invoiced, collected, payables, receivables, pending, expenseCategories, incomeCategories] = await Promise.all([
     prisma.financeAccount.findMany({ where: { companyId: session.activeCompanyId, active: true }, orderBy: { name: "asc" } }),
     prisma.financeMovement.findMany({ where: { companyId: session.activeCompanyId, createdAt: { gte: start, lt: end } } }),
-    prisma.billingDocument.aggregate({ where: { companyId: session.activeCompanyId, status: "EMITIDA", kind: { not: "REMISION" }, issuedAt: { gte: start, lt: end } }, _sum: { total: true } }),
+    prisma.billingDocument.aggregate({ where: { companyId: session.activeCompanyId, status: "EMITIDA", kind: { notIn: ["REMISION", "NOTA_CREDITO"] }, issuedAt: { gte: start, lt: end } }, _sum: { total: true } }),
     prisma.payment.aggregate({ where: { companyId: session.activeCompanyId, status: "VALIDADO", kind: "CLIENTE", createdAt: { gte: start, lt: end } }, _sum: { amount: true } }),
     prisma.payable.aggregate({ where: { companyId: session.activeCompanyId, balance: { gt: 0 } }, _sum: { balance: true } }),
     prisma.receivable.aggregate({ where: { companyId: session.activeCompanyId, balance: { gt: 0 } }, _sum: { balance: true } }),

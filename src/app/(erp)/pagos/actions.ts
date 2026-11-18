@@ -5,7 +5,11 @@ import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { confirmIntercompanyPayment, registerClientPayment, registerIntercompanyPayment, validatePayment } from "@/lib/billing";
 import { sendPaymentComplementByEmail, sendPaymentComplementByWhatsApp } from "@/lib/billing-delivery";
-import { stampPaymentComplement } from "@/lib/facturapi";
+import {
+  cancelPaymentComplement,
+  pollPaymentComplementCancellation,
+  stampPaymentComplement,
+} from "@/lib/facturapi";
 import { setFlash } from "@/lib/flash";
 import { optionalText, requiredText } from "@/lib/form";
 import { moneyFromForm } from "@/lib/money";
@@ -210,6 +214,54 @@ export async function sendRepWhatsAppAction(formData: FormData) {
       phone: optionalText(formData.get("phone")),
       authorUserId: session.userId,
     });
+    await setFlash({ tone: result.ok ? "ok" : "error", message: result.message });
+  } catch (error) {
+    await setFlash({ tone: "error", message: bubble(error) });
+  }
+  redirect(`/pagos/${paymentId}`);
+}
+
+export async function cancelPaymentRepAction(formData: FormData) {
+  "use server";
+  const paymentId = requiredText(formData.get("paymentId"), "Pago");
+  const complementId = requiredText(formData.get("complementId"), "REP");
+  try {
+    const session = await requireCompany();
+    if (
+      session.role !== "CEO"
+      && session.role !== "ADMINISTRADOR"
+      && session.role !== "COORDINACION_ADMINISTRACION"
+    ) {
+      throw new Error("Solo Coordinación, CEO o Administrador pueden cancelar un REP.");
+    }
+    const rep = await prisma.paymentComplement.findFirst({
+      where: { id: complementId, paymentId, companyId: session.activeCompanyId },
+      select: { id: true },
+    });
+    if (!rep) throw new Error("El REP no pertenece a la empresa activa.");
+    const result = await cancelPaymentComplement(rep.id, {
+      motive: requiredText(formData.get("motive"), "Motivo SAT"),
+      actorUserId: session.userId,
+    });
+    await setFlash({ tone: result.ok ? "ok" : "error", message: result.message });
+  } catch (error) {
+    await setFlash({ tone: "error", message: bubble(error) });
+  }
+  redirect(`/pagos/${paymentId}`);
+}
+
+export async function pollRepCancellationAction(formData: FormData) {
+  "use server";
+  const paymentId = requiredText(formData.get("paymentId"), "Pago");
+  const complementId = requiredText(formData.get("complementId"), "REP");
+  try {
+    const session = await requireCompany();
+    const rep = await prisma.paymentComplement.findFirst({
+      where: { id: complementId, paymentId, companyId: session.activeCompanyId },
+      select: { id: true },
+    });
+    if (!rep) throw new Error("El REP no pertenece a la empresa activa.");
+    const result = await pollPaymentComplementCancellation(rep.id, { actorUserId: session.userId });
     await setFlash({ tone: result.ok ? "ok" : "error", message: result.message });
   } catch (error) {
     await setFlash({ tone: "error", message: bubble(error) });

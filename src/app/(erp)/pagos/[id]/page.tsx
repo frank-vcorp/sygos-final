@@ -1,6 +1,8 @@
 import { notFound, redirect } from "next/navigation";
 import {
+  cancelPaymentRepAction,
   confirmIntercompanyAction,
+  pollRepCancellationAction,
   sendRepEmailAction,
   sendRepWhatsAppAction,
   stampPaymentRepAction,
@@ -14,7 +16,7 @@ import {
   resolveBillingDocumentEmailRecipient,
   resolveBillingDocumentWhatsAppPhone,
 } from "@/lib/billing-delivery";
-import { isBillingDocumentEligibleForRep } from "@/lib/facturapi";
+import { isBillingDocumentEligibleForRep, SAT_CANCEL_MOTIVES } from "@/lib/facturapi";
 import { homePath } from "@/lib/home";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
@@ -320,6 +322,35 @@ export default async function PagoPage({ params }: { params: Promise<{ id: strin
                   </form>
                 </div>
               ) : null}
+            </div>
+          ) : null}
+
+          {rep && canOperateRepHere && rep.fiscalStatus !== "CANCELADA" && (rep.fiscalStatus === "TIMBRADA" || rep.fiscalStatus === "SIMULADA") ? (
+            <div className="border-t border-slate-200/80 pt-3">
+              {rep.cancellationStatus === "pending" || rep.cancellationStatus === "verifying" ? (
+                <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  <span>Cancelación del REP en proceso ({rep.cancellationStatus}).</span>
+                  <form action={pollRepCancellationAction}>
+                    <input type="hidden" name="paymentId" value={row.id} />
+                    <input type="hidden" name="complementId" value={rep.id} />
+                    <Button type="submit" tone="ghost">Consultar estatus cancelación REP</Button>
+                  </form>
+                </div>
+              ) : (
+                <form action={cancelPaymentRepAction} className="flex flex-wrap items-end gap-2">
+                  <input type="hidden" name="paymentId" value={row.id} />
+                  <input type="hidden" name="complementId" value={rep.id} />
+                  <label className="min-w-0 flex-1">
+                    <span className="mb-1 block text-xs font-semibold text-[var(--ink)]">Cancelar REP ante SAT (desbloquea cancelación de factura PPD)</span>
+                    <select name="motive" defaultValue="02" className={controlClass}>
+                      {SAT_CANCEL_MOTIVES.map((m) => (
+                        <option key={m.id} value={m.id}>{m.label}</option>
+                      ))}
+                    </select>
+                  </label>
+                  <Button type="submit" tone="danger">Cancelar REP</Button>
+                </form>
+              )}
             </div>
           ) : null}
         </Card>
