@@ -2,7 +2,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "./db";
 import { allocateFolio, serviceFolioForAttention } from "./folios";
 import { recordCompanyCash } from "./purchases";
-import { stampBillingDocument } from "./facturapi";
+import { stampBillingDocument, triggerRepAfterPaymentValidation } from "./facturapi";
 import {
   parseCompanyFiscalConfig,
   resolveSatDefaultsForDocument,
@@ -1098,6 +1098,7 @@ export async function registerClientPayment(
   if (immediate) {
     await applyReceivable(receivable.id, roundMoney(input.amount));
     await recordCompanyCash(actor.activeCompanyId, "INGRESO", roundMoney(input.amount), input.method, folio, payment.id);
+    await triggerRepAfterPaymentValidation(payment.id).catch(() => undefined);
   }
   await recordHistory({
     companyId: actor.activeCompanyId,
@@ -1134,6 +1135,7 @@ export async function validatePayment(actor: Actor, paymentId: string) {
     if (application.receivableId) await applyReceivable(application.receivableId, application.amount);
     await prisma.paymentApplication.update({ where: { id: application.id }, data: { confirmedAt: new Date() } });
   }
+  await triggerRepAfterPaymentValidation(payment.id).catch(() => undefined);
   await recordHistory({
     companyId: actor.activeCompanyId,
     entityType: "PAGO",
@@ -1210,6 +1212,7 @@ export async function confirmIntercompanyPayment(actor: Actor, paymentId: string
   await recordCompanyCash(payment.companyId, "EGRESO", payment.amount, payment.method, payment.folio, payment.id);
   const servomotores = await prisma.company.findUnique({ where: { code: "SERVOMOTORES" } });
   if (servomotores) await recordCompanyCash(servomotores.id, "INGRESO", payment.amount, payment.method, payment.folio, `${payment.id}-sm`);
+  await triggerRepAfterPaymentValidation(payment.id).catch(() => undefined);
   await recordHistory({
     companyId: actor.activeCompanyId,
     entityType: "PAGO",

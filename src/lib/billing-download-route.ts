@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getBillingDocumentDownload } from "./billing-artifacts";
-import { canDownloadBillingDocument } from "./billing-delivery";
+import { getBillingDocumentDownload, getPaymentComplementDownload } from "./billing-artifacts";
+import { canDownloadBillingDocument, canDownloadPaymentComplement } from "./billing-delivery";
 import { prisma } from "./db";
 import { getSession } from "./session";
 
@@ -44,6 +44,65 @@ export async function handleBillingDocumentDownload(
   if (!file) {
     return NextResponse.json(
       { message: `El archivo ${format.toUpperCase()} aún no está disponible.` },
+      { status: 404 },
+    );
+  }
+
+  const url = new URL(request.url);
+  const disposition =
+    format === "pdf" && url.searchParams.get("download") !== "1"
+      ? `inline; filename="${file.filename}"`
+      : `attachment; filename="${file.filename}"`;
+
+  return new NextResponse(new Uint8Array(file.buffer), {
+    status: 200,
+    headers: {
+      "Content-Type": file.contentType,
+      "Content-Disposition": disposition,
+      "Cache-Control": "private, no-store",
+    },
+  });
+}
+
+export async function handlePaymentComplementDownload(
+  request: Request,
+  complementId: string,
+  format: "xml" | "pdf" | "zip",
+) {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ message: "No autenticado." }, { status: 401 });
+  }
+
+  const rep = await prisma.paymentComplement.findUnique({
+    where: { id: complementId },
+    select: {
+      id: true,
+      companyId: true,
+      payment: { select: { kind: true, companyId: true } },
+      client: { select: { ownerUserId: true } },
+    },
+  });
+
+  if (!rep) {
+    return NextResponse.json({ message: "Complemento de pago no encontrado." }, { status: 404 });
+  }
+
+  const allowed = canDownloadPaymentComplement(session, {
+    companyId: rep.companyId,
+    paymentKind: rep.payment.kind,
+    paymentCompanyId: rep.payment.companyId,
+    clientOwnerUserId: rep.client.ownerUserId,
+  });
+
+  if (!allowed) {
+    return NextResponse.json({ message: "No tienes permiso para descargar este complemento." }, { status: 403 });
+  }
+
+  const file = await getPaymentComplementDownload(rep.id, format);
+  if (!file) {
+    return NextResponse.json(
+      { message: `El archivo ${format.toUpperCase()} del REP aún no está disponible.` },
       { status: 404 },
     );
   }

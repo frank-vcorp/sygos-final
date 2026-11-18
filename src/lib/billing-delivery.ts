@@ -1,4 +1,8 @@
-import { ensureBillingDocumentArtifacts, safeFileBaseName } from "./billing-artifacts";
+import {
+  ensureBillingDocumentArtifacts,
+  ensurePaymentComplementArtifacts,
+  safeFileBaseName,
+} from "./billing-artifacts";
 import { prisma } from "./db";
 import { parseCompanyFiscalConfig } from "./fiscal-config";
 import { recordHistory } from "./history";
@@ -256,4 +260,204 @@ export async function maybeAutoDeliverStampedDocument(
   } catch {
     // Non-blocking: delivery failures never revert stamping
   }
+}
+
+export type DownloadableComplementAccess = {
+  companyId: string;
+  paymentKind: string;
+  paymentCompanyId: string;
+  clientOwnerUserId: string | null;
+};
+
+/**
+ * Valida quién puede descargar XML/PDF/ZIP de un PaymentComplement (REP):
+ * - Empresa emisora del REP (Servomotores para intercompañía; misma empresa para cliente).
+ * - Para pagos INTERCOMPANIA, también SYSTRON (pagador) con roles financieros/administrativos.
+ */
+export function canDownloadPaymentComplement(
+  session: DownloadActorSession | null,
+  rep: DownloadableComplementAccess,
+): boolean {
+  if (!session || !session.activeCompanyId) return false;
+  const code = session.activeCompanyCode;
+  if (rep.companyId === session.activeCompanyId) {
+    if (session.role === "VENTAS") {
+      return (
+        (can(session.role, "invoice.request", code) || can(session.role, "payment.register", code))
+        && rep.clientOwnerUserId === session.userId
+      );
+    }
+    return (
+      can(session.role, "payment.register", code)
+      || can(session.role, "payment.validate", code)
+      || can(session.role, "receivable.view", code)
+      || can(session.role, "finance.view", code)
+      || can(session.role, "invoice.issue", code)
+    );
+  }
+
+  if (
+    rep.paymentKind === "INTERCOMPANIA"
+    && rep.paymentCompanyId === session.activeCompanyId
+    && session.role !== "VENTAS"
+  ) {
+    return (
+      can(session.role, "finance.view", code)
+      || can(session.role, "receivable.view", code)
+      || can(session.role, "payment.validate", code)
+      || can(session.role, "invoice.issue", code)
+    );
+  }
+
+  return false;
+}
+
+export async function sendPaymentComplementByEmail(input: {
+  companyId: string;
+  complementId: string;
+  toEmail?: string | null;
+  authorUserId?: string | null;
+  fetchFn?: typeof fetch;
+}): Promise<{ ok: boolean; message: string }> {
+  const rep = await prisma.paymentComplement.findUnique({
+    where: { id: input.complementId },
+    include: {
+      company: true,
+      payment: true,
+      client: {
+        include: {
+          contacts: { where: { active: true }, orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }] },
+        },
+      },
+    },
+  });
+  if (!rep || (rep.companyId !== input.companyId && rep.payment.companyId !== input.companyId)) {
+    return { ok: false, message: "Complemento de pago no encontrado en esta empresa." };
+  }
+  if (rep.fiscalStatus !== "TIMBRADA" && !rep.xmlContent && !rep.fiscalExternalId) {
+    return { ok: false, message: "El complemento de pago aún no está timbrado en Facturapi." };
+  }
+
+  const recipient = input.toEmail?.trim() || resolveBillingDocumentEmailRecipient(rep);
+  if (!recipient) {
+    return { ok: false, message: "El cliente no tiene correo fiscal ni de contacto capturado." };
+  }
+
+  const artifacts = await ensurePaymentComplementArtifacts(rep.id, { fetchFn: input.fetchFn });
+  const base = safeFileBaseName(`REP-${rep.payment.folio}`);
+  const attachments: EmailAttachment[] = [];
+  if (artifacts.pdf && artifacts.pdf.length > 0) {
+    attachments.push({ filename: `${base}.pdf`, content: artifacts.pdf, contentType: "application/pdf" });
+  }
+  if (artifacts.xml) {
+    attachments.push({ filename: `${base}.xml`, content: Buffer.from(artifacts.xml, "utf8"), contentType: "application/xml" });
+  }
+  if (attachments.length === 0) {
+    return { ok: false, message: "No fue posible obtener los archivos XML/PDF del REP desde Facturapi." };
+  }
+
+  const isTestEnv = rep.fiscalEnv === "TEST";
+  const subject = `${isTestEnv ? "[PRUEBA SANDBOX] " : ""}Complemento de pago ${rep.payment.folio} · ${rep.company.name}`;
+  const text = [
+    `Estimado(a) ${rep.client.name},`,
+    "",
+    `Adjuntamos su Complemento de Pago (CFDI tipo P) correspondiente al pago ${rep.payment.folio} por ${money(rep.totalAmount)}.`,
+    rep.fiscalUuid ? `UUID fiscal: ${rep.fiscalUuid}` : null,
+    isTestEnv ? "NOTA: Este complemento se emitió en ambiente de pruebas (sin validez ante el SAT)." : null,
+    "",
+    "Atentamente,",
+    rep.company.name,
+  ]
+    .filter((line): line is string => line !== null)
+    .join("\n");
+
+  const result = await sendSystemEmail({
+    companyId: rep.companyId,
+    to: recipient,
+    subject,
+    text,
+    attachments,
+  });
+
+  if (result.ok) {
+    await recordHistory({
+      companyId: rep.companyId,
+      entityType: "PAGO",
+      entityId: rep.paymentId,
+      action: "ENVIO_REP_CORREO",
+      summary: `REP de ${rep.payment.folio} (XML/PDF) enviado por correo a ${recipient}.`,
+      authorUserId: input.authorUserId ?? null,
+    });
+  }
+
+  return { ok: result.ok, message: result.message };
+}
+
+export async function sendPaymentComplementByWhatsApp(input: {
+  companyId: string;
+  complementId: string;
+  phone?: string | null;
+  authorUserId?: string | null;
+  fetchFn?: typeof fetch;
+}): Promise<{ ok: boolean; message: string }> {
+  const rep = await prisma.paymentComplement.findUnique({
+    where: { id: input.complementId },
+    include: {
+      company: true,
+      payment: true,
+      client: {
+        include: {
+          contacts: { where: { active: true }, orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }] },
+        },
+      },
+    },
+  });
+  if (!rep || (rep.companyId !== input.companyId && rep.payment.companyId !== input.companyId)) {
+    return { ok: false, message: "Complemento de pago no encontrado en esta empresa." };
+  }
+  if (rep.fiscalStatus !== "TIMBRADA" && !rep.pdfContent && !rep.fiscalExternalId) {
+    return { ok: false, message: "El complemento de pago aún no está timbrado en Facturapi." };
+  }
+
+  const targetPhone = input.phone?.trim() || resolveBillingDocumentWhatsAppPhone(rep);
+  if (!targetPhone) {
+    return { ok: false, message: "El cliente no tiene teléfono de contacto para WhatsApp." };
+  }
+
+  const artifacts = await ensurePaymentComplementArtifacts(rep.id, { fetchFn: input.fetchFn });
+  if (!artifacts.pdf || artifacts.pdf.length === 0) {
+    return { ok: false, message: "No se pudo obtener el PDF del complemento de pago desde Facturapi." };
+  }
+
+  const base = safeFileBaseName(`REP-${rep.payment.folio}`);
+  const isTestEnv = rep.fiscalEnv === "TEST";
+  const caption = [
+    `${isTestEnv ? "[PRUEBA SANDBOX] " : ""}Complemento de pago ${rep.payment.folio} · ${rep.company.name}`,
+    `Importe: ${money(rep.totalAmount)}`,
+    rep.fiscalUuid ? `UUID: ${rep.fiscalUuid}` : null,
+  ]
+    .filter(Boolean)
+    .join("\n");
+
+  const result = await sendWhatsAppDocument({
+    companyId: rep.companyId,
+    phone: targetPhone,
+    document: artifacts.pdf,
+    fileName: `${base}.pdf`,
+    mimetype: "application/pdf",
+    caption,
+  });
+
+  if (result.ok) {
+    await recordHistory({
+      companyId: rep.companyId,
+      entityType: "PAGO",
+      entityId: rep.paymentId,
+      action: "ENVIO_REP_WHATSAPP",
+      summary: `PDF del REP de ${rep.payment.folio} enviado por WhatsApp a ${targetPhone}.`,
+      authorUserId: input.authorUserId ?? null,
+    });
+  }
+
+  return { ok: result.ok, message: result.message };
 }

@@ -170,3 +170,142 @@ export async function getBillingDocumentDownload(
   }
   return null;
 }
+
+export async function ensurePaymentComplementArtifacts(
+  complementId: string,
+  options?: { fetchFn?: typeof fetch },
+): Promise<{
+  folio: string;
+  xml: string | null;
+  pdf: Buffer | null;
+}> {
+  const fetchFn = options?.fetchFn ?? fetch;
+  const rep = await prisma.paymentComplement.findUnique({
+    where: { id: complementId },
+    select: {
+      id: true,
+      companyId: true,
+      fiscalStatus: true,
+      fiscalEnv: true,
+      fiscalExternalId: true,
+      xmlContent: true,
+      pdfContent: true,
+      payment: { select: { folio: true } },
+    },
+  });
+  if (!rep) {
+    return { folio: "REP", xml: null, pdf: null };
+  }
+
+  const label = `REP-${rep.payment.folio}`;
+  let xml: string | null = rep.xmlContent ?? null;
+  let pdf: Buffer | null = rep.pdfContent ? Buffer.from(rep.pdfContent) : null;
+
+  const needsXml = !xml;
+  const needsPdf = !pdf || pdf.length === 0;
+
+  if (
+    (needsXml || needsPdf)
+    && rep.fiscalExternalId
+    && rep.fiscalEnv !== "SIMULATED"
+    && (rep.fiscalStatus === "TIMBRADA" || rep.fiscalStatus === "CANCELADA")
+  ) {
+    const cred = await resolveFacturapiSecretForEnv(rep.companyId, rep.fiscalEnv);
+    if (cred) {
+      const [fetchedXmlBuf, fetchedPdfBuf] = await Promise.all([
+        needsXml ? fetchInvoiceFileFromFacturapi(cred.secret, rep.fiscalExternalId, "xml", fetchFn) : Promise.resolve(null),
+        needsPdf ? fetchInvoiceFileFromFacturapi(cred.secret, rep.fiscalExternalId, "pdf", fetchFn) : Promise.resolve(null),
+      ]);
+      const nextXml = fetchedXmlBuf ? fetchedXmlBuf.toString("utf8") : null;
+      const nextPdf = fetchedPdfBuf && fetchedPdfBuf.length > 0 ? fetchedPdfBuf : null;
+      if (nextXml || nextPdf) {
+        await prisma.paymentComplement.update({
+          where: { id: rep.id },
+          data: {
+            ...(nextXml ? { xmlContent: nextXml } : {}),
+            ...(nextPdf ? { pdfContent: Uint8Array.from(nextPdf) } : {}),
+          },
+        });
+      }
+      if (nextXml) xml = nextXml;
+      if (nextPdf) pdf = nextPdf;
+    }
+  }
+
+  return { folio: label, xml, pdf };
+}
+
+export async function getPaymentComplementDownload(
+  complementId: string,
+  format: "xml" | "pdf" | "zip",
+  options?: { fetchFn?: typeof fetch },
+): Promise<{
+  filename: string;
+  contentType: string;
+  buffer: Buffer;
+} | null> {
+  const { folio, xml, pdf } = await ensurePaymentComplementArtifacts(complementId, options);
+  const base = safeFileBaseName(folio);
+
+  if (format === "xml") {
+    if (!xml) return null;
+    return {
+      filename: `${base}.xml`,
+      contentType: "application/xml; charset=utf-8",
+      buffer: Buffer.from(xml, "utf8"),
+    };
+  }
+
+  if (format === "pdf") {
+    if (!pdf || pdf.length === 0) return null;
+    return {
+      filename: `${base}.pdf`,
+      contentType: "application/pdf",
+      buffer: pdf,
+    };
+  }
+
+  const entries: Array<{ name: string; content: Buffer }> = [];
+  if (xml) entries.push({ name: `${base}.xml`, content: Buffer.from(xml, "utf8") });
+  if (pdf && pdf.length > 0) entries.push({ name: `${base}.pdf`, content: pdf });
+
+  if (entries.length === 2) {
+    return {
+      filename: `${base}.zip`,
+      contentType: "application/zip",
+      buffer: buildZipBuffer(entries),
+    };
+  }
+
+  const rep = await prisma.paymentComplement.findUnique({
+    where: { id: complementId },
+    select: { companyId: true, fiscalExternalId: true, fiscalEnv: true },
+  });
+  if (rep?.fiscalExternalId && rep.fiscalEnv !== "SIMULATED") {
+    const cred = await resolveFacturapiSecretForEnv(rep.companyId, rep.fiscalEnv);
+    if (cred) {
+      const zipBuf = await fetchInvoiceFileFromFacturapi(
+        cred.secret,
+        rep.fiscalExternalId,
+        "zip",
+        options?.fetchFn ?? fetch,
+      );
+      if (zipBuf) {
+        return {
+          filename: `${base}.zip`,
+          contentType: "application/zip",
+          buffer: zipBuf,
+        };
+      }
+    }
+  }
+
+  if (entries.length > 0) {
+    return {
+      filename: `${base}.zip`,
+      contentType: "application/zip",
+      buffer: buildZipBuffer(entries),
+    };
+  }
+  return null;
+}

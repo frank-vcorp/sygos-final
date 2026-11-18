@@ -3,6 +3,7 @@ import { RegisterPaymentDialog } from "./register-payment-dialog";
 import { getPaymentFormOptions } from "./payment-form-data";
 import { ActiveFilters, Badge, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, SegmentedNav, Table, Td, Th } from "@/components/ui";
 import { ClientNameLink } from "@/components/client-entity-links";
+import { repBadgeInfo } from "@/lib/billing-badges";
 import { homePath } from "@/lib/home";
 import { prisma } from "@/lib/db";
 import { money } from "@/lib/money";
@@ -19,11 +20,14 @@ export default async function PagosPage({ searchParams }: { searchParams: Promis
   const paymentFormOptions = canRegister ? await getPaymentFormOptions(session) : { receivables: [], payables: [] };
   const canEditClient = can(session.role, "client.edit", session.activeCompanyCode);
   const own = session.activeCompanyCode === "SERVOMOTORES"
-    ? { OR: [{ companyId: session.activeCompanyId }, { kind: "INTERCOMPANIA", status: "PENDIENTE" }] }
+    ? { OR: [{ companyId: session.activeCompanyId }, { kind: "INTERCOMPANIA" }] }
     : { companyId: session.activeCompanyId };
   const rows = await prisma.payment.findMany({
     where: { ...own, ...(filter ? { status: filter } : {}) },
-    include: { client: true },
+    include: {
+      client: true,
+      paymentComplement: { select: { id: true, fiscalStatus: true, fiscalEnv: true } },
+    },
     orderBy: { createdAt: "desc" },
     take: 100,
   });
@@ -62,27 +66,32 @@ export default async function PagosPage({ searchParams }: { searchParams: Promis
         <ResponsiveData
           table={
             <Table>
-              <thead><tr><Th>Folio</Th><Th>Cliente</Th><Th>Tipo</Th><Th>Importe</Th><Th>Estado</Th></tr></thead>
+              <thead><tr><Th>Folio</Th><Th>Cliente</Th><Th>Tipo</Th><Th>Importe</Th><Th>Estado</Th><Th>REP</Th></tr></thead>
               <tbody>
-                {rows.map((row) => (
-                  <tr key={row.id}>
-                    <Td><RecordLink href={`/pagos/${row.id}`}>{row.folio}</RecordLink></Td>
-                    <Td>
-                      {row.kind === "INTERCOMPANIA" || !row.client ? "—" : (
-                        <ClientNameLink clientId={row.client.id} name={row.client.name} isSystem={row.client.isSystem} canEdit={canEditClient} />
-                      )}
-                    </Td>
-                    <Td>{row.kind === "INTERCOMPANIA" ? "Intercompañía" : "Cliente"}</Td>
-                    <Td>{money(row.amount)}</Td>
-                    <Td><Badge tone={row.status === "PENDIENTE" ? "warn" : "neutral"}>{row.status === "PENDIENTE" ? "Pendiente" : "Validado"}</Badge></Td>
-                  </tr>
-                ))}
+                {rows.map((row) => {
+                  const repBadge = row.paymentComplement ? repBadgeInfo(row.paymentComplement) : null;
+                  return (
+                    <tr key={row.id}>
+                      <Td><RecordLink href={`/pagos/${row.id}`}>{row.folio}</RecordLink></Td>
+                      <Td>
+                        {row.kind === "INTERCOMPANIA" || !row.client ? "SYSTRON (intercompañía)" : (
+                          <ClientNameLink clientId={row.client.id} name={row.client.name} isSystem={row.client.isSystem} canEdit={canEditClient} />
+                        )}
+                      </Td>
+                      <Td>{row.kind === "INTERCOMPANIA" ? "Intercompañía" : "Cliente"}</Td>
+                      <Td>{money(row.amount)}</Td>
+                      <Td><Badge tone={row.status === "PENDIENTE" ? "warn" : "neutral"}>{row.status === "PENDIENTE" ? "Pendiente" : "Validado"}</Badge></Td>
+                      <Td>{repBadge ? <Badge tone={repBadge.tone}>{repBadge.label}</Badge> : "—"}</Td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </Table>
           }
           cards={rows.map((row) => {
             const kindLabel = row.kind === "INTERCOMPANIA" ? "Intercompañía" : "Cliente";
             const statusLabel = row.status === "PENDIENTE" ? "Pendiente" : "Validado";
+            const repBadge = row.paymentComplement ? repBadgeInfo(row.paymentComplement) : null;
             const footer = row.kind === "INTERCOMPANIA" || !row.client
               ? "Intercompañía"
               : <ClientNameLink clientId={row.client.id} name={row.client.name} isSystem={row.client.isSystem} canEdit={canEditClient} />;
@@ -91,7 +100,12 @@ export default async function PagosPage({ searchParams }: { searchParams: Promis
                 key={row.id}
                 href={`/pagos/${row.id}`}
                 title={row.folio}
-                meta={<Badge tone={row.status === "PENDIENTE" ? "warn" : "neutral"}>{statusLabel}</Badge>}
+                meta={
+                  <span className="flex flex-wrap gap-1.5">
+                    <Badge tone={row.status === "PENDIENTE" ? "warn" : "neutral"}>{statusLabel}</Badge>
+                    {repBadge ? <Badge tone={repBadge.tone}>{repBadge.label}</Badge> : null}
+                  </span>
+                }
                 footer={footer}
               >
                 <p>{kindLabel} · {money(row.amount)}</p>

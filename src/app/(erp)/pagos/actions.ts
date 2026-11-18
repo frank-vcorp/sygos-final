@@ -4,8 +4,10 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { confirmIntercompanyPayment, registerClientPayment, registerIntercompanyPayment, validatePayment } from "@/lib/billing";
+import { sendPaymentComplementByEmail, sendPaymentComplementByWhatsApp } from "@/lib/billing-delivery";
+import { stampPaymentComplement } from "@/lib/facturapi";
 import { setFlash } from "@/lib/flash";
-import { requiredText } from "@/lib/form";
+import { optionalText, requiredText } from "@/lib/form";
 import { moneyFromForm } from "@/lib/money";
 import { can, type Action } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
@@ -132,4 +134,85 @@ export async function confirmIntercompanyAction(formData: FormData) {
     await setFlash({ tone: "error", message: bubble(error) });
   }
   redirect(`/pagos/${id}`);
+}
+
+export async function stampPaymentRepAction(formData: FormData) {
+  "use server";
+  const paymentId = requiredText(formData.get("paymentId"), "Pago");
+  try {
+    const session = await requireCompany();
+    if (
+      !can(session.role, "payment.validate", session.activeCompanyCode)
+      && !can(session.role, "invoice.issue", session.activeCompanyCode)
+    ) {
+      throw new Error("No tienes permiso para timbrar complementos de pago.");
+    }
+    const payment = await prisma.payment.findFirst({
+      where: session.activeCompanyCode === "SERVOMOTORES"
+        ? { id: paymentId, OR: [{ companyId: session.activeCompanyId }, { kind: "INTERCOMPANIA" }] }
+        : { id: paymentId, companyId: session.activeCompanyId },
+      select: { id: true, kind: true, companyId: true },
+    });
+    if (!payment) throw new Error("Ese pago no pertenece a esta empresa.");
+    if (payment.kind === "INTERCOMPANIA" && session.activeCompanyCode !== "SERVOMOTORES") {
+      throw new Error("El REP intercompañía lo timbra Servomotores.");
+    }
+    const result = await stampPaymentComplement(payment.id, { isPaymentId: true });
+    await setFlash({ tone: result.ok ? "ok" : "error", message: result.message });
+  } catch (error) {
+    await setFlash({ tone: "error", message: bubble(error) });
+  }
+  redirect(`/pagos/${paymentId}`);
+}
+
+export async function sendRepEmailAction(formData: FormData) {
+  "use server";
+  const paymentId = requiredText(formData.get("paymentId"), "Pago");
+  const complementId = requiredText(formData.get("complementId"), "REP");
+  try {
+    const session = await requireCompany();
+    if (
+      !can(session.role, "payment.register", session.activeCompanyCode)
+      && !can(session.role, "payment.validate", session.activeCompanyCode)
+      && !can(session.role, "invoice.issue", session.activeCompanyCode)
+    ) {
+      throw new Error("No tienes permiso para enviar este complemento.");
+    }
+    const result = await sendPaymentComplementByEmail({
+      companyId: session.activeCompanyId,
+      complementId,
+      toEmail: optionalText(formData.get("toEmail")),
+      authorUserId: session.userId,
+    });
+    await setFlash({ tone: result.ok ? "ok" : "error", message: result.message });
+  } catch (error) {
+    await setFlash({ tone: "error", message: bubble(error) });
+  }
+  redirect(`/pagos/${paymentId}`);
+}
+
+export async function sendRepWhatsAppAction(formData: FormData) {
+  "use server";
+  const paymentId = requiredText(formData.get("paymentId"), "Pago");
+  const complementId = requiredText(formData.get("complementId"), "REP");
+  try {
+    const session = await requireCompany();
+    if (
+      !can(session.role, "payment.register", session.activeCompanyCode)
+      && !can(session.role, "payment.validate", session.activeCompanyCode)
+      && !can(session.role, "invoice.issue", session.activeCompanyCode)
+    ) {
+      throw new Error("No tienes permiso para enviar este complemento.");
+    }
+    const result = await sendPaymentComplementByWhatsApp({
+      companyId: session.activeCompanyId,
+      complementId,
+      phone: optionalText(formData.get("phone")),
+      authorUserId: session.userId,
+    });
+    await setFlash({ tone: result.ok ? "ok" : "error", message: result.message });
+  } catch (error) {
+    await setFlash({ tone: "error", message: bubble(error) });
+  }
+  redirect(`/pagos/${paymentId}`);
 }

@@ -61,6 +61,7 @@ model Company {
   receivables      Receivable[]
   payables         Payable[]
   payments         Payment[]
+  paymentComplements PaymentComplement[]
   financeAccounts  FinanceAccount[]
   financeMovements FinanceMovement[]
   purchases        Purchase[]
@@ -154,6 +155,7 @@ model Client {
   billingDocuments BillingDocument[]
   receivables      Receivable[]
   payments         Payment[]
+  paymentComplements PaymentComplement[]
   fieldServiceCases FieldServiceCase[]
 
   @@index([companyId, name])
@@ -805,6 +807,7 @@ model BillingDocument {
   receivable Receivable?
   payable    Payable?
   lines      BillingLine[]
+  paymentComplementItems PaymentComplementItem[]
 
   @@unique([companyId, folio])
   @@index([companyId, status])
@@ -887,6 +890,7 @@ model Payment {
   createdAt    DateTime @default(now())
 
   applications PaymentApplication[]
+  paymentComplement PaymentComplement?
 
   @@unique([companyId, folio])
   @@index([companyId, status])
@@ -902,6 +906,58 @@ model PaymentApplication {
   payable      Payable?    @relation(fields: [payableId], references: [id])
   amount       Float
   confirmedAt  DateTime?
+
+  complementItem PaymentComplementItem?
+}
+
+model PaymentComplement {
+  id                   String    @id @default(cuid())
+  companyId            String
+  company              Company   @relation(fields: [companyId], references: [id])
+  paymentId            String    @unique
+  payment              Payment   @relation(fields: [paymentId], references: [id])
+  clientId             String
+  client               Client    @relation(fields: [clientId], references: [id])
+  fiscalEnv            String?
+  fiscalStatus         String    @default("PENDIENTE")
+  fiscalError          String?
+  fiscalIdempotencyKey String?   @unique
+  fiscalExternalId     String?
+  fiscalUuid           String?
+  fiscalSeries         String?
+  fiscalFolioNumber    Int?
+  verificationUrl      String?
+  paymentForm          String
+  paymentDate          DateTime
+  totalAmount          Float
+  xmlContent           String?
+  pdfContent           Bytes?
+  cancellationStatus   String?
+  canceledAt           DateTime?
+  stampedAt            DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  items PaymentComplementItem[]
+
+  @@index([companyId, fiscalStatus])
+}
+
+model PaymentComplementItem {
+  id                   String             @id @default(cuid())
+  complementId         String
+  complement           PaymentComplement  @relation(fields: [complementId], references: [id], onDelete: Cascade)
+  billingDocumentId    String
+  billingDocument      BillingDocument    @relation(fields: [billingDocumentId], references: [id])
+  paymentApplicationId String             @unique
+  paymentApplication   PaymentApplication @relation(fields: [paymentApplicationId], references: [id])
+  installment          Int
+  lastBalance          Float
+  amountPaid           Float
+  insoluto             Float
+
+  @@index([complementId])
+  @@index([billingDocumentId])
 }
 
 model CollectionNote {

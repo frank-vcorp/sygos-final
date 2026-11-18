@@ -4,6 +4,8 @@ import { ClientNameLink } from "@/components/client-entity-links";
 import { RegisterPaymentDialog } from "@/app/(erp)/pagos/register-payment-dialog";
 import { getPaymentFormOptions } from "@/app/(erp)/pagos/payment-form-data";
 import { Badge, Button, Card, controlClass, DetailAnchorButton, EntityDetailHeader, EntityMetaItem, Field, FormActions, FormPanel, FormSection, MobileCard, TextLink } from "@/components/ui";
+import { repBadgeInfo } from "@/lib/billing-badges";
+import { isBillingDocumentEligibleForRep } from "@/lib/facturapi";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
 import { money } from "@/lib/money";
@@ -17,7 +19,30 @@ export default async function CuentaPage({ params }: { params: Promise<{ id: str
   const { id } = await params;
   const row = await prisma.receivable.findFirst({
     where: { id, companyId: session.activeCompanyId },
-    include: { client: true, document: true, notes: { orderBy: { createdAt: "desc" } }, applications: { include: { payment: true } } },
+    include: {
+      client: true,
+      document: true,
+      notes: { orderBy: { createdAt: "desc" } },
+      applications: {
+        include: {
+          payment: {
+            include: {
+              paymentComplement: {
+                select: {
+                  id: true,
+                  fiscalStatus: true,
+                  fiscalEnv: true,
+                  fiscalUuid: true,
+                  fiscalExternalId: true,
+                  xmlContent: true,
+                  pdfContent: true,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
   });
   if (!row) notFound();
   await redirectIfSalesNotAssigned(session, row.sellerUserId, "/cobranza");
@@ -64,14 +89,34 @@ export default async function CuentaPage({ params }: { params: Promise<{ id: str
       <Card className="mb-4 p-4 text-sm">
         <h2 className="font-medium">Pagos aplicados</h2>
         {confirmedApps.length === 0 ? <p className="mt-1 text-[var(--muted)]">Todavía no hay un pago validado.</p> : (
-          <ul className="mt-2 space-y-1">
-            {confirmedApps.map((item) => (
-              <li key={item.id}>
-                <TextLink href={`/pagos/${item.payment.id}`}>{item.payment.folio}</TextLink>
-                {" · "}
-                {money(item.amount)}
-              </li>
-            ))}
+          <ul className="mt-2 space-y-2">
+            {confirmedApps.map((item) => {
+              const rep = item.payment.paymentComplement;
+              const isEligiblePpd = isBillingDocumentEligibleForRep(row.document);
+              const repBadge = rep ? repBadgeInfo(rep) : isEligiblePpd ? repBadgeInfo({ fiscalStatus: "PENDIENTE" }) : null;
+              const canDownloadRep =
+                Boolean(rep)
+                && (rep!.fiscalStatus === "TIMBRADA"
+                  || Boolean(rep!.xmlContent)
+                  || Boolean(rep!.pdfContent)
+                  || (Boolean(rep!.fiscalExternalId) && rep!.fiscalStatus === "CANCELADA"));
+              return (
+                <li key={item.id} className="flex flex-wrap items-center gap-2">
+                  <TextLink href={`/pagos/${item.payment.id}`}>{item.payment.folio}</TextLink>
+                  <span>· {money(item.amount)}</span>
+                  {repBadge ? <Badge tone={repBadge.tone}>{repBadge.label}</Badge> : null}
+                  {canDownloadRep && rep ? (
+                    <span className="flex flex-wrap gap-2 text-xs">
+                      <a href={`/api/billing/complements/${rep.id}/pdf`} target="_blank" rel="noreferrer" className="font-medium text-[#0a477e] hover:underline">PDF</a>
+                      <a href={`/api/billing/complements/${rep.id}/xml`} className="font-medium text-[#0a477e] hover:underline">XML</a>
+                      <a href={`/api/billing/complements/${rep.id}/zip`} className="font-medium text-[#0a477e] hover:underline">ZIP</a>
+                    </span>
+                  ) : isEligiblePpd ? (
+                    <TextLink href={`/pagos/${item.payment.id}`} className="text-xs">Gestionar REP</TextLink>
+                  ) : null}
+                </li>
+              );
+            })}
           </ul>
         )}
       </Card>
