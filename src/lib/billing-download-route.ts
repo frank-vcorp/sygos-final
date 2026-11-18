@@ -3,8 +3,14 @@ import {
   getBillingDocumentDownload,
   getCancellationReceiptDownload,
   getPaymentComplementDownload,
+  getPayrollLineDownload,
+  getPayrollPeriodZipDownload,
 } from "@/lib/billing-artifacts";
-import { canDownloadBillingDocument, canDownloadPaymentComplement } from "./billing-delivery";
+import {
+  canDownloadBillingDocument,
+  canDownloadPaymentComplement,
+  canDownloadPayrollLine,
+} from "./billing-delivery";
 import { prisma } from "./db";
 import { getSession } from "./session";
 
@@ -182,6 +188,95 @@ export async function handleCancellationReceiptDownload(
     headers: {
       "Content-Type": file.contentType,
       "Content-Disposition": disposition,
+      "Cache-Control": "private, no-store",
+    },
+  });
+}
+
+export async function handlePayrollLineDownload(
+  request: Request,
+  lineId: string,
+  format: "xml" | "pdf" | "zip",
+) {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ message: "No autenticado." }, { status: 401 });
+  }
+
+  const line = await prisma.payrollLine.findUnique({
+    where: { id: lineId },
+    select: {
+      id: true,
+      period: { select: { companyId: true } },
+    },
+  });
+
+  if (!line) {
+    return NextResponse.json({ message: "Recibo de nómina no encontrado." }, { status: 404 });
+  }
+
+  if (!canDownloadPayrollLine(session, { companyId: line.period.companyId })) {
+    return NextResponse.json({ message: "No tienes permiso para descargar este recibo de nómina." }, { status: 403 });
+  }
+
+  const file = await getPayrollLineDownload(line.id, format);
+  if (!file) {
+    return NextResponse.json(
+      { message: `El archivo ${format.toUpperCase()} del recibo de nómina aún no está disponible.` },
+      { status: 404 },
+    );
+  }
+
+  const url = new URL(request.url);
+  const disposition =
+    format === "pdf" && url.searchParams.get("download") !== "1"
+      ? `inline; filename="${file.filename}"`
+      : `attachment; filename="${file.filename}"`;
+
+  return new NextResponse(new Uint8Array(file.buffer), {
+    status: 200,
+    headers: {
+      "Content-Type": file.contentType,
+      "Content-Disposition": disposition,
+      "Cache-Control": "private, no-store",
+    },
+  });
+}
+
+export async function handlePayrollPeriodZipDownload(
+  _request: Request,
+  periodId: string,
+) {
+  const session = await getSession();
+  if (!session) {
+    return NextResponse.json({ message: "No autenticado." }, { status: 401 });
+  }
+
+  const period = await prisma.payrollPeriod.findUnique({
+    where: { id: periodId },
+    select: { id: true, companyId: true },
+  });
+  if (!period) {
+    return NextResponse.json({ message: "Periodo de nómina no encontrado." }, { status: 404 });
+  }
+
+  if (!canDownloadPayrollLine(session, { companyId: period.companyId })) {
+    return NextResponse.json({ message: "No tienes permiso para descargar los CFDI de esta nómina." }, { status: 403 });
+  }
+
+  const file = await getPayrollPeriodZipDownload(period.id);
+  if (!file) {
+    return NextResponse.json(
+      { message: "Aún no hay recibos timbrados disponibles en este periodo." },
+      { status: 404 },
+    );
+  }
+
+  return new NextResponse(new Uint8Array(file.buffer), {
+    status: 200,
+    headers: {
+      "Content-Type": file.contentType,
+      "Content-Disposition": `attachment; filename="${file.filename}"`,
       "Cache-Control": "private, no-store",
     },
   });

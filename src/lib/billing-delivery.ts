@@ -461,3 +461,12 @@ export async function sendPaymentComplementByWhatsApp(input: {
 
   return { ok: result.ok, message: result.message };
 }
+
+export function canDownloadPayrollLine(
+  session: DownloadActorSession | null,
+  line: { companyId: string },
+): boolean {
+  if (!session || !session.activeCompanyId) return false;
+  if (line.companyId !== session.activeCompanyId) return false;
+  return can(session.role, "personnel.manage") || can(session.role, "personnel.authorize");
+}

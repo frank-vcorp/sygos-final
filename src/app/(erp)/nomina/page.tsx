@@ -15,6 +15,7 @@ import {
   Th,
 } from "@/components/ui";
 import { coordPageSubtitle, coordPageTitle, coordUsesSidebarNav } from "@/lib/coordination-ui";
+import { payrollFiscalBadgeInfo } from "@/lib/billing-badges";
 import { prisma } from "@/lib/db";
 import { listHref } from "@/lib/list-url";
 import { money, roundMoney } from "@/lib/money";
@@ -160,6 +161,10 @@ export default async function NominaPage({
                   const periodDisplay =
                     row.periodLabel || `${row.periodStart} a ${row.periodEnd}`;
                   const paymentDisplay = row.paymentDate || row.periodEnd;
+                  const fiscalBadge =
+                    row.status === "CERRADA" || row.status === "AUTORIZADA"
+                      ? payrollFiscalBadgeInfo(row)
+                      : null;
                   return (
                     <tr key={row.id}>
                       <Td>
@@ -170,9 +175,12 @@ export default async function NominaPage({
                       <Td>{row.lines.length}</Td>
                       <Td className="font-semibold text-slate-900 tabular-nums">{money(total)}</Td>
                       <Td>
-                        <Badge tone={payrollStatusTone(row.status)}>
-                          {payrollStatusLabel(row.status)}
-                        </Badge>
+                        <span className="flex flex-wrap gap-1.5">
+                          <Badge tone={payrollStatusTone(row.status)}>
+                            {payrollStatusLabel(row.status)}
+                          </Badge>
+                          {fiscalBadge ? <Badge tone={fiscalBadge.tone}>{fiscalBadge.label}</Badge> : null}
+                        </span>
                       </Td>
                     </tr>
                   );

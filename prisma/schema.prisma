@@ -1419,6 +1419,7 @@ model PayrollPeriod {
   paymentDate      String   @default("")
   status           String
   fiscalStatus     String   @default("PENDIENTE")
+  fiscalEnv        String?
   fiscalError      String?
   fiscalExternalId String?
   version          Int      @default(1)
@@ -1485,10 +1486,16 @@ model PayrollLine {
   totalPercepciones   Float       @default(0)
   totalPagar          Float       @default(0)
   originsJson         String      @default("{}")
-  missing          String?
-  fiscalStatus     String?
-  fiscalExternalId String?
-  fiscalUuid       String?
+  missing              String?
+  fiscalStatus         String?
+  fiscalEnv            String?
+  fiscalError          String?
+  fiscalIdempotencyKey String?   @unique
+  fiscalExternalId     String?
+  fiscalUuid           String?
+  xmlContent           String?
+  pdfContent           Bytes?
+  stampedAt            DateTime?
 
   @@unique([periodId, collaboratorId])
 }

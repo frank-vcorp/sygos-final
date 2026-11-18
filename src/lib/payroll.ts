@@ -1,4 +1,5 @@
 import { prisma } from "./db";
+import { stampPayrollPeriod } from "./facturapi";
 import { ConcurrencyError } from "./form";
 import { recordHistory } from "./history";
 import { money, roundMoney } from "./money";
@@ -874,6 +875,8 @@ export async function validateAndClosePayroll(
       data: { status: "PAGADA", payrollPeriodId: period.id },
     });
   }
+
+  await stampPayrollPeriod(period.id).catch(() => undefined);
 
   await recordHistory({
     companyId: actor.activeCompanyId,

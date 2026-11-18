@@ -3,6 +3,7 @@ import {
   ensureBillingDocumentArtifacts,
   ensureCancellationReceiptArtifacts,
   ensurePaymentComplementArtifacts,
+  ensurePayrollLineArtifacts,
   ensureRepCancellationReceiptArtifacts,
 } from "./billing-artifacts";
 import { maybeAutoDeliverStampedDocument } from "./billing-delivery";
@@ -677,93 +678,78 @@ export async function stampBillingDocument(
   }
 }
 
-export async function stampPayrollPeriod(periodId: string) {
-  const period = await prisma.payrollPeriod.findUnique({
-    where: { id: periodId },
-    include: { lines: { include: { collaborator: { include: { user: true } } } }, company: true },
-  });
-  if (!period) return;
-  if (await inSandbox()) {
-    await prisma.payrollPeriod.update({
-      where: { id: period.id },
-      data: { fiscalStatus: "SIMULADA", fiscalError: "PRUEBA / SIN VALIDEZ. No se contactó a Facturapi." },
-    });
-    return;
-  }
-  const cred = await resolveFacturapiRuntimeCredential(period.companyId);
-  if (cred.status !== "READY") {
-    await prisma.payrollPeriod.update({
-      where: { id: period.id },
-      data: { fiscalStatus: "ERROR", fiscalError: cred.status === "UNAVAILABLE" ? cred.message : cred.message },
-    });
-    return;
-  }
-  const secret = cred.secret;
-  const setting = await prismaProd.integrationSetting.findFirst({
-    where: {
-      companyId: period.companyId,
-      provider: { in: [`FACTURAPI_${cred.env}`, "FACTURAPI"] },
-    },
-  });
-  const extra = setting?.extra
-    ? (JSON.parse(setting.extra) as { registroPatronal?: string; employerCurp?: string; employerState?: string })
-    : {};
-  const registro = period.company.registroPatronal || extra.registroPatronal;
-  const employerCurp = period.company.employerCurp || extra.employerCurp;
-  const state = period.company.employerState || extra.employerState;
-  if (!registro || !employerCurp || !state) {
-    await prisma.payrollPeriod.update({
-      where: { id: period.id },
-      data: {
-        fiscalStatus: "ERROR",
-        fiscalError: "Facturapi está configurado, pero falta registro patronal, CURP del patrón o entidad federativa.",
-      },
-    });
-    return;
-  }
-  const errors: string[] = [];
-  for (const line of period.lines.filter((row) => row.transferTotal > 0)) {
-    const person = line.collaborator;
-    const missing = [
-      !person.rfc ? "RFC" : null,
-      !person.curp ? "CURP" : null,
-      !person.nss ? "NSS" : null,
-      !person.fiscalZip ? "código postal" : null,
-    ].filter(Boolean);
-    if (missing.length > 0) {
-      errors.push(`${person.user.name}: falta ${missing.join(", ")}`);
-      continue;
-    }
-    if (line.fiscalExternalId) continue;
-    const body = {
-      type: "N",
-      external_id: line.id,
+function nextPayrollIdempotencyAttemptKey(lineId: string, currentKey: string | null | undefined): string {
+  if (!currentKey) return `sygos-nom-${lineId}-a1`;
+  const match = currentKey.match(/-a(\d+)$/);
+  const nextAttempt = match ? Number.parseInt(match[1]!, 10) + 1 : 2;
+  return `sygos-nom-${lineId}-a${nextAttempt}`;
+}
+
+export function buildPayrollReceiptPayload(input: {
+  externalId: string;
+  idempotencyKey?: string | null;
+  employeeName: string;
+  rfc: string | null;
+  curp: string | null;
+  nss: string | null;
+  fiscalZip: string | null;
+  hiredAt: Date;
+  dailySalary: number;
+  transferTotal: number;
+  periodStart: string;
+  periodEnd: string;
+  paymentDate?: string | null;
+  employerCurp: string | null;
+  registroPatronal: string | null;
+  employerState: string | null;
+  employeeNumber?: string;
+}) {
+  const missing = [
+    !input.rfc ? "RFC" : null,
+    !input.curp ? "CURP" : null,
+    !input.nss ? "NSS" : null,
+    !input.fiscalZip ? "código postal" : null,
+    !input.employerCurp ? "CURP del patrón" : null,
+    !input.registroPatronal ? "registro patronal" : null,
+    !input.employerState ? "entidad federativa" : null,
+  ].filter(Boolean);
+  if (missing.length > 0) return { error: `Falta ${missing.join(", ")}` };
+
+  const payDate = input.paymentDate?.trim() || input.periodEnd;
+  return {
+    body: {
+      type: "N" as const,
+      external_id: input.externalId,
+      ...(input.idempotencyKey ? { idempotency_key: input.idempotencyKey.slice(0, 100) } : {}),
       customer: {
-        legal_name: person.user.name,
-        tax_id: person.rfc,
+        legal_name: resolveClientSatLegalName({ name: input.employeeName }),
+        tax_id: input.rfc!,
         tax_system: "605",
-        address: { country: "MEX", zip: person.fiscalZip },
+        address: { country: "MEX", zip: input.fiscalZip! },
       },
       complements: [
         {
-          type: "nomina",
+          type: "nomina" as const,
           data: {
-            fecha_pago: new Date().toISOString(),
-            fecha_inicial_pago: `${period.periodStart}T06:00:00.000Z`,
-            fecha_final_pago: `${period.periodEnd}T06:00:00.000Z`,
+            fecha_pago: `${payDate}T12:00:00.000Z`,
+            fecha_inicial_pago: `${input.periodStart}T06:00:00.000Z`,
+            fecha_final_pago: `${input.periodEnd}T06:00:00.000Z`,
             num_dias_pagados: 7,
-            emisor: { curp: employerCurp, registro_patronal: registro },
+            emisor: {
+              curp: input.employerCurp!,
+              registro_patronal: input.registroPatronal!,
+            },
             receptor: {
-              curp: person.curp,
+              curp: input.curp!,
               tipo_contrato: "01",
               tipo_regimen: "02",
-              num_empleado: person.id.slice(-6),
+              num_empleado: input.employeeNumber || input.externalId.slice(-6),
               periodicidad_pago: "02",
-              clave_ent_fed: state,
-              num_seguridad_social: person.nss,
-              fecha_inicio_rel_laboral: person.hiredAt.toISOString(),
+              clave_ent_fed: input.employerState!,
+              num_seguridad_social: input.nss!,
+              fecha_inicio_rel_laboral: input.hiredAt.toISOString(),
               tipo_jornada: "01",
-              salario_diario_integrado: person.dailyStamped + person.dailyCash,
+              salario_diario_integrado: input.dailySalary,
               antiguedad: true,
             },
             percepciones: {
@@ -772,7 +758,7 @@ export async function stampPayrollPeriod(periodId: string) {
                   tipo_percepcion: "001",
                   clave: "001",
                   concepto: "Sueldo",
-                  importe_gravado: line.transferTotal,
+                  importe_gravado: input.transferTotal,
                   importe_exento: 0,
                 },
               ],
@@ -780,28 +766,354 @@ export async function stampPayrollPeriod(periodId: string) {
           },
         },
       ],
-    };
-    const created = await facturapiFetch(secret, "/invoices", { method: "POST", body: JSON.stringify(body) });
-    if (!created.ok || !created.body.id) {
-      errors.push(`${person.user.name}: ${created.body.message || "Facturapi no timbró el recibo"}`);
-    } else {
+    },
+  };
+}
+
+export async function recomputePayrollPeriodFiscalStatus(
+  periodId: string,
+  envOverride?: string | null,
+) {
+  const period = await prisma.payrollPeriod.findUnique({
+    where: { id: periodId },
+    include: { lines: true },
+  });
+  if (!period) return;
+  const eligible = period.lines.filter((line) => line.transferTotal > 0);
+  if (eligible.length === 0) {
+    await prisma.payrollPeriod.update({
+      where: { id: period.id },
+      data: { fiscalStatus: "NO_APLICA", fiscalEnv: envOverride ?? period.fiscalEnv, fiscalError: null },
+    });
+    return;
+  }
+
+  const lineErrors = eligible
+    .filter((l) => l.fiscalStatus === "ERROR")
+    .map((l) => l.fiscalError || "Error al timbrar recibo");
+  const hasProcessing = eligible.some((l) => l.fiscalStatus === "PROCESANDO");
+  const hasSimulated = eligible.some((l) => l.fiscalStatus === "SIMULADA");
+  const allStamped = eligible.every((l) => l.fiscalStatus === "TIMBRADA");
+  const resolvedEnv = envOverride ?? eligible.find((l) => l.fiscalEnv)?.fiscalEnv ?? period.fiscalEnv;
+
+  let fiscalStatus = "PENDIENTE";
+  let fiscalError: string | null = null;
+  if (lineErrors.length > 0) {
+    fiscalStatus = "ERROR";
+    fiscalError = lineErrors.join(" · ");
+  } else if (hasProcessing) {
+    fiscalStatus = "PROCESANDO";
+    fiscalError = "Uno o más recibos están en proceso ante el SAT (HTTP 202).";
+  } else if (hasSimulated) {
+    fiscalStatus = "SIMULADA";
+    fiscalError = "PRUEBA / SIN VALIDEZ. No se contactó a Facturapi.";
+  } else if (allStamped) {
+    fiscalStatus = "TIMBRADA";
+    fiscalError = null;
+  }
+
+  await prisma.payrollPeriod.update({
+    where: { id: period.id },
+    data: {
+      fiscalStatus,
+      fiscalEnv: resolvedEnv,
+      fiscalError,
+    },
+  });
+}
+
+export async function stampPayrollPeriod(
+  periodId: string,
+  options?: { lineId?: string; fetchFn?: typeof fetch },
+) {
+  const fetchFn = options?.fetchFn ?? fetch;
+  const period = await prisma.payrollPeriod.findUnique({
+    where: { id: periodId },
+    include: { lines: { include: { collaborator: { include: { user: true } } } }, company: true },
+  });
+  if (!period) return;
+
+  const targetLines = period.lines.filter(
+    (row) => row.transferTotal > 0 && (!options?.lineId || row.id === options.lineId),
+  );
+
+  const cred = await resolveFacturapiRuntimeCredential(period.companyId);
+  if (cred.status === "SIMULATED") {
+    for (const line of targetLines) {
+      await prisma.payrollLine.update({
+        where: { id: line.id },
+        data: { fiscalStatus: "SIMULADA", fiscalEnv: "SIMULATED", fiscalError: cred.message },
+      });
+    }
+    await prisma.payrollPeriod.update({
+      where: { id: period.id },
+      data: { fiscalStatus: "SIMULADA", fiscalEnv: "SIMULATED", fiscalError: cred.message },
+    });
+    return;
+  }
+  if (cred.status === "UNAVAILABLE") {
+    await prisma.payrollPeriod.update({
+      where: { id: period.id },
+      data: { fiscalStatus: "ERROR", fiscalEnv: cred.env, fiscalError: cred.message },
+    });
+    return;
+  }
+
+  const secret = cred.secret;
+  const fiscalEnv = cred.env;
+  const setting = await prismaProd.integrationSetting.findFirst({
+    where: {
+      companyId: period.companyId,
+      provider: { in: [`FACTURAPI_${fiscalEnv}`, "FACTURAPI"] },
+    },
+  });
+  const extra = setting?.extra
+    ? (JSON.parse(setting.extra) as { registroPatronal?: string; employerCurp?: string; employerState?: string })
+    : {};
+  const registro = period.company.registroPatronal || extra.registroPatronal || null;
+  const employerCurp = period.company.employerCurp || extra.employerCurp || null;
+  const state = period.company.employerState || extra.employerState || null;
+  if (!registro || !employerCurp || !state) {
+    await prisma.payrollPeriod.update({
+      where: { id: period.id },
+      data: {
+        fiscalStatus: "ERROR",
+        fiscalEnv,
+        fiscalError: "Facturapi está configurado, pero falta registro patronal, CURP del patrón o entidad federativa.",
+      },
+    });
+    return;
+  }
+
+  for (const line of targetLines) {
+    const person = line.collaborator;
+    if (line.fiscalStatus === "TIMBRADA") continue;
+
+    try {
+      if (line.fiscalExternalId) {
+        const current = await facturapiFetch(secret, `/invoices/${line.fiscalExternalId}`, undefined, fetchFn);
+        if (current.ok && current.body.status === "valid") {
+          await prisma.payrollLine.update({
+            where: { id: line.id },
+            data: {
+              fiscalEnv,
+              fiscalStatus: "TIMBRADA",
+              fiscalUuid: current.body.uuid ?? line.fiscalUuid,
+              stampedAt: line.stampedAt ?? new Date(),
+              fiscalError: null,
+            },
+          });
+          await ensurePayrollLineArtifacts(line.id, { fetchFn }).catch(() => undefined);
+          continue;
+        }
+        if (current.ok && current.body.status === "pending") {
+          await prisma.payrollLine.update({
+            where: { id: line.id },
+            data: {
+              fiscalEnv,
+              fiscalStatus: "PROCESANDO",
+              fiscalError: "Recibo en proceso ante el SAT (HTTP 202).",
+            },
+          });
+          continue;
+        }
+        if (current.ok && current.body.status === "failed") {
+          await prisma.payrollLine.update({
+            where: { id: line.id },
+            data: {
+              fiscalEnv,
+              fiscalExternalId: null,
+              fiscalIdempotencyKey: nextPayrollIdempotencyAttemptKey(line.id, line.fiscalIdempotencyKey),
+              fiscalStatus: "ERROR",
+              fiscalError: `${person.user.name}: ${current.body.message || "Facturapi agotó la recuperación (failed)."}`,
+            },
+          });
+          continue;
+        }
+        if (current.ok && current.body.status === "canceled") {
+          await prisma.payrollLine.update({
+            where: { id: line.id },
+            data: { fiscalEnv, fiscalStatus: "CANCELADA", fiscalError: "Recibo cancelado en Facturapi." },
+          });
+          continue;
+        }
+        await prisma.payrollLine.update({
+          where: { id: line.id },
+          data: {
+            fiscalEnv,
+            fiscalStatus: "ERROR",
+            fiscalError: `${person.user.name}: ${current.body.message || "Facturapi aún no confirma este recibo."}`,
+          },
+        });
+        continue;
+      }
+
+      const listed = await facturapiFetch(
+        secret,
+        `/invoices?external_id=${encodeURIComponent(line.id)}&limit=20`,
+        undefined,
+        fetchFn,
+      );
+      const existing = listed.body.data?.find(
+        (row) => row.external_id === line.id && row.status !== "failed" && row.status !== "canceled",
+      );
+      if (existing?.id) {
+        const nextStatus = existing.status === "valid" ? "TIMBRADA" : existing.status === "pending" ? "PROCESANDO" : "ERROR";
+        await prisma.payrollLine.update({
+          where: { id: line.id },
+          data: {
+            fiscalEnv,
+            fiscalExternalId: existing.id,
+            fiscalUuid: existing.uuid ?? null,
+            stampedAt: existing.status === "valid" ? new Date() : null,
+            fiscalStatus: nextStatus,
+            fiscalError:
+              existing.status === "valid"
+                ? null
+                : `${person.user.name}: ya existe en Facturapi (${existing.status ?? "pendiente"}).`,
+          },
+        });
+        if (existing.status === "valid") {
+          await ensurePayrollLineArtifacts(line.id, { fetchFn }).catch(() => undefined);
+        }
+        continue;
+      }
+
+      const idempotencyKey =
+        line.fiscalIdempotencyKey || nextPayrollIdempotencyAttemptKey(line.id, line.fiscalIdempotencyKey);
+      if (idempotencyKey !== line.fiscalIdempotencyKey) {
+        await prisma.payrollLine.update({
+          where: { id: line.id },
+          data: { fiscalIdempotencyKey: idempotencyKey },
+        });
+      }
+
+      const payload = buildPayrollReceiptPayload({
+        externalId: line.id,
+        idempotencyKey,
+        employeeName: person.user.name,
+        rfc: person.rfc,
+        curp: person.curp,
+        nss: person.nss,
+        fiscalZip: person.fiscalZip,
+        hiredAt: person.hiredAt,
+        dailySalary: person.dailyStamped + person.dailyCash,
+        transferTotal: line.transferTotal,
+        periodStart: period.periodStart,
+        periodEnd: period.periodEnd,
+        paymentDate: period.paymentDate,
+        employerCurp,
+        registroPatronal: registro,
+        employerState: state,
+        employeeNumber: person.id.slice(-6),
+      });
+
+      if ("error" in payload && payload.error) {
+        await prisma.payrollLine.update({
+          where: { id: line.id },
+          data: { fiscalEnv, fiscalStatus: "ERROR", fiscalError: `${person.user.name}: ${payload.error}` },
+        });
+        continue;
+      }
+
+      const created = await facturapiFetch(
+        secret,
+        "/invoices",
+        { method: "POST", body: JSON.stringify(payload.body) },
+        fetchFn,
+      );
+
+      if (created.status === 409 || created.body.code === "idempotency_key_in_use") {
+        const recovered = await facturapiFetch(
+          secret,
+          `/invoices?external_id=${encodeURIComponent(line.id)}&limit=20`,
+          undefined,
+          fetchFn,
+        );
+        const match = recovered.body.data?.find(
+          (row) => row.external_id === line.id && row.status !== "failed" && row.status !== "canceled",
+        );
+        if (match?.id) {
+          const nextStatus = match.status === "valid" ? "TIMBRADA" : match.status === "pending" ? "PROCESANDO" : "ERROR";
+          await prisma.payrollLine.update({
+            where: { id: line.id },
+            data: {
+              fiscalEnv,
+              fiscalExternalId: match.id,
+              fiscalUuid: match.uuid ?? null,
+              stampedAt: match.status === "valid" ? new Date() : null,
+              fiscalStatus: nextStatus,
+              fiscalError: match.status === "valid" ? null : `${person.user.name}: recibo recuperado (${match.status}).`,
+            },
+          });
+          if (match.status === "valid") {
+            await ensurePayrollLineArtifacts(line.id, { fetchFn }).catch(() => undefined);
+          }
+          continue;
+        }
+        await prisma.payrollLine.update({
+          where: { id: line.id },
+          data: {
+            fiscalEnv,
+            fiscalStatus: "ERROR",
+            fiscalError: `${person.user.name}: clave de idempotencia en uso (409). Consulta en unos segundos.`,
+          },
+        });
+        continue;
+      }
+
+      if ((created.status === 202 || created.body.status === "pending") && created.body.id) {
+        await prisma.payrollLine.update({
+          where: { id: line.id },
+          data: {
+            fiscalEnv,
+            fiscalExternalId: created.body.id,
+            fiscalStatus: "PROCESANDO",
+            fiscalError: "Recibo en proceso ante el SAT (HTTP 202). Facturapi reintentará automáticamente.",
+          },
+        });
+        continue;
+      }
+
+      if (!created.ok || !created.body.id) {
+        await prisma.payrollLine.update({
+          where: { id: line.id },
+          data: {
+            fiscalEnv,
+            fiscalStatus: "ERROR",
+            fiscalError: `${person.user.name}: ${created.body.message || "Facturapi no timbró el recibo"}`,
+          },
+        });
+        continue;
+      }
+
       await prisma.payrollLine.update({
         where: { id: line.id },
         data: {
+          fiscalEnv,
           fiscalExternalId: created.body.id,
-          fiscalUuid: created.body.uuid,
+          fiscalUuid: created.body.uuid ?? null,
+          stampedAt: created.body.status === "valid" ? new Date() : null,
           fiscalStatus: created.body.status === "valid" ? "TIMBRADA" : "ERROR",
+          fiscalError:
+            created.body.status === "valid"
+              ? null
+              : `${person.user.name}: Facturapi recibió el recibo y aún no lo marca como vigente.`,
         },
+      });
+      if (created.body.status === "valid") {
+        await ensurePayrollLineArtifacts(line.id, { fetchFn }).catch(() => undefined);
+      }
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : "Error de red al timbrar recibo.";
+      await prisma.payrollLine.update({
+        where: { id: line.id },
+        data: { fiscalEnv, fiscalStatus: "ERROR", fiscalError: `${person.user.name}: ${msg}` },
       });
     }
   }
-  await prisma.payrollPeriod.update({
-    where: { id: period.id },
-    data:
-      errors.length > 0
-        ? { fiscalStatus: "ERROR", fiscalError: errors.join(". ") }
-        : { fiscalStatus: "TIMBRADA", fiscalError: null },
-  });
+
+  await recomputePayrollPeriodFiscalStatus(period.id, fiscalEnv);
 }
 
 type WebhookRecord = {
@@ -1183,6 +1495,86 @@ export async function processFacturapiWebhook(input: {
                 canceledAt: rep.canceledAt ?? new Date(),
               },
             });
+          }
+        } else {
+          const payrollLine = await prisma.payrollLine.findFirst({
+            where: {
+              period: { companyId: company.id },
+              OR: orFilters,
+            },
+            include: {
+              period: { select: { id: true, folio: true } },
+              collaborator: { include: { user: { select: { name: true } } } },
+            },
+          });
+          if (payrollLine && (!payrollLine.fiscalEnv || payrollLine.fiscalEnv === eventEnv)) {
+            if (inv.status === "valid") {
+              await prisma.payrollLine.update({
+                where: { id: payrollLine.id },
+                data: {
+                  fiscalEnv: eventEnv,
+                  fiscalExternalId: inv.id ?? payrollLine.fiscalExternalId,
+                  fiscalUuid: inv.uuid ?? payrollLine.fiscalUuid,
+                  stampedAt: payrollLine.stampedAt ?? new Date(),
+                  fiscalStatus: "TIMBRADA",
+                  fiscalError: null,
+                },
+              });
+              await ensurePayrollLineArtifacts(payrollLine.id, { fetchFn }).catch(() => undefined);
+              await recomputePayrollPeriodFiscalStatus(payrollLine.period.id, eventEnv);
+              await recordHistory({
+                companyId: company.id,
+                entityType: "NOMINA",
+                entityId: payrollLine.period.id,
+                action: "TIMBRADO_NOMINA_WEBHOOK",
+                summary: `Recibo CFDI de ${payrollLine.collaborator.user.name} en ${payrollLine.period.folio} timbrado vía webhook (${eventEnv}).`,
+              });
+            } else if (inv.status === "failed") {
+              const errorDetail =
+                event.related_resource_messages
+                  ?.filter((m) => m.message && (!m.severity || m.severity === "error"))
+                  .map((m) => m.message)
+                  .join(" · ")
+                || inv.message
+                || "Facturapi marcó el recibo de nómina como fallido.";
+              await prisma.payrollLine.update({
+                where: { id: payrollLine.id },
+                data: {
+                  fiscalEnv: eventEnv,
+                  fiscalStatus: "ERROR",
+                  fiscalExternalId: null,
+                  fiscalIdempotencyKey: nextPayrollIdempotencyAttemptKey(payrollLine.id, payrollLine.fiscalIdempotencyKey),
+                  fiscalError: `${payrollLine.collaborator.user.name}: ${errorDetail}`,
+                },
+              });
+              await recomputePayrollPeriodFiscalStatus(payrollLine.period.id, eventEnv);
+              await recordHistory({
+                companyId: company.id,
+                entityType: "NOMINA",
+                entityId: payrollLine.period.id,
+                action: "ERROR_NOMINA_WEBHOOK",
+                summary: `Error en recibo CFDI de ${payrollLine.collaborator.user.name} (${payrollLine.period.folio}): ${errorDetail}`,
+              });
+            } else if (inv.status === "pending") {
+              await prisma.payrollLine.update({
+                where: { id: payrollLine.id },
+                data: {
+                  fiscalEnv: eventEnv,
+                  fiscalExternalId: inv.id ?? payrollLine.fiscalExternalId,
+                  fiscalStatus: "PROCESANDO",
+                },
+              });
+              await recomputePayrollPeriodFiscalStatus(payrollLine.period.id, eventEnv);
+            } else if (inv.status === "canceled") {
+              await prisma.payrollLine.update({
+                where: { id: payrollLine.id },
+                data: {
+                  fiscalEnv: eventEnv,
+                  fiscalStatus: "CANCELADA",
+                },
+              });
+              await recomputePayrollPeriodFiscalStatus(payrollLine.period.id, eventEnv);
+            }
           }
         }
       }

@@ -1,5 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import {
+  retryPayrollAction,
   returnPayrollToCorrectionAction,
   sendPayrollToValidationAction,
   validateAndClosePayrollAction,
@@ -21,10 +22,12 @@ import {
   Th,
   TextLink,
 } from "@/components/ui";
+import { payrollFiscalBadgeInfo } from "@/lib/billing-badges";
 import { prisma } from "@/lib/db";
 import { money, roundMoney } from "@/lib/money";
 import {
   getPayrollPendingWarnings,
+  isPayrollClosed,
   isPayrollEditable,
   payrollStatusLabel,
   payrollStatusTone,
@@ -66,6 +69,11 @@ export default async function NominaDetallePage({
   const isCeo = can(session.role, "personnel.authorize");
   const editable = isPayrollEditable(row.status);
   const pendingValidation = row.status === "PENDIENTE_VALIDACION";
+  const closed = isPayrollClosed(row.status);
+  const periodFiscalBadge = closed ? payrollFiscalBadgeInfo(row) : null;
+  const hasAnyPeriodCfdi = row.lines.some(
+    (line) => line.fiscalStatus === "TIMBRADA" || Boolean(line.xmlContent) || Boolean(line.pdfContent),
+  );
 
   const warnings = await getPayrollPendingWarnings(
     session.activeCompanyId,
@@ -130,6 +138,31 @@ export default async function NominaDetallePage({
         </form>
       </div>
     );
+  } else if (closed) {
+    if (row.fiscalStatus !== "TIMBRADA" && row.fiscalStatus !== "NO_APLICA") {
+      primaryAction = (
+        <form action={retryPayrollAction} className="inline">
+          <input type="hidden" name="periodId" value={row.id} />
+          <Button type="submit" tone={row.fiscalStatus === "ERROR" || row.fiscalStatus === "PROCESANDO" ? "ghost" : undefined}>
+            {row.fiscalStatus === "PROCESANDO"
+              ? "Consultar estatus CFDI"
+              : row.fiscalStatus === "ERROR"
+                ? "Reintentar timbrado"
+                : "Timbrar nómina CFDI"}
+          </Button>
+        </form>
+      );
+    }
+    if (hasAnyPeriodCfdi) {
+      secondaryActions = (
+        <a
+          href={`/api/payroll/periods/${row.id}/zip`}
+          className="inline-flex min-h-9 items-center rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-800 hover:bg-slate-50"
+        >
+          Descargar ZIP del periodo
+        </a>
+      );
+    }
   }
 
   const baseHref = `/nomina/${row.id}`;
@@ -141,9 +174,12 @@ export default async function NominaDetallePage({
         title={row.folio}
         subtitle={`Personal > Nómina > ${row.folio} · ${periodDisplay}`}
         status={
-          <Badge tone={payrollStatusTone(row.status)}>
-            {payrollStatusLabel(row.status)}
-          </Badge>
+          <span className="flex flex-wrap gap-1.5">
+            <Badge tone={payrollStatusTone(row.status)}>
+              {payrollStatusLabel(row.status)}
+            </Badge>
+            {periodFiscalBadge ? <Badge tone={periodFiscalBadge.tone}>{periodFiscalBadge.label}</Badge> : null}
+          </span>
         }
         meta={
           <>
@@ -186,6 +222,14 @@ export default async function NominaDetallePage({
 
       {activeTab === "resumen" ? (
         <Card className="p-5">
+          {closed && row.fiscalEnv === "TEST" && row.fiscalStatus === "TIMBRADA" ? (
+            <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900">
+              TIMBRE DE PRUEBA (SANDBOX): Los recibos CFDI de este periodo se timbraron con llave sk_test_ y no tienen validez ante el SAT.
+            </div>
+          ) : null}
+          {closed && row.fiscalError ? (
+            <p className="mb-4 rounded-md bg-[var(--warn-soft)] px-3 py-2 text-xs">{row.fiscalError}</p>
+          ) : null}
           <h2 className="mb-4 border-b border-slate-100 pb-3 text-base font-bold tracking-tight text-slate-900">
             Resumen general de la nómina
           </h2>
@@ -263,11 +307,20 @@ export default async function NominaDetallePage({
                       <Th>Compensaciones</Th>
                       <Th>Prima vacacional</Th>
                       <Th>Total</Th>
+                      {closed ? <Th>CFDI Nómina</Th> : null}
                     </tr>
                   </thead>
                   <tbody>
                     {row.lines.map((line) => {
                       const amounts = visiblePayrollAmounts(line);
+                      const lineBadge = closed ? payrollFiscalBadgeInfo(line) : null;
+                      const canDownloadLine =
+                        line.fiscalStatus === "TIMBRADA" || Boolean(line.xmlContent) || Boolean(line.pdfContent);
+                      const canRetryLine =
+                        closed
+                        && line.transferTotal > 0
+                        && line.fiscalStatus !== "TIMBRADA"
+                        && line.fiscalStatus !== "CANCELADA";
                       return (
                         <tr key={line.id}>
                           <Td>
@@ -282,6 +335,30 @@ export default async function NominaDetallePage({
                           <Td className="tabular-nums">{money(amounts.compensaciones)}</Td>
                           <Td className="tabular-nums">{money(amounts.primaVacacional)}</Td>
                           <Td className="font-bold text-slate-900 tabular-nums">{money(amounts.total)}</Td>
+                          {closed ? (
+                            <Td>
+                              <div className="flex flex-wrap items-center gap-2 text-xs">
+                                {lineBadge ? <Badge tone={lineBadge.tone}>{lineBadge.label}</Badge> : "—"}
+                                {canDownloadLine ? (
+                                  <span className="flex gap-1.5">
+                                    <a href={`/api/payroll/lines/${line.id}/pdf`} target="_blank" rel="noreferrer" className="font-medium text-[#0a477e] hover:underline">PDF</a>
+                                    <a href={`/api/payroll/lines/${line.id}/xml`} className="font-medium text-[#0a477e] hover:underline">XML</a>
+                                    <a href={`/api/payroll/lines/${line.id}/zip`} className="font-medium text-[#0a477e] hover:underline">ZIP</a>
+                                  </span>
+                                ) : null}
+                                {canRetryLine ? (
+                                  <form action={retryPayrollAction} className="inline">
+                                    <input type="hidden" name="periodId" value={row.id} />
+                                    <input type="hidden" name="lineId" value={line.id} />
+                                    <input type="hidden" name="returnTo" value={`/nomina/${row.id}?tab=colaboradores`} />
+                                    <Button type="submit" tone="ghost" className="min-h-7 px-2 py-0.5 text-[11px]">
+                                      {line.fiscalStatus === "PROCESANDO" ? "Consultar" : "Reintentar"}
+                                    </Button>
+                                  </form>
+                                ) : null}
+                              </div>
+                            </Td>
+                          ) : null}
                         </tr>
                       );
                     })}

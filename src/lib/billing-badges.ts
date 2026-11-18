@@ -68,3 +68,26 @@ export function repBadgeInfo(rep: {
   if (rep.fiscalStatus === "ERROR") return { label: "Error REP", tone: "danger" };
   return { label: "REP Pendiente", tone: "neutral" };
 }
+
+export function payrollFiscalBadgeInfo(row: {
+  fiscalStatus?: string | null;
+  fiscalEnv?: string | null;
+}): { label: string; tone: "neutral" | "ok" | "warn" | "danger" } | null {
+  if (!row.fiscalStatus || row.fiscalStatus === "NO_APLICA") return null;
+  if (row.fiscalStatus === "TIMBRADA") {
+    if (row.fiscalEnv === "TEST") {
+      return { label: "TIMBRE DE PRUEBA (SANDBOX)", tone: "warn" };
+    }
+    return { label: "Timbrado SAT", tone: "ok" };
+  }
+  if (row.fiscalStatus === "PROCESANDO") {
+    return {
+      label: row.fiscalEnv === "TEST" ? "Procesando (202 · Sandbox)" : "Procesando SAT (202)",
+      tone: "warn",
+    };
+  }
+  if (row.fiscalStatus === "SIMULADA") return { label: "Simulada (Modo pruebas)", tone: "warn" };
+  if (row.fiscalStatus === "ERROR") return { label: "Error timbrado", tone: "danger" };
+  if (row.fiscalStatus === "CANCELADA") return { label: "Cancelada SAT", tone: "danger" };
+  return { label: "Pendiente timbrado", tone: "neutral" };
+}

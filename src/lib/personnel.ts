@@ -1605,12 +1605,14 @@ async function payFromAccount(companyId: string, kind: "BANCARIA" | "EFECTIVO", 
   await prisma.financeMovement.create({ data: { companyId, accountId: account.id, direction: "EGRESO", amount, category: "Nómina", note: folio, originType: "NOMINA", originId } });
 }
 
-export async function retryPayrollFiscal(actor: Actor, periodId: string) {
+export async function retryPayrollFiscal(actor: Actor, periodId: string, lineId?: string) {
   assertHr(actor);
-  const period = await prisma.payrollPeriod.findFirst({ where: { id: periodId, companyId: actor.activeCompanyId, status: "AUTORIZADA" } });
-  if (!period) throw new Error("Solo se reintenta una nómina ya autorizada.");
-  await stampPayrollPeriod(period.id);
-  return period;
+  const period = await prisma.payrollPeriod.findFirst({
+    where: { id: periodId, companyId: actor.activeCompanyId, status: { in: ["CERRADA", "AUTORIZADA"] } },
+  });
+  if (!period) throw new Error("Solo se timbra o reintenta una nómina ya cerrada/autorizada.");
+  await stampPayrollPeriod(period.id, lineId ? { lineId } : undefined);
+  return prisma.payrollPeriod.findUnique({ where: { id: period.id } });
 }
 
 export async function generateAguinaldo(actor: Actor, year: number) {

@@ -190,12 +190,17 @@ export async function authorizePayrollAction(formData: FormData) {
 export async function retryPayrollAction(formData: FormData) {
   "use server";
   const id = requiredText(formData.get("periodId"), "Nómina");
+  const lineId = optionalText(formData.get("lineId"));
+  const returnTo = optionalText(formData.get("returnTo"));
   try {
     const session = await guard("personnel.manage");
-    await retryPayrollFiscal(session, id);
-    await setFlash({ tone: "ok", message: "El reintento conservó la misma nómina." });
+    await retryPayrollFiscal(session, id, lineId ?? undefined);
+    await setFlash({ tone: "ok", message: lineId ? "Recibo de nómina actualizado sobre el mismo registro." : "Timbrado de nómina actualizado sobre el mismo periodo." });
   } catch (error) {
     await setFlash({ tone: "error", message: bubble(error) });
+  }
+  if (returnTo && returnTo.startsWith("/nomina/")) {
+    redirect(returnTo);
   }
   redirect(`/nomina/${id}`);
 }
