@@ -53,7 +53,11 @@ export function PurchaseFilters({
                 <option value="CANCELADA">Cancelada</option>
               </>
             ) : (
-              <option value="PENDIENTE_VALIDAR">Pendiente de validación</option>
+              <>
+                <option value="PENDIENTE_VALIDAR">Pendiente de validación</option>
+                <option value="PROCESADA">Procesada</option>
+                <option value="TODOS">Todas</option>
+              </>
             )}
           </select>
           <input name="fecha" type="date" value={filters.fecha} className={`${controlClass} sm:w-auto`} aria-label="Fecha" onChange={(event) => update("fecha", event.target.value)} />

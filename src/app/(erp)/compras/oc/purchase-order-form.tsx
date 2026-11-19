@@ -15,31 +15,40 @@ export function PurchaseOrderForm({
   categories,
   accounts,
   allowQuickSupplier,
+  generalOnly = false,
 }: {
   suppliers: PickerOption[];
   categories: ExpenseCategoryCatalogItem[];
   accounts: TreasuryAccountOption[];
   allowQuickSupplier: boolean;
+  generalOnly?: boolean;
 }) {
   const [purchaseKind, setPurchaseKind] = useState<"GENERAL" | "REFACCION">("GENERAL");
-  const refaccion = purchaseKind === "REFACCION";
+  const effectiveKind: "GENERAL" | "REFACCION" = generalOnly ? "GENERAL" : purchaseKind;
+  const refaccion = effectiveKind === "REFACCION";
 
   return (
     <FormPanel action={phaseOnePurchaseAction} className="max-w-none border-0 shadow-none">
       <input type="hidden" name="order" value="si" />
-      <input type="hidden" name="purchaseKind" value={purchaseKind} />
+      <input type="hidden" name="purchaseKind" value={effectiveKind} />
       <div className="space-y-4">
         <div className="grid gap-3 sm:grid-cols-[8.5rem_minmax(0,1fr)] sm:items-start">
-          <Field label="Tipo">
-            <select
-              value={purchaseKind}
-              onChange={(event) => setPurchaseKind(event.target.value === "REFACCION" ? "REFACCION" : "GENERAL")}
-              className={controlClass}
-            >
-              <option value="GENERAL">General</option>
-              <option value="REFACCION">Refacción</option>
-            </select>
-          </Field>
+          {generalOnly ? (
+            <Field label="Tipo">
+              <p className="py-2 text-sm font-medium text-[var(--ink)]">General</p>
+            </Field>
+          ) : (
+            <Field label="Tipo">
+              <select
+                value={effectiveKind}
+                onChange={(event) => setPurchaseKind(event.target.value === "REFACCION" ? "REFACCION" : "GENERAL")}
+                className={controlClass}
+              >
+                <option value="GENERAL">General</option>
+                <option value="REFACCION">Refacción</option>
+              </select>
+            </Field>
+          )}
           <SupplierPicker
             suppliers={suppliers}
             allowQuickSupplier={allowQuickSupplier}

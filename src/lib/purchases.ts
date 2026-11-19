@@ -1,4 +1,4 @@
-import type { ShoppingList } from "@prisma/client";
+import type { Prisma, ShoppingList } from "@prisma/client";
 import { prisma } from "./db";
 import { allocateFolio } from "./folios";
 import { ConcurrencyError } from "./form";
@@ -18,6 +18,7 @@ import {
   normalizeFinanceAccountKind,
   normalizeOperationalPaymentType,
   paymentTypeRequiresTreasuryAccount,
+  VENDOR_CREDIT_PAYMENT,
   type FinanceAccountKind,
 } from "./finance-accounts";
 
@@ -31,6 +32,21 @@ export {
 export { requirementPartNumberRequired } from "./requirement-display";
 
 type Actor = { userId: string; role: Role; activeCompanyId: string; activeCompanyCode: string };
+
+export function isCoordinationGeneralOnlyPurchases(role: Role, companyCode?: string | null): boolean {
+  return role === "COORDINACION_ADMINISTRACION" && companyCode === "SYSTRON";
+}
+
+export function assertCoordinationCanCreatePurchaseKind(
+  actor: Pick<Actor, "role" | "activeCompanyCode">,
+  kind: "GENERAL" | "REFACCION",
+  target: "compra" | "oc" | "lista" | "requerimiento",
+) {
+  if (!isCoordinationGeneralOnlyPurchases(actor.role, actor.activeCompanyCode)) return;
+  if (kind === "REFACCION") {
+    throw new Error(`Coordinación de Administración en SYSTRON solo puede crear ${target === "lista" ? "listas" : target === "oc" ? "órdenes de compra" : target === "requerimiento" ? "requerimientos" : "compras"} generales (no técnicas).`);
+  }
+}
 
 export function withinDirectLimits(amount: number, monthUsed: number, limit: number, budget: number) {
   return amount > 0 && amount <= limit && monthUsed + amount <= budget;
@@ -243,58 +259,108 @@ export async function cancelOrder(actor: Actor, purchaseId: string, version: num
   });
 }
 
-async function postMovement(companyId: string, accountId: string, direction: "INGRESO" | "EGRESO", amount: number, category: string, originType: string, originId: string, note: string, pendingProof = false) {
-  const account = await prisma.financeAccount.findFirst({ where: { id: accountId, companyId, active: true } });
+async function postMovement(
+  companyId: string,
+  accountId: string,
+  direction: "INGRESO" | "EGRESO",
+  amount: number,
+  category: string,
+  originType: string,
+  originId: string,
+  note: string,
+  pendingProof = false,
+  db: Prisma.TransactionClient | typeof prisma = prisma,
+) {
+  const account = await db.financeAccount.findFirst({ where: { id: accountId, companyId, active: true } });
   if (!account) throw new Error("Selecciona una cuenta de esta empresa.");
   if (isCreditCardAccountKind(account.kind) && direction === "EGRESO") {
-    await prisma.financeAccount.update({ where: { id: account.id }, data: { balance: account.balance + amount } });
+    await db.financeAccount.update({ where: { id: account.id }, data: { balance: account.balance + amount } });
   } else if (!isCreditCardAccountKind(account.kind)) {
     const delta = direction === "INGRESO" ? amount : -amount;
     if (account.balance + delta < 0 && isCashAccountKind(account.kind)) throw new Error("La caja no tiene saldo para ese egreso.");
-    await prisma.financeAccount.update({ where: { id: account.id }, data: { balance: account.balance + delta } });
+    await db.financeAccount.update({ where: { id: account.id }, data: { balance: account.balance + delta } });
   }
-  return prisma.financeMovement.create({
+  return db.financeMovement.create({
     data: { companyId, accountId, direction, amount, category, originType, originId, note, pendingProof },
   });
+}
+
+async function applyPurchaseToFinanceTx(
+  tx: Prisma.TransactionClient,
+  row: {
+    id: string;
+    companyId: string;
+    version: number;
+    supplierId: string | null;
+    amount: number;
+    destination: string;
+    destinationRef: string | null;
+    expenseCategory: string | null;
+    expenseSubcategory: string | null;
+    concept: string;
+    purchaseDate: Date | null;
+  },
+  settlement: "CONTADO" | "CREDITO",
+  accountId: string | null,
+) {
+  if (!row.supplierId) throw new Error("Indica el proveedor antes de procesar.");
+  if (settlement === "CONTADO") {
+    if (!accountId) throw new Error("El contado sale de una cuenta.");
+    const movementDetails = purchaseMovementDetails(row);
+    const movement = await postMovement(
+      row.companyId,
+      accountId,
+      "EGRESO",
+      row.amount,
+      movementDetails.category,
+      "COMPRA",
+      row.id,
+      movementDetails.note,
+      false,
+      tx,
+    );
+    const updated = await tx.purchase.updateMany({
+      where: { id: row.id, version: row.version },
+      data: { status: "PROCESADA", settlement: "CONTADO", accountId, movementId: movement.id, version: { increment: 1 } },
+    });
+    if (updated.count === 0) throw new ConcurrencyError();
+    return { settlement: "CONTADO" as const, movementId: movement.id, payableId: null };
+  }
+  const supplier = await tx.supplier.findUnique({ where: { id: row.supplierId } });
+  const due = new Date(row.purchaseDate ?? Date.now());
+  due.setDate(due.getDate() + (supplier?.creditDays ?? 0));
+  const payable = await tx.payable.create({
+    data: {
+      companyId: row.companyId,
+      supplierId: row.supplierId,
+      purchaseId: row.id,
+      equipmentId: row.destination === "MOT" ? row.destinationRef : null,
+      amount: row.amount,
+      balance: row.amount,
+      dueAt: due,
+      status: "ABIERTA",
+    },
+  });
+  const updated = await tx.purchase.updateMany({
+    where: { id: row.id, version: row.version },
+    data: { status: "PROCESADA", settlement: "CREDITO", payableId: payable.id, version: { increment: 1 } },
+  });
+  if (updated.count === 0) throw new ConcurrencyError();
+  return { settlement: "CREDITO" as const, movementId: null, payableId: payable.id };
 }
 
 export async function processPurchase(actor: Actor, purchaseId: string, version: number, settlement: "CONTADO" | "CREDITO", accountId: string | null) {
   const row = await prisma.purchase.findFirst({ where: { id: purchaseId, companyId: actor.activeCompanyId } });
   if (!row || row.movementId || row.payableId) throw new Error("Esa compra ya tiene un movimiento financiero.");
-  const ready = (row.kind === "DIRECTA" && row.status === "PENDIENTE_VALIDAR") || (row.kind === "OC" && row.status === "AUTORIZADA");
+  const ready =
+    ((row.kind === "DIRECTA" || row.kind === "COMPRA") && row.status === "PENDIENTE_VALIDAR")
+    || (row.kind === "OC" && row.status === "AUTORIZADA");
   if (!ready) throw new Error("Esa compra no está lista para procesarse.");
   if (!row.supplierId) throw new Error("Indica el proveedor antes de procesar.");
   if (settlement === "CONTADO" && !accountId) throw new Error("El contado sale de una cuenta.");
-  if (settlement === "CONTADO" && accountId) {
-    const movementDetails = purchaseMovementDetails(row);
-    const movement = await postMovement(row.companyId, accountId, "EGRESO", row.amount, movementDetails.category, "COMPRA", row.id, movementDetails.note);
-    const updated = await prisma.purchase.updateMany({
-      where: { id: row.id, version },
-      data: { status: "PROCESADA", settlement: "CONTADO", accountId, movementId: movement.id, version: { increment: 1 } },
-    });
-    if (updated.count === 0) throw new ConcurrencyError();
-  } else {
-    const supplier = await prisma.supplier.findUnique({ where: { id: row.supplierId } });
-    const due = new Date();
-    due.setDate(due.getDate() + (supplier?.creditDays ?? 0));
-    const payable = await prisma.payable.create({
-      data: {
-        companyId: row.companyId,
-        supplierId: row.supplierId,
-        purchaseId: row.id,
-        equipmentId: row.destination === "MOT" ? row.destinationRef : null,
-        amount: row.amount,
-        balance: row.amount,
-        dueAt: due,
-        status: "ABIERTA",
-      },
-    });
-    const updated = await prisma.purchase.updateMany({
-      where: { id: row.id, version },
-      data: { status: "PROCESADA", settlement: "CREDITO", payableId: payable.id, version: { increment: 1 } },
-    });
-    if (updated.count === 0) throw new ConcurrencyError();
-  }
+  await prisma.$transaction((tx) =>
+    applyPurchaseToFinanceTx(tx, { ...row, version }, settlement, accountId),
+  );
   await recordHistory({
     companyId: actor.activeCompanyId,
     entityType: "COMPRA",
@@ -648,6 +714,7 @@ export async function createShoppingList(
   actor: Actor,
   input: { kind: "GENERAL" | "REFACCION"; supplierId?: string | null },
 ) {
+  assertCoordinationCanCreatePurchaseKind(actor, input.kind, "lista");
   if (input.supplierId) await supplierForPurchase(actor, input.supplierId);
   const folio = await allocateFolio(actor.activeCompanyId, "LC");
   return prisma.shoppingList.create({
@@ -823,7 +890,9 @@ export async function createPhaseOnePurchase(
     purchaseKind?: "GENERAL" | "REFACCION";
   },
 ) {
-  const refacciones = input.purchaseKind === "REFACCION";
+  const kindValue = input.purchaseKind === "REFACCION" ? "REFACCION" : "GENERAL";
+  assertCoordinationCanCreatePurchaseKind(actor, kindValue, input.order ? "oc" : "compra");
+  const refacciones = kindValue === "REFACCION";
   const lines = input.lines.length
     ? normalizedLines(input.lines, {
         requirePartNumber: refacciones,
@@ -849,42 +918,80 @@ export async function createPhaseOnePurchase(
   );
   const folio = await allocateFolio(actor.activeCompanyId, input.order ? "OC" : "COM");
   const authorized = input.order && (actor.role === "CEO" || actor.role === "ADMINISTRADOR");
-  return prisma.purchase.create({
-    data: {
-      folio,
-      companyId: actor.activeCompanyId,
-      kind: input.order ? "OC" : "COMPRA",
-      status: input.order ? (authorized ? "AUTORIZADA" : "PENDIENTE_AUTORIZACION") : "PENDIENTE_VALIDAR",
-      supplierId: finance.supplier.id,
-      currency: finance.supplier.currency,
-      expenseCategory: finance.expenseCategory,
-      expenseSubcategory: finance.expenseSubcategory,
-      expenseCategoryId: finance.expenseCategoryId,
-      expenseSubcategoryId: finance.expenseSubcategoryId,
-      paymentType: normalizeOperationalPaymentType(input.paymentType),
-      accountId: input.accountId ?? null,
-      purchaseDate: input.purchaseDate ?? null,
-      concept,
-      quantity: lines[0]?.quantity ?? 1,
-      amount,
-      authorizedAmount: authorized ? amount : null,
-      destination: "INVENTARIO",
-      requesterUserId: actor.userId,
-      lines: lines.length
-        ? {
-            create: lines.map((line) => ({
-              partNumber: line.partNumber,
-              description: line.description ?? "",
-              quantity: line.quantity,
-              unitPrice: line.unitPrice ?? null,
-              sourceType: line.sourceType ?? null,
-              sourceId: line.sourceId ?? null,
-            })),
-          }
-        : undefined,
-    },
-    include: { lines: true, supplier: true },
+  const normalizedPaymentType = normalizeOperationalPaymentType(input.paymentType);
+  const immediateProcess =
+    !input.order
+    && !refacciones
+    && isCoordinationGeneralOnlyPurchases(actor.role, actor.activeCompanyCode);
+  const immediateSettlement: "CONTADO" | "CREDITO" =
+    normalizedPaymentType === VENDOR_CREDIT_PAYMENT ? "CREDITO" : "CONTADO";
+
+  const created = await prisma.$transaction(async (tx) => {
+    const purchase = await tx.purchase.create({
+      data: {
+        folio,
+        companyId: actor.activeCompanyId,
+        kind: input.order ? "OC" : "COMPRA",
+        status: input.order ? (authorized ? "AUTORIZADA" : "PENDIENTE_AUTORIZACION") : "PENDIENTE_VALIDAR",
+        supplierId: finance.supplier.id,
+        currency: finance.supplier.currency,
+        expenseCategory: finance.expenseCategory,
+        expenseSubcategory: finance.expenseSubcategory,
+        expenseCategoryId: finance.expenseCategoryId,
+        expenseSubcategoryId: finance.expenseSubcategoryId,
+        paymentType: normalizedPaymentType,
+        accountId: input.accountId ?? null,
+        purchaseDate: input.purchaseDate ?? null,
+        concept,
+        quantity: lines[0]?.quantity ?? 1,
+        amount,
+        authorizedAmount: authorized ? amount : null,
+        destination: "INVENTARIO",
+        requesterUserId: actor.userId,
+        lines: lines.length
+          ? {
+              create: lines.map((line) => ({
+                partNumber: line.partNumber,
+                description: line.description ?? "",
+                quantity: line.quantity,
+                unitPrice: line.unitPrice ?? null,
+                sourceType: line.sourceType ?? null,
+                sourceId: line.sourceId ?? null,
+              })),
+            }
+          : undefined,
+      },
+      include: { lines: true, supplier: true },
+    });
+
+    if (!immediateProcess) return purchase;
+
+    await applyPurchaseToFinanceTx(
+      tx,
+      purchase,
+      immediateSettlement,
+      immediateSettlement === "CONTADO" ? (input.accountId ?? null) : null,
+    );
+    return tx.purchase.findUniqueOrThrow({
+      where: { id: purchase.id },
+      include: { lines: true, supplier: true },
+    });
   });
+
+  if (immediateProcess) {
+    await recordHistory({
+      companyId: actor.activeCompanyId,
+      entityType: "COMPRA",
+      entityId: created.id,
+      action: "PROCESO",
+      summary: immediateSettlement === "CONTADO"
+        ? `${created.folio} registrada y aplicada directamente a Finanzas (egreso).`
+        : `${created.folio} registrada y enviada directamente a CxP.`,
+      authorUserId: actor.userId,
+    });
+  }
+
+  return created;
 }
 
 export async function attachProof(actor: Actor, movementId: string, proofNote: string) {

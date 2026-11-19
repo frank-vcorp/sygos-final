@@ -16,6 +16,8 @@ export function PurchaseRegistrationModal({
   categories,
   accounts,
   allowQuickSupplier,
+  generalOnly = false,
+  triggerLabel = "Registrar compra",
   initiallyOpen = false,
   showTrigger = true,
   returnHref = "/compras",
@@ -24,6 +26,8 @@ export function PurchaseRegistrationModal({
   categories: ExpenseCategoryCatalogItem[];
   accounts: TreasuryAccountOption[];
   allowQuickSupplier: boolean;
+  generalOnly?: boolean;
+  triggerLabel?: string;
   initiallyOpen?: boolean;
   showTrigger?: boolean;
   returnHref?: string;
@@ -31,6 +35,7 @@ export function PurchaseRegistrationModal({
   const router = useRouter();
   const [open, setOpen] = useState(initiallyOpen);
   const [purchaseKind, setPurchaseKind] = useState<"GENERAL" | "REFACCION">("GENERAL");
+  const effectiveKind: "GENERAL" | "REFACCION" = generalOnly ? "GENERAL" : purchaseKind;
 
   function close() {
     setOpen(false);
@@ -39,44 +44,52 @@ export function PurchaseRegistrationModal({
 
   return (
     <>
-      {showTrigger ? <Button type="button" onClick={() => setOpen(true)}>Registrar compra</Button> : null}
-      <FormOverlayDialog open={open} onClose={close} title="Registrar compra" titleId="registrar-compra-title" wide>
+      {showTrigger ? <Button type="button" onClick={() => setOpen(true)}>{triggerLabel}</Button> : null}
+      <FormOverlayDialog open={open} onClose={close} title={generalOnly ? "Registrar compra no técnica" : "Registrar compra"} titleId="registrar-compra-title" wide>
         <p className="mb-4 text-sm leading-6 text-[var(--muted)]">
-          Registra una compra urgente ya realizada, sin requerimiento ni lista. La moneda se hereda del proveedor.
+          {generalOnly
+            ? "Registra una compra no técnica directa (general). Se aplicará directo a Finanzas o CxP según la forma de pago."
+            : "Registra una compra urgente ya realizada, sin requerimiento ni lista. La moneda se hereda del proveedor."}
         </p>
         <FormPanel action={phaseOnePurchaseAction} className="max-w-none">
-          <input type="hidden" name="purchaseKind" value={purchaseKind} />
+          <input type="hidden" name="purchaseKind" value={effectiveKind} />
           <FormSection title="Datos de la compra" description="Captura solo la información administrativa y financiera necesaria.">
             <div className="md:col-span-2">
               <SupplierPicker suppliers={suppliers} required allowQuickSupplier={allowQuickSupplier} />
             </div>
-            <Field label="Tipo de compra">
-              <select
-                name="purchaseKindSelector"
-                value={purchaseKind}
-                onChange={(event) => setPurchaseKind(event.target.value as "GENERAL" | "REFACCION")}
-                className={controlClass}
-              >
-                <option value="GENERAL">General</option>
-                <option value="REFACCION">Refacciones</option>
-              </select>
-            </Field>
+            {generalOnly ? (
+              <Field label="Tipo de compra">
+                <p className="py-2 text-sm font-medium text-[var(--ink)]">General (no técnica)</p>
+              </Field>
+            ) : (
+              <Field label="Tipo de compra">
+                <select
+                  name="purchaseKindSelector"
+                  value={effectiveKind}
+                  onChange={(event) => setPurchaseKind(event.target.value as "GENERAL" | "REFACCION")}
+                  className={controlClass}
+                >
+                  <option value="GENERAL">General</option>
+                  <option value="REFACCION">Refacciones</option>
+                </select>
+              </Field>
+            )}
             <Field label="Fecha de compra">
               <input name="purchaseDate" type="date" defaultValue={new Date().toISOString().slice(0, 10)} required className={controlClass} />
             </Field>
             <Field label="Monto" hint="Se guarda en la moneda configurada para el proveedor.">
               <MoneyInput name="amount" required min="0.01" />
             </Field>
-            <Field label="Descripción general" hint={purchaseKind === "REFACCION" ? "Sugerida para compras de refacciones; puedes ajustarla." : "Describe la compra para su registro administrativo."}>
+            <Field label="Descripción general" hint={effectiveKind === "REFACCION" ? "Sugerida para compras de refacciones; puedes ajustarla." : "Describe la compra para su registro administrativo."}>
               <input
-                key={purchaseKind}
+                key={effectiveKind}
                 name="concept"
                 required
-                defaultValue={purchaseKind === "REFACCION" ? "Compra de refacciones y componentes" : ""}
+                defaultValue={effectiveKind === "REFACCION" ? "Compra de refacciones y componentes" : ""}
                 className={controlClass}
               />
             </Field>
-            {purchaseKind === "REFACCION" ? (
+            {effectiveKind === "REFACCION" ? (
               <div className="md:col-span-2 rounded-lg border border-[var(--line)] bg-[var(--surface)] px-3 py-2 text-sm">
                 <span className="text-[var(--muted)]">Clasificación de egreso</span>
                 <strong className="ml-2">Producción y operación · Refacciones y componentes</strong>
@@ -97,7 +110,7 @@ export function PurchaseRegistrationModal({
               </div>
             </details>
           </FormSection>
-          <FormActions note="La compra quedará lista para el flujo administrativo existente.">
+          <FormActions note={generalOnly ? "La compra no técnica se registrará como procesada directamente en Finanzas o CxP." : "La compra quedará lista para el flujo administrativo existente."}>
             <Button type="submit">Guardar compra realizada</Button>
           </FormActions>
         </FormPanel>

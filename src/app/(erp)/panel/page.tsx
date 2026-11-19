@@ -7,6 +7,7 @@ import {
   SalesPanelServiciosSection,
 } from "@/components/sales-panel-bandeja";
 import { RequirementListSection } from "@/app/(erp)/compras/requerimientos/requirement-list-section";
+import { PurchaseRegistrationModal } from "@/components/purchase-registration-modal";
 import { ActionLink, Card, KpiCard, PageHeader, RecordLink, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { mapTreasuryAccountOptions, treasuryAccountSelect } from "@/lib/finance-accounts";
@@ -1120,6 +1121,7 @@ async function Sales({
 }
 
 async function Coordination({ companyId, code, vista }: { companyId: string; code: string; vista?: string }) {
+  const systron = code === "SYSTRON";
   const comprasPendientesHref = purchaseListHref({
     vista: "compras",
     q: "",
@@ -1129,7 +1131,7 @@ async function Coordination({ companyId, code, vista }: { companyId: string; cod
     proveedor: "",
     solicitante: "",
   });
-  const [invoices, remissions, payments, purchases, openPayables, payableSum] = await Promise.all([
+  const [invoices, remissions, payments, purchases, openPayables, payableSum, suppliers, categories, accounts] = await Promise.all([
     prisma.billingDocument.findMany({
       where: { companyId, status: "SOLICITADA", kind: { not: "REMISION" } },
       select: { id: true, folio: true, kind: true, technicalCaseId: true, quote: { select: { technicalCaseId: true } } },
@@ -1141,7 +1143,11 @@ async function Coordination({ companyId, code, vista }: { companyId: string; cod
       take: 20,
     }),
     prisma.payment.findMany({ where: { companyId, status: "PENDIENTE" }, orderBy: { createdAt: "asc" }, take: 20 }),
-    prisma.purchase.findMany({ where: { companyId, kind: "DIRECTA", status: "PENDIENTE_VALIDAR" }, take: 20 }),
+    prisma.purchase.findMany({
+      where: { companyId, kind: { in: ["DIRECTA", "COMPRA"] }, status: "PENDIENTE_VALIDAR" },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+    }),
     prisma.payable.findMany({
       where: { companyId, balance: { gt: 0 } },
       include: { supplier: true, document: true },
@@ -1149,7 +1155,21 @@ async function Coordination({ companyId, code, vista }: { companyId: string; cod
       take: 20,
     }),
     prisma.payable.aggregate({ where: { companyId, balance: { gt: 0 } }, _sum: { balance: true } }),
+    systron
+      ? prisma.supplier.findMany({ where: { companyId, active: true }, orderBy: { name: "asc" } })
+      : Promise.resolve([]),
+    systron
+      ? prisma.expenseCategory.findMany({
+          where: { companyId, active: true },
+          include: { subcategories: { where: { active: true } } },
+          orderBy: { name: "asc" },
+        })
+      : Promise.resolve([]),
+    systron
+      ? prisma.financeAccount.findMany({ where: { companyId, active: true }, select: treasuryAccountSelect, orderBy: { name: "asc" } })
+      : Promise.resolve([]),
   ]);
+  const treasuryAccounts = mapTreasuryAccountOptions(accounts);
   const billingServiceLinkMap = await batchLoadBillingDocumentServiceLinks([
     ...invoices.map((row) => pickBillingDocumentTechnicalCaseId(row)),
     ...remissions.map((row) => pickBillingDocumentTechnicalCaseId(row)),
@@ -1171,7 +1191,23 @@ async function Coordination({ companyId, code, vista }: { companyId: string; cod
   ];
   return (
     <>
-      <PageHeader title="Panel de coordinación" subtitle={subtitle} />
+      <PageHeader
+        title="Panel de coordinación"
+        subtitle={subtitle}
+        action={
+          systron ? (
+            <PurchaseRegistrationModal
+              triggerLabel="Nueva compra no técnica"
+              generalOnly
+              suppliers={suppliers.map((supplier) => ({ id: supplier.id, name: `${supplier.name} · ${supplier.currency}` }))}
+              categories={categories}
+              accounts={treasuryAccounts}
+              allowQuickSupplier={can("COORDINACION_ADMINISTRACION", "supplier.operate", code)}
+              returnHref="/panel?vista=pendientes"
+            />
+          ) : null
+        }
+      />
       {vista === "accesos" ? (
         <section className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {quickLinks.map((link) => (
@@ -1228,7 +1264,7 @@ async function loadCoordinationFinanceSnapshot(companyId: string) {
       take: 12,
     }),
     prisma.payment.findMany({ where: { companyId, status: "PENDIENTE" }, orderBy: { createdAt: "asc" }, take: 12 }),
-    prisma.purchase.findMany({ where: { companyId, kind: "DIRECTA", status: "PENDIENTE_VALIDAR" }, take: 12 }),
+    prisma.purchase.findMany({ where: { companyId, kind: { in: ["DIRECTA", "COMPRA"] }, status: "PENDIENTE_VALIDAR" }, take: 12 }),
     prisma.payable.findMany({
       where: { companyId, balance: { gt: 0 } },
       include: { supplier: true, document: true },

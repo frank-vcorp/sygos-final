@@ -5,7 +5,7 @@ import { ShoppingListFilters } from "./shopping-list-filters";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { shoppingListHref } from "@/lib/purchase-filter-links";
-import { shoppingListStatusFilter } from "@/lib/purchases";
+import { isCoordinationGeneralOnlyPurchases, shoppingListStatusFilter } from "@/lib/purchases";
 import { shoppingListKindLabel } from "@/lib/shopping-list-display";
 import { requireCompany } from "@/lib/session";
 
@@ -36,6 +36,7 @@ export default async function ListasComprasPage({ searchParams }: { searchParams
           <ShoppingListCreateModal
             suppliers={suppliers}
             allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)}
+            generalOnly={isCoordinationGeneralOnlyPurchases(session.role, session.activeCompanyCode)}
           />
         }
       />

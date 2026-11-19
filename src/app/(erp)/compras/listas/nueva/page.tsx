@@ -3,6 +3,7 @@ import { ShoppingListCreateModal } from "../shopping-list-create-modal";
 import { PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
+import { isCoordinationGeneralOnlyPurchases } from "@/lib/purchases";
 import { requireCompany } from "@/lib/session";
 
 export default async function NuevaListaCompraPage() {
@@ -24,6 +25,7 @@ export default async function NuevaListaCompraPage() {
       <ShoppingListCreateModal
         suppliers={suppliers}
         allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)}
+        generalOnly={isCoordinationGeneralOnlyPurchases(session.role, session.activeCompanyCode)}
         initiallyOpen
         showTrigger={false}
         returnHref="/compras/listas"

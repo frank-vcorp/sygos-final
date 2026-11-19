@@ -3,6 +3,7 @@ import { PurchaseRegistrationModal } from "@/components/purchase-registration-mo
 import { PageHeader } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
+import { isCoordinationGeneralOnlyPurchases } from "@/lib/purchases";
 import { requireCompany } from "@/lib/session";
 import { mapTreasuryAccountOptions, treasuryAccountSelect } from "@/lib/finance-accounts";
 
@@ -28,6 +29,7 @@ export default async function NuevaCompraPage() {
         categories={categories}
         accounts={treasuryAccounts}
         allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)}
+        generalOnly={isCoordinationGeneralOnlyPurchases(session.role, session.activeCompanyCode)}
         initiallyOpen
         showTrigger={false}
         returnHref="/compras"

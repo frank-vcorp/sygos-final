@@ -8,6 +8,7 @@ import { money } from "@/lib/money";
 import { coordFilterChips, coordPageSubtitle, coordPageTitle, coordUsesSidebarNav } from "@/lib/coordination-ui";
 import { can } from "@/lib/permissions";
 import { purchaseListHref } from "@/lib/purchase-filter-links";
+import { isCoordinationGeneralOnlyPurchases } from "@/lib/purchases";
 import { requireCompany } from "@/lib/session";
 import { mapTreasuryAccountOptions, treasuryAccountSelect } from "@/lib/finance-accounts";
 
@@ -33,12 +34,15 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
   const where = view === "autorizar"
     ? { kind: "OC", status: "PENDIENTE_AUTORIZACION" }
     : view === "procesar"
-      ? { OR: [{ kind: "DIRECTA", status: "PENDIENTE_VALIDAR" }, { kind: "OC", status: "AUTORIZADA" }] }
+      ? { OR: [{ kind: { in: ["DIRECTA", "COMPRA"] }, status: "PENDIENTE_VALIDAR" }, { kind: "OC", status: "AUTORIZADA" }] }
       : view === "oc"
         ? { kind: "OC", status: estadoCompras ?? { not: "ELIMINADA" } }
         : view === "legacy"
           ? { kind: "DIRECTA", status: { not: "ELIMINADA" } }
-          : { kind: "COMPRA", status: estadoCompras ?? { not: "ELIMINADA" } };
+          : {
+              kind: estadoCompras === "PENDIENTE_VALIDAR" ? { in: ["COMPRA", "DIRECTA"] } : "COMPRA",
+              status: estadoCompras && estadoCompras !== "TODOS" ? estadoCompras : { not: "ELIMINADA" },
+            };
   const rows = await prisma.purchase.findMany({
     where: {
       companyId: session.activeCompanyId,
@@ -82,6 +86,7 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
     solicitante: omit === "solicitante" ? undefined : solicitante,
   });
   const sidebarNav = coordUsesSidebarNav(session.role);
+  const generalOnly = isCoordinationGeneralOnlyPurchases(session.role, session.activeCompanyCode);
   const comprasTitle = view === "oc" ? "Órdenes de compra" : "Compras";
   return (
     <>
@@ -101,6 +106,7 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
                 categories={categories}
                 accounts={treasuryAccounts}
                 allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)}
+                generalOnly={generalOnly}
                 initiallyOpen={nueva === "1"}
                 returnHref={filters()}
               />
@@ -111,6 +117,7 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
               categories={categories}
               accounts={treasuryAccounts}
               allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)}
+              generalOnly={generalOnly}
               returnHref={filters()}
             />
             ) : null}
@@ -134,7 +141,7 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
       <ActiveFilters
         items={[
           ...coordFilterChips(sidebarNav, view !== "compras" ? [{ label: viewLabel, clearHref: filters("vista") }] : []),
-          ...((view === "compras" || view === "oc") && estadoCompras ? [{ label: STATUS[estadoCompras] ?? estadoCompras, clearHref: filters("estado") }] : []),
+          ...((view === "compras" || view === "oc") && estadoCompras ? [{ label: estadoCompras === "TODOS" ? "Todas" : (STATUS[estadoCompras] ?? estadoCompras), clearHref: filters("estado") }] : []),
           ...(fecha ? [{ label: `Fecha: ${fecha}`, clearHref: filters("fecha") }] : []),
           ...(proveedor ? [{ label: `Proveedor: ${suppliers.find((supplier) => supplier.id === proveedor)?.name ?? "Seleccionado"}`, clearHref: filters("proveedor") }] : []),
           ...(categoria ? [{ label: `Categoría: ${categories.find((category) => category.id === categoria)?.name ?? "Seleccionada"}`, clearHref: filters("categoria") }] : []),

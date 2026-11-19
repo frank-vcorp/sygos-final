@@ -46,7 +46,14 @@ export default async function CompraPage({ params }: { params: Promise<{ id: str
   if (!row) notFound();
   const accounts = mapTreasuryAccountOptions(
     await prisma.financeAccount.findMany({
-      where: { companyId: session.activeCompanyId, active: true, kind: { notIn: financeAccountKindsForFilter("CREDITO") } },
+      where: {
+        companyId: session.activeCompanyId,
+        active: true,
+        OR: [
+          { kind: { notIn: financeAccountKindsForFilter("CREDITO") } },
+          ...(row.accountId ? [{ id: row.accountId }] : []),
+        ],
+      },
       orderBy: { name: "asc" },
     }),
   );
@@ -55,7 +62,9 @@ export default async function CompraPage({ params }: { params: Promise<{ id: str
   const requester = await prisma.user.findUnique({ where: { id: row.requesterUserId }, select: { name: true } });
   const canManage = can(session.role, "finance.manage", session.activeCompanyCode);
   const canAuthorize = can(session.role, "purchase.authorize", session.activeCompanyCode);
-  const ready = (row.kind === "DIRECTA" && row.status === "PENDIENTE_VALIDAR") || (row.kind === "OC" && row.status === "AUTORIZADA");
+  const ready =
+    ((row.kind === "DIRECTA" || row.kind === "COMPRA") && row.status === "PENDIENTE_VALIDAR")
+    || (row.kind === "OC" && row.status === "AUTORIZADA");
 
   let primaryAction: React.ReactNode = null;
   if (row.kind === "OC" && row.status === "PENDIENTE_AUTORIZACION" && canAuthorize) {
@@ -148,13 +157,13 @@ export default async function CompraPage({ params }: { params: Promise<{ id: str
           <input type="hidden" name="version" value={row.version} />
           <FormSection title="Procesar compra" columns={1}>
             <Field label="Forma">
-              <select name="settlement" className={controlClass} defaultValue="CONTADO">
+              <select name="settlement" className={controlClass} defaultValue={row.paymentType === "CREDITO" ? "CREDITO" : "CONTADO"}>
                 <option value="CONTADO">Contado, un egreso</option>
                 <option value="CREDITO">Crédito, una cuenta por pagar</option>
               </select>
             </Field>
             <Field label="Cuenta, si es contado">
-              <select name="accountId" className={controlClass} defaultValue={accounts[0]?.id ?? ""}>
+              <select name="accountId" className={controlClass} defaultValue={row.accountId ?? accounts[0]?.id ?? ""}>
                 {accounts.map((account) => <option key={account.id} value={account.id}>{account.name}</option>)}
               </select>
             </Field>

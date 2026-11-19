@@ -9,7 +9,7 @@ import { optionalText, parseVersion, requiredText } from "@/lib/form";
 import { moneyFromForm } from "@/lib/money";
 import { partRequestShortfall } from "@/lib/part-inventory";
 import { can, type Action } from "@/lib/permissions";
-import { addRequirementToShoppingList, cancelOrder, changeAuthorizedOrder, convertShoppingListToPurchase, createPhaseOnePurchase, createRequirement, createShoppingList, decideOrder, discardDirectPurchase, editDirectPurchase, editRequirement, processPurchase, purchaseRequirement, registerDirectPurchase, registerOrder, removeShoppingListLine, requirementPartNumberRequired, setRequirementStatus, setShoppingListSupplier, updateShoppingListLine } from "@/lib/purchases";
+import { addRequirementToShoppingList, assertCoordinationCanCreatePurchaseKind, cancelOrder, changeAuthorizedOrder, convertShoppingListToPurchase, createPhaseOnePurchase, createRequirement, createShoppingList, decideOrder, discardDirectPurchase, editDirectPurchase, editRequirement, processPurchase, purchaseRequirement, registerDirectPurchase, registerOrder, removeShoppingListLine, requirementPartNumberRequired, setRequirementStatus, setShoppingListSupplier, updateShoppingListLine } from "@/lib/purchases";
 import { requireCompany } from "@/lib/session";
 
 async function guard(action: Action) {
@@ -168,6 +168,7 @@ export async function createRequirementAction(
       throw new Error("No tienes permiso para crear requerimientos en esta empresa.");
     }
     const kind = formData.get("kind") === "REFACCION" ? "REFACCION" : "GENERAL";
+    assertCoordinationCanCreatePurchaseKind(session, kind, "requerimiento");
     if (kind === "REFACCION" && !can(session.role, "purchase.requirement.refaccion", session.activeCompanyCode)) {
       throw new Error("Solo puedes crear requerimientos generales.");
     }
@@ -279,6 +280,7 @@ export async function phaseOnePurchaseAction(formData: FormData) {
     const session = await guard("purchase.operate");
     const order = formData.get("order") === "si";
     const purchaseKind = formData.get("purchaseKind") === "REFACCION" ? "REFACCION" : "GENERAL";
+    assertCoordinationCanCreatePurchaseKind(session, purchaseKind, order ? "oc" : "compra");
     const lines = phaseOneLinesFromForm(formData, order);
     const purchaseDateRaw = optionalText(formData.get("purchaseDate"));
     const purchase = await createPhaseOnePurchase(session, {
@@ -294,7 +296,12 @@ export async function phaseOnePurchaseAction(formData: FormData) {
       concept: optionalText(formData.get("concept")) ?? undefined,
       purchaseKind,
     });
-    await setFlash({ tone: "ok", message: `${purchase.folio} creada.` });
+    await setFlash({
+      tone: "ok",
+      message: purchase.status === "PROCESADA"
+        ? `${purchase.folio} registrada y aplicada a ${purchase.settlement === "CREDITO" ? "CxP" : "Finanzas"}.`
+        : `${purchase.folio} creada.`,
+    });
     redirect(`/compras/${purchase.id}`);
   } catch (error) {
     await setFlash({ tone: "error", message: bubble(error) });
@@ -500,8 +507,10 @@ export async function createShoppingListAction(
   "use server";
   try {
     const session = await guard("purchase.operate");
+    const kind = formData.get("kind") === "REFACCION" ? "REFACCION" : "GENERAL";
+    assertCoordinationCanCreatePurchaseKind(session, kind, "lista");
     const list = await createShoppingList(session, {
-      kind: formData.get("kind") === "REFACCION" ? "REFACCION" : "GENERAL",
+      kind,
       supplierId: optionalText(formData.get("supplierId")),
     });
     await setFlash({ tone: "ok", message: `${list.folio} creada.` });

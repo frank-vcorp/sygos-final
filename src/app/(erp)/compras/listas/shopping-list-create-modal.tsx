@@ -13,12 +13,14 @@ const initialState: CreateShoppingListState = { status: "idle" };
 export function ShoppingListCreateModal({
   suppliers,
   allowQuickSupplier,
+  generalOnly = false,
   initiallyOpen = false,
   showTrigger = true,
   returnHref = "/compras/listas",
 }: {
   suppliers: PickerOption[];
   allowQuickSupplier: boolean;
+  generalOnly?: boolean;
   initiallyOpen?: boolean;
   showTrigger?: boolean;
   returnHref?: string;
@@ -40,7 +42,7 @@ export function ShoppingListCreateModal({
           <Button type="button" onClick={() => setOpen(true)}>Nueva lista</Button>
         </div>
       ) : null}
-      {open ? <ShoppingListCreateDialog suppliers={suppliers} allowQuickSupplier={allowQuickSupplier} onClose={close} /> : null}
+      {open ? <ShoppingListCreateDialog suppliers={suppliers} allowQuickSupplier={allowQuickSupplier} generalOnly={generalOnly} onClose={close} /> : null}
     </>
   );
 }
@@ -48,10 +50,12 @@ export function ShoppingListCreateModal({
 function ShoppingListCreateDialog({
   suppliers,
   allowQuickSupplier,
+  generalOnly,
   onClose,
 }: {
   suppliers: PickerOption[];
   allowQuickSupplier: boolean;
+  generalOnly: boolean;
   onClose: () => void;
 }) {
   const [state, formAction, pending] = useActionState(createShoppingListAction, initialState);
@@ -67,13 +71,22 @@ function ShoppingListCreateDialog({
   return (
     <FormOverlayDialog open onClose={onClose} title="Nueva lista de compras" titleId="shopping-list-create-dialog" wide>
       <form action={formAction}>
-        <FormSection title="Nueva lista" description="Elige si concentrarás refacciones o compras generales.">
-          <Field label="Tipo de lista">
-            <select name="kind" defaultValue="GENERAL" className={controlClass}>
-              <option value="GENERAL">Generales</option>
-              <option value="REFACCION">Refacciones</option>
-            </select>
-          </Field>
+        <FormSection title="Nueva lista" description={generalOnly ? "Concentra requerimientos generales (no técnicos)." : "Elige si concentrarás refacciones o compras generales."}>
+          {generalOnly ? (
+            <>
+              <input type="hidden" name="kind" value="GENERAL" />
+              <Field label="Tipo de lista">
+                <p className="py-2 text-sm font-medium text-[var(--ink)]">Generales</p>
+              </Field>
+            </>
+          ) : (
+            <Field label="Tipo de lista">
+              <select name="kind" defaultValue="GENERAL" className={controlClass}>
+                <option value="GENERAL">Generales</option>
+                <option value="REFACCION">Refacciones</option>
+              </select>
+            </Field>
+          )}
           <div className="md:col-span-2">
             <SupplierPicker suppliers={suppliers} allowQuickSupplier={allowQuickSupplier} allowEmpty emptyLabel="Sin proveedor por ahora" />
           </div>

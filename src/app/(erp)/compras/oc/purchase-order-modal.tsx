@@ -13,6 +13,7 @@ export function PurchaseOrderModal({
   categories,
   accounts,
   allowQuickSupplier,
+  generalOnly = false,
   initiallyOpen = false,
   showTrigger = true,
   returnHref = "/compras?vista=oc",
@@ -21,6 +22,7 @@ export function PurchaseOrderModal({
   categories: ExpenseCategoryCatalogItem[];
   accounts: import("@/components/operational-payment-fields").TreasuryAccountOption[];
   allowQuickSupplier: boolean;
+  generalOnly?: boolean;
   initiallyOpen?: boolean;
   showTrigger?: boolean;
   returnHref?: string;
@@ -50,6 +52,7 @@ export function PurchaseOrderModal({
           categories={categories}
           accounts={accounts}
           allowQuickSupplier={allowQuickSupplier}
+          generalOnly={generalOnly}
         />
       </FormOverlayDialog>
     </>
