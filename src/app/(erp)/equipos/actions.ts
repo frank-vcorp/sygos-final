@@ -5,7 +5,7 @@ import { MOVEMENTS, type MovementKind } from "@/lib/custody";
 import { cancelMovement, createAttention, createEqui, createMot, registerMovement } from "@/lib/equipment-service";
 import { setFlash } from "@/lib/flash";
 import { clientIdFromForm, supplierIdFromForm } from "@/lib/form-quick-entities";
-import { optionalText, parseVersion, requiredText } from "@/lib/form";
+import { optionalText, parseMexicoDateTimeInput, parseVersion, requiredText } from "@/lib/form";
 import { can, type Action } from "@/lib/permissions";
 import { isReparacionExpressAttentionType } from "@/lib/priorities";
 import { requireCompany } from "@/lib/session";
@@ -20,11 +20,7 @@ async function guard(action: Action) {
 }
 
 function whenOf(value: FormDataEntryValue | null) {
-  const text = optionalText(value);
-  if (!text) return new Date();
-  const date = new Date(text);
-  if (Number.isNaN(date.getTime())) throw new Error("La fecha no es válida.");
-  return date;
+  return parseMexicoDateTimeInput(value) ?? new Date();
 }
 
 export async function createEquiAction(formData: FormData) {
@@ -90,6 +86,11 @@ export async function createAttentionAction(formData: FormData) {
   try {
     const session = await guard("attention.create");
     const attentionType = requiredText(formData.get("attentionType"), "Tipo de atención");
+    const allowOrderOverrides = session.role !== "VENTAS";
+    const createdAt = allowOrderOverrides ? parseMexicoDateTimeInput(formData.get("createdAt")) : null;
+    const sellerUserId = allowOrderOverrides && formData.has("sellerUserId")
+      ? (optionalText(formData.get("sellerUserId")) ?? null)
+      : undefined;
     await createAttention(session, {
       equipmentId: requiredText(formData.get("equipmentId"), "Equipo"),
       attentionType,
@@ -100,6 +101,9 @@ export async function createAttentionAction(formData: FormData) {
       antecedent: optionalText(formData.get("antecedent")),
       deliveryInstructions: optionalText(formData.get("deliveryInstructions")),
       originalCaseId: optionalText(formData.get("originalCaseId")),
+      sellerUserId,
+      legacyFolio: optionalText(formData.get("legacyFolio")),
+      createdAt,
       version: parseVersion(formData.get("version")),
     });
     await setFlash({ tone: "ok", message: "Atención creada. El SLA inicia con la recepción física." });

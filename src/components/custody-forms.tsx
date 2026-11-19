@@ -23,6 +23,11 @@ export function AttentionForm({
   version,
   priorities,
   repairs,
+  sellers = [],
+  defaultSellerUserId = "",
+  canSelectSeller = false,
+  canEditOrderDate = false,
+  defaultCreatedAt = "",
   variant = "card",
 }: {
   equipmentId: string;
@@ -30,8 +35,14 @@ export function AttentionForm({
   version: number;
   priorities: PriorityRow[];
   repairs: Array<{ id: string; folio: string }>;
+  sellers?: Array<{ id: string; name: string }>;
+  defaultSellerUserId?: string;
+  canSelectSeller?: boolean;
+  canEditOrderDate?: boolean;
+  defaultCreatedAt?: string;
   variant?: "card" | "plain";
 }) {
+  const initialSellerId = sellers.some((seller) => seller.id === defaultSellerUserId) ? defaultSellerUserId : "";
   const fields = (
     <>
       <input type="hidden" name="equipmentId" value={equipmentId} />
@@ -56,6 +67,24 @@ export function AttentionForm({
             </optgroup>
           ))}
         </select>
+      </Field>
+      {canSelectSeller ? (
+        <Field label="Vendedor" hint="Por defecto toma el vendedor del cliente.">
+          <select name="sellerUserId" defaultValue={initialSellerId} className={controlClass}>
+            <option value="">Sin vendedor asignado</option>
+            {sellers.map((seller) => (
+              <option key={seller.id} value={seller.id}>{seller.name}</option>
+            ))}
+          </select>
+        </Field>
+      ) : null}
+      {canEditOrderDate ? (
+        <Field label="Fecha de creación de orden" hint="Opcional. Por defecto usa la fecha actual.">
+          <input name="createdAt" type="datetime-local" defaultValue={defaultCreatedAt} className={controlClass} />
+        </Field>
+      ) : null}
+      <Field label="Folio del sistema anterior" hint="Opcional. Referencia del folio histórico.">
+        <input name="legacyFolio" placeholder="Ej. OS-1234" className={controlClass} />
       </Field>
       <Field label="Falla reportada"><textarea name="reportedFault" required rows={3} className={controlClass} /></Field>
       <Field label="Reparación de origen" hint="Obligatoria en Diagnóstico de Garantía. Debe estar terminada, pagada y dentro de seis meses desde su salida.">
@@ -123,6 +152,7 @@ export function MovementForm({
     clientId: string;
     clientName: string;
     clientIsSystem?: boolean;
+    defaultOccurredAt?: string;
   };
 }) {
   const movements = restrictMovements ?? allowedMovements(kind, custody);
@@ -154,6 +184,9 @@ export function MovementForm({
           <div><dt className="text-[var(--muted)]">Falla reportada</dt><dd>{receiptPreset.reportedFault}</dd></div>
           <div><dt className="text-[var(--muted)]">Movimiento</dt><dd>{MOVEMENT_LABEL[receiptPreset.movement]}</dd></div>
         </dl>
+        <Field label="Fecha y hora de entrada" hint="Prellenada con la fecha de creación de la atención cuando existe; puedes ajustarla.">
+          <input name="occurredAt" type="datetime-local" defaultValue={receiptPreset.defaultOccurredAt} className={controlClass} />
+        </Field>
       </>
     );
     if (variant === "card") {

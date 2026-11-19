@@ -20,6 +20,7 @@ type AttentionSlice = {
   slaStartedAt: Date | null;
   attentionType: string;
   sellerUserId: string | null;
+  legacyFolio?: string | null;
   technicalCases: TechnicalCaseSlice[];
 };
 
@@ -36,6 +37,7 @@ export type AlmacenBandejaRow = {
   clientIsSystem: boolean;
   physical: StackedStatus;
   sellerName: string | null;
+  legacyFolio?: string | null;
 };
 
 export function mapEquipmentToAlmacenRow(
@@ -93,5 +95,6 @@ export function mapEquipmentToAlmacenRow(
     clientIsSystem: options.hideClient ? true : equipment.client.isSystem,
     physical: physicalStatusFromCustody(equipment.custody),
     sellerName: null,
+    legacyFolio: attention?.legacyFolio ?? null,
   };
 }

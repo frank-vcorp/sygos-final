@@ -7,6 +7,7 @@ export async function recordHistory(input: {
   action: string;
   summary: string;
   authorUserId?: string | null;
+  createdAt?: Date;
 }) {
   await prisma.functionalHistory.create({
     data: {
@@ -16,6 +17,7 @@ export async function recordHistory(input: {
       action: input.action,
       summary: input.summary,
       authorUserId: input.authorUserId ?? null,
+      ...(input.createdAt ? { createdAt: input.createdAt } : {}),
     },
   });
 }

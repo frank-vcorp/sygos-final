@@ -8,7 +8,14 @@ import { ServiceEquipmentPicker, type ServiceEquipmentOption } from "@/component
 import { Button, controlClass, Field, FormActions, FormBlock, FormPanel } from "@/components/ui";
 
 type PriorityOption = DiagnosisPriorityOption;
-type RepairOption = { id: string; folio: string };
+type RepairOption = { id: string; folio: string; clientOwnerUserId?: string | null };
+type ClientOption = { id: string; name: string; ownerUserId?: string | null };
+type SellerOption = { id: string; name: string };
+
+function matchingSellerId(ownerUserId: string | null | undefined, sellers: SellerOption[]) {
+  if (!ownerUserId) return "";
+  return sellers.some((seller) => seller.id === ownerUserId) ? ownerUserId : "";
+}
 
 export function ServiceStartForm({
   action,
@@ -21,6 +28,11 @@ export function ServiceStartForm({
   models,
   catalogByKind,
   repairs,
+  sellers = [],
+  canSelectSeller = false,
+  canEditOrderDate = false,
+  canConfirmPhysicalReceipt = false,
+  defaultCreatedAt = "",
   defaultClientId,
   companyCode,
   allowQuickClient,
@@ -31,7 +43,7 @@ export function ServiceStartForm({
 }: {
   action: (formData: FormData) => void | Promise<void>;
   attentionType: string;
-  clients: Array<{ id: string; name: string }>;
+  clients: ClientOption[];
   equipment: ServiceEquipmentOption[];
   priorities: PriorityOption[];
   types: string[];
@@ -39,6 +51,11 @@ export function ServiceStartForm({
   models: Array<{ type: string; brand: string; model: string }>;
   catalogByKind?: EquipmentCatalogByKind;
   repairs: RepairOption[];
+  sellers?: SellerOption[];
+  canSelectSeller?: boolean;
+  canEditOrderDate?: boolean;
+  canConfirmPhysicalReceipt?: boolean;
+  defaultCreatedAt?: string;
   defaultClientId: string;
   companyCode: string;
   allowQuickClient: boolean;
@@ -48,11 +65,26 @@ export function ServiceStartForm({
   hidePriority?: boolean;
 }) {
   const [clientId, setClientId] = useState(defaultClientId);
+  const [sellerUserId, setSellerUserId] = useState(() => {
+    const initialClient = clients.find((c) => c.id === defaultClientId);
+    return matchingSellerId(initialClient?.ownerUserId, sellers);
+  });
   const [equipmentKind, setEquipmentKind] = useState<"EQUI" | "MOT">(quickEquipmentKinds?.[0] ?? "EQUI");
   const visiblePriorities = useMemo(
     () => (attentionType === "DIAGNOSTICO" ? filterDiagnosisPrioritiesForEquipment(priorities, companyCode, equipmentKind) : priorities),
     [attentionType, priorities, companyCode, equipmentKind],
   );
+
+  function handleClientChange(nextClientId: string) {
+    setClientId(nextClientId);
+    const selected = clients.find((c) => c.id === nextClientId);
+    setSellerUserId(matchingSellerId(selected?.ownerUserId, sellers));
+  }
+
+  function handleRepairChange(nextRepairId: string) {
+    const repair = repairs.find((r) => r.id === nextRepairId);
+    if (repair) setSellerUserId(matchingSellerId(repair.clientOwnerUserId, sellers));
+  }
 
   return (
     <FormPanel action={action} className="mx-auto max-w-6xl">
@@ -71,7 +103,7 @@ export function ServiceStartForm({
               defaultClientId={defaultClientId}
               allowQuickClient={allowQuickClient}
               extendedContact={false}
-              onClientChange={setClientId}
+              onClientChange={handleClientChange}
             />
           )}
           <ServiceEquipmentPicker
@@ -102,13 +134,57 @@ export function ServiceStartForm({
               </select>
             </Field>
           )}
+          {canSelectSeller ? (
+            <Field label="Vendedor" hint="Por defecto usa el vendedor asignado al cliente; puedes elegir otro vendedor activo.">
+              <select
+                name="sellerUserId"
+                value={sellerUserId}
+                onChange={(event) => setSellerUserId(event.target.value)}
+                className={controlClass}
+              >
+                <option value="">Sin vendedor asignado</option>
+                {sellers.map((seller) => (
+                  <option key={seller.id} value={seller.id}>{seller.name}</option>
+                ))}
+              </select>
+            </Field>
+          ) : null}
+          {canEditOrderDate ? (
+            <Field label="Fecha de creación de orden" hint="Opcional. Por defecto usa la fecha y hora actual.">
+              <input
+                name="createdAt"
+                type="datetime-local"
+                defaultValue={defaultCreatedAt}
+                className={controlClass}
+              />
+            </Field>
+          ) : null}
+          {canConfirmPhysicalReceipt && equipmentKind === "EQUI" ? (
+            <label className="flex items-start gap-2.5 rounded-xl border border-[var(--line)] bg-[#f8fbfd] px-3.5 py-3 text-sm">
+              <input
+                type="checkbox"
+                name="confirmPhysicalReceipt"
+                value="si"
+                className="mt-1 h-4 w-4 rounded border-[#cbd8e6] text-[var(--accent)]"
+              />
+              <span>
+                <span className="block font-medium text-[var(--ink)]">Confirmar ingreso físico al taller con esta misma fecha</span>
+                <span className="mt-0.5 block text-xs text-[var(--muted)]">
+                  Registra la entrada en almacén (ENT) e inicia el SLA y el folio técnico usando la fecha de creación indicada arriba.
+                </span>
+              </span>
+            </label>
+          ) : null}
+          <Field label="Folio del sistema anterior" hint="Opcional. Referencia del folio histórico; Sygos generará su propio folio consecutivo.">
+            <input name="legacyFolio" placeholder="Ej. OS-1234" className={controlClass} />
+          </Field>
           <Field label="Falla reportada" hint="Describe el síntoma o problema que reporta el cliente.">
             <textarea name="reportedFault" required rows={4} className={controlClass} />
           </Field>
           {warranty ? (
             <>
               <Field label="Reparación pagada de origen">
-                <select name="originalCaseId" required className={controlClass}>
+                <select name="originalCaseId" required className={controlClass} onChange={(event) => handleRepairChange(event.target.value)}>
                   <option value="">Selecciona</option>
                   {repairs.map((repair) => <option key={repair.id} value={repair.id}>{repair.folio}</option>)}
                 </select>

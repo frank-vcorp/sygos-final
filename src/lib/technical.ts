@@ -70,7 +70,7 @@ export async function ensureOsStubForDiagnosis(
     originalCaseId: string | null;
     serviceNumber: number | null;
   },
-  dxCase: { id: string; folio: string },
+  dxCase: { id: string; folio: string; createdAt?: Date },
   tx: ServiceTx,
 ) {
   let n = attention.serviceNumber ?? serviceCycleNumberFromFolio(dxCase.folio);
@@ -116,6 +116,7 @@ export async function ensureOsStubForDiagnosis(
       originalCaseId: attention.originalCaseId,
       slaDueAt: null,
       quotePending: true,
+      createdAt: dxCase.createdAt,
     },
   });
 }
@@ -187,6 +188,7 @@ export async function openCase(attentionId: string, receivedAt: Date) {
           ? null
           : addBusinessDays(receivedAt, attention.prioritySlaMaxDays),
         quotePending: isReparacionExpressAttentionType(attention.attentionType),
+        createdAt: receivedAt,
       },
     });
     if (attention.initialLog?.trim() && attention.createdByUserId) {
@@ -195,6 +197,7 @@ export async function openCase(attentionId: string, receivedAt: Date) {
           caseId: technicalCase.id,
           body: attention.initialLog.trim(),
           authorUserId: attention.createdByUserId,
+          createdAt: receivedAt,
         },
       });
       await tx.attention.update({ where: { id: attention.id }, data: { initialLog: null } });
@@ -222,6 +225,7 @@ export async function openCase(attentionId: string, receivedAt: Date) {
           originalCaseId: attention.originalCaseId,
           slaDueAt: null,
           quotePending: true,
+          createdAt: receivedAt,
         },
       });
     }
@@ -234,6 +238,7 @@ export async function openCase(attentionId: string, receivedAt: Date) {
     action: "ALTA",
     summary: `${technicalCase.folio} abierta y en espera de asignación técnica.`,
     authorUserId: attention.createdByUserId,
+    createdAt: receivedAt,
   });
   if (isReparacionExpressAttentionType(attention.attentionType) && attention.createdByUserId) {
     const { ensureQuoteFromCase } = await import("./quotes");
@@ -272,6 +277,7 @@ async function openDiagnosisOnExpressAttention(
         originalCaseId: attention.originalCaseId,
         slaDueAt: addBusinessDays(receivedAt, attention.prioritySlaMaxDays),
         quotePending: false,
+        createdAt: receivedAt,
       },
     });
     const owner = await tx.attention.findUnique({
@@ -290,6 +296,7 @@ async function openDiagnosisOnExpressAttention(
     action: "ALTA",
     summary: `${technicalCase.folio} abierta en la misma atención Express.`,
     authorUserId: attention.createdByUserId,
+    createdAt: receivedAt,
   });
   return technicalCase;
 }

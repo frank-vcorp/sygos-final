@@ -4,6 +4,8 @@ import { ServiceStartForm } from "@/components/service-start-form";
 import { PageHeader } from "@/components/ui";
 import { loadEquipmentCatalogByKind } from "@/lib/catalog";
 import { prisma } from "@/lib/db";
+import { listCompanySellers } from "@/lib/equipment-service";
+import { formatMexicoDateTimeLocalValue } from "@/lib/form";
 import { can } from "@/lib/permissions";
 import { loadDiagnosisPriorityOptions } from "@/lib/diagnosis-priorities";
 import { ATTENTION_LABEL, type AttentionType } from "@/lib/priorities";
@@ -29,10 +31,12 @@ export default async function NuevoServicioPage({
   const attentionType = TYPES[tipo as keyof typeof TYPES];
   if (!attentionType) notFound();
   const warranty = attentionType === "DIAGNOSTICO_GARANTIA";
-  const [clients, equipment, priorities, catalog, repairs] = await Promise.all([
+  const allowOrderOverrides = session.role !== "VENTAS";
+  const [clients, equipment, priorities, catalog, repairs, sellers] = await Promise.all([
     prisma.client.findMany({
       where: { companyId: session.activeCompanyId, active: true, isSystem: false, ...(session.role === "VENTAS" ? { ownerUserId: session.userId } : {}) },
       orderBy: { name: "asc" },
+      select: { id: true, name: true, ownerUserId: true },
     }),
     prisma.equipment.findMany({
       where: { originCompanyId: session.activeCompanyId, ...(session.role === "VENTAS" ? { client: { ownerUserId: session.userId } } : {}) },
@@ -46,11 +50,13 @@ export default async function NuevoServicioPage({
     warranty
       ? prisma.technicalCase.findMany({
           where: { kind: "OS", status: "TERMINADA", paidAt: { not: null }, attention: { attentionType: { not: "DIAGNOSTICO_GARANTIA" } }, equipment: { originCompanyId: session.activeCompanyId } },
-          select: { id: true, folio: true },
+          select: { id: true, folio: true, equipment: { select: { client: { select: { ownerUserId: true } } } } },
         })
       : Promise.resolve([]),
+    allowOrderOverrides ? listCompanySellers(session.activeCompanyId, session.activeCompanyCode) : Promise.resolve([]),
   ]);
   const defaultClientId = clientIdParam && clients.some((row) => row.id === clientIdParam) ? clientIdParam : "";
+  const defaultCreatedAt = allowOrderOverrides ? formatMexicoDateTimeLocalValue(new Date()) : "";
   const quickEquipmentKinds: Array<"EQUI" | "MOT"> = [
     ...(can(session.role, "equi.create", session.activeCompanyCode) ? ["EQUI" as const] : []),
     ...(can(session.role, "mot.create", session.activeCompanyCode) ? ["MOT" as const] : []),
@@ -73,7 +79,12 @@ export default async function NuevoServicioPage({
         brands={catalog.EQUI.brands}
         models={catalog.EQUI.models}
         catalogByKind={catalog}
-        repairs={repairs}
+        repairs={repairs.map((r) => ({ id: r.id, folio: r.folio, clientOwnerUserId: r.equipment.client.ownerUserId }))}
+        sellers={sellers}
+        canSelectSeller={allowOrderOverrides}
+        canEditOrderDate={allowOrderOverrides}
+        canConfirmPhysicalReceipt={allowOrderOverrides && can(session.role, "custody.confirm", session.activeCompanyCode)}
+        defaultCreatedAt={defaultCreatedAt}
         defaultClientId={defaultClientId}
         companyCode={session.activeCompanyCode ?? "SYSTRON"}
         allowQuickClient={can(session.role, "client.create", session.activeCompanyCode)}

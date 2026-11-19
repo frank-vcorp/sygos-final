@@ -14,9 +14,10 @@ import { Badge, Card, DetailAnchorButton, EntityDetailHeader, EntityMetaItem, Mo
 import { buildAlmacenEntradaPreset, pickCustodyFlowAttention } from "@/lib/almacen-entrada";
 import { allowedMovements, CUSTODY_LABEL, isInitialWarehouseReceipt, isReceipt, isWarehouseExitDocument, MOVEMENT_LABEL, receiptReasonFromAttention, type Custody, type MovementKind } from "@/lib/custody";
 import { prisma } from "@/lib/db";
+import { listCompanySellers } from "@/lib/equipment-service";
 import { displayCompanyCaseFolio, ensureOriginCompanyServiceNumbers } from "@/lib/folios";
 import { serviceClientForCompany } from "@/lib/intercompany-client";
-import { formatWhen } from "@/lib/form";
+import { formatMexicoDateTimeLocalValue, formatWhen } from "@/lib/form";
 import { historyFor } from "@/lib/history";
 import { can, canListMotors } from "@/lib/permissions";
 import { openPendingCases } from "@/lib/technical";
@@ -118,6 +119,9 @@ export async function EquipmentDetail({
   const priorities = equipment.originCompanyId === session.activeCompanyId
     ? await prisma.priority.findMany({ where: { companyId: session.activeCompanyId, active: true }, orderBy: { sortOrder: "asc" } })
     : [];
+  const sellers = session.role !== "VENTAS" && equipment.originCompanyId === session.activeCompanyId
+    ? await listCompanySellers(session.activeCompanyId, session.activeCompanyCode)
+    : [];
   const history = await historyFor("EQUIPO", equipment.id);
   const users = await prisma.user.findMany({
     where: { id: { in: equipment.movements.map((row) => row.authorUserId) } },
@@ -159,6 +163,9 @@ export async function EquipmentDetail({
   const activeServiceLabel = openAttention
     ? ATTENTION_LABEL[openAttention.attentionType as AttentionType] ?? openAttention.attentionType
     : null;
+  const defaultReceiptAt = openAttention
+    ? formatMexicoDateTimeLocalValue(openAttention.createdAt)
+    : formatMexicoDateTimeLocalValue(new Date());
   const receiptPreset =
     simplifiedReceipt && receiptMovement && openAttention && receiptReason
       ? {
@@ -169,6 +176,7 @@ export async function EquipmentDetail({
           clientId: equipment.client.id,
           clientName: equipment.client.name,
           clientIsSystem: intercompany,
+          defaultOccurredAt: defaultReceiptAt,
         }
       : undefined;
   const backLabel = listHref === "/custodia" ? "Almacén" : expectedKind === "EQUI" ? "Equipos" : "Motores";
@@ -230,6 +238,11 @@ export async function EquipmentDetail({
         kind={expectedKind}
         version={equipment.version}
         priorities={priorities.map((row) => ({ id: row.id, attentionType: row.attentionType, name: row.name }))}
+        sellers={sellers}
+        defaultSellerUserId={equipment.client.ownerUserId ?? ""}
+        canSelectSeller={session.role !== "VENTAS"}
+        canEditOrderDate={session.role !== "VENTAS"}
+        defaultCreatedAt={formatMexicoDateTimeLocalValue(new Date())}
       />
     );
   } else if (canMove && movementOptions.length > 0 && !showCreateAttentionFromEquipment && !custodyDetail) {
@@ -277,6 +290,7 @@ export async function EquipmentDetail({
           clientId={shownClient.id}
           clientName={shownClient.name}
           clientIsSystem={shownClient.isSystem}
+          defaultOccurredAt={defaultReceiptAt}
         />
       )
       : null;
@@ -339,6 +353,7 @@ export async function EquipmentDetail({
               </EntityMetaItem>
             ) : null}
             {custodyDetail && sellerUser ? <EntityMetaItem label="Vendedor">{sellerUser.name}</EntityMetaItem> : null}
+            {openAttention?.legacyFolio ? <EntityMetaItem label="Folio anterior">{openAttention.legacyFolio}</EntityMetaItem> : null}
             {intercompany && sellerUser ? <EntityMetaItem label="Contacto SYSTRON">{sellerUser.name}</EntityMetaItem> : null}
           </>
         }
@@ -463,6 +478,7 @@ export async function EquipmentDetail({
                         </p>
                       ) : null}
                       <p>{attention.reportedFault}</p>
+                      {attention.legacyFolio ? <p className="text-xs text-[var(--muted)]">Folio anterior: {attention.legacyFolio}</p> : null}
                       <p>
                         {attention.status === "ABIERTA" ? "SLA aún no inicia. Empieza cuando se confirma la entrada física." : `SLA iniciado ${attention.slaStartedAt ? formatWhen(attention.slaStartedAt) : ""}.`}
                         {attention.antecedent ? ` Antecedente: ${attention.antecedent}.` : ""}

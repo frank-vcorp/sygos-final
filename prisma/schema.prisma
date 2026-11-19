@@ -386,6 +386,7 @@ model Attention {
   initialLog          String?
   createdByUserId     String?
   sellerUserId        String?
+  legacyFolio         String?
   originalCaseId      String?
   originQuoteId       String?
   status              String    @default("ABIERTA")

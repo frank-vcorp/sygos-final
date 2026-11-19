@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { setFlash } from "@/lib/flash";
 import { clientIdFromForm } from "@/lib/form-quick-entities";
-import { optionalText, requiredText } from "@/lib/form";
+import { optionalText, parseMexicoDateTimeInput, requiredText } from "@/lib/form";
 import { can } from "@/lib/permissions";
 import { isAttentionType } from "@/lib/priorities";
 import { startService } from "@/lib/equipment-service";
@@ -33,6 +33,15 @@ export async function startServiceAction(formData: FormData) {
     const priorityId = attentionType === "REPARACION"
       ? optionalText(formData.get("priorityId"))
       : requiredText(formData.get("priorityId"), "Prioridad");
+    const allowOrderOverrides = session.role !== "VENTAS";
+    const createdAt = allowOrderOverrides ? parseMexicoDateTimeInput(formData.get("createdAt")) : null;
+    const confirmPhysicalReceipt =
+      allowOrderOverrides
+      && formData.get("confirmPhysicalReceipt") === "si"
+      && can(session.role, "custody.confirm", session.activeCompanyCode);
+    const sellerUserId = allowOrderOverrides && formData.has("sellerUserId")
+      ? (optionalText(formData.get("sellerUserId")) ?? null)
+      : undefined;
     const attention = await startService(session, {
       attentionType,
       clientId,
@@ -49,13 +58,22 @@ export async function startServiceAction(formData: FormData) {
       antecedent: optionalText(formData.get("antecedent")),
       originalCaseId: optionalText(formData.get("originalCaseId")),
       initialLog: optionalText(formData.get("initialLog")),
+      sellerUserId,
+      legacyFolio: optionalText(formData.get("legacyFolio")),
+      createdAt,
+      confirmPhysicalReceipt,
     });
     const equipment = await import("@/lib/db").then(({ prisma }) => prisma.equipment.findUnique({ where: { id: attention.equipmentId } }));
+    const enteredShop = confirmPhysicalReceipt && equipment?.kind === "EQUI";
     await setFlash({
       tone: "ok",
-      message: attentionType === "REPARACION"
-        ? "Reparación Express abierta. Entra directo sin plazo SLA."
-        : "Servicio abierto. El SLA inicia cuando se confirme la entrada física.",
+      message: enteredShop
+        ? attentionType === "REPARACION"
+          ? "Reparación Express abierta con ingreso físico confirmado."
+          : "Servicio abierto con ingreso físico confirmado y SLA calculado con esa fecha."
+        : attentionType === "REPARACION"
+          ? "Reparación Express abierta. Entra directo sin plazo SLA."
+          : "Servicio abierto. El SLA inicia cuando se confirme la entrada física.",
     });
     redirect(equipment?.kind === "MOT" ? `/motores/${attention.equipmentId}` : `/equipos/${attention.equipmentId}`);
   } catch (error) {

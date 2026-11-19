@@ -62,6 +62,7 @@ export default async function AtencionDetallePage({ params }: { params: Promise<
               <ClientNameLink clientId={shownClient.id} name={shownClient.name} isSystem={shownClient.isSystem} canEdit={can(session.role, "client.edit", session.activeCompanyCode) && !shownClient.isSystem} />
             </EntityMetaItem>
             <EntityMetaItem label="Vendedor">{seller?.name ?? "Sin vendedor asignado"}</EntityMetaItem>
+            {attention.legacyFolio ? <EntityMetaItem label="Folio anterior">{attention.legacyFolio}</EntityMetaItem> : null}
             <EntityMetaItem label="Prioridad">{attention.priorityName}</EntityMetaItem>
             <EntityMetaItem label="Capturada">{formatWhen(attention.createdAt)}</EntityMetaItem>
             <EntityMetaItem label="Folio del servicio">{attention.attentionType === "REPARACION" ? "OS" : "DX"} · se asigna al ingreso físico</EntityMetaItem>

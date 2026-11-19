@@ -46,3 +46,48 @@ export function formatWhen(date: Date): string {
     timeStyle: "short",
   }).format(date);
 }
+
+const MEXICO_LOCAL_DATETIME = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/;
+const MEXICO_LOCAL_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+
+/**
+ * Interpreta entradas de `<input type="datetime-local">` o `date` como hora de Ciudad de México (UTC-6),
+ * manteniendo soporte para cadenas ISO con zona explícita.
+ */
+export function parseMexicoDateTimeInput(value: FormDataEntryValue | null): Date | null {
+  const text = optionalText(value);
+  if (!text) return null;
+  const dtMatch = MEXICO_LOCAL_DATETIME.exec(text);
+  if (dtMatch) {
+    const [, y, m, d, hh, mm, ss = "00"] = dtMatch;
+    const parsed = new Date(`${y}-${m}-${d}T${hh}:${mm}:${ss}-06:00`);
+    if (Number.isNaN(parsed.getTime())) throw new Error("La fecha no es válida.");
+    return parsed;
+  }
+  const dateMatch = MEXICO_LOCAL_DATE.exec(text);
+  if (dateMatch) {
+    const [, y, m, d] = dateMatch;
+    const parsed = new Date(`${y}-${m}-${d}T12:00:00-06:00`);
+    if (Number.isNaN(parsed.getTime())) throw new Error("La fecha no es válida.");
+    return parsed;
+  }
+  const parsed = new Date(text);
+  if (Number.isNaN(parsed.getTime())) throw new Error("La fecha no es válida.");
+  return parsed;
+}
+
+/** Formatea una fecha a `YYYY-MM-DDTHH:mm` en hora de Ciudad de México para `<input type="datetime-local">`. */
+export function formatMexicoDateTimeLocalValue(date: Date): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Mexico_City",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(date);
+  const get = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
+  const hour = get("hour") === "24" ? "00" : get("hour");
+  return `${get("year")}-${get("month")}-${get("day")}T${hour}:${get("minute")}`;
+}

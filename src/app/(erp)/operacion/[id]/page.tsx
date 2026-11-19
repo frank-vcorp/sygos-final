@@ -629,6 +629,7 @@ export default async function OperacionDetallePage({ params }: { params: Promise
               </span>
             </EntityMetaItem>
             <EntityMetaItem label="Prioridad">{row.attention.priorityName}</EntityMetaItem>
+            {row.attention.legacyFolio ? <EntityMetaItem label="Folio anterior">{row.attention.legacyFolio}</EntityMetaItem> : null}
             {linkedOs ? (
               <EntityMetaItem label="Orden de servicio">
                 <TextLink href={`/operacion/${linkedOs.id}`}>

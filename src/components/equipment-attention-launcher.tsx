@@ -8,6 +8,7 @@ import { Button, controlClass, Field } from "@/components/ui";
 import { ATTENTION_LABEL, ATTENTION_TYPES, isReparacionExpressAttentionType, type AttentionType } from "@/lib/priorities";
 
 type PriorityRow = { id: string; attentionType: string; name: string };
+type SellerOption = { id: string; name: string };
 
 const primaryButtonClass =
   "inline-flex min-h-11 items-center justify-center rounded-md bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2";
@@ -21,6 +22,11 @@ export function EquipmentAttentionLauncher({
   kind,
   version,
   priorities,
+  sellers = [],
+  defaultSellerUserId = "",
+  canSelectSeller = false,
+  canEditOrderDate = false,
+  defaultCreatedAt = "",
 }: {
   equipmentId: string;
   equipmentFolio: string;
@@ -30,6 +36,11 @@ export function EquipmentAttentionLauncher({
   kind: "EQUI" | "MOT";
   version: number;
   priorities: PriorityRow[];
+  sellers?: SellerOption[];
+  defaultSellerUserId?: string;
+  canSelectSeller?: boolean;
+  canEditOrderDate?: boolean;
+  defaultCreatedAt?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [attentionType, setAttentionType] = useState<AttentionType | "">("");
@@ -39,6 +50,7 @@ export function EquipmentAttentionLauncher({
     : [];
   const expressType = attentionType ? isReparacionExpressAttentionType(attentionType) : false;
   const canSubmit = Boolean(attentionType && reportedFault.trim() && (expressType || priorityOptions.length > 0));
+  const initialSellerId = sellers.some((seller) => seller.id === defaultSellerUserId) ? defaultSellerUserId : "";
 
   return (
     <>
@@ -90,6 +102,24 @@ export function EquipmentAttentionLauncher({
               </select>
             </Field>
           )}
+          {canSelectSeller ? (
+            <Field label="Vendedor" hint="Por defecto toma el vendedor del cliente.">
+              <select name="sellerUserId" defaultValue={initialSellerId} className={controlClass}>
+                <option value="">Sin vendedor asignado</option>
+                {sellers.map((seller) => (
+                  <option key={seller.id} value={seller.id}>{seller.name}</option>
+                ))}
+              </select>
+            </Field>
+          ) : null}
+          {canEditOrderDate ? (
+            <Field label="Fecha de creación de orden" hint="Opcional. Por defecto usa la fecha actual.">
+              <input name="createdAt" type="datetime-local" defaultValue={defaultCreatedAt} className={controlClass} />
+            </Field>
+          ) : null}
+          <Field label="Folio del sistema anterior" hint="Opcional. Referencia del folio histórico.">
+            <input name="legacyFolio" placeholder="Ej. OS-1234" className={controlClass} />
+          </Field>
           <div className="flex flex-wrap justify-end gap-2">
             <Button type="button" tone="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
             <Button type="submit" disabled={!canSubmit}>Crear atención</Button>

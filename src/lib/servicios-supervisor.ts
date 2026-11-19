@@ -142,6 +142,7 @@ function caseSearchWhere(companyId: string, q: string) {
           }]
         : []),
       { equipment: { folio: { contains: q } } },
+      { attention: { legacyFolio: { contains: q } } },
       { equipment: { client: { name: { contains: q } } } },
       { attention: { adminClient: { name: { contains: q } } } },
       { attention: { reportedFault: { contains: q } } },
@@ -193,6 +194,7 @@ type CaseRecord = {
     attentionType: string;
     slaStartedAt: Date | null;
     sellerUserId: string | null;
+    legacyFolio?: string | null;
     priorityName: string;
     createdAt: Date;
     originCompanyId: string;
@@ -232,6 +234,7 @@ export type ServicioBandejaRow = {
   slaStartedAt: Date | null;
   attentionCreatedAt: Date;
   priorityName: string;
+  legacyFolio?: string | null;
   attentionType: string;
   createdAt: Date;
   closedAt: Date | null;
@@ -251,6 +254,7 @@ export type CancelledServicioBandejaRow = {
   closedAt: Date;
   createdAt: Date;
   priorityName: string;
+  legacyFolio?: string | null;
 };
 
 export type SupervisorServicioRow = ServicioBandejaRow | CancelledServicioBandejaRow;
@@ -458,6 +462,7 @@ function buildServicioRow(
     slaStartedAt: primary.attention.slaStartedAt,
     attentionCreatedAt: primary.attention.createdAt,
     priorityName: primary.attention.priorityName,
+    legacyFolio: primary.attention.legacyFolio ?? null,
     attentionType: primary.attention.attentionType,
     createdAt: primary.createdAt,
     closedAt: primary.validatedAt ?? primary.updatedAt,
@@ -494,6 +499,7 @@ const caseInclude = {
       slaStartedAt: true,
       attentionType: true,
       sellerUserId: true,
+      legacyFolio: true,
       originCompanyId: true,
       serviceCompanyId: true,
       serviceNumber: true,
@@ -741,6 +747,7 @@ export async function listHistorialServicios(
             ...(q
               ? {
                   OR: [
+                    { legacyFolio: { contains: q } },
                     { equipment: { folio: { contains: q } } },
                     { equipment: { client: { name: { contains: q } } } },
                     { adminClient: { name: { contains: q } } },
@@ -776,6 +783,7 @@ export async function listHistorialServicios(
     closedAt: row.updatedAt,
     createdAt: row.createdAt,
     priorityName: row.priorityName,
+    legacyFolio: row.legacyFolio ?? null,
     };
   });
 

@@ -53,6 +53,7 @@ export default async function CustodiaPage({ searchParams }: { searchParams: Pro
         slaStartedAt: true,
         attentionType: true,
         sellerUserId: true,
+        legacyFolio: true,
         originCompanyId: true,
         serviceCompanyId: true,
         adminClient: { select: { id: true, name: true, isSystem: true } },

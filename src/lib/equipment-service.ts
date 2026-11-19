@@ -5,7 +5,9 @@ import { allocateFolio } from "./folios";
 import { ConcurrencyError } from "./form";
 import { recordHistory } from "./history";
 import { rememberCatalog } from "./catalog";
+import { can } from "./permissions";
 import { isAttentionType, isReparacionExpressAttentionType, REPARACION_RECEIPT_REASON, reparacionExpressFrozenPriority, type AttentionType } from "./priorities";
+import type { Role } from "./roles";
 import { SALES_NOT_ASSIGNED_MESSAGE } from "./sales-assignment";
 import { assertDefinitiveWarehouseExit, assertTestWarehouseExit } from "./warehouse-exit";
 import { autoIngresoMotIfServomotores } from "./mot-servomotores-auto-ingreso";
@@ -17,6 +19,53 @@ type Actor = {
   activeCompanyId: string;
   activeCompanyCode: string;
 };
+
+export async function listCompanySellers(companyId: string, companyCode: string | null | undefined) {
+  const companySellerRole = companyCode === "SERVOMOTORES" ? "GERENTE_OPERATIVO_SERVOMOTORES" : "VENTAS";
+  return prisma.user.findMany({
+    where: {
+      active: true,
+      OR: [
+        { role: companySellerRole, companyId },
+        { role: "CEO" },
+      ],
+    },
+    orderBy: { name: "asc" },
+    select: { id: true, name: true, role: true },
+  });
+}
+
+export async function resolveAttentionSellerUserId(
+  actor: Actor,
+  clientOwnerUserId: string | null,
+  requestedSellerUserId?: string | null,
+): Promise<string | null> {
+  if (actor.role === "VENTAS") return actor.userId;
+  if (requestedSellerUserId === undefined) return clientOwnerUserId;
+  const trimmed = requestedSellerUserId?.trim() || "";
+  if (!trimmed) return null;
+  const expectedCompanyRole = actor.activeCompanyCode === "SERVOMOTORES" ? "GERENTE_OPERATIVO_SERVOMOTORES" : "VENTAS";
+  const seller = await prisma.user.findFirst({
+    where: {
+      id: trimmed,
+      active: true,
+      OR: [
+        { role: expectedCompanyRole, companyId: actor.activeCompanyId },
+        { role: "CEO" },
+      ],
+    },
+    select: { id: true },
+  });
+  if (!seller) {
+    throw new Error("Selecciona un vendedor activo válido para esta empresa.");
+  }
+  return seller.id;
+}
+
+function normalizeLegacyFolio(value: string | null | undefined): string | null {
+  const trimmed = value?.trim() ?? "";
+  return trimmed.length ? trimmed : null;
+}
 
 async function ownClient(actor: Actor, clientId: string) {
   const client = await prisma.client.findFirst({
@@ -54,6 +103,7 @@ export async function createEqui(
     model: string;
     description: string | null;
     serial: string | null;
+    createdAt?: Date | null;
   },
 ) {
   if (actor.activeCompanyCode !== "SYSTRON") throw new Error("EQUI solo se crea en SYSTRON.");
@@ -73,6 +123,7 @@ export async function createEqui(
       serial: input.serial,
       custody: "SIN_CUSTODIA",
       createdByUserId: actor.userId,
+      ...(input.createdAt ? { createdAt: input.createdAt } : {}),
     },
   });
   await recordHistory({
@@ -82,6 +133,7 @@ export async function createEqui(
     action: "ALTA",
     summary: `Alta de ${folio}. Identidad física sin entrada de almacén.`,
     authorUserId: actor.userId,
+    ...(input.createdAt ? { createdAt: input.createdAt } : {}),
   });
   return equipment;
 }
@@ -140,6 +192,9 @@ export async function createMot(
     reportedFault: string;
     antecedent: string | null;
     deliveryInstructions: string | null;
+    sellerUserId?: string | null;
+    legacyFolio?: string | null;
+    createdAt?: Date | null;
   },
 ) {
   if (input.attentionType === "DIAGNOSTICO_GARANTIA") {
@@ -147,6 +202,9 @@ export async function createMot(
   }
   if (!isAttentionType(input.attentionType)) throw new Error("Selecciona el tipo de atención.");
   const client = await ownClient(actor, input.clientId);
+  const sellerUserId = await resolveAttentionSellerUserId(actor, client.ownerUserId, input.sellerUserId);
+  const legacyFolio = normalizeLegacyFolio(input.legacyFolio);
+  const occurredAt = input.createdAt ?? new Date();
   const identity = await rememberCatalog(input.typeName, input.brand ?? "", input.model, "MOT");
   const priority = await resolveFrozenPriority(actor.activeCompanyId, input.attentionType, input.priorityId);
   const servomotores = await prisma.company.findUnique({ where: { code: "SERVOMOTORES" } });
@@ -170,6 +228,7 @@ export async function createMot(
       serial: input.serial,
       custody: "PENDIENTE_INGRESO",
       createdByUserId: actor.userId,
+      createdAt: occurredAt,
     },
   });
   await prisma.attention.create({
@@ -188,7 +247,10 @@ export async function createMot(
       reportedFault: input.reportedFault,
       antecedent: input.antecedent,
       deliveryInstructions: input.deliveryInstructions,
-      sellerUserId: actor.role === "VENTAS" ? actor.userId : client.ownerUserId,
+      sellerUserId,
+      legacyFolio,
+      createdByUserId: actor.userId,
+      createdAt: occurredAt,
       status: "ABIERTA",
     },
   });
@@ -202,6 +264,7 @@ export async function createMot(
         ? `${folio} creado en SYSTRON. No entra a almacén SYSTRON; ingreso automático en taller Servomotores.`
         : `${folio} creado para un cliente de Servomotores. Ingreso automático en taller.`,
     authorUserId: actor.userId,
+    createdAt: occurredAt,
   });
   await autoIngresoMotIfServomotores(equipment.id, servomotores.id, actor.userId, {
     preferredAssigneeUserId: actor.role === "GERENTE_OPERATIVO_SERVOMOTORES" ? actor.userId : null,
@@ -210,6 +273,7 @@ export async function createMot(
       orderBy: { createdAt: "desc" },
       select: { id: true },
     }))?.id,
+    occurredAt,
   });
   return equipment;
 }
@@ -225,6 +289,9 @@ export async function createAttention(
     deliveryInstructions?: string | null;
     initialLog?: string | null;
     originalCaseId: string | null;
+    sellerUserId?: string | null;
+    legacyFolio?: string | null;
+    createdAt?: Date | null;
     version: number;
   },
 ) {
@@ -233,7 +300,10 @@ export async function createAttention(
   if (!equipment || equipment.originCompanyId !== actor.activeCompanyId) {
     throw new Error("La atención se crea en la empresa que originó el equipo.");
   }
-  await ownClient(actor, equipment.clientId);
+  const client = await ownClient(actor, equipment.clientId);
+  const sellerUserId = await resolveAttentionSellerUserId(actor, client.ownerUserId, input.sellerUserId);
+  const legacyFolio = normalizeLegacyFolio(input.legacyFolio);
+  const attentionCreatedAt = input.createdAt ?? new Date();
   const reportedFault = input.reportedFault?.trim() || "";
   if (!reportedFault) throw new Error("Indica la falla reportada.");
   let originalCaseId = input.originalCaseId;
@@ -254,12 +324,11 @@ export async function createAttention(
       ? await prisma.company.findUnique({ where: { code: "SERVOMOTORES" } })
       : await prisma.company.findUnique({ where: { id: equipment.originCompanyId } });
   if (!service) throw new Error("No está definida la empresa que ejecuta el servicio.");
-  const client = await prisma.client.findUnique({ where: { id: equipment.clientId } });
   const adminClient =
     equipment.kind === "MOT" && actor.activeCompanyCode === "SYSTRON"
       ? await prisma.client.findUnique({ where: { id: "client-intercompany-systron" } })
       : client;
-  if (!adminClient || !client) throw new Error("Falta el cliente administrativo de la atención.");
+  if (!adminClient) throw new Error("Falta el cliente administrativo de la atención.");
   /** EQUI siempre entra por Almacén (Entradas → pasar a resguardo); MOT puede arrancar SLA si ya está en taller. */
   const inServiceCustody =
     equipment.kind !== "EQUI"
@@ -295,10 +364,12 @@ export async function createAttention(
         deliveryInstructions: input.deliveryInstructions ?? null,
         initialLog: input.initialLog ?? null,
         createdByUserId: actor.userId,
-        sellerUserId: actor.role === "VENTAS" ? actor.userId : client.ownerUserId,
+        sellerUserId,
+        legacyFolio,
         originalCaseId,
         status: inServiceCustody ? "EN_PROCESO" : "ABIERTA",
-        slaStartedAt: inServiceCustody ? new Date() : null,
+        slaStartedAt: inServiceCustody ? attentionCreatedAt : null,
+        createdAt: attentionCreatedAt,
       },
     });
   });
@@ -306,6 +377,7 @@ export async function createAttention(
     await autoIngresoMotIfServomotores(equipment.id, service.id, actor.userId, {
       preferredAssigneeUserId: actor.role === "GERENTE_OPERATIVO_SERVOMOTORES" ? actor.userId : null,
       attentionId: attention.id,
+      occurredAt: attentionCreatedAt,
     });
   } else if (attention.slaStartedAt) {
     await openCase(attention.id, attention.slaStartedAt);
@@ -317,14 +389,16 @@ export async function createAttention(
     action: "ATENCION",
     summary: `Nueva atención ${input.attentionType} con prioridad ${priority.name}. No sustituye la identidad ${equipment.folio}.`,
     authorUserId: actor.userId,
+    createdAt: attentionCreatedAt,
   });
   await recordHistory({
     companyId: actor.activeCompanyId,
     entityType: "ATENCION",
     entityId: attention.id,
     action: "ALTA",
-    summary: `Atención ${input.attentionType} creada con prioridad ${priority.name}.`,
+    summary: `Atención ${input.attentionType} creada con prioridad ${priority.name}.${legacyFolio ? ` Folio anterior: ${legacyFolio}.` : ""}`,
     authorUserId: actor.userId,
+    createdAt: attentionCreatedAt,
   });
   return attention;
 }
@@ -347,6 +421,10 @@ export async function startService(
     antecedent: string | null;
     originalCaseId: string | null;
     initialLog: string | null;
+    sellerUserId?: string | null;
+    legacyFolio?: string | null;
+    createdAt?: Date | null;
+    confirmPhysicalReceipt?: boolean;
   },
 ) {
   let clientId = input.clientId;
@@ -358,6 +436,13 @@ export async function startService(
     });
     clientId = resolved.clientId;
   }
+  if (input.confirmPhysicalReceipt && !can(actor.role as Role, "custody.confirm", actor.activeCompanyCode)) {
+    throw new Error("No tienes permiso para confirmar la entrada física.");
+  }
+  if (input.sellerUserId !== undefined) {
+    await resolveAttentionSellerUserId(actor, null, input.sellerUserId);
+  }
+  const orderDate = input.createdAt ?? null;
   let equipmentId = input.equipmentId;
   let version = 1;
   if (!equipmentId) {
@@ -374,6 +459,7 @@ export async function startService(
         model: input.model,
         description: null,
         serial: input.serial,
+        createdAt: orderDate,
       });
       equipmentId = equipment.id;
     } else if (input.equipmentKind === "MOT") {
@@ -392,6 +478,7 @@ export async function startService(
           serial: input.serial,
           custody: "PENDIENTE_INGRESO",
           createdByUserId: actor.userId,
+          ...(orderDate ? { createdAt: orderDate } : {}),
         },
       });
       equipmentId = equipment.id;
@@ -415,6 +502,9 @@ export async function startService(
     antecedent: input.antecedent,
     initialLog: input.initialLog,
     originalCaseId: input.originalCaseId,
+    sellerUserId: input.sellerUserId,
+    legacyFolio: input.legacyFolio,
+    createdAt: orderDate,
     version,
   });
   if (input.equipmentKind === "MOT") {
@@ -425,8 +515,30 @@ export async function startService(
         await autoIngresoMotIfServomotores(equipmentId, servomotores.id, actor.userId, {
           preferredAssigneeUserId: actor.role === "GERENTE_OPERATIVO_SERVOMOTORES" ? actor.userId : null,
           attentionId: attention.id,
+          occurredAt: attention.createdAt,
         });
       }
+    }
+  } else if (input.confirmPhysicalReceipt) {
+    const eq = await prisma.equipment.findUnique({
+      where: { id: equipmentId },
+      select: { kind: true, custody: true, version: true },
+    });
+    if (eq?.kind === "EQUI" && attention.status === "ABIERTA") {
+      const reason = receiptReasonFromAttention(attention.attentionType) ?? "Diagnóstico";
+      await registerMovement(actor, {
+        equipmentId,
+        version: eq.version,
+        kind: "ENTRADA",
+        reason,
+        occurredAt: attention.createdAt,
+        receiverName: null,
+        deliveryMode: null,
+        contact: null,
+        enablingDocument: null,
+        supplierId: null,
+        notes: null,
+      });
     }
   }
   return attention;
@@ -572,6 +684,7 @@ export async function registerMovement(
     action: "CUSTODIA",
     summary: folio ? `${folio} confirmado. Custodia: ${custody}.` : `${input.kind} confirmado. Custodia: ${custody}.`,
     authorUserId: actor.userId,
+    ...(receipt ? { createdAt: input.occurredAt } : {}),
   });
   if (attention) {
     await recordHistory({
@@ -583,6 +696,7 @@ export async function registerMovement(
         ? `${folio ?? input.kind} confirmado. El equipo quedó en resguardo e inició la atención.`
         : `${input.kind} registrado para el equipo.`,
       authorUserId: actor.userId,
+      ...(receipt ? { createdAt: input.occurredAt } : {}),
     });
   }
   return {

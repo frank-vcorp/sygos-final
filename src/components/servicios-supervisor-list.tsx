@@ -39,7 +39,15 @@ function tagTone(tag: string): StatusTone {
   return "neutral";
 }
 
-function AtencionVigenteCell({ createdAt, priorityName }: { createdAt: Date; priorityName: string }) {
+function AtencionVigenteCell({
+  createdAt,
+  priorityName,
+  legacyFolio,
+}: {
+  createdAt: Date;
+  priorityName: string;
+  legacyFolio?: string | null;
+}) {
   const tone = priorityNameTone(priorityName);
   return (
     <div className="flex min-w-0 flex-col items-start gap-px leading-none">
@@ -49,6 +57,11 @@ function AtencionVigenteCell({ createdAt, priorityName }: { createdAt: Date; pri
       <span className={`max-w-full truncate text-[10px] font-semibold leading-[1.1rem] ${TAG_TEXT_CLASS[tone]}`} title={priorityName}>
         {priorityName}
       </span>
+      {legacyFolio ? (
+        <span className="max-w-full truncate text-[10px] font-medium leading-[1.1rem] text-[var(--muted)]" title={`Folio anterior: ${legacyFolio}`}>
+          Ant: {legacyFolio}
+        </span>
+      ) : null}
     </div>
   );
 }
@@ -169,7 +182,7 @@ function BandejaTd({
       case "atencionVigente":
         return (
           <Td>
-            <AtencionVigenteCell createdAt={row.createdAt} priorityName={row.priorityName} />
+            <AtencionVigenteCell createdAt={row.createdAt} priorityName={row.priorityName} legacyFolio={row.legacyFolio} />
           </Td>
         );
       case "diagnostico":
@@ -214,7 +227,7 @@ function BandejaTd({
     case "atencionVigente":
       return (
         <Td>
-          <AtencionVigenteCell createdAt={row.attentionCreatedAt} priorityName={row.priorityName} />
+          <AtencionVigenteCell createdAt={row.attentionCreatedAt} priorityName={row.priorityName} legacyFolio={row.legacyFolio} />
         </Td>
       );
     case "diagnostico":
@@ -319,6 +332,7 @@ export function ServiciosSupervisorList({
                   {formatServiciosBandejaDate(row.createdAt)} ·{" "}
                   <span className={TAG_TEXT_CLASS[priorityNameTone(row.priorityName)]}>{row.priorityName}</span>
                 </p>
+                {row.legacyFolio ? <p>Folio anterior: {row.legacyFolio}</p> : null}
                 <p>Cierre: {formatClosedAt(row.closedAt)}</p>
               </MobileCard>
             </div>
@@ -369,6 +383,7 @@ export function ServiciosSupervisorList({
                   <span className={TAG_TEXT_CLASS[priorityNameTone(row.priorityName)]}>{row.priorityName}</span>
                 </p>
               ) : null}
+              {row.legacyFolio ? <p>Folio anterior: {row.legacyFolio}</p> : null}
               {columns.vendedor ? <p>Vendedor: {row.sellerName ?? "Sin asignar"}</p> : null}
               {columns.tecnico ? <p>Técnico: {row.technicianName ?? "Sin asignar"}</p> : null}
               {columns.sla ? (

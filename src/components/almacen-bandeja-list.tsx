@@ -49,6 +49,11 @@ export function AlmacenBandejaList({ rows }: { rows: AlmacenBandejaRow[] }) {
                 <Td><FolioCell folio={row.osFolio} href={row.osHref} /></Td>
                 <Td>
                   <RecordLink href={row.equipmentHref}>{row.equipmentLabel}</RecordLink>
+                  {row.legacyFolio ? (
+                    <span className="block text-[10px] font-medium text-[var(--muted)]">
+                      Ant: {row.legacyFolio}
+                    </span>
+                  ) : null}
                 </Td>
                 <Td>
                   <ClientNameLink clientId={row.clientId} name={row.clientName} isSystem={row.clientIsSystem} />
@@ -70,6 +75,7 @@ export function AlmacenBandejaList({ rows }: { rows: AlmacenBandejaRow[] }) {
           {row.diagnosisFolio ? <p>DX: {row.diagnosisFolio}</p> : null}
           {row.osFolio ? <p>OS: {row.osFolio}</p> : null}
           <p>{row.equipmentLabel}</p>
+          {row.legacyFolio ? <p>Folio anterior: {row.legacyFolio}</p> : null}
           <p>
             <ClientNameLink clientId={row.clientId} name={row.clientName} isSystem={row.clientIsSystem} />
           </p>

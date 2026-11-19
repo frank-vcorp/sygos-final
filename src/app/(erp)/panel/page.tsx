@@ -7,7 +7,7 @@ import {
   SalesPanelServiciosSection,
 } from "@/components/sales-panel-bandeja";
 import { RequirementListSection } from "@/app/(erp)/compras/requerimientos/requirement-list-section";
-import { Card, KpiCard, PageHeader, RecordLink, TextLink } from "@/components/ui";
+import { ActionLink, Card, KpiCard, PageHeader, RecordLink, TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
 import { mapTreasuryAccountOptions, treasuryAccountSelect } from "@/lib/finance-accounts";
 import { money } from "@/lib/money";
@@ -403,7 +403,12 @@ async function GerenteSystronPanel({
       <PageHeader
         title="Inicio"
         subtitle="Pendientes del taller con el mismo detalle que Servicios activos."
-        action={<TextLink href="/panel?vista=historial">Ver historial</TextLink>}
+        action={
+          <div className="flex flex-wrap items-center gap-3">
+            <TextLink href="/panel?vista=historial">Ver historial</TextLink>
+            <ActionLink href="/servicios/nuevo">Nuevo servicio</ActionLink>
+          </div>
+        }
       />
       <section className="flex w-full max-w-none flex-col gap-4">
         {sections.map(({ filtro, rows }) =>

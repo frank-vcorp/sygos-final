@@ -127,6 +127,7 @@ export async function applyMotServomotoresAutoIngreso(input: MotServomotoresAuto
     action: "CUSTODIA",
     summary: `${folio} ingreso automático en taller Servomotores. Custodia: ${custody}.`,
     authorUserId: input.authorUserId,
+    createdAt: occurredAt,
   });
   if (attention?.id) {
     await recordHistory({
@@ -136,6 +137,7 @@ export async function applyMotServomotoresAutoIngreso(input: MotServomotoresAuto
       action: "ENTRADA_FISICA",
       summary: `${folio} ingreso automático. El motor quedó en resguardo e inició la atención.`,
       authorUserId: input.authorUserId,
+      createdAt: occurredAt,
     });
   }
 
@@ -146,7 +148,7 @@ export async function autoIngresoMotIfServomotores(
   equipmentId: string,
   serviceCompanyId: string,
   authorUserId: string,
-  options?: { preferredAssigneeUserId?: string | null; attentionId?: string | null },
+  options?: { preferredAssigneeUserId?: string | null; attentionId?: string | null; occurredAt?: Date },
 ): Promise<boolean> {
   return applyMotServomotoresAutoIngreso({
     equipmentId,
@@ -154,6 +156,7 @@ export async function autoIngresoMotIfServomotores(
     authorUserId,
     preferredAssigneeUserId: options?.preferredAssigneeUserId,
     attentionId: options?.attentionId ?? null,
+    occurredAt: options?.occurredAt,
   });
 }
 
