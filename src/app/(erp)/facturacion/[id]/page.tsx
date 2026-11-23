@@ -521,6 +521,7 @@ export default async function DocumentoPage({ params }: { params: Promise<{ id: 
         </Card>
       ) : null}
 
+      {showFiscalFields ? (
       <Card className="mt-4 p-4 text-sm space-y-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div>
@@ -641,6 +642,7 @@ export default async function DocumentoPage({ params }: { params: Promise<{ id: 
           </>
         )}
       </Card>
+      ) : null}
 
       <HistoryTimeline className="mt-6" items={history.map((item) => ({ id: item.id, createdAt: item.createdAt, summary: item.summary, authorName: item.author?.name }))} />
     </>

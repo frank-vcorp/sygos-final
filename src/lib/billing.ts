@@ -191,7 +191,7 @@ export async function requestFromQuote(actor: Actor, quoteId: string, kind: "FAC
   const used = await invoicedTotal(quote.id);
   const remaining = roundMoney(totals.total - used);
   if (remaining <= 0 && kind === "FACTURA") throw new Error("Esa operación ya no tiene saldo por facturar.");
-  const total = kind === "REMISION" && (amount == null || amount === 0) ? 0 : roundMoney(amount ?? remaining);
+  const total = roundMoney(amount ?? remaining);
   if (kind === "FACTURA" && (total <= 0 || total > remaining)) throw new Error("El importe no puede exceder el saldo permitido.");
   if (kind === "FACTURA" && quote.linkedQuoteId && !quote.client.isSystem) {
     await issueServomotoresInvoiceForEndClientRequest(actor, quote.linkedQuoteId);
@@ -306,7 +306,7 @@ export async function requestFromFieldServiceCase(
   const used = await invoicedTotalForFieldService(row.id);
   const remaining = roundMoney(serviceTotal - used);
   if (remaining <= 0 && kind === "FACTURA") throw new Error("Ese servicio de campo ya no tiene saldo por facturar.");
-  const total = kind === "REMISION" && (amount == null || amount === 0) ? 0 : roundMoney(amount ?? remaining);
+  const total = roundMoney(amount ?? remaining);
   if (kind === "FACTURA" && (total <= 0 || total > remaining)) throw new Error("El importe no puede exceder el saldo permitido.");
   const subtotal = roundMoney(total / 1.16);
   const iva = roundMoney(total - subtotal);

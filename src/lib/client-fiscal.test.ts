@@ -102,5 +102,13 @@ describe("clientFiscalReady", () => {
     const rem = await requestFromQuote(actor, quote.id, "REMISION", null);
     assert.equal(rem.kind, "REMISION");
     assert.equal(rem.status, "SOLICITADA");
+    assert.equal(rem.total, 1160);
+    const remWithLines = await prisma.billingDocument.findUnique({
+      where: { id: rem.id },
+      include: { lines: true },
+    });
+    assert.equal(remWithLines!.lines[0]!.unitPrice, 1000);
+    assert.equal(remWithLines!.lines[0]!.amount, 1000);
+    assert.ok(remWithLines!.lines[0]!.satProductKey);
   });
 });
