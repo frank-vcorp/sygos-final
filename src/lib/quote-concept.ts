@@ -2,6 +2,7 @@ import type { QuoteType } from "./quote-meta";
 
 export const TECHNICAL_SERVICE_CONCEPT_TITLE = "Servicio de reparación y mantenimiento";
 export const COMMERCIAL_DIAGNOSTIC_CONCEPT_TITLE = "Diagnóstico";
+export const COMMERCIAL_PREVENTIVE_MAINTENANCE_CONCEPT_TITLE = "Mantenimiento preventivo";
 export const COMMERCIAL_FIELD_SERVICE_CONCEPT_TITLE = "Servicio de campo";
 export const COMMERCIAL_EQUIPMENT_SALE_CONCEPT_TITLE = "Venta de equipo";
 
@@ -37,6 +38,9 @@ export function commercialSellerQuoteConcept(quoteType: QuoteType, equipment: Qu
     case "DIAGNOSTICO":
       if (!equipment) return COMMERCIAL_DIAGNOSTIC_CONCEPT_TITLE;
       return conceptWithEquipment(COMMERCIAL_DIAGNOSTIC_CONCEPT_TITLE, equipment);
+    case "MANTENIMIENTO_PREVENTIVO":
+      if (!equipment) return COMMERCIAL_PREVENTIVE_MAINTENANCE_CONCEPT_TITLE;
+      return conceptWithEquipment(COMMERCIAL_PREVENTIVE_MAINTENANCE_CONCEPT_TITLE, equipment);
     case "REPARACION":
       return technicalServiceConcept(
         equipment ?? { typeName: null, brandName: null, model: null, serial: null },

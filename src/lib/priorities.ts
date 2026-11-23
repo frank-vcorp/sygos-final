@@ -1,10 +1,11 @@
-export const ATTENTION_TYPES = ["DIAGNOSTICO", "REPARACION", "REPARACION_TALLER", "DIAGNOSTICO_GARANTIA"] as const;
+export const ATTENTION_TYPES = ["DIAGNOSTICO", "REPARACION", "REPARACION_TALLER", "MANTENIMIENTO_PREVENTIVO", "DIAGNOSTICO_GARANTIA"] as const;
 export type AttentionType = (typeof ATTENTION_TYPES)[number];
 
 export const ATTENTION_LABEL: Record<AttentionType, string> = {
   DIAGNOSTICO: "Diagnóstico",
   REPARACION: "Reparación Express",
   REPARACION_TALLER: "Reparación / servicio taller",
+  MANTENIMIENTO_PREVENTIVO: "Mantenimiento preventivo",
   DIAGNOSTICO_GARANTIA: "Diagnóstico de Garantía",
 };
 
@@ -13,6 +14,9 @@ export const REPARACION_RECEIPT_REASON = "Reparación Express";
 
 /** Motivo de entrada para COTOS (reparación taller, no Express). */
 export const REPARACION_TALLER_RECEIPT_REASON = "Reparación taller";
+
+/** Motivo de entrada para COTMP (mantenimiento preventivo comercial). */
+export const MANTENIMIENTO_PREVENTIVO_RECEIPT_REASON = "Mantenimiento preventivo";
 
 export function isReparacionExpressAttentionType(attentionType: string): boolean {
   return attentionType === "REPARACION";
@@ -105,6 +109,10 @@ export function initialPriorities(companyCode: "SYSTRON" | "SERVOMOTORES"): Prio
     row("REPARACION_TALLER", "Normal", null, 0),
     row("REPARACION_TALLER", "Alta", null, 10),
     row("REPARACION_TALLER", "Exprés", null, 20),
+    row("MANTENIMIENTO_PREVENTIVO", "Normal", equiDiagnosisPrice ? 0 : null, null, "EQUI"),
+    row("MANTENIMIENTO_PREVENTIVO", "Alta", equiDiagnosisPrice ? 3500 : null, null, "EQUI"),
+    row("MANTENIMIENTO_PREVENTIVO", "Exprés", equiDiagnosisPrice ? 4500 : null, null, "EQUI"),
+    ...diagnosisMOT.map((r) => ({ ...r, attentionType: "MANTENIMIENTO_PREVENTIVO" as const })),
     row("DIAGNOSTICO_GARANTIA", "Normal", 0, null),
     row("DIAGNOSTICO_GARANTIA", "Alta", 0, null),
     row("DIAGNOSTICO_GARANTIA", "Exprés", 0, null),

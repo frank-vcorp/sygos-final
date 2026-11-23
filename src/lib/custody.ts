@@ -31,7 +31,7 @@ export const CUSTODY_LABEL: Record<Custody, string> = {
   FUERA: "Fuera",
 };
 
-import { REPARACION_RECEIPT_REASON, REPARACION_TALLER_RECEIPT_REASON } from "./priorities";
+import { MANTENIMIENTO_PREVENTIVO_RECEIPT_REASON, REPARACION_RECEIPT_REASON, REPARACION_TALLER_RECEIPT_REASON } from "./priorities";
 
 export const MOVEMENT_REASONS: Record<MovementKind, readonly string[]> = {
   ENTRADA: ["Diagnóstico", REPARACION_RECEIPT_REASON, "Diagnóstico de Garantía", "Venta de equipo", "Retorno de proveedor"],
@@ -105,6 +105,7 @@ const ATTENTION_TO_RECEIPT_REASON: Record<string, string> = {
   DIAGNOSTICO: "Diagnóstico",
   REPARACION: REPARACION_RECEIPT_REASON,
   REPARACION_TALLER: REPARACION_TALLER_RECEIPT_REASON,
+  MANTENIMIENTO_PREVENTIVO: MANTENIMIENTO_PREVENTIVO_RECEIPT_REASON,
   DIAGNOSTICO_GARANTIA: "Diagnóstico de Garantía",
 };
 

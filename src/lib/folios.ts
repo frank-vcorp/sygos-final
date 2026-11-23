@@ -319,7 +319,7 @@ export async function revealAuthorizedIntercompanyOrders(): Promise<void> {
     if (!stub.spawnedFromId || stub.attention.originCompanyId === stub.attention.serviceCompanyId) continue;
     const authorized = await prisma.quote.findFirst({
       where: {
-        quoteType: { in: ["DIAGNOSTICO", "REPARACION"] },
+        quoteType: { in: ["DIAGNOSTICO", "REPARACION", "MANTENIMIENTO_PREVENTIVO"] },
         status: { in: ["AUTORIZADA", "AUTORIZADA_PENDIENTE_EQUIPO"] },
         OR: [
           { technicalCaseId: { in: [stub.spawnedFromId, stub.id] } },

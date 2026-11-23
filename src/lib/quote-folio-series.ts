@@ -1,6 +1,6 @@
 import type { QuoteType } from "./quote-meta";
 
-export const COMMERCIAL_QUOTE_SERIES = ["COTDX", "COTOS", "COTSC", "COTVT", "SCA"] as const;
+export const COMMERCIAL_QUOTE_SERIES = ["COTDX", "COTOS", "COTMP", "COTSC", "COTVT", "SCA"] as const;
 export type CommercialQuoteSeries = (typeof COMMERCIAL_QUOTE_SERIES)[number];
 
 export function commercialQuoteSeriesForType(quoteType: QuoteType): CommercialQuoteSeries {
@@ -9,6 +9,8 @@ export function commercialQuoteSeriesForType(quoteType: QuoteType): CommercialQu
       return "COTDX";
     case "REPARACION":
       return "COTOS";
+    case "MANTENIMIENTO_PREVENTIVO":
+      return "COTMP";
     case "CAMPO":
       return "COTSC";
     case "VENTA_EQUIPO":
@@ -25,7 +27,11 @@ export function isCotosQuote(quote: { quoteType: string; folio: string; technica
   return quote.quoteType === "REPARACION" && isSellerCommercialQuote(quote) && quote.folio.startsWith("COTOS-");
 }
 
+export function isCotmpQuote(quote: { quoteType: string; folio: string; technicalCaseId: string | null }) {
+  return quote.quoteType === "MANTENIMIENTO_PREVENTIVO" && isSellerCommercialQuote(quote) && quote.folio.startsWith("COTMP-");
+}
+
 export function commercialSeriesFromFolio(folio: string): CommercialQuoteSeries | null {
-  const match = /^(COTDX|COTOS|COTSC|COTVT|SCA)-/.exec(folio);
+  const match = /^(COTDX|COTOS|COTMP|COTSC|COTVT|SCA)-/.exec(folio);
   return match ? (match[1] as CommercialQuoteSeries) : null;
 }

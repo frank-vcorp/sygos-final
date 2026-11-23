@@ -130,7 +130,11 @@ function activityReturn(formData: FormData, id?: string | null) {
   });
 }
 
-function priorityReturn(formData: FormData, attentionType: "DIAGNOSTICO" | "REPARACION", savedId: string | null) {
+function priorityReturn(
+  formData: FormData,
+  attentionType: "DIAGNOSTICO" | "REPARACION" | "MANTENIMIENTO_PREVENTIVO",
+  savedId: string | null,
+) {
   return queryBack("/configuracion/prioridades", {
     dx: attentionType === "DIAGNOSTICO" ? savedId : optionalText(formData.get("dx")),
     os: attentionType === "REPARACION" ? savedId : optionalText(formData.get("os")),
@@ -597,7 +601,12 @@ export async function saveRepairPriorityAction(formData: FormData) {
   await savePriority(formData, "REPARACION");
 }
 
-async function savePriority(formData: FormData, attentionType: "DIAGNOSTICO" | "REPARACION") {
+export async function saveMantenimientoPriorityAction(formData: FormData) {
+  "use server";
+  await savePriority(formData, "MANTENIMIENTO_PREVENTIVO");
+}
+
+async function savePriority(formData: FormData, attentionType: "DIAGNOSTICO" | "REPARACION" | "MANTENIMIENTO_PREVENTIVO") {
   const existingId = optionalText(formData.get("priorityId"));
   const back = priorityReturn(formData, attentionType, existingId);
   let savedId = existingId;
@@ -606,10 +615,11 @@ async function savePriority(formData: FormData, attentionType: "DIAGNOSTICO" | "
     const name = requiredText(formData.get("name"), "Nombre");
     const active = activeFromForm(formData);
     const slaMaxDays = requiredSla(formData);
-    const equipmentKind = attentionType === "DIAGNOSTICO"
+    const catalogPriceType = attentionType === "DIAGNOSTICO" || attentionType === "MANTENIMIENTO_PREVENTIVO";
+    const equipmentKind = catalogPriceType
       ? (optionalText(formData.get("equipmentKind")) === "MOT" ? "MOT" : "EQUI")
       : "EQUI";
-    const data = attentionType === "DIAGNOSTICO"
+    const data = catalogPriceType
       ? { name, active, slaMaxDays, price: requiredNonNegative(formData, "price", "Costo fijo") }
       : { name, active, slaMaxDays, incrementPct: requiredPercent(formData) };
     if (existingId) {

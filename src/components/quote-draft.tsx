@@ -35,6 +35,7 @@ export function QuoteDraft({
   catalogByKind,
   fixedQuoteType,
   diagnosisPriorities = [],
+  mantenimientoPriorities = [],
 }: {
   clients: Client[];
   equipment: ServiceEquipmentOption[];
@@ -50,6 +51,7 @@ export function QuoteDraft({
   catalogByKind?: EquipmentCatalogByKind;
   fixedQuoteType?: QuoteType;
   diagnosisPriorities?: PriorityOption[];
+  mantenimientoPriorities?: PriorityOption[];
 }) {
   const [clientId, setClientId] = useState(defaultClientId);
   const [createdClients, setCreatedClients] = useState<Client[]>([]);
@@ -59,10 +61,15 @@ export function QuoteDraft({
     () => filterDiagnosisPrioritiesForEquipment(diagnosisPriorities, companyCode, equipmentKind),
     [diagnosisPriorities, companyCode, equipmentKind],
   );
+  const filteredMantenimientoPriorities = useMemo(
+    () => filterDiagnosisPrioritiesForEquipment(mantenimientoPriorities, companyCode, equipmentKind),
+    [mantenimientoPriorities, companyCode, equipmentKind],
+  );
   const client = [...clients, ...createdClients].find((row) => row.id === clientId);
   const contacts = client?.contacts ?? [];
-  const requiresEquipment = quoteType === "DIAGNOSTICO" || quoteType === "REPARACION";
+  const requiresEquipment = quoteType === "DIAGNOSTICO" || quoteType === "REPARACION" || quoteType === "MANTENIMIENTO_PREVENTIVO";
   const requiresDiagnosisPriority = quoteType === "DIAGNOSTICO" && !fixedQuoteType;
+  const requiresMantenimientoPriority = quoteType === "MANTENIMIENTO_PREVENTIVO" && !fixedQuoteType;
   if (clients.length === 0 && !allowQuickClient) {
     return (
       <p className="rounded-md border border-[#efd0d0] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]">
@@ -86,6 +93,16 @@ export function QuoteDraft({
             <select name="priorityId" className={controlClass} required defaultValue="">
               <option value="">Selecciona</option>
               {filteredDiagnosisPriorities.map((item) => (
+                <option key={item.id} value={item.id}>{item.label}</option>
+              ))}
+            </select>
+          </Field>
+        ) : null}
+        {requiresMantenimientoPriority ? (
+          <Field label="Prioridad del mantenimiento" hint="Obligatoria en COTMP; mismo esquema de catálogo que diagnóstico (precio fijo por prioridad).">
+            <select name="priorityId" className={controlClass} required defaultValue="">
+              <option value="">Selecciona</option>
+              {filteredMantenimientoPriorities.map((item) => (
                 <option key={item.id} value={item.id}>{item.label}</option>
               ))}
             </select>

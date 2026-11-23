@@ -103,7 +103,7 @@ export default async function OperacionDetallePage({ params }: { params: Promise
   const authorizedSiblingQuote = linkedOsCandidate && row.attention.originCompanyId !== row.attention.serviceCompanyId
     ? await prisma.quote.findFirst({
         where: {
-          quoteType: { in: ["DIAGNOSTICO", "REPARACION"] },
+          quoteType: { in: ["DIAGNOSTICO", "REPARACION", "MANTENIMIENTO_PREVENTIVO"] },
           status: { in: ["AUTORIZADA", "AUTORIZADA_PENDIENTE_EQUIPO"] },
           OR: [
             { technicalCaseId: { in: [row.id, linkedOsCandidate.id] } },

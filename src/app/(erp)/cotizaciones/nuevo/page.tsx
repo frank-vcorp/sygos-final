@@ -7,13 +7,13 @@ import { loadEquipmentCatalogByKind } from "@/lib/catalog";
 import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
-import { loadDiagnosisPriorityOptions } from "@/lib/diagnosis-priorities";
+import { loadDiagnosisPriorityOptions, loadMantenimientoPreventivoPriorityOptions } from "@/lib/diagnosis-priorities";
 
 export default async function NuevaCotizacionPage({ searchParams }: { searchParams: Promise<{ clientId?: string }> }) {
   const session = await requireCompany();
   if (!can(session.role, "quote.create", session.activeCompanyCode)) redirect("/cotizaciones");
   const { clientId } = await searchParams;
-  const [clients, equipment, catalog, diagnosisPriorities] = await Promise.all([
+  const [clients, equipment, catalog, diagnosisPriorities, mantenimientoPriorities] = await Promise.all([
     prisma.client.findMany({
       where: { companyId: session.activeCompanyId, active: true, isSystem: false, ...(session.role === "VENTAS" ? { ownerUserId: session.userId } : {}) },
       include: { contacts: { where: { active: true }, orderBy: [{ isPrimary: "desc" }, { name: "asc" }] } },
@@ -26,6 +26,7 @@ export default async function NuevaCotizacionPage({ searchParams }: { searchPara
     }),
     loadEquipmentCatalogByKind(),
     loadDiagnosisPriorityOptions(session.activeCompanyId, session.activeCompanyCode),
+    loadMantenimientoPreventivoPriorityOptions(session.activeCompanyId, session.activeCompanyCode),
   ]);
   const quickEquipmentKinds: Array<"EQUI" | "MOT"> = [
     ...(can(session.role, "equi.create", session.activeCompanyCode) ? ["EQUI" as const] : []),
@@ -35,7 +36,7 @@ export default async function NuevaCotizacionPage({ searchParams }: { searchPara
     <>
       <PageHeader
         title="Nueva cotización"
-        subtitle="Completa cliente, equipo y destinatarios. Diagnóstico (COTDX) toma el precio de la prioridad del catálogo; los demás tipos quedan sin precio hasta coordinación."
+        subtitle="Completa cliente, equipo y destinatarios. COTDX y COTMP toman precio del catálogo de prioridad; COTOS, campo y venta quedan sin precio hasta coordinación."
         back={{ href: "/cotizaciones", label: "Cotizaciones" }}
       />
       <FormPanel action={createQuoteAction}>
@@ -54,9 +55,10 @@ export default async function NuevaCotizacionPage({ searchParams }: { searchPara
             models={catalog.EQUI.models}
             catalogByKind={catalog}
             diagnosisPriorities={diagnosisPriorities}
+            mantenimientoPriorities={mantenimientoPriorities}
           />
         </div>
-        <FormActions note="COTDX: precio automático según prioridad. COTOS, campo y venta de equipo: sin precio hasta que gerencia los complete.">
+        <FormActions note="COTDX/COTMP: precio automático según prioridad. COTOS, campo y venta: sin precio hasta que gerencia los complete.">
           <SubmitButton pendingLabel="Guardando…">Guardar cotización</SubmitButton>
         </FormActions>
       </FormPanel>

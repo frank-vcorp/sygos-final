@@ -102,7 +102,7 @@ export default async function CustodiaPage({ searchParams }: { searchParams: Pro
                 equipmentId: { in: rows.map((row) => row.id) },
                 companyId: session.activeCompanyId,
                 status: "AUTORIZADA_PENDIENTE_EQUIPO",
-                quoteType: { in: ["DIAGNOSTICO", "REPARACION"] },
+                quoteType: { in: ["DIAGNOSTICO", "REPARACION", "MANTENIMIENTO_PREVENTIVO"] },
               },
               select: { equipmentId: true, quoteType: true },
             })

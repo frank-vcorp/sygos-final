@@ -187,7 +187,7 @@ export async function EquipmentDetail({
           equipmentId: equipment.id,
           companyId: session.activeCompanyId,
           status: "AUTORIZADA_PENDIENTE_EQUIPO",
-          quoteType: { in: ["DIAGNOSTICO", "REPARACION"] },
+          quoteType: { in: ["DIAGNOSTICO", "REPARACION", "MANTENIMIENTO_PREVENTIVO"] },
         },
         include: { lines: true },
         orderBy: { createdAt: "desc" },

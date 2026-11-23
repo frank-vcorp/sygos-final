@@ -134,7 +134,7 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
   const mirrorQuote = Boolean(quote.linkedQuoteId && base);
   const priced = quote.status !== "PENDIENTE_COTIZAR" || session.role !== "VENTAS";
   const totals = priced ? quoteTotals(linesForTotal(quote.lines, quote.quoteType, quote.status), quote.discountPct) : null;
-  const waitingEquipment = quote.status === "AUTORIZADA_PENDIENTE_EQUIPO" && !quote.equipmentId && !quote.technicalCaseId && (quote.quoteType === "DIAGNOSTICO" || quote.quoteType === "REPARACION");
+  const waitingEquipment = quote.status === "AUTORIZADA_PENDIENTE_EQUIPO" && !quote.equipmentId && !quote.technicalCaseId && (quote.quoteType === "DIAGNOSTICO" || quote.quoteType === "REPARACION" || quote.quoteType === "MANTENIMIENTO_PREVENTIVO");
   const [gear, priorities, catalog] = waitingEquipment
     ? await Promise.all([
         prisma.equipment.findMany({ where: { originCompanyId: session.activeCompanyId, ...(session.role === "VENTAS" ? { client: { ownerUserId: session.userId } } : {}) }, orderBy: { createdAt: "desc" }, select: { id: true, folio: true, model: true, clientId: true, kind: true, typeName: true, brandName: true, serial: true } }),

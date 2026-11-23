@@ -13,9 +13,9 @@ import { recordHistory } from "./history";
 import { ensureOsStubForDiagnosis } from "./technical";
 import { finalFromBase } from "./money";
 import { ATTENTION_LABEL, isReparacionExpressAttentionType, type AttentionType } from "./priorities";
-import { ensureMotDiagnosisPriorities, ensureReparacionTallerPriorities } from "./priority-catalog";
+import { ensureMantenimientoPreventivoPriorities, ensureMotDiagnosisPriorities, ensureReparacionTallerPriorities } from "./priority-catalog";
 import { commercialSellerQuoteConcept, technicalServiceConcept } from "./quote-concept";
-import { commercialQuoteSeriesForType, isCotosQuote, isSellerCommercialQuote } from "./quote-folio-series";
+import { commercialQuoteSeriesForType, isCotmpQuote, isCotosQuote, isSellerCommercialQuote } from "./quote-folio-series";
 import { createFieldServiceCaseFromQuote, FIELD_SERVICE_DEFAULT_HOURS, parseFieldServicePricing } from "./field-service";
 import type { Role } from "./roles";
 import { QUOTE_STATUS_LABEL, QUOTE_TYPE_LABEL, QUOTE_TYPES, type QuoteType } from "./quote-meta";
@@ -33,6 +33,7 @@ export function commercialAttentionTypeForQuote(quote: {
   technicalCaseId: string | null;
 }): AttentionType {
   if (quote.quoteType === "DIAGNOSTICO") return "DIAGNOSTICO";
+  if (isCotmpQuote(quote)) return "MANTENIMIENTO_PREVENTIVO";
   if (isCotosQuote(quote)) return "REPARACION_TALLER";
   if (quote.quoteType === "REPARACION") return "REPARACION";
   return "DIAGNOSTICO";
@@ -44,7 +45,7 @@ export function commercialCaseKindForQuote(quote: {
   folio: string;
   technicalCaseId: string | null;
 }): "DIAGNOSTICO" | "OS" {
-  if (isCotosQuote(quote)) return "OS";
+  if (isCotosQuote(quote) || isCotmpQuote(quote)) return "OS";
   if (quote.quoteType === "DIAGNOSTICO" && isSellerCommercialQuote(quote)) return "DIAGNOSTICO";
   return quote.quoteType === "REPARACION" ? "OS" : "DIAGNOSTICO";
 }
@@ -64,6 +65,7 @@ async function freezePriorityFromCatalog(
   priorityId: string,
 ) {
   await ensureReparacionTallerPriorities(companyId);
+  await ensureMantenimientoPreventivoPriorities(companyId, companyCode ?? "SYSTRON");
   await ensureMotDiagnosisPriorities(companyId, companyCode ?? "");
   const priority = await prisma.priority.findFirst({
     where: { id: priorityId, companyId, attentionType, active: true },
@@ -223,7 +225,7 @@ export async function ensureQuoteWorkshopSrvReservation(
 ): Promise<number | null> {
   if (quote.reservedServiceNumber != null) return quote.reservedServiceNumber;
   if (quote.technicalCaseId != null) return null;
-  if (quote.quoteType !== "DIAGNOSTICO" && !isCotosQuote(quote)) return null;
+  if (quote.quoteType !== "DIAGNOSTICO" && !isCotosQuote(quote) && !isCotmpQuote(quote)) return null;
   if (!quote.equipmentId) return null;
   const equipment = await prisma.equipment.findUnique({
     where: { id: quote.equipmentId },
@@ -262,7 +264,7 @@ export async function createSellerQuote(
       })
     : null;
   if (input.equipmentId && !equipment) throw new Error("Selecciona un equipo de este cliente.");
-  if (!input.equipmentId && (input.quoteType === "DIAGNOSTICO" || input.quoteType === "REPARACION")) {
+  if (!input.equipmentId && (input.quoteType === "DIAGNOSTICO" || input.quoteType === "REPARACION" || input.quoteType === "MANTENIMIENTO_PREVENTIVO")) {
     throw new Error("Selecciona o registra un equipo para esta cotización.");
   }
   const manualConcepts = input.concepts
@@ -277,6 +279,10 @@ export async function createSellerQuote(
     if (!input.priorityId) throw new Error("Selecciona la prioridad del diagnóstico.");
     frozenPriority = await freezePriorityFromCatalog(actor.activeCompanyId, actor.activeCompanyCode, "DIAGNOSTICO", input.priorityId);
   }
+  if (input.quoteType === "MANTENIMIENTO_PREVENTIVO") {
+    if (!input.priorityId) throw new Error("Selecciona la prioridad del mantenimiento preventivo.");
+    frozenPriority = await freezePriorityFromCatalog(actor.activeCompanyId, actor.activeCompanyCode, "MANTENIMIENTO_PREVENTIVO", input.priorityId);
+  }
   if (input.contactIds.length === 0) throw new Error("Selecciona al menos un contacto.");
   const contacts = await prisma.contact.count({ where: { id: { in: input.contactIds }, clientId: client.id, active: true } });
   if (contacts !== input.contactIds.length) throw new Error("Algún contacto no pertenece al cliente.");
@@ -290,11 +296,12 @@ export async function createSellerQuote(
   const folioSeries = commercialQuoteSeriesForType(input.quoteType);
   const folio = await allocateFolio(actor.activeCompanyId, folioSeries);
   let reservedServiceNumber: number | null = null;
-  if (equipment && (input.quoteType === "DIAGNOSTICO" || input.quoteType === "REPARACION")) {
+  if (equipment && (input.quoteType === "DIAGNOSTICO" || input.quoteType === "REPARACION" || input.quoteType === "MANTENIMIENTO_PREVENTIVO")) {
     const service = await serviceCompanyForEquipment(equipment, actor.activeCompanyId);
     reservedServiceNumber = await allocateServiceNumber(service.id);
   }
-  const diagnosisPricing = input.quoteType === "DIAGNOSTICO" && frozenPriority
+  const catalogPricingType = input.quoteType === "DIAGNOSTICO" || input.quoteType === "MANTENIMIENTO_PREVENTIVO";
+  const diagnosisPricing = catalogPricingType && frozenPriority
     ? diagnosisQuotePricingFromCatalog(frozenPriority.price, frozenPriority.incrementPct, null)
     : { line: {} as Record<string, never>, status: "PENDIENTE_COTIZAR" as const };
   const quote = await prisma.quote.create({
@@ -335,7 +342,7 @@ export async function createSellerQuote(
     entityId: quote.id,
     action: "ALTA",
     summary: diagnosisPricing.status === "PENDIENTE_DECISION"
-      ? `${folio} quedó con precio del catálogo de diagnóstico; pendiente de decisión del cliente.`
+      ? `${folio} quedó con precio del catálogo de prioridad; pendiente de decisión del cliente.`
       : `${folio} quedó pendiente de cotizar. Los contactos elegidos se usan al dar seguimiento.`,
     authorUserId: actor.userId,
   });
@@ -922,7 +929,7 @@ export async function decideQuote(
   if (!authorized && !rejectionReason) throw new Error("Indica por qué el cliente no autorizó la cotización.");
   const chosen = authorized ? quote.lines.filter((line) => quote.quoteType !== "VENTA_EQUIPO" || lineIds.includes(line.id)) : [];
   if (authorized && chosen.length === 0) throw new Error("Selecciona al menos una línea autorizada.");
-  const serviceQuote = quote.quoteType === "DIAGNOSTICO" || quote.quoteType === "REPARACION";
+  const serviceQuote = quote.quoteType === "DIAGNOSTICO" || quote.quoteType === "REPARACION" || quote.quoteType === "MANTENIMIENTO_PREVENTIVO";
   const equipment = quote.equipmentId
     ? await prisma.equipment.findUnique({ where: { id: quote.equipmentId } })
     : null;
@@ -938,6 +945,13 @@ export async function decideQuote(
     && equipment?.holderCompanyId
     && !quote.technicalCaseId,
   );
+  const cotmpInShop = Boolean(
+    authorized
+    && isCotmpQuote(quote)
+    && received
+    && equipment?.holderCompanyId
+    && !quote.technicalCaseId,
+  );
   const cotdxInShop = Boolean(
     authorized
     && quote.quoteType === "DIAGNOSTICO"
@@ -946,7 +960,7 @@ export async function decideQuote(
     && equipment?.holderCompanyId
     && !quote.technicalCaseId,
   );
-  const needsEquipment = authorized && serviceQuote && diagnosis?.kind !== "OS" && !received && !cotosInShop && !cotdxInShop;
+  const needsEquipment = authorized && serviceQuote && diagnosis?.kind !== "OS" && !received && !cotosInShop && !cotmpInShop && !cotdxInShop;
   const status = !authorized ? "NO_AUTORIZADA" : needsEquipment ? "AUTORIZADA_PENDIENTE_EQUIPO" : "AUTORIZADA";
   const creditDays = quote.client.creditDays;
   const saleFolio = status === "AUTORIZADA" && quote.quoteType === "VENTA_EQUIPO" ? await allocateFolio(quote.companyId, "VTA") : null;
@@ -1061,19 +1075,22 @@ export async function decideQuote(
     && equipment
     && activeQuote
     && isSellerCommercialQuote(activeQuote)
-    && (activeQuote.quoteType === "DIAGNOSTICO" || isCotosQuote(activeQuote))
+    && (activeQuote.quoteType === "DIAGNOSTICO" || isCotosQuote(activeQuote) || isCotmpQuote(activeQuote))
   ) {
     await ensureCommercialAttentionBeforeWarehouse(actor, activeQuote, equipment);
   }
   if (authorized && cotosInShop && equipment && activeQuote) {
     await openCotosRepairFromQuote(actor, activeQuote, equipment.id);
   }
+  if (authorized && cotmpInShop && equipment && activeQuote) {
+    await openCotmpMaintenanceFromQuote(actor, activeQuote, equipment.id);
+  }
   if (authorized && cotdxInShop && equipment && activeQuote) {
     await openCotdxFromQuote(actor, activeQuote, equipment.id);
   }
 }
 
-/** Atención ABIERTA tras autorizar COTDX/COTOS comercial con equipo aún fuera de resguardo (ingreso en almacén). */
+/** Atención ABIERTA tras autorizar COTDX/COTOS/COTMP comercial con equipo aún fuera de resguardo (ingreso en almacén). */
 async function ensureCommercialAttentionBeforeWarehouse(
   actor: Actor,
   quote: {
@@ -1113,6 +1130,9 @@ async function ensureCommercialAttentionBeforeWarehouse(
   const fromQuote = frozenPriorityFromQuote(quote);
   if (!fromQuote && quote.quoteType === "DIAGNOSTICO") {
     throw new Error("La cotización COTDX no tiene prioridad congelada.");
+  }
+  if (!fromQuote && isCotmpQuote(quote)) {
+    throw new Error("La cotización COTMP no tiene prioridad congelada.");
   }
   if (!fromQuote && isCotosQuote(quote)) {
     await ensureReparacionTallerPriorities(actor.activeCompanyId);
@@ -1177,7 +1197,9 @@ export async function relateQuoteEquipment(actor: Actor, quoteId: string, versio
   });
   if (!quote || quote.status !== "AUTORIZADA_PENDIENTE_EQUIPO") throw new Error("Esta cotización no está esperando el equipo.");
   if (quote.technicalCaseId) throw new Error("Esta cotización ya tiene operación técnica.");
-  if (quote.quoteType !== "DIAGNOSTICO" && quote.quoteType !== "REPARACION") throw new Error("Este tipo no abre operación al ingresar el equipo.");
+  if (quote.quoteType !== "DIAGNOSTICO" && quote.quoteType !== "REPARACION" && quote.quoteType !== "MANTENIMIENTO_PREVENTIVO") {
+    throw new Error("Este tipo no abre operación al ingresar el equipo.");
+  }
   const equipment = await prisma.equipment.findFirst({ where: { id: equipmentId, originCompanyId: actor.activeCompanyId, clientId: quote.clientId } });
   if (!equipment) throw new Error("El equipo no es de este cliente en esta empresa.");
   const attentionType = commercialAttentionTypeForQuote(quote);
@@ -1486,6 +1508,97 @@ async function openCotosRepairFromQuote(
   const created = await openCase(attention.id, attention.slaStartedAt ?? new Date());
   if (!created) return;
   await linkCommercialQuoteToTechnicalCase(quote.id, equipment.id, created.id, quote);
+}
+
+async function openCotmpMaintenanceFromQuote(
+  actor: Actor,
+  quote: {
+    id: string;
+    companyId: string;
+    clientId: string;
+    sellerUserId: string | null;
+    lines: Array<{ authorized: boolean; concept: string; unitPrice: number | null; basePrice: number | null; incrementPct: number | null }>;
+    priorityName: string | null;
+    priorityPrice: number | null;
+    priorityIncrementPct: number | null;
+    priorityTargetMinDays: number | null;
+    priorityTargetMaxDays: number | null;
+    prioritySlaMaxDays: number | null;
+  },
+  equipmentId: string,
+) {
+  const equipment = await prisma.equipment.findUnique({ where: { id: equipmentId } });
+  if (!equipment) return;
+  const service = equipment.kind === "MOT"
+    ? await prisma.company.findUnique({ where: { code: "SERVOMOTORES" } })
+    : await prisma.company.findUnique({ where: { id: actor.activeCompanyId } });
+  if (!service || equipment.holderCompanyId !== service.id) return;
+  const existing = await prisma.attention.findFirst({
+    where: { originQuoteId: quote.id },
+    include: { technicalCases: true },
+  });
+  if (existing) {
+    const osCase = existing.technicalCases.find((row) => row.kind === "OS");
+    if (osCase) {
+      await linkCommercialQuoteToTechnicalCase(quote.id, equipment.id, osCase.id);
+      return;
+    }
+    const slaStartedAt = existing.slaStartedAt ?? new Date();
+    if (!existing.slaStartedAt) {
+      await prisma.attention.update({
+        where: { id: existing.id },
+        data: { status: "EN_PROCESO", slaStartedAt },
+      });
+    }
+    const { openCase } = await import("./technical");
+    const created = await openCase(existing.id, slaStartedAt);
+    if (!created) return;
+    await linkCommercialQuoteToTechnicalCase(quote.id, equipment.id, created.id);
+    return;
+  }
+  const fromQuote = frozenPriorityFromQuote(quote);
+  if (!fromQuote) throw new Error("La cotización COTMP no tiene prioridad congelada.");
+  const concept = quote.lines.find((line) => line.authorized)?.concept ?? quote.lines[0]?.concept ?? "Mantenimiento preventivo autorizado";
+  const quotePriceLine = quote.lines.find((line) => line.authorized && line.unitPrice != null) ?? quote.lines.find((line) => line.unitPrice != null);
+  const stored = await prisma.quote.findUnique({
+    where: { id: quote.id },
+    select: {
+      id: true,
+      quoteType: true,
+      folio: true,
+      equipmentId: true,
+      technicalCaseId: true,
+      reservedServiceNumber: true,
+    },
+  });
+  const reservedServiceNumber = stored
+    ? await ensureQuoteWorkshopSrvReservation(stored, actor.activeCompanyId)
+    : null;
+  const attention = await prisma.attention.create({
+    data: {
+      equipmentId: equipment.id,
+      originCompanyId: equipment.originCompanyId,
+      serviceCompanyId: service.id,
+      adminClientId: quote.clientId,
+      attentionType: "MANTENIMIENTO_PREVENTIVO",
+      priorityName: fromQuote.name,
+      priorityPrice: quotePriceLine?.basePrice ?? fromQuote.price,
+      priorityIncrementPct: quotePriceLine?.incrementPct ?? fromQuote.incrementPct,
+      priorityTargetMin: fromQuote.targetMinDays,
+      priorityTargetMax: fromQuote.targetMaxDays,
+      prioritySlaMaxDays: fromQuote.slaMaxDays,
+      reportedFault: concept,
+      sellerUserId: quote.sellerUserId,
+      originQuoteId: quote.id,
+      status: "EN_PROCESO",
+      slaStartedAt: new Date(),
+      ...(reservedServiceNumber != null ? { serviceNumber: reservedServiceNumber } : {}),
+    },
+  });
+  const { openCase } = await import("./technical");
+  const created = await openCase(attention.id, attention.slaStartedAt ?? new Date());
+  if (!created) return;
+  await linkCommercialQuoteToTechnicalCase(quote.id, equipment.id, created.id);
 }
 
 export async function openWaitingRepairs(equipmentId: string, authorUserId: string) {

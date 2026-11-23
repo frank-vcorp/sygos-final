@@ -20,11 +20,20 @@ export function resolveEntradaAttentionType(
   if (attention) return attention.attentionType;
   if (quoteType === "REPARACION") return "REPARACION";
   if (quoteType === "DIAGNOSTICO") return "DIAGNOSTICO";
+  if (quoteType === "MANTENIMIENTO_PREVENTIVO") return "MANTENIMIENTO_PREVENTIVO";
   return null;
 }
 
 export function entradaServiceBadge(attentionType: string | null | undefined, quoteType?: string | null): EntradaServiceBadge | null {
-  const resolved = attentionType ?? (quoteType === "REPARACION" ? "REPARACION" : quoteType === "DIAGNOSTICO" ? "DIAGNOSTICO" : null);
+  const resolved =
+    attentionType
+    ?? (quoteType === "REPARACION"
+      ? "REPARACION"
+      : quoteType === "DIAGNOSTICO"
+        ? "DIAGNOSTICO"
+        : quoteType === "MANTENIMIENTO_PREVENTIVO"
+          ? "MANTENIMIENTO_PREVENTIVO"
+          : null);
   if (!resolved) return null;
   return serviceSeries(resolved);
 }
@@ -73,12 +82,22 @@ export function buildAlmacenEntradaPreset(input: {
       clientName: input.clientName,
     };
   }
-  if (input.quoteType === "REPARACION" || input.quoteType === "DIAGNOSTICO") {
-    const reason = input.quoteType === "REPARACION" ? REPARACION_RECEIPT_REASON : "Diagnóstico";
+  if (input.quoteType === "REPARACION" || input.quoteType === "DIAGNOSTICO" || input.quoteType === "MANTENIMIENTO_PREVENTIVO") {
+    const reason =
+      input.quoteType === "REPARACION"
+        ? REPARACION_RECEIPT_REASON
+        : input.quoteType === "MANTENIMIENTO_PREVENTIVO"
+          ? "Mantenimiento preventivo"
+          : "Diagnóstico";
     return {
       movement,
       reason,
-      serviceLabel: input.quoteType === "REPARACION" ? ATTENTION_LABEL.REPARACION : "Diagnóstico",
+      serviceLabel:
+        input.quoteType === "REPARACION"
+          ? ATTENTION_LABEL.REPARACION
+          : input.quoteType === "MANTENIMIENTO_PREVENTIVO"
+            ? ATTENTION_LABEL.MANTENIMIENTO_PREVENTIVO
+            : "Diagnóstico",
       reportedFault: input.quoteConcept ?? "Servicio autorizado",
       clientName: input.clientName,
     };

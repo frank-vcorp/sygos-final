@@ -5,7 +5,7 @@ import { join } from "path";
 import { describe, it } from "node:test";
 
 describe("commercial quote folios", () => {
-  it("series COTDX/COTOS/COTSC/COTVT/SCA son independientes", async () => {
+  it("series COTDX/COTOS/COTMP/COTSC/COTVT/SCA son independientes", async () => {
     const dir = mkdtempSync(join(tmpdir(), "sygos-cot-"));
     process.env.DATABASE_URL = `file:${join(dir, "test.db")}`;
     const { execSync } = await import("child_process");
@@ -19,6 +19,7 @@ describe("commercial quote folios", () => {
     const company = await prisma.company.create({ data: { code: "COTCO", name: "COT" } });
     assert.equal(await allocateFolio(company.id, "COTDX"), "COTDX-1");
     assert.equal(await allocateFolio(company.id, "COTOS"), "COTOS-1");
+    assert.equal(await allocateFolio(company.id, "COTMP"), "COTMP-1");
     assert.equal(await allocateFolio(company.id, "COTSC"), "COTSC-1");
     assert.equal(await allocateFolio(company.id, "COTVT"), "COTVT-1");
     assert.equal(await allocateFolio(company.id, "SCA"), "SCA-1");
@@ -100,6 +101,80 @@ describe("commercial quote folios", () => {
     assert.equal(stored!.lines.length, 1);
     assert.match(stored!.lines[0]!.concept, /^Diagnóstico/);
     assert.equal(stored!.lines[0]!.unitPrice, 3500);
+    await prisma.$disconnect();
+  });
+
+  it("createSellerQuote asigna COTMP y congela prioridad de mantenimiento", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "sygos-cotmp-"));
+    process.env.DATABASE_URL = `file:${join(dir, "test.db")}`;
+    const { execSync } = await import("child_process");
+    execSync("npx prisma db push --skip-generate", {
+      cwd: join(import.meta.dirname, "../.."),
+      env: process.env,
+      stdio: "ignore",
+    });
+    const { prisma } = await import("./db");
+    const { createSellerQuote } = await import("./quotes");
+    const { initialPriorities } = await import("./priorities");
+    const { defaultSellerQuoteCommercialTerms } = await import("./quote-commercial-terms");
+
+    const company = await prisma.company.create({ data: { code: "SYMP", name: "Systron" } });
+    for (const row of initialPriorities("SYSTRON")) {
+      await prisma.priority.create({ data: { companyId: company.id, ...row } });
+    }
+    const user = await prisma.user.create({
+      data: { username: "v-mp", name: "V", passwordHash: "x", role: "VENTAS", companyId: company.id },
+    });
+    const client = await prisma.client.create({
+      data: {
+        companyId: company.id,
+        name: "Cliente",
+        ownerUserId: user.id,
+        active: true,
+        isSystem: false,
+        requiresInvoice: true,
+        rfc: "XAXX010101000",
+        cfdiUse: "G03",
+        paymentMethod: "PUE",
+      },
+    });
+    const contact = await prisma.contact.create({ data: { clientId: client.id, name: "Contacto", active: true, isPrimary: true } });
+    const equipment = await prisma.equipment.create({
+      data: {
+        folio: "EQUI-MP",
+        kind: "EQUI",
+        originCompanyId: company.id,
+        clientId: client.id,
+        model: "M",
+        custody: "SIN_CUSTODIA",
+        createdByUserId: user.id,
+      },
+    });
+    const priority = await prisma.priority.findFirst({
+      where: { companyId: company.id, attentionType: "MANTENIMIENTO_PREVENTIVO", name: "Alta" },
+    });
+    assert.ok(priority);
+
+    const quote = await createSellerQuote(
+      { userId: user.id, role: "VENTAS", activeCompanyId: company.id, activeCompanyCode: "SYSTRON" },
+      {
+        clientId: client.id,
+        quoteType: "MANTENIMIENTO_PREVENTIVO",
+        equipmentId: equipment.id,
+        reference: null,
+        concepts: [],
+        contactIds: [contact.id],
+        priorityId: priority!.id,
+        ...defaultSellerQuoteCommercialTerms,
+      },
+    );
+    assert.match(quote.folio, /^COTMP-/);
+    assert.equal(quote.priorityName, "Alta");
+    assert.equal(quote.status, "PENDIENTE_DECISION");
+    const stored = await prisma.quote.findUnique({ where: { id: quote.id }, include: { lines: true } });
+    assert.match(stored!.lines[0]!.concept, /^Mantenimiento preventivo/);
+    assert.equal(stored!.lines[0]!.unitPrice, 3500);
+    assert.equal(stored!.reservedServiceNumber, 1);
     await prisma.$disconnect();
   });
 

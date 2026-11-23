@@ -9,7 +9,7 @@ const FUNCTIONAL_HISTORY_OPS = ["OPERACION", "COTIZACION", "FACTURACION"] as con
 export const serviceQuoteWhere: Prisma.QuoteWhereInput = {
   OR: [
     {
-      quoteType: { in: ["DIAGNOSTICO", "REPARACION"] },
+      quoteType: { in: ["DIAGNOSTICO", "REPARACION", "MANTENIMIENTO_PREVENTIVO"] },
       technicalCaseId: { not: null },
     },
     { folio: { startsWith: "COT-" } },
