@@ -59,6 +59,10 @@ import { redirectIfSalesNotAssigned } from "@/lib/sales-assignment";
 import { serviciosBandejaHref } from "@/lib/servicios-catalog";
 import { HISTORIAL_CASE } from "@/lib/servicios-supervisor";
 import { requireCompany } from "@/lib/session";
+import {
+  mergeTechnicalLogs,
+  technicalCaseIdsForMergedBitacora,
+} from "@/lib/technical-log-merge";
 import { definitiveExitAuthorized, findEnablingBillingDocument } from "@/lib/warehouse-exit";
 
 export default async function OperacionDetallePage({ params }: { params: Promise<{ id: string }> }) {
@@ -93,7 +97,7 @@ export default async function OperacionDetallePage({ params }: { params: Promise
   const displayFolio = displayCompanyCaseFolio(row.folio, row.attention, session.activeCompanyId);
   const siblingCases = await prisma.technicalCase.findMany({
     where: { attentionId: row.attentionId, id: { not: row.id } },
-    select: { id: true, folio: true, kind: true, quotePending: true },
+    select: { id: true, folio: true, kind: true, quotePending: true, spawnedFromId: true },
   });
   const linkedOsCandidate = siblingCases.find((item) => item.kind === "OS") ?? null;
   const authorizedSiblingQuote = linkedOsCandidate && row.attention.originCompanyId !== row.attention.serviceCompanyId
@@ -122,8 +126,34 @@ export default async function OperacionDetallePage({ params }: { params: Promise
   const technicianOwned = row.assigneeUserId === session.userId || row.finishedByUserId === session.userId;
   if (session.role === "TECNICO" && !technicianOwned) notFound();
   const readOnly = !owns || session.role === "COORDINACION_ADMINISTRACION";
+  const bitacoraCaseIds = technicalCaseIdsForMergedBitacora(
+    { id: row.id, kind: row.kind, spawnedFromId: row.spawnedFromId },
+    siblingCases,
+  );
+  const bitacoraMerged = bitacoraCaseIds.length > 1;
+  const bitacoraCasesMeta = [
+    { id: row.id, folio: row.folio, kind: row.kind, spawnedFromId: row.spawnedFromId },
+    ...siblingCases.filter((item) => bitacoraCaseIds.includes(item.id)),
+  ];
+  const knownBitacoraMetaIds = new Set(bitacoraCasesMeta.map((item) => item.id));
+  const missingBitacoraCaseIds = bitacoraCaseIds.filter((id) => !knownBitacoraMetaIds.has(id));
+  if (missingBitacoraCaseIds.length) {
+    bitacoraCasesMeta.push(
+      ...(await prisma.technicalCase.findMany({
+        where: { id: { in: missingBitacoraCaseIds } },
+        select: { id: true, folio: true, kind: true, spawnedFromId: true },
+      })),
+    );
+  }
+  const bitacoraLogs = bitacoraMerged
+    ? await prisma.technicalLog.findMany({
+        where: { caseId: { in: bitacoraCaseIds } },
+        orderBy: { createdAt: "asc" },
+      })
+    : row.logs;
+  const mergedBitacora = mergeTechnicalLogs(row.id, bitacoraCasesMeta, bitacoraLogs);
   const authors = await prisma.user.findMany({
-    where: { id: { in: row.logs.map((item) => item.authorUserId) } },
+    where: { id: { in: mergedBitacora.map((item) => item.authorUserId) } },
     select: { id: true, name: true },
   });
   const names = new Map(authors.map((user) => [user.id, user.name]));
@@ -678,10 +708,22 @@ export default async function OperacionDetallePage({ params }: { params: Promise
             <h2 className="font-medium">Bitácora</h2>
             <p className="mt-1 text-sm text-[var(--muted)]">Las entradas no se editan ni se borran. Una corrección es una entrada nueva.</p>
             <ul className="mt-3 space-y-2 text-sm">
-              {row.logs.map((item) => (
+              {mergedBitacora.map((item) => (
                 <li key={item.id} className="border-t border-[var(--line)] pt-2">
-                  <span className="text-[var(--muted)]">{formatWhen(item.createdAt)} · {names.get(item.authorUserId) ?? "—"}</span>
-                  <p>{item.body}</p>
+                  <div className="flex flex-wrap items-center gap-x-1 gap-y-1 text-[var(--muted)]">
+                    <span>
+                      {formatWhen(item.createdAt)} · {names.get(item.authorUserId) ?? "—"}
+                    </span>
+                    {bitacoraMerged ? (
+                      <>
+                        <Badge tone={item.caseKind === "OS" ? "ok" : "neutral"}>{item.caseKindLabel}</Badge>
+                        <span className="text-xs font-medium text-[#38506c]">
+                          {displayCompanyCaseFolio(item.caseFolio, row.attention, session.activeCompanyId)}
+                        </span>
+                      </>
+                    ) : null}
+                  </div>
+                  <p className="mt-0.5">{item.body}</p>
                 </li>
               ))}
             </ul>
