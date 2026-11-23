@@ -122,7 +122,6 @@ export const NAV_GROUPS: NavGroupDef[] = [
       { href: "/cobranza", show: (role, code) => ventas(role) && can(role, "receivable.view", code) },
       { href: "/facturacion", show: (role, code) => ventas(role) && (can(role, "invoice.request", code) || can(role, "invoice.issue", code)) },
       { href: "/pagos", show: (role, code) => ventas(role) && (can(role, "payment.register", code) || can(role, "payment.validate", code)) },
-      { href: "/personal/horas", show: (role, code) => ventas(role) && can(role, "overtime.capture", code) },
       { href: "/proveedores", show: (role, code) => notVentas(role) && can(role, "supplier.operate", code) },
       { href: "/usuarios", show: (role) => notVentas(role) && can(role, "user.manage") },
     ],

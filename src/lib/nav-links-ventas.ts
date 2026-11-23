@@ -48,10 +48,7 @@ export const VENTAS_NAV_GROUPS: NavGroupDef[] = [
   },
   {
     title: "Cuenta",
-    links: [
-      { href: "/personal/horas", label: "Horas extra", show: (role, code) => ventas(role) && can(role, "overtime.capture", code) },
-      { href: "/cuenta", label: "Usuario", show: ventas },
-    ],
+    links: [{ href: "/cuenta", label: "Usuario", show: ventas }],
   },
   requerimientosNavGroup(),
 ];
