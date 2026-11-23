@@ -19,6 +19,7 @@ import { recordHistory } from "./history";
 import { linesForTotal, quoteTotals, roundMoney } from "./money";
 import type { Role } from "./roles";
 import { SALES_NOT_ASSIGNED_MESSAGE } from "./sales-assignment";
+import { assertClientFiscalReadyForInvoice } from "./client-fiscal";
 import { resolvePaymentFormForDocument } from "./sat-payment-method";
 
 type Actor = { userId: string; role: Role; activeCompanyId: string; activeCompanyCode: string };
@@ -173,11 +174,8 @@ export async function requestFromQuote(actor: Actor, quoteId: string, kind: "FAC
     return requestFromFieldServiceCase(actor, quote.fieldServiceCase.id, kind, amount);
   }
   if (actor.role === "VENTAS" && quote.sellerUserId !== actor.userId) throw new Error(SALES_NOT_ASSIGNED_MESSAGE);
-  if (quote.client.requiresInvoice === true && kind === "REMISION") {
-    throw new Error("Este cliente requiere factura (CFDI).");
-  }
-  if (quote.client.requiresInvoice !== true && kind === "FACTURA") {
-    throw new Error("Este cliente no está marcado como que requiere factura; usa remisión.");
+  if (kind === "FACTURA") {
+    assertClientFiscalReadyForInvoice(quote.client);
   }
   if (quote.technicalCaseId && kind === "FACTURA") {
     const linkedCase = await prisma.technicalCase.findUnique({

@@ -3,6 +3,7 @@ import { requestDocumentAction, requestIntercompanyAction } from "@/app/(erp)/fa
 import { decideAction, discountAction, linkBaseAction, relateEquipmentAction, sendQuoteMailAction, setPricesAction, updateGeneratedConceptAction, updateSellerConceptComplementAction } from "../actions";
 import { RelateEquipmentForm } from "@/components/relate-equipment-form";
 import { HistoryTimeline } from "@/components/history-timeline";
+import { QuoteBillingRequestActions } from "@/components/quote-billing-request-actions";
 import { QuoteDecisionActions } from "@/components/quote-decision-actions";
 import { QuoteSellerDecisionDiscountPanel, QuoteSellerDecisionHeaderActions, QuoteSellerDecisionRoot } from "@/components/quote-seller-decision";
 import { QuoteConcept } from "@/components/quote-concept";
@@ -528,13 +529,21 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
                   <Button type="submit" tone="ghost">Solicitar factura a SYSTRON</Button>
                 </form>
               ) : !quote.client.isSystem ? (
-                <form action={requestDocumentAction}>
-                  <input type="hidden" name="quoteId" value={quote.id} />
-                  <input type="hidden" name="kind" value={quote.client.requiresInvoice ? "FACTURA" : "REMISION"} />
-                  <Button type="submit" tone="ghost">
-                    {quote.client.requiresInvoice ? "Solicitar factura" : "Solicitar remisión"}
-                  </Button>
-                </form>
+                <QuoteBillingRequestActions
+                  quoteId={quote.id}
+                  client={{
+                    id: quote.client.id,
+                    name: quote.client.name,
+                    satLegalName: quote.client.satLegalName,
+                    rfc: quote.client.rfc,
+                    taxRegime: quote.client.taxRegime,
+                    cfdiUse: quote.client.cfdiUse,
+                    paymentMethod: quote.client.paymentMethod,
+                    fiscalZip: quote.client.fiscalZip,
+                  }}
+                  canEditClient={canEditClient}
+                  requestDocumentAction={requestDocumentAction}
+                />
               ) : null}
             </div>
           ) : null}

@@ -34,6 +34,8 @@ describe("factura de Servomotores al solicitar la del cliente final", () => {
         isSystem: false,
         requiresInvoice: true,
         rfc: "XAXX010101000",
+        taxRegime: "601",
+        fiscalZip: "64000",
         cfdiUse: "G03",
         paymentMethod: "PUE",
         ownerUserId: seller.id,
