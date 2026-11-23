@@ -13,8 +13,19 @@ const prisma = new PrismaClient();
 async function main() {
   const systron = await prisma.company.upsert({
     where: { code: "SYSTRON" },
-    update: { name: "SYSTRON", inventoryEnabled: true },
-    create: { code: "SYSTRON", name: "SYSTRON", inventoryEnabled: true },
+    update: {
+      name: "SYSTRON",
+      inventoryEnabled: true,
+      phone: "442 525 8219",
+      email: "administracion@systron.mx",
+    },
+    create: {
+      code: "SYSTRON",
+      name: "SYSTRON",
+      inventoryEnabled: true,
+      phone: "442 525 8219",
+      email: "administracion@systron.mx",
+    },
   });
   const servomotores = await prisma.company.upsert({
     where: { code: "SERVOMOTORES" },

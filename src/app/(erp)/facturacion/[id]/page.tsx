@@ -247,6 +247,13 @@ export default async function DocumentoPage({ params }: { params: Promise<{ id: 
           </>
         }
         primaryAction={primaryAction}
+        secondaryActions={
+          row.kind === "REMISION" ? (
+            <TextLink href={`/documentos/remision/${row.id}`}>Imprimir</TextLink>
+          ) : row.kind === "FACTURA" || row.kind === "FACTURA_LIBRE" || row.kind === "FACTURA_INTERCOMPANIA" ? (
+            <TextLink href={`/documentos/factura/${row.id}`}>Imprimir</TextLink>
+          ) : null
+        }
       />
 
       {row.fiscalEnv === "TEST" && row.fiscalStatus === "TIMBRADA" ? (

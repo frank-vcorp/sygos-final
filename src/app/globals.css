@@ -86,22 +86,44 @@ summary {
     display: block !important;
   }
 
-  .quote-document {
+  .quote-document,
+  .sygos-document {
     width: 100%;
     color: #111827;
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
   }
 
-  .quote-document thead {
+  .quote-document thead,
+  .sygos-document thead {
     display: table-header-group;
   }
 
   .quote-document tr,
   .quote-document dl,
-  .quote-document footer {
+  .quote-document footer,
+  .sygos-document tr,
+  .sygos-document dl,
+  .sygos-document footer {
     break-inside: avoid;
   }
+}
+
+/* Tokens por empresa — ver src/lib/company-theme.ts */
+[data-company="SYSTRON"] {
+  --accent: #a61e24;
+  --accent-soft: #fceaea;
+  --accent-secondary: #c9a227;
+}
+
+[data-company="SERVOMOTORES"] {
+  --accent: #1b4965;
+  --accent-soft: #e3edf5;
+  --accent-secondary: #64748b;
+}
+
+.sygos-document .doc-print-header {
+  box-shadow: inset 0 -3px 0 0 var(--accent-secondary);
 }
 
 

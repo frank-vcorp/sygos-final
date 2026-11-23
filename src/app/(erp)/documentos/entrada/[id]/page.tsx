@@ -1,9 +1,11 @@
 import { notFound } from "next/navigation";
-import { CompanyLogo } from "@/components/brand-logo";
-import { PrintButton } from "@/components/print-button";
-import { ClientNameLink } from "@/components/client-entity-links";
-import { TextLink } from "@/components/ui";
+import { DocumentFooter } from "@/components/documents/document-footer";
+import { DocumentHeader } from "@/components/documents/document-header";
+import { DocumentPartyGrid, buildCommercialClientParty } from "@/components/documents/document-party-grid";
+import { DocumentPrintShell } from "@/components/documents/document-print-shell";
+import { DocumentSignatureRow } from "@/components/documents/document-signature-row";
 import { prisma } from "@/lib/db";
+import { companyDisplayName, primaryContact } from "@/lib/document-print";
 import { serviceClientForCompany } from "@/lib/intercompany-client";
 import { formatWhen } from "@/lib/form";
 import { MOVEMENT_LABEL, type MovementKind } from "@/lib/custody";
@@ -17,8 +19,12 @@ export default async function EntradaDocumentoPage({ params }: { params: Promise
     where: { id, companyId: session.activeCompanyId },
     include: {
       company: true,
-      attention: { include: { adminClient: true } },
-      equipment: { include: { client: true } },
+      attention: {
+        include: {
+          adminClient: { include: { contacts: { where: { active: true }, orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }] } } },
+        },
+      },
+      equipment: { include: { client: { include: { contacts: { where: { active: true }, orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }] } } } } },
     },
   });
   if (!movement || !movement.folio || (movement.kind !== "ENTRADA" && movement.kind !== "INGRESO")) notFound();
@@ -35,87 +41,74 @@ export default async function EntradaDocumentoPage({ params }: { params: Promise
     ? serviceClientForCompany(session.activeCompanyId, movement.attention, movement.equipment.client)
     : movement.equipment.client;
   const issued = movement.occurredAt.toLocaleDateString("es-MX", { timeZone: "America/Mexico_City", dateStyle: "long" });
+  const clientContacts =
+    shownClient.id === movement.equipment.client.id
+      ? movement.equipment.client.contacts
+      : (movement.attention?.adminClient?.contacts ?? movement.equipment.client.contacts);
+  const contact = primaryContact(clientContacts);
+  const clientParty = buildCommercialClientParty(shownClient, contact);
 
   return (
-    <div className="mx-auto max-w-4xl space-y-4 print:max-w-none">
-      <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
-        <TextLink href={backHref}>Volver al equipo</TextLink>
-        <PrintButton />
-      </div>
-      <article className="quote-document overflow-hidden rounded-lg border border-[var(--line)] bg-white text-sm print:rounded-none print:border-0">
-        <header className="border-b-4 border-[var(--accent)] px-6 py-6 sm:px-10">
-          <div className="flex flex-wrap items-start justify-between gap-6">
-            <div>
-              <CompanyLogo code={movement.company.code} />
-              <p className="mt-3 font-semibold">{movement.company.legalName || movement.company.name}</p>
-            </div>
-            <div className="min-w-52 text-right">
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">{title}</p>
-              <p className="mt-1 text-3xl font-semibold text-[var(--accent)]">{movement.folio}</p>
-              <p className="mt-1">{issued}</p>
-              <p className="mt-1 text-xs text-[var(--muted)]">{formatWhen(movement.occurredAt)}</p>
-            </div>
-          </div>
-        </header>
+    <DocumentPrintShell companyCode={movement.company.code} backHref={backHref} backLabel="Volver al equipo">
+      <DocumentHeader
+        company={movement.company}
+        docTitle={title}
+        folio={movement.folio}
+        issued={issued}
+        timeLine={formatWhen(movement.occurredAt)}
+      />
 
-        <div className="px-6 py-6 sm:px-10">
-          <section className="grid gap-4 rounded-lg bg-[#f7f8f9] p-4 sm:grid-cols-2">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Cliente</p>
-              <p className="mt-1 text-base font-semibold">
-                <ClientNameLink
-                  clientId={shownClient.id}
-                  name={shownClient.name}
-                  isSystem={shownClient.isSystem}
-                />
-              </p>
-            </div>
-            <div className="sm:text-right">
+      <div className="px-6 py-6 sm:px-10">
+        <DocumentPartyGrid
+          clientName={clientParty.clientName}
+          clientLines={clientParty.clientLines}
+          right={
+            <>
               <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Equipo</p>
               <p className="mt-1 font-medium">{movement.equipment.folio}</p>
-              <p className="text-sm text-[var(--muted)]">{[movement.equipment.typeName, movement.equipment.brandName, movement.equipment.model].filter(Boolean).join(" · ")}</p>
+              <p className="text-sm text-[var(--muted)]">
+                {[movement.equipment.typeName, movement.equipment.brandName, movement.equipment.model].filter(Boolean).join(" · ")}
+              </p>
               {movement.equipment.serial ? <p className="text-sm text-[var(--muted)]">Serie: {movement.equipment.serial}</p> : null}
-            </div>
+            </>
+          }
+        />
+
+        <section className="mt-6 grid gap-3 text-sm sm:grid-cols-2">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Servicio</p>
+            <p className="mt-1 font-medium">{movement.reason}</p>
+            {movement.attention ? <p className="mt-1 text-[var(--muted)]">Falla: {movement.attention.reportedFault}</p> : null}
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Movimiento</p>
+            <p className="mt-1">{MOVEMENT_LABEL[movement.kind as MovementKind] ?? movement.kind}</p>
+            <p className="mt-1 text-[var(--muted)]">Confirmó almacén: {author?.name ?? "—"}</p>
+            {seller ? <p className="text-[var(--muted)]">Vendedor: {seller.name}</p> : null}
+          </div>
+        </section>
+
+        {movement.notes ? (
+          <section className="mt-6">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Observaciones</p>
+            <p className="mt-1 whitespace-pre-wrap">{movement.notes}</p>
           </section>
+        ) : null}
 
-          <section className="mt-6 grid gap-3 text-sm sm:grid-cols-2">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Servicio</p>
-              <p className="mt-1 font-medium">{movement.reason}</p>
-              {movement.attention ? <p className="mt-1 text-[var(--muted)]">Falla: {movement.attention.reportedFault}</p> : null}
-            </div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Movimiento</p>
-              <p className="mt-1">{MOVEMENT_LABEL[movement.kind as MovementKind] ?? movement.kind}</p>
-              <p className="mt-1 text-[var(--muted)]">Confirmó almacén: {author?.name ?? "—"}</p>
-              {seller ? <p className="text-[var(--muted)]">Vendedor: {seller.name}</p> : null}
-            </div>
-          </section>
+        <DocumentSignatureRow
+          slots={[
+            { key: "deliver", label: "Entrega (vendedor / quien trae el equipo)", caption: "Nombre y firma" },
+            { key: "warehouse", label: "Recibe almacén", caption: `${author?.name ?? "—"} · firma` },
+          ]}
+        />
 
-          {movement.notes ? (
-            <section className="mt-6">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Observaciones</p>
-              <p className="mt-1 whitespace-pre-wrap">{movement.notes}</p>
-            </section>
-          ) : null}
+        <p className="mt-8 text-xs text-[var(--muted)]">
+          Documento generado al confirmar la {MOVEMENT_LABEL[movement.kind as MovementKind]?.toLowerCase() ?? "recepción"} física.
+          Conserva una copia firmada para el expediente del equipo.
+        </p>
 
-          <section className="mt-10 grid gap-10 border-t border-[var(--line)] pt-8 sm:grid-cols-2">
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Entrega (vendedor / quien trae el equipo)</p>
-              <div className="mt-12 border-t border-[var(--line)] pt-2 text-sm text-[var(--muted)]">Nombre y firma</div>
-            </div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Recibe almacén</p>
-              <div className="mt-12 border-t border-[var(--line)] pt-2 text-sm text-[var(--muted)]">{author?.name ?? "—"} · firma</div>
-            </div>
-          </section>
-
-          <p className="mt-8 text-xs text-[var(--muted)]">
-            Documento generado al confirmar la {MOVEMENT_LABEL[movement.kind as MovementKind]?.toLowerCase() ?? "recepción"} física.
-            Conserva una copia firmada para el expediente del equipo.
-          </p>
-        </div>
-      </article>
-    </div>
+        <DocumentFooter issuerName={companyDisplayName(movement.company)} folio={movement.folio} />
+      </div>
+    </DocumentPrintShell>
   );
 }

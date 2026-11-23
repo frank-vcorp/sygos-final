@@ -2,11 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import { companyThemeDataAttribute } from "@/lib/company-theme";
+
 export function ErpShell({
+  companyCode,
   sidebar,
   toolbar,
   children,
 }: {
+  companyCode?: string | null;
   sidebar: React.ReactNode;
   toolbar: React.ReactNode;
   children: React.ReactNode;
@@ -43,6 +47,7 @@ export function ErpShell({
   return (
     <div
       data-erp-shell
+      data-company={companyThemeDataAttribute(companyCode)}
       data-sidebar-collapsed={collapsed ? "true" : "false"}
       className={`min-h-screen md:grid ${collapsed ? "md:grid-cols-[72px_minmax(0,1fr)]" : "md:grid-cols-[280px_minmax(0,1fr)]"}`}
     >
@@ -57,7 +62,7 @@ export function ErpShell({
           ☰
         </button>
         <span className="inline-flex items-center gap-2 text-sm font-bold tracking-tight text-slate-900">
-          <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-[#0a477e] text-[11px] font-bold text-white shadow-2xs">
+          <span className="inline-flex h-6 w-6 items-center justify-center rounded-md bg-[var(--accent)] text-[11px] font-bold text-white shadow-2xs">
             S
           </span>
           SYGOS
@@ -95,7 +100,7 @@ export function ErpShell({
           <button
             type="button"
             onClick={toggleCollapsed}
-            className="inline-flex min-h-9 min-w-9 items-center justify-center rounded-lg border border-slate-200/90 bg-white text-xl font-medium text-slate-600 shadow-2xs hover:border-slate-300 hover:bg-slate-50 hover:text-[#0a477e]"
+            className="inline-flex min-h-9 min-w-9 items-center justify-center rounded-lg border border-slate-200/90 bg-white text-xl font-medium text-slate-600 shadow-2xs hover:border-slate-300 hover:bg-slate-50 hover:text-[var(--accent)]"
             aria-label={collapsed ? "Expandir menú lateral" : "Contraer menú lateral"}
             title={collapsed ? "Expandir menú lateral" : "Contraer menú lateral"}
           >

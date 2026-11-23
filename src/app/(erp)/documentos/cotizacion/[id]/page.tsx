@@ -1,10 +1,14 @@
 import { notFound } from "next/navigation";
-import { CompanyLogo } from "@/components/brand-logo";
-import { PrintButton } from "@/components/print-button";
+import { DocumentFooter } from "@/components/documents/document-footer";
+import { DocumentHeader } from "@/components/documents/document-header";
+import { DocumentLegalNotes } from "@/components/documents/document-legal-notes";
+import { DocumentLinesTableCommercial } from "@/components/documents/document-lines-table";
+import { DocumentPartyGrid, buildCommercialClientParty } from "@/components/documents/document-party-grid";
+import { DocumentPrintShell } from "@/components/documents/document-print-shell";
+import { DocumentTotalsBox } from "@/components/documents/document-totals-box";
 import { QuoteConcept } from "@/components/quote-concept";
-import { ClientNameLink } from "@/components/client-entity-links";
-import { TextLink } from "@/components/ui";
 import { prisma } from "@/lib/db";
+import { companyDisplayName, primaryContact } from "@/lib/document-print";
 import { linesForTotal, money, quoteTotals } from "@/lib/money";
 import { quotePaymentConditionDisplay, warrantyMonthsLabel } from "@/lib/quote-commercial-terms";
 import { QUOTE_STATUS_LABEL, QUOTE_TYPE_LABEL, quoteRequiresDeliveryDays, type QuoteType } from "@/lib/quotes";
@@ -13,111 +17,89 @@ import { requireCompany } from "@/lib/session";
 export default async function CotizacionDocumentoPage({ params }: { params: Promise<{ id: string }> }) {
   const session = await requireCompany();
   const { id } = await params;
-  const quote = await prisma.quote.findFirst({ where: { id, companyId: session.activeCompanyId }, include: { client: true, company: true, lines: true } });
+  const quote = await prisma.quote.findFirst({
+    where: { id, companyId: session.activeCompanyId },
+    include: {
+      client: { include: { contacts: { where: { active: true }, orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }] } } },
+      company: true,
+      lines: true,
+    },
+  });
   if (!quote) notFound();
   const lines = linesForTotal(quote.lines, quote.quoteType, quote.status);
   const totals = quoteTotals(lines, quote.discountPct);
   const seller = quote.sellerUserId ? await prisma.user.findUnique({ where: { id: quote.sellerUserId }, select: { name: true } }) : null;
   const issued = quote.createdAt.toLocaleDateString("es-MX", { timeZone: "America/Mexico_City", dateStyle: "long" });
+  const contact = primaryContact(quote.client.contacts);
+  const clientParty = buildCommercialClientParty(quote.client, contact);
+
   return (
-    <div className="mx-auto max-w-4xl space-y-4 print:max-w-none">
-      <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
-        <TextLink href={`/cotizaciones/${quote.id}`}>Volver a la cotización</TextLink>
-        <PrintButton />
-      </div>
-      <article className="quote-document overflow-hidden rounded-lg border border-[var(--line)] bg-white text-sm print:rounded-none print:border-0">
-      <header className="border-b-4 border-[var(--accent)] px-6 py-6 sm:px-10">
-        <div className="flex flex-wrap items-start justify-between gap-6">
-          <div>
-            <CompanyLogo code={quote.company.code} />
-            <p className="mt-3 font-semibold">{quote.company.legalName || quote.company.name}</p>
-            <p className="text-xs text-[var(--muted)]">RFC: {quote.company.rfc || "Pendiente"}</p>
-            {quote.company.fiscalAddress ? <p className="max-w-md text-xs text-[var(--muted)]">{quote.company.fiscalAddress}</p> : null}
-          </div>
-          <div className="min-w-52 text-right">
-            <p className="text-xs font-semibold uppercase tracking-[0.2em] text-[var(--muted)]">Cotización</p>
-            <p className="mt-1 text-3xl font-semibold text-[var(--accent)]">{quote.folio}</p>
-            <p className="mt-1">{issued}</p>
-            <p className="mt-2 inline-flex rounded-full bg-[var(--accent-soft)] px-3 py-1 text-xs font-semibold text-[var(--accent)]">{QUOTE_STATUS_LABEL[quote.status] ?? quote.status}</p>
-          </div>
-        </div>
-      </header>
+    <DocumentPrintShell companyCode={quote.company.code} backHref={`/cotizaciones/${quote.id}`} backLabel="Volver a la cotización">
+      <DocumentHeader
+        company={quote.company}
+        docTitle="Cotización"
+        folio={quote.folio}
+        issued={issued}
+        statusBadge={{ label: QUOTE_STATUS_LABEL[quote.status] ?? quote.status }}
+      />
 
       <div className="px-6 py-6 sm:px-10">
-        <section className="grid gap-4 rounded-lg bg-[#f7f8f9] p-4 sm:grid-cols-2">
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Cliente</p>
-            <p className="mt-1 text-base font-semibold">
-              <ClientNameLink
-                clientId={quote.client.id}
-                name={quote.client.name}
-                isSystem={quote.client.isSystem}
-              />
+        <DocumentPartyGrid
+          clientName={clientParty.clientName}
+          clientLines={clientParty.clientLines}
+          right={
+            <>
+              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Servicio</p>
+              <p className="mt-1 font-medium">{QUOTE_TYPE_LABEL[quote.quoteType as QuoteType] ?? quote.quoteType}</p>
+              {seller ? <p className="text-sm text-[var(--muted)]">Atiende: {seller.name}</p> : null}
+            </>
+          }
+        />
+
+        <DocumentLinesTableCommercial
+          lines={lines.map((line, index) => ({
+            id: line.id,
+            concept: <QuoteConcept concept={line.concept} complement={index === 0 ? quote.sellerConceptComplement : null} />,
+            quantity: line.quantity,
+            unitPrice: money(line.unitPrice),
+            amount: line.unitPrice == null ? "Pendiente" : money(line.unitPrice * line.quantity),
+          }))}
+        />
+
+        <DocumentTotalsBox
+          rows={
+            totals
+              ? [
+                  { key: "sub", label: "Subtotal", value: money(totals.subtotal) },
+                  ...(totals.discount > 0
+                    ? [{ key: "disc", label: `Descuento (${quote.discountPct}%)`, value: `− ${money(totals.discount)}` }]
+                    : []),
+                  { key: "iva", label: "IVA 16%", value: money(totals.iva) },
+                  { key: "tot", label: "Total", value: money(totals.total), emphasis: true },
+                ]
+              : []
+          }
+          emptyFallback={<div className="w-[280px] font-medium text-[var(--warn)]">Cotización pendiente de precio.</div>}
+        />
+
+        <DocumentLegalNotes>
+          {warrantyMonthsLabel(quote.warrantyMonths) ? <p>Garantía: {warrantyMonthsLabel(quote.warrantyMonths)}.</p> : null}
+          <p>Condición de pago: {quotePaymentConditionDisplay(quote.paymentCondition, quote.creditDays)}.</p>
+          {quote.reference ? <p className="whitespace-pre-wrap">Referencia: {quote.reference}</p> : null}
+          {quoteRequiresDeliveryDays(quote) && quote.deliveryBusinessDays != null ? (
+            <p>Tiempo de entrega: {quote.deliveryBusinessDays} días hábiles.</p>
+          ) : null}
+          {quoteRequiresDeliveryDays(quote) && quote.slaDueAt ? (
+            <p>
+              Fecha de entrega:{" "}
+              {quote.slaDueAt.toLocaleDateString("es-MX", { timeZone: "America/Mexico_City", dateStyle: "long" })}.
             </p>
-            {quote.client.rfc ? <p className="text-sm text-[var(--muted)]">RFC: {quote.client.rfc}</p> : null}
-          </div>
-          <div className="sm:text-right">
-            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Servicio</p>
-            <p className="mt-1 font-medium">{QUOTE_TYPE_LABEL[quote.quoteType as QuoteType] ?? quote.quoteType}</p>
-            {seller ? <p className="text-sm text-[var(--muted)]">Atiende: {seller.name}</p> : null}
-          </div>
-        </section>
+          ) : null}
+          <p>Importes expresados en pesos mexicanos (MXN).</p>
+        </DocumentLegalNotes>
 
-        <table className="mt-6 w-full text-left">
-          <thead>
-            <tr className="bg-[var(--accent)] text-white">
-              <th className="px-3 py-2.5">Concepto</th>
-              <th className="w-24 px-3 py-2.5 text-center">Cantidad</th>
-              <th className="w-36 px-3 py-2.5 text-right">Precio unitario</th>
-              <th className="w-36 px-3 py-2.5 text-right">Importe</th>
-            </tr>
-          </thead>
-          <tbody>
-            {lines.map((line, index) => (
-              <tr key={line.id} className="border-b border-[var(--line)]">
-                <td className="px-3 py-3"><QuoteConcept concept={line.concept} complement={index === 0 ? quote.sellerConceptComplement : null} /></td>
-                <td className="px-3 py-3 text-center">{line.quantity}</td>
-                <td className="px-3 py-3 text-right">{money(line.unitPrice)}</td>
-                <td className="px-3 py-3 text-right font-medium">{line.unitPrice == null ? "Pendiente" : money(line.unitPrice * line.quantity)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        <div className="mt-6 grid gap-6 sm:grid-cols-[1fr_280px]">
-          <div className="text-sm">
-            {quote.reference ? <div><p className="text-xs font-semibold uppercase tracking-wide text-[var(--muted)]">Información complementaria</p><p className="mt-1 whitespace-pre-wrap">{quote.reference}</p></div> : null}
-            <p className="mt-4 text-[var(--muted)]">Condición de pago: {quotePaymentConditionDisplay(quote.paymentCondition, quote.creditDays)}.</p>
-            {warrantyMonthsLabel(quote.warrantyMonths) ? (
-              <p className="mt-1 text-[var(--muted)]">Garantía: {warrantyMonthsLabel(quote.warrantyMonths)}.</p>
-            ) : null}
-            {quoteRequiresDeliveryDays(quote) && quote.deliveryBusinessDays != null ? (
-              <p className="mt-1 text-[var(--muted)]">Tiempo de entrega: {quote.deliveryBusinessDays} días hábiles.</p>
-            ) : null}
-            {quoteRequiresDeliveryDays(quote) && quote.slaDueAt ? (
-              <p className="mt-1 text-[var(--muted)]">
-                Fecha de entrega: {quote.slaDueAt.toLocaleDateString("es-MX", { timeZone: "America/Mexico_City", dateStyle: "long" })}.
-              </p>
-            ) : null}
-            <p className="mt-1 text-[var(--muted)]">Importes expresados en pesos mexicanos.</p>
-          </div>
-          <dl className="space-y-2 rounded-lg border border-[var(--line)] p-4">
-            {totals ? (
-              <>
-                <div className="flex justify-between gap-4"><dt>Subtotal</dt><dd>{money(totals.subtotal)}</dd></div>
-                {totals.discount > 0 ? <div className="flex justify-between gap-4"><dt>Descuento ({quote.discountPct}%)</dt><dd>− {money(totals.discount)}</dd></div> : null}
-                <div className="flex justify-between gap-4"><dt>IVA 16%</dt><dd>{money(totals.iva)}</dd></div>
-                <div className="flex justify-between gap-4 border-t border-[var(--line)] pt-3 text-lg font-semibold text-[var(--accent)]"><dt>Total</dt><dd>{money(totals.total)}</dd></div>
-              </>
-            ) : <div className="font-medium text-[var(--warn)]">Cotización pendiente de precio.</div>}
-          </dl>
-        </div>
-
-        <footer className="mt-10 border-t border-[var(--line)] pt-4 text-center text-xs text-[var(--muted)]">
-          Documento emitido por {quote.company.legalName || quote.company.name} · {quote.folio}
-        </footer>
+        <DocumentFooter issuerName={companyDisplayName(quote.company)} folio={quote.folio} />
       </div>
-    </article>
-    </div>
+    </DocumentPrintShell>
   );
 }
