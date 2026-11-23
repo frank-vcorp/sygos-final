@@ -19,6 +19,7 @@ function row(partial: Partial<ServicioBandejaRow>): ServicioBandejaRow {
     kind: "servicio",
     id: "a1",
     equipmentId: "e1",
+    equipmentKind: "EQUI",
     equipmentHref: "/equipos/e1",
     equipmentLabel: "EQ-1",
     diagnosisFolio: null,

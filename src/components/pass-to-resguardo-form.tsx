@@ -17,7 +17,6 @@ export function PassToResguardoForm({
   clientId,
   clientName,
   clientIsSystem = false,
-  defaultOccurredAt,
   direct = false,
 }: {
   equipmentId: string;
@@ -31,7 +30,6 @@ export function PassToResguardoForm({
   clientId: string;
   clientName: string;
   clientIsSystem?: boolean;
-  defaultOccurredAt?: string;
   /** Un solo clic desde la cabecera del equipo (sin overlay ni resumen). */
   direct?: boolean;
 }) {
@@ -49,15 +47,6 @@ export function PassToResguardoForm({
     return (
       <form action={movementAction} className="inline-flex flex-wrap items-center gap-2">
         {fields}
-        {defaultOccurredAt ? (
-          <input
-            type="datetime-local"
-            name="occurredAt"
-            defaultValue={defaultOccurredAt}
-            aria-label="Fecha y hora de entrada"
-            className={`${controlClass} w-auto`}
-          />
-        ) : null}
         <Button type="submit">Pasar a resguardo</Button>
       </form>
     );
@@ -79,11 +68,6 @@ export function PassToResguardoForm({
         <div><dt className="text-[var(--muted)]">Falla reportada</dt><dd>{reportedFault}</dd></div>
         <div><dt className="text-[var(--muted)]">Movimiento</dt><dd>{MOVEMENT_LABEL[movement]}</dd></div>
       </dl>
-      {defaultOccurredAt ? (
-        <Field label="Fecha y hora de entrada">
-          <input type="datetime-local" name="occurredAt" defaultValue={defaultOccurredAt} className={controlClass} />
-        </Field>
-      ) : null}
       <Button type="submit">Pasar a resguardo</Button>
     </form>
   );

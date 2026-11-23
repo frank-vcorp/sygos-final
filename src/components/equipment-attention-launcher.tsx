@@ -25,8 +25,7 @@ export function EquipmentAttentionLauncher({
   sellers = [],
   defaultSellerUserId = "",
   canSelectSeller = false,
-  canEditOrderDate = false,
-  defaultCreatedAt = "",
+  canCaptureLegacyFolio = false,
 }: {
   equipmentId: string;
   equipmentFolio: string;
@@ -39,8 +38,7 @@ export function EquipmentAttentionLauncher({
   sellers?: SellerOption[];
   defaultSellerUserId?: string;
   canSelectSeller?: boolean;
-  canEditOrderDate?: boolean;
-  defaultCreatedAt?: string;
+  canCaptureLegacyFolio?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [attentionType, setAttentionType] = useState<AttentionType | "">("");
@@ -112,14 +110,11 @@ export function EquipmentAttentionLauncher({
               </select>
             </Field>
           ) : null}
-          {canEditOrderDate ? (
-            <Field label="Fecha de creación de orden" hint="Opcional. Por defecto usa la fecha actual.">
-              <input name="createdAt" type="datetime-local" defaultValue={defaultCreatedAt} className={controlClass} />
+          {canCaptureLegacyFolio ? (
+            <Field label="Folio del sistema anterior" hint="Opcional. Referencia del folio histórico.">
+              <input name="legacyFolio" placeholder="Ej. OS-1234" className={controlClass} />
             </Field>
           ) : null}
-          <Field label="Folio del sistema anterior" hint="Opcional. Referencia del folio histórico.">
-            <input name="legacyFolio" placeholder="Ej. OS-1234" className={controlClass} />
-          </Field>
           <div className="flex flex-wrap justify-end gap-2">
             <Button type="button" tone="ghost" onClick={() => setOpen(false)}>Cancelar</Button>
             <Button type="submit" disabled={!canSubmit}>Crear atención</Button>

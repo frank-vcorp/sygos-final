@@ -17,7 +17,7 @@ import { prisma } from "@/lib/db";
 import { listCompanySellers } from "@/lib/equipment-service";
 import { displayCompanyCaseFolio, ensureOriginCompanyServiceNumbers } from "@/lib/folios";
 import { serviceClientForCompany } from "@/lib/intercompany-client";
-import { formatMexicoDateTimeLocalValue, formatWhen } from "@/lib/form";
+import { formatWhen } from "@/lib/form";
 import { historyFor } from "@/lib/history";
 import { can, canListMotors } from "@/lib/permissions";
 import { openPendingCases } from "@/lib/technical";
@@ -163,9 +163,6 @@ export async function EquipmentDetail({
   const activeServiceLabel = openAttention
     ? ATTENTION_LABEL[openAttention.attentionType as AttentionType] ?? openAttention.attentionType
     : null;
-  const defaultReceiptAt = openAttention
-    ? formatMexicoDateTimeLocalValue(openAttention.createdAt)
-    : formatMexicoDateTimeLocalValue(new Date());
   const receiptPreset =
     simplifiedReceipt && receiptMovement && openAttention && receiptReason
       ? {
@@ -176,7 +173,6 @@ export async function EquipmentDetail({
           clientId: equipment.client.id,
           clientName: equipment.client.name,
           clientIsSystem: intercompany,
-          defaultOccurredAt: defaultReceiptAt,
         }
       : undefined;
   const backLabel = listHref === "/custodia" ? "Almacén" : expectedKind === "EQUI" ? "Equipos" : "Motores";
@@ -241,8 +237,7 @@ export async function EquipmentDetail({
         sellers={sellers}
         defaultSellerUserId={equipment.client.ownerUserId ?? ""}
         canSelectSeller={session.role !== "VENTAS"}
-        canEditOrderDate={session.role !== "VENTAS"}
-        defaultCreatedAt={formatMexicoDateTimeLocalValue(new Date())}
+        canCaptureLegacyFolio={session.role === "GERENTE_OPERATIVO_SYSTRON"}
       />
     );
   } else if (canMove && movementOptions.length > 0 && !showCreateAttentionFromEquipment && !custodyDetail) {
@@ -290,7 +285,6 @@ export async function EquipmentDetail({
           clientId={shownClient.id}
           clientName={shownClient.name}
           clientIsSystem={shownClient.isSystem}
-          defaultOccurredAt={defaultReceiptAt}
         />
       )
       : null;

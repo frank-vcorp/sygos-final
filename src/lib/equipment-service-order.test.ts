@@ -34,7 +34,7 @@ describe("órdenes desde Gerente Operativo SYSTRON: vendedor, folio anterior y m
     });
 
     const { prisma } = await import("./db");
-    const { registerMovement, startService } = await import("./equipment-service");
+    const { createAttention, createEqui, registerMovement, startService } = await import("./equipment-service");
     const { listActiveServicios } = await import("./servicios-supervisor");
     const { ensureQuoteFromCase } = await import("./quotes");
 
@@ -189,7 +189,7 @@ describe("órdenes desde Gerente Operativo SYSTRON: vendedor, folio anterior y m
       assert.equal(row.diagnosisFolio, "DX-1");
     }
 
-    // Segunda orden sin ingreso inmediato, seguida de ingreso físico manual con la fecha de la atención
+    // Segunda orden sin ingreso inmediato; el ingreso físico desde equipo usa la hora del servidor (no la de captura)
     const secondDate = parseMexicoDateTimeInput("2026-10-08T09:15")!;
     const att2 = await startService(actor, {
       attentionType: "DIAGNOSTICO",
@@ -216,12 +216,13 @@ describe("órdenes desde Gerente Operativo SYSTRON: vendedor, folio anterior y m
     assert.equal(eq2.folio, "EQUI-2");
     assert.equal(eq2.custody, "SIN_CUSTODIA");
 
+    const movementStartMs = Date.now();
     await registerMovement(actor, {
       equipmentId: eq2.id,
       version: eq2.version,
       kind: "ENTRADA",
       reason: "Diagnóstico",
-      occurredAt: att2.createdAt,
+      occurredAt: secondDate,
       receiverName: null,
       deliveryMode: null,
       contact: null,
@@ -235,10 +236,71 @@ describe("órdenes desde Gerente Operativo SYSTRON: vendedor, folio anterior y m
       include: { technicalCases: true, movements: true },
     });
     const dx2 = storedAtt2.technicalCases.find((c) => c.kind === "DIAGNOSTICO")!;
+    const entrada2 = storedAtt2.movements[0]!;
     assert.equal(dx2.folio, "DX-2");
-    assert.equal(storedAtt2.movements[0]!.folio, "ENT-2");
-    assert.equal(storedAtt2.slaStartedAt?.toISOString(), secondDate.toISOString());
-    assert.equal(dx2.createdAt.toISOString(), secondDate.toISOString());
-    assert.equal(dx2.slaDueAt?.toISOString(), addBusinessDays(secondDate, 3).toISOString());
+    assert.equal(entrada2.folio, "ENT-2");
+    assert.equal(storedAtt2.createdAt.toISOString(), secondDate.toISOString());
+    assert.notEqual(storedAtt2.slaStartedAt?.toISOString(), secondDate.toISOString());
+    assert.equal(storedAtt2.slaStartedAt?.toISOString(), entrada2.occurredAt.toISOString());
+    assert.ok(entrada2.occurredAt.getTime() >= movementStartMs - 2000);
+    assert.ok(entrada2.occurredAt.getTime() <= Date.now() + 2000);
+    assert.equal(dx2.slaDueAt?.toISOString(), addBusinessDays(entrada2.occurredAt, 3).toISOString());
+
+    const admin = await prisma.user.create({
+      data: { username: "admin-lf", name: "Admin LF", passwordHash: "x", role: "ADMINISTRADOR", companyId: systron.id },
+    });
+    const adminActor = {
+      userId: admin.id,
+      role: "ADMINISTRADOR",
+      activeCompanyId: systron.id,
+      activeCompanyCode: "SYSTRON",
+    };
+    const legacyBase = {
+      attentionType: "DIAGNOSTICO" as const,
+      clientId: client.id,
+      newClientName: null,
+      contactName: null,
+      equipmentId: null,
+      equipmentKind: "EQUI" as const,
+      model: "ATV320",
+      typeName: "Variador",
+      brandName: "Schneider",
+      priorityId: priority.id,
+      reportedFault: "Prueba restricción legacy",
+      antecedent: null,
+      originalCaseId: null,
+      initialLog: null,
+    };
+    await assert.rejects(
+      () => startService(adminActor, { ...legacyBase, serial: "SER-LF-TAMPER", legacyFolio: "SYS-TAMPER" }),
+      /folio del sistema anterior/,
+    );
+    const adminAtt = await startService(adminActor, { ...legacyBase, serial: "SER-LF-OK" });
+    const adminStored = await prisma.attention.findUniqueOrThrow({ where: { id: adminAtt.id } });
+    assert.equal(adminStored.legacyFolio, null);
+
+    const equiSoloFecha = await createEqui(adminActor, {
+      clientId: client.id,
+      typeName: "Variador",
+      brandName: "ABB",
+      model: "ACS580",
+      description: null,
+      serial: "SER-DATE",
+    });
+    const tamperedCapture = parseMexicoDateTimeInput("2015-06-01T12:00")!;
+    await assert.rejects(
+      () =>
+        createAttention(adminActor, {
+          equipmentId: equiSoloFecha.id,
+          attentionType: "DIAGNOSTICO",
+          priorityId: priority.id,
+          reportedFault: "Prueba fecha",
+          antecedent: null,
+          originalCaseId: null,
+          createdAt: tamperedCapture,
+          version: equiSoloFecha.version,
+        }),
+      /automáticamente/,
+    );
   });
 });

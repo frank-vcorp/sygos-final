@@ -34,9 +34,10 @@ export async function startServiceAction(formData: FormData) {
       ? optionalText(formData.get("priorityId"))
       : requiredText(formData.get("priorityId"), "Prioridad");
     const allowOrderOverrides = session.role !== "VENTAS";
-    const createdAt = allowOrderOverrides ? parseMexicoDateTimeInput(formData.get("createdAt")) : null;
+    const gerenteSystron = session.role === "GERENTE_OPERATIVO_SYSTRON";
+    const createdAt = gerenteSystron ? parseMexicoDateTimeInput(formData.get("createdAt")) : null;
     const confirmPhysicalReceipt =
-      allowOrderOverrides
+      gerenteSystron
       && formData.get("confirmPhysicalReceipt") === "si"
       && can(session.role, "custody.confirm", session.activeCompanyCode);
     const sellerUserId = allowOrderOverrides && formData.has("sellerUserId")
@@ -59,7 +60,9 @@ export async function startServiceAction(formData: FormData) {
       originalCaseId: optionalText(formData.get("originalCaseId")),
       initialLog: optionalText(formData.get("initialLog")),
       sellerUserId,
-      legacyFolio: optionalText(formData.get("legacyFolio")),
+      legacyFolio: session.role === "GERENTE_OPERATIVO_SYSTRON"
+        ? optionalText(formData.get("legacyFolio"))
+        : undefined,
       createdAt,
       confirmPhysicalReceipt,
     });

@@ -107,7 +107,6 @@ export function WarehouseExitFormAlmacen({
         <p className="text-sm text-[var(--muted)]">
           Equipo <span className="font-medium text-[var(--ink)]">{equipmentFolio}</span>. Mientras el DX sigue abierto (sin validar), la salida será a prueba. Recibe: {sellerName}.
         </p>
-        <Field label="Fecha y hora"><input name="occurredAt" type="datetime-local" className={controlClass} /></Field>
         <Field label="Observaciones"><textarea name="notes" rows={2} className={controlClass} /></Field>
         <Button type="submit">Registrar salida</Button>
       </form>
@@ -153,7 +152,6 @@ export function WarehouseExitFormAlmacen({
             <option value="paqueteria">Paquetería</option>
           </select>
         </Field>
-        <Field label="Fecha y hora"><input name="occurredAt" type="datetime-local" className={controlClass} /></Field>
         <Field label="Observaciones"><textarea name="notes" rows={2} className={controlClass} /></Field>
         <Button type="submit">Registrar salida</Button>
       </form>

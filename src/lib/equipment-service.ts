@@ -67,6 +67,34 @@ function normalizeLegacyFolio(value: string | null | undefined): string | null {
   return trimmed.length ? trimmed : null;
 }
 
+function resolveAttentionCreatedAt(
+  actor: Actor,
+  input: { createdAt?: Date | null; allowCustomCreatedAt?: boolean },
+): Date {
+  if (input.allowCustomCreatedAt && actor.role === "GERENTE_OPERATIVO_SYSTRON") {
+    return input.createdAt ?? new Date();
+  }
+  if (input.createdAt != null) {
+    throw new Error("La fecha de creación se asigna automáticamente en este flujo.");
+  }
+  return new Date();
+}
+
+function resolveMovementOccurredAt(input: { occurredAt: Date; allowCustomOccurredAt?: boolean }): Date {
+  return input.allowCustomOccurredAt ? input.occurredAt : new Date();
+}
+
+function resolveLegacyFolioForActor(actor: Actor, value: string | null | undefined): string | null {
+  if (actor.role !== "GERENTE_OPERATIVO_SYSTRON") {
+    const trimmed = value?.trim() ?? "";
+    if (trimmed.length > 0) {
+      throw new Error("Solo el Gerente Operativo puede capturar el folio del sistema anterior.");
+    }
+    return null;
+  }
+  return normalizeLegacyFolio(value);
+}
+
 async function ownClient(actor: Actor, clientId: string) {
   const client = await prisma.client.findFirst({
     where: { id: clientId, companyId: actor.activeCompanyId, active: true, isSystem: false },
@@ -203,7 +231,7 @@ export async function createMot(
   if (!isAttentionType(input.attentionType)) throw new Error("Selecciona el tipo de atención.");
   const client = await ownClient(actor, input.clientId);
   const sellerUserId = await resolveAttentionSellerUserId(actor, client.ownerUserId, input.sellerUserId);
-  const legacyFolio = normalizeLegacyFolio(input.legacyFolio);
+  const legacyFolio = resolveLegacyFolioForActor(actor, input.legacyFolio);
   const occurredAt = input.createdAt ?? new Date();
   const identity = await rememberCatalog(input.typeName, input.brand ?? "", input.model, "MOT");
   const priority = await resolveFrozenPriority(actor.activeCompanyId, input.attentionType, input.priorityId);
@@ -292,6 +320,7 @@ export async function createAttention(
     sellerUserId?: string | null;
     legacyFolio?: string | null;
     createdAt?: Date | null;
+    allowCustomCreatedAt?: boolean;
     version: number;
   },
 ) {
@@ -302,8 +331,11 @@ export async function createAttention(
   }
   const client = await ownClient(actor, equipment.clientId);
   const sellerUserId = await resolveAttentionSellerUserId(actor, client.ownerUserId, input.sellerUserId);
-  const legacyFolio = normalizeLegacyFolio(input.legacyFolio);
-  const attentionCreatedAt = input.createdAt ?? new Date();
+  const legacyFolio = resolveLegacyFolioForActor(actor, input.legacyFolio);
+  const attentionCreatedAt = resolveAttentionCreatedAt(actor, {
+    createdAt: input.createdAt,
+    allowCustomCreatedAt: input.allowCustomCreatedAt,
+  });
   const reportedFault = input.reportedFault?.trim() || "";
   if (!reportedFault) throw new Error("Indica la falla reportada.");
   let originalCaseId = input.originalCaseId;
@@ -442,7 +474,8 @@ export async function startService(
   if (input.sellerUserId !== undefined) {
     await resolveAttentionSellerUserId(actor, null, input.sellerUserId);
   }
-  const orderDate = input.createdAt ?? null;
+  const allowCustomCreatedAt = actor.role === "GERENTE_OPERATIVO_SYSTRON";
+  const orderDate = allowCustomCreatedAt ? (input.createdAt ?? null) : null;
   let equipmentId = input.equipmentId;
   let version = 1;
   if (!equipmentId) {
@@ -505,6 +538,7 @@ export async function startService(
     sellerUserId: input.sellerUserId,
     legacyFolio: input.legacyFolio,
     createdAt: orderDate,
+    allowCustomCreatedAt,
     version,
   });
   if (input.equipmentKind === "MOT") {
@@ -532,6 +566,7 @@ export async function startService(
         kind: "ENTRADA",
         reason,
         occurredAt: attention.createdAt,
+        allowCustomOccurredAt: allowCustomCreatedAt,
         receiverName: null,
         deliveryMode: null,
         contact: null,
@@ -559,8 +594,10 @@ export async function registerMovement(
     supplierId: string | null;
     notes: string | null;
     technicalCaseId?: string | null;
+    allowCustomOccurredAt?: boolean;
   },
 ) {
+  const occurredAt = resolveMovementOccurredAt(input);
   const equipment = await prisma.equipment.findUnique({ where: { id: input.equipmentId } });
   if (!equipment) throw new Error("No se encontró el equipo.");
   assertMovementCompany(actor, equipment.kind);
@@ -661,19 +698,19 @@ export async function registerMovement(
         supplierId: input.supplierId,
         notes: input.notes,
         authorUserId: actor.userId,
-        occurredAt: input.occurredAt,
+        occurredAt,
       },
     });
     movementId = created.id;
     if (isReceipt(input.kind)) {
       await tx.attention.updateMany({
         where: { equipmentId: equipment.id, slaStartedAt: null },
-        data: { status: "EN_PROCESO", slaStartedAt: input.occurredAt },
+        data: { status: "EN_PROCESO", slaStartedAt: occurredAt },
       });
     }
   });
   if (isReceipt(input.kind)) {
-    await openPendingCases(equipment.id, input.occurredAt);
+    await openPendingCases(equipment.id, occurredAt);
     const { openWaitingRepairs } = await import("./quotes");
     await openWaitingRepairs(equipment.id, actor.userId);
   }
@@ -684,7 +721,7 @@ export async function registerMovement(
     action: "CUSTODIA",
     summary: folio ? `${folio} confirmado. Custodia: ${custody}.` : `${input.kind} confirmado. Custodia: ${custody}.`,
     authorUserId: actor.userId,
-    ...(receipt ? { createdAt: input.occurredAt } : {}),
+    ...(receipt ? { createdAt: occurredAt } : {}),
   });
   if (attention) {
     await recordHistory({
@@ -696,7 +733,7 @@ export async function registerMovement(
         ? `${folio ?? input.kind} confirmado. El equipo quedó en resguardo e inició la atención.`
         : `${input.kind} registrado para el equipo.`,
       authorUserId: actor.userId,
-      ...(receipt ? { createdAt: input.occurredAt } : {}),
+      ...(receipt ? { createdAt: occurredAt } : {}),
     });
   }
   return {

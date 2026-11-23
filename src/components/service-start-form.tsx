@@ -32,6 +32,7 @@ export function ServiceStartForm({
   canSelectSeller = false,
   canEditOrderDate = false,
   canConfirmPhysicalReceipt = false,
+  canCaptureLegacyFolio = false,
   defaultCreatedAt = "",
   defaultClientId,
   companyCode,
@@ -55,6 +56,7 @@ export function ServiceStartForm({
   canSelectSeller?: boolean;
   canEditOrderDate?: boolean;
   canConfirmPhysicalReceipt?: boolean;
+  canCaptureLegacyFolio?: boolean;
   defaultCreatedAt?: string;
   defaultClientId: string;
   companyCode: string;
@@ -175,9 +177,11 @@ export function ServiceStartForm({
               </span>
             </label>
           ) : null}
-          <Field label="Folio del sistema anterior" hint="Opcional. Referencia del folio histórico; Sygos generará su propio folio consecutivo.">
-            <input name="legacyFolio" placeholder="Ej. OS-1234" className={controlClass} />
-          </Field>
+          {canCaptureLegacyFolio ? (
+            <Field label="Folio del sistema anterior" hint="Opcional. Referencia del folio histórico; Sygos generará su propio folio consecutivo.">
+              <input name="legacyFolio" placeholder="Ej. OS-1234" className={controlClass} />
+            </Field>
+          ) : null}
           <Field label="Falla reportada" hint="Describe el síntoma o problema que reporta el cliente.">
             <textarea name="reportedFault" required rows={4} className={controlClass} />
           </Field>

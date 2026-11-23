@@ -5,7 +5,7 @@ import { MOVEMENTS, type MovementKind } from "@/lib/custody";
 import { cancelMovement, createAttention, createEqui, createMot, registerMovement } from "@/lib/equipment-service";
 import { setFlash } from "@/lib/flash";
 import { clientIdFromForm, supplierIdFromForm } from "@/lib/form-quick-entities";
-import { optionalText, parseMexicoDateTimeInput, parseVersion, requiredText } from "@/lib/form";
+import { optionalText, parseVersion, requiredText } from "@/lib/form";
 import { can, type Action } from "@/lib/permissions";
 import { isReparacionExpressAttentionType } from "@/lib/priorities";
 import { requireCompany } from "@/lib/session";
@@ -17,10 +17,6 @@ async function guard(action: Action) {
     redirect("/inicio");
   }
   return session;
-}
-
-function whenOf(value: FormDataEntryValue | null) {
-  return parseMexicoDateTimeInput(value) ?? new Date();
 }
 
 export async function createEquiAction(formData: FormData) {
@@ -87,7 +83,6 @@ export async function createAttentionAction(formData: FormData) {
     const session = await guard("attention.create");
     const attentionType = requiredText(formData.get("attentionType"), "Tipo de atención");
     const allowOrderOverrides = session.role !== "VENTAS";
-    const createdAt = allowOrderOverrides ? parseMexicoDateTimeInput(formData.get("createdAt")) : null;
     const sellerUserId = allowOrderOverrides && formData.has("sellerUserId")
       ? (optionalText(formData.get("sellerUserId")) ?? null)
       : undefined;
@@ -102,8 +97,9 @@ export async function createAttentionAction(formData: FormData) {
       deliveryInstructions: optionalText(formData.get("deliveryInstructions")),
       originalCaseId: optionalText(formData.get("originalCaseId")),
       sellerUserId,
-      legacyFolio: optionalText(formData.get("legacyFolio")),
-      createdAt,
+      legacyFolio: session.role === "GERENTE_OPERATIVO_SYSTRON"
+        ? optionalText(formData.get("legacyFolio"))
+        : undefined,
       version: parseVersion(formData.get("version")),
     });
     await setFlash({ tone: "ok", message: "Atención creada. El SLA inicia con la recepción física." });
@@ -129,7 +125,7 @@ export async function movementAction(formData: FormData) {
       version: parseVersion(formData.get("version")),
       kind: movement as MovementKind,
       reason: requiredText(formData.get("reason"), "Motivo"),
-      occurredAt: whenOf(formData.get("occurredAt")),
+      occurredAt: new Date(),
       receiverName: optionalText(formData.get("receiverName")),
       deliveryMode: optionalText(formData.get("deliveryMode")),
       contact: optionalText(formData.get("contact")),

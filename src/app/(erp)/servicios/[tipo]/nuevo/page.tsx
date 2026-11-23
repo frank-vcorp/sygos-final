@@ -56,7 +56,8 @@ export default async function NuevoServicioPage({
     allowOrderOverrides ? listCompanySellers(session.activeCompanyId, session.activeCompanyCode) : Promise.resolve([]),
   ]);
   const defaultClientId = clientIdParam && clients.some((row) => row.id === clientIdParam) ? clientIdParam : "";
-  const defaultCreatedAt = allowOrderOverrides ? formatMexicoDateTimeLocalValue(new Date()) : "";
+  const gerenteSystron = session.role === "GERENTE_OPERATIVO_SYSTRON";
+  const defaultCreatedAt = gerenteSystron ? formatMexicoDateTimeLocalValue(new Date()) : "";
   const quickEquipmentKinds: Array<"EQUI" | "MOT"> = [
     ...(can(session.role, "equi.create", session.activeCompanyCode) ? ["EQUI" as const] : []),
     ...(can(session.role, "mot.create", session.activeCompanyCode) ? ["MOT" as const] : []),
@@ -82,8 +83,9 @@ export default async function NuevoServicioPage({
         repairs={repairs.map((r) => ({ id: r.id, folio: r.folio, clientOwnerUserId: r.equipment.client.ownerUserId }))}
         sellers={sellers}
         canSelectSeller={allowOrderOverrides}
-        canEditOrderDate={allowOrderOverrides}
-        canConfirmPhysicalReceipt={allowOrderOverrides && can(session.role, "custody.confirm", session.activeCompanyCode)}
+        canEditOrderDate={gerenteSystron}
+        canConfirmPhysicalReceipt={gerenteSystron && can(session.role, "custody.confirm", session.activeCompanyCode)}
+        canCaptureLegacyFolio={session.role === "GERENTE_OPERATIVO_SYSTRON"}
         defaultCreatedAt={defaultCreatedAt}
         defaultClientId={defaultClientId}
         companyCode={session.activeCompanyCode ?? "SYSTRON"}

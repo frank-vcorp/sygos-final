@@ -7,6 +7,7 @@ function row(partial: Partial<ServicioBandejaRow> & Pick<ServicioBandejaRow, "id
   return {
     kind: "servicio",
     equipmentId: "e1",
+    equipmentKind: "EQUI",
     equipmentHref: "/equipos/e1",
     equipmentLabel: "EQUI-1",
     diagnosisFolio: null,

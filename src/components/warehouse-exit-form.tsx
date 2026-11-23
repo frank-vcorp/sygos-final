@@ -82,7 +82,6 @@ export function WarehouseExitForm({
                 <option value="paqueteria">Paquetería</option>
               </select>
             </Field>
-            <Field label="Fecha y hora"><input name="occurredAt" type="datetime-local" className={controlClass} /></Field>
             <Field label="Observaciones"><textarea name="notes" rows={2} className={controlClass} /></Field>
             <Button type="submit">Confirmar salida definitiva</Button>
           </form>
@@ -102,7 +101,6 @@ export function WarehouseExitForm({
           <input type="hidden" name="reason" value={testReason} />
           <input type="hidden" name="receiverName" value={sellerName} />
           <p className="text-sm text-[var(--muted)]">Solo durante el diagnóstico (DX sin validar). Recibe: {sellerName}.</p>
-          <Field label="Fecha y hora"><input name="occurredAt" type="datetime-local" className={controlClass} /></Field>
           <Field label="Observaciones"><textarea name="notes" rows={2} className={controlClass} /></Field>
           <Button type="submit">Confirmar salida a pruebas</Button>
         </form>
