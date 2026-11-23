@@ -1,3 +1,5 @@
+const FALLBACK_SERVICE_CLIENT = { id: "", name: "Cliente", isSystem: false } as const;
+
 /** En Servomotores el cliente del caso es la empresa Systron, no el cliente final. */
 export function serviceClientForCompany<T extends { id: string; name: string; isSystem: boolean }>(
   viewingCompanyId: string,
@@ -6,8 +8,9 @@ export function serviceClientForCompany<T extends { id: string; name: string; is
     serviceCompanyId: string;
     adminClient: T | null;
   },
-  equipmentClient: T,
+  equipmentClient: T | null,
 ): T {
+  const base = equipmentClient ?? (FALLBACK_SERVICE_CLIENT as T);
   if (
     viewingCompanyId === attention.serviceCompanyId
     && attention.originCompanyId !== attention.serviceCompanyId
@@ -15,5 +18,5 @@ export function serviceClientForCompany<T extends { id: string; name: string; is
   ) {
     return attention.adminClient;
   }
-  return equipmentClient;
+  return base;
 }

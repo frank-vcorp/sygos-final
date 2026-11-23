@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/db";
-import { displayCompanyCaseFolio, ensureOriginCompanyServiceNumbers, type CompanyFolioAttention } from "@/lib/folios";
+import { displayCompanyCaseFolio, loadOriginCompanyServiceNumbersForDisplay, type CompanyFolioAttention } from "@/lib/folios";
 
 export type TechnicalCaseLinkSlice = {
   id: string;
@@ -82,7 +82,7 @@ export async function batchLoadBillingDocumentServiceLinks(
 
   const attentionIds = [...new Set(seedCases.map((c) => c.attentionId))];
   const originNumbers = viewingCompanyId
-    ? await ensureOriginCompanyServiceNumbers(attentionIds)
+    ? await loadOriginCompanyServiceNumbersForDisplay(attentionIds)
     : new Map<string, number>();
   const allCases = attentionIds.length
     ? await prisma.technicalCase.findMany({
