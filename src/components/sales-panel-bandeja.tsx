@@ -15,12 +15,12 @@ function countLabel(count: number) {
 function ServiciosTableBlock({
   rows,
   role,
-  highlightRow,
+  highlightRowIds,
   columnOptions,
 }: {
   rows: SupervisorServicioRow[];
   role: Role;
-  highlightRow?: (row: SupervisorServicioRow) => boolean;
+  highlightRowIds?: readonly string[];
   columnOptions?: ServicioBandejaColumnOptions;
 }) {
   const shown = rows.slice(0, LIST_CAP);
@@ -30,7 +30,7 @@ function ServiciosTableBlock({
         rows={shown}
         role={role}
         variant="activos"
-        highlightRow={highlightRow}
+        highlightRowIds={highlightRowIds}
         columnOptions={columnOptions}
       />
     </div>
@@ -43,14 +43,14 @@ export function SalesPanelServiciosSection({
   bandejaHref,
   rows,
   role,
-  highlightRow,
+  highlightRowIds,
 }: {
   title: string;
   empty: string;
   bandejaHref?: string;
   rows: SupervisorServicioRow[];
   role: Role;
-  highlightRow?: (row: SupervisorServicioRow) => boolean;
+  highlightRowIds?: readonly string[];
 }) {
   const shown = rows.slice(0, LIST_CAP);
   return (
@@ -65,7 +65,7 @@ export function SalesPanelServiciosSection({
       {shown.length === 0 ? (
         <p className="m-5 rounded-lg bg-[#f5f8fb] px-4 py-3 text-sm text-[var(--muted)]">{empty}</p>
       ) : (
-        <ServiciosTableBlock rows={rows} role={role} highlightRow={highlightRow} />
+        <ServiciosTableBlock rows={rows} role={role} highlightRowIds={highlightRowIds} />
       )}
     </Card>
   );

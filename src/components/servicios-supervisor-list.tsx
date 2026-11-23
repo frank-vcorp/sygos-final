@@ -20,6 +20,7 @@ import {
 } from "@/lib/servicios-bandeja";
 import type { Role } from "@/lib/roles";
 import { isReparacionExpressAttentionType } from "@/lib/priorities";
+import { supervisorServicioRowStableId } from "@/lib/panel-servicio-row-highlight-ids";
 import { servicioRowHighlight, type SupervisorServicioRow } from "@/lib/servicios-supervisor-rows";
 
 const TONE_CLASS: Record<StatusTone, string> = {
@@ -289,16 +290,17 @@ export function ServiciosSupervisorList({
   rows,
   role,
   variant = "activos",
-  highlightRow,
+  highlightRowIds,
   columnOptions,
 }: {
   rows: SupervisorServicioRow[];
   role: Role;
   variant?: "activos" | "historial";
-  /** Resalta filas (p. ej. CxC vigente en panel de ventas). */
-  highlightRow?: (row: SupervisorServicioRow) => boolean;
+  /** IDs serializables desde el servidor (evita pasar funciones al client). */
+  highlightRowIds?: readonly string[];
   columnOptions?: ServicioBandejaColumnOptions;
 }) {
+  const highlightIds = highlightRowIds?.length ? new Set(highlightRowIds) : null;
   const historial = variant === "historial";
   const activos = variant === "activos";
   const columns = serviciosBandejaColumns(role, columnOptions);
@@ -321,15 +323,15 @@ export function ServiciosSupervisorList({
       columns={sortableColumns}
       stickyHeader
       initialOrder={{ mode: "preserve" }}
-      rowKey={(row) => (row.kind === "cancelado" ? `att-${row.id}` : row.id)}
+      rowKey={supervisorServicioRowStableId}
       rowClassName={(row) => {
         const { wrapClass } = servicioRowHighlight(row);
-        const extraClass = highlightRow?.(row) ? VIGENTE_ROW_CLASS : undefined;
+        const extraClass = highlightIds?.has(supervisorServicioRowStableId(row)) ? VIGENTE_ROW_CLASS : undefined;
         return rowSurfaceClass(wrapClass, extraClass, historial);
       }}
       mobileCard={(row) => {
         const { wrapClass } = servicioRowHighlight(row);
-        const extraClass = highlightRow?.(row) ? VIGENTE_ROW_CLASS : undefined;
+        const extraClass = highlightIds?.has(supervisorServicioRowStableId(row)) ? VIGENTE_ROW_CLASS : undefined;
         if (row.kind === "cancelado") {
           return (
             <div key={`att-${row.id}`}>

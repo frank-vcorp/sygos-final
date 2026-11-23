@@ -15,10 +15,8 @@ import { money } from "@/lib/money";
 import { purchaseListHref } from "@/lib/purchase-filter-links";
 import { can } from "@/lib/permissions";
 import { homePath } from "@/lib/home";
-import {
-  loadRequirementListContexts,
-  syncPendingPartRequestRequirements,
-} from "@/lib/requirement-list-enrichment";
+import { loadRequirementListContexts } from "@/lib/requirement-list-enrichment";
+import { cobranzaVigenteRowIds, vencidoServicioRowIds } from "@/lib/panel-servicio-row-highlight-ids";
 import { shoppingListKindFromList } from "@/lib/shopping-list-display";
 import {
   mergeSalesPendientesAutorizacion,
@@ -43,7 +41,6 @@ import {
   listActiveServicios,
   listHistorialServicios,
   listServiciosForBillingLinks,
-  servicioRowHighlight,
   type ServicioBandejaRow,
 } from "@/lib/servicios-supervisor";
 import {
@@ -313,8 +310,6 @@ async function GerenteSystronPanel({
     );
   }
 
-  await syncPendingPartRequestRequirements(companyId);
-
   const canManageRequirements = can(role, "purchase.operate", companyCode);
   const allowQuickSupplier = can(role, "supplier.operate", companyCode);
 
@@ -443,10 +438,8 @@ async function GerenteSystronPanel({
               bandejaHref={serviciosBandejaHref({ vista: "activos", filtro })}
               rows={rows}
               role={role}
-              highlightRow={
-                filtro === "vencidos"
-                  ? (row) => servicioRowHighlight(row, panelCtx.now).markers.includes("Vencido")
-                  : undefined
+              highlightRowIds={
+                filtro === "vencidos" ? vencidoServicioRowIds(rows, panelCtx.now) : undefined
               }
             />
           ),
@@ -533,7 +526,6 @@ async function GerenteServomotoresPanel({
     );
   }
 
-  await syncPendingPartRequestRequirements(companyId);
   const canManageRequirements = can(role, "purchase.operate", companyCode);
   const allowQuickSupplier = can(role, "supplier.operate", companyCode);
 
@@ -788,7 +780,7 @@ async function GerenteServomotoresPanel({
           bandejaHref="/cobranza?vista=cxc"
           rows={cobranzaServicios.slice(0, 20)}
           role={role}
-          highlightRow={(row) => row.kind === "servicio" && vigenteEquipmentIds.has(row.equipmentId)}
+          highlightRowIds={cobranzaVigenteRowIds(cobranzaServicios.slice(0, 20), vigenteEquipmentIds)}
         />
         <SalesPanelServiciosSection
           title="Entregas pendientes"
@@ -828,9 +820,9 @@ async function GerenteServomotoresPanel({
               bandejaHref={serviciosBandejaHref({ vista: "activos", filtro })}
               rows={rows.slice(0, 20)}
               role={role}
-              highlightRow={
+              highlightRowIds={
                 filtro === "vencidos"
-                  ? (row) => servicioRowHighlight(row, panelCtx.now).markers.includes("Vencido")
+                  ? vencidoServicioRowIds(rows.slice(0, 20), panelCtx.now)
                   : undefined
               }
             />
@@ -1106,7 +1098,7 @@ async function Sales({
           bandejaHref="/cobranza?vista=cxc"
           rows={cobranzaServicios}
           role={role}
-          highlightRow={(row) => row.kind === "servicio" && vigenteEquipmentIds.has(row.equipmentId)}
+          highlightRowIds={cobranzaVigenteRowIds(cobranzaServicios, vigenteEquipmentIds)}
         />
         <SalesPanelServiciosSection
           title="Entregas pendientes"
