@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  activeTechnicalCaseFolio,
   administrativeStatus,
   formatServiciosBandejaDate,
   orderedBandejaColumns,
+  orderedBandejaDisplayColumns,
   PHYSICAL_ESTADO,
   physicalStatusFromCustody,
   priorityNameTone,
@@ -146,6 +148,42 @@ describe("serviciosBandejaColumns", () => {
     assert.equal(order.includes("tecnico"), true);
     assert.equal(order.includes("sla"), true);
     assert.equal(order.at(-1), "sla");
+  });
+});
+
+describe("activeTechnicalCaseFolio", () => {
+  it("prioriza OS cuando existe", () => {
+    const row = activeTechnicalCaseFolio({
+      osFolio: "OS-1",
+      osHref: "/operacion/os-1",
+      diagnosisFolio: "DX-1",
+      diagnosisHref: "/operacion/dx-1",
+    });
+    assert.deepEqual(row, { folio: "OS-1", href: "/operacion/os-1", kind: "OS" });
+  });
+
+  it("muestra solo DX sin OS activa", () => {
+    const row = activeTechnicalCaseFolio({
+      osFolio: null,
+      osHref: null,
+      diagnosisFolio: "DX-2",
+      diagnosisHref: "/operacion/dx-2",
+    });
+    assert.deepEqual(row, { folio: "DX-2", href: "/operacion/dx-2", kind: "DX" });
+  });
+});
+
+describe("orderedBandejaDisplayColumns", () => {
+  it("fusiona DX y OS en activos", () => {
+    const cols = serviciosBandejaColumns("TECNICO");
+    const order = orderedBandejaDisplayColumns(cols, undefined, "activos");
+    assert.equal(order.includes("diagnostico"), false);
+    assert.equal(order.includes("ordenServicio"), false);
+    assert.equal(order.includes("servicioActivo"), true);
+    const hist = orderedBandejaDisplayColumns(cols, undefined, "historial");
+    assert.equal(hist.includes("diagnostico"), true);
+    assert.equal(hist.includes("ordenServicio"), true);
+    assert.equal(hist.includes("servicioActivo"), false);
   });
 });
 

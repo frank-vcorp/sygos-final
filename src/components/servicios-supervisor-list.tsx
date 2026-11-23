@@ -1,20 +1,26 @@
+"use client";
+
 import { ClientNameLink } from "@/components/client-entity-links";
+import { SortableResponsiveList } from "@/components/sortable-list";
 import { SlaCountdown } from "@/components/sla-countdown";
-import { MobileCard, RecordLink, ResponsiveData, Table, Td, Th } from "@/components/ui";
+import { MobileCard, RecordLink } from "@/components/ui";
+import { bandejaColumnSortValue } from "@/lib/servicios-bandeja-sort";
 import {
+  activeTechnicalCaseFolio,
   formatServiciosBandejaDate,
-  orderedBandejaColumns,
+  orderedBandejaDisplayColumns,
   priorityNameTone,
   serviciosBandejaColumns,
   type ServicioBandejaColumnKey,
   type ServicioBandejaColumnOptions,
   type ServicioBandejaColumns,
+  type ServicioBandejaDisplayColumnKey,
   type StatusTone,
   type StackedStatus,
 } from "@/lib/servicios-bandeja";
 import type { Role } from "@/lib/roles";
 import { isReparacionExpressAttentionType } from "@/lib/priorities";
-import { servicioRowHighlight, type SupervisorServicioRow } from "@/lib/servicios-supervisor";
+import { servicioRowHighlight, type SupervisorServicioRow } from "@/lib/servicios-supervisor-rows";
 
 const TONE_CLASS: Record<StatusTone, string> = {
   neutral: "border-[#d8dee6] bg-[#f4f6f8] text-[#3d4650]",
@@ -103,6 +109,20 @@ function FolioCell({ folio, href }: { folio: string | null; href: string | null 
   return <RecordLink href={href}>{folio}</RecordLink>;
 }
 
+function ActiveServicioCell({ row }: { row: ServicioBandejaRowLike }) {
+  const active = activeTechnicalCaseFolio(row);
+  if (!active) return null;
+  if (!active.href) return <span className="font-medium text-[var(--ink)]">{active.folio}</span>;
+  return <RecordLink href={active.href}>{active.folio}</RecordLink>;
+}
+
+type ServicioBandejaRowLike = {
+  osFolio: string | null;
+  osHref: string | null;
+  diagnosisFolio: string | null;
+  diagnosisHref: string | null;
+};
+
 function formatClosedAt(date: Date) {
   return date.toLocaleString("es-MX", {
     timeZone: "America/Mexico_City",
@@ -146,7 +166,8 @@ function rowSurfaceClass(wrapClass: string, extra?: string, historial?: boolean)
   return parts.length ? parts.join(" ") : undefined;
 }
 
-function bandejaThLabel(key: ServicioBandejaColumnKey, trailHeader: string) {
+function bandejaThLabel(key: ServicioBandejaDisplayColumnKey, trailHeader: string) {
+  if (key === "servicioActivo") return "Servicio activo";
   const labels: Record<ServicioBandejaColumnKey, string> = {
     atencionVigente: "Atención",
     diagnostico: "Diagnóstico",
@@ -161,63 +182,62 @@ function bandejaThLabel(key: ServicioBandejaColumnKey, trailHeader: string) {
     tecnico: "Técnico",
     sla: trailHeader,
   };
-  return labels[key];
+  return labels[key as ServicioBandejaColumnKey];
 }
 
-function BandejaTd({
+function columnEnabled(columns: ServicioBandejaColumns, columnKey: ServicioBandejaDisplayColumnKey) {
+  if (columnKey === "servicioActivo") return columns.diagnostico || columns.ordenServicio;
+  return columns[columnKey];
+}
+
+function BandejaCell({
   columnKey,
   row,
   columns,
   historial,
 }: {
-  columnKey: ServicioBandejaColumnKey;
+  columnKey: ServicioBandejaDisplayColumnKey;
   row: SupervisorServicioRow;
   columns: ServicioBandejaColumns;
   historial: boolean;
 }) {
-  if (!columns[columnKey]) return null;
+  if (!columnEnabled(columns, columnKey)) return null;
 
   if (row.kind === "cancelado") {
     switch (columnKey) {
       case "atencionVigente":
         return (
-          <Td>
-            <AtencionVigenteCell createdAt={row.createdAt} priorityName={row.priorityName} legacyFolio={row.legacyFolio} />
-          </Td>
+          <AtencionVigenteCell createdAt={row.createdAt} priorityName={row.priorityName} legacyFolio={row.legacyFolio} />
         );
+      case "servicioActivo":
+        return null;
       case "diagnostico":
       case "ordenServicio":
       case "vendedor":
       case "tecnico":
       case "cotizacion":
       case "cotizacionMonto":
-        return <Td><span className="text-[var(--muted)]">—</span></Td>;
+        return <span className="text-[var(--muted)]">—</span>;
       case "equipo":
         return (
-          <Td>
-            <RecordLink href={row.equipmentHref}>{row.equipmentLabel}</RecordLink>
-          </Td>
+          <RecordLink href={row.equipmentHref}>{row.equipmentLabel}</RecordLink>
         );
       case "cliente":
         return (
-          <Td>
-            <ClienteCell clientId={row.clientId} clientName={row.clientName} clientIsSystem={row.clientIsSystem} />
-          </Td>
+          <ClienteCell clientId={row.clientId} clientName={row.clientName} clientIsSystem={row.clientIsSystem} />
         );
       case "edoTecnico":
         return (
-          <Td>
-            <StatusBadge status={{ label: "Cancelada", tone: "danger" }} />
-          </Td>
+          <StatusBadge status={{ label: "Cancelada", tone: "danger" }} />
         );
       case "edoAdministrativo":
-        return (
-          <Td>
-            {columns.edoTecnico ? <span className="text-[var(--muted)]">—</span> : <StatusBadge status={{ label: "Cancelada", tone: "danger" }} />}
-          </Td>
+        return columns.edoTecnico ? (
+          <span className="text-[var(--muted)]">—</span>
+        ) : (
+          <StatusBadge status={{ label: "Cancelada", tone: "danger" }} />
         );
       case "sla":
-        return <Td><span className="text-sm text-[var(--muted)]">{formatClosedAt(row.closedAt)}</span></Td>;
+        return <span className="text-sm text-[var(--muted)]">{formatClosedAt(row.closedAt)}</span>;
       default:
         return null;
     }
@@ -226,48 +246,40 @@ function BandejaTd({
   switch (columnKey) {
     case "atencionVigente":
       return (
-        <Td>
-          <AtencionVigenteCell createdAt={row.attentionCreatedAt} priorityName={row.priorityName} legacyFolio={row.legacyFolio} />
-        </Td>
+        <AtencionVigenteCell createdAt={row.attentionCreatedAt} priorityName={row.priorityName} legacyFolio={row.legacyFolio} />
       );
+    case "servicioActivo":
+      return <ActiveServicioCell row={row} />;
     case "diagnostico":
-      return <Td><FolioCell folio={row.diagnosisFolio} href={row.diagnosisHref} /></Td>;
+      return <FolioCell folio={row.diagnosisFolio} href={row.diagnosisHref} />;
     case "ordenServicio":
-      return <Td><FolioCell folio={row.osFolio} href={row.osHref} /></Td>;
+      return <FolioCell folio={row.osFolio} href={row.osHref} />;
     case "equipo":
       return (
-        <Td>
-          <RecordLink href={row.equipmentHref}>{row.equipmentLabel}</RecordLink>
-        </Td>
+        <RecordLink href={row.equipmentHref}>{row.equipmentLabel}</RecordLink>
       );
     case "cliente":
       return (
-        <Td>
-          <ClienteCell clientId={row.clientId} clientName={row.clientName} clientIsSystem={row.clientIsSystem} />
-        </Td>
+        <ClienteCell clientId={row.clientId} clientName={row.clientName} clientIsSystem={row.clientIsSystem} />
       );
     case "edoTecnico":
-      return <Td><StatusBadge status={row.technical} /></Td>;
+      return <StatusBadge status={row.technical} />;
     case "edoAdministrativo":
-      return <Td><StatusBadge status={row.administrative} /></Td>;
+      return <StatusBadge status={row.administrative} />;
     case "vendedor":
-      return <Td>{row.sellerName ?? "Sin asignar"}</Td>;
+      return row.sellerName ?? "Sin asignar";
     case "tecnico":
-      return <Td>{row.technicianName ?? "Sin asignar"}</Td>;
+      return row.technicianName ?? "Sin asignar";
     case "sla":
       return (
-        <Td>
-          <SlaCell dueAt={row.slaDueAt} historial={historial} closedAt={row.closedAt} attentionType={row.attentionType} />
-        </Td>
+        <SlaCell dueAt={row.slaDueAt} historial={historial} closedAt={row.closedAt} attentionType={row.attentionType} />
       );
     case "cotizacion":
       return (
-        <Td>
-          <FolioCell folio={row.quoteFolio} href={row.quoteHref} />
-        </Td>
+        <FolioCell folio={row.quoteFolio} href={row.quoteHref} />
       );
     case "cotizacionMonto":
-      return <Td>{row.quoteMonto}</Td>;
+      return row.quoteMonto;
     default:
       return null;
   }
@@ -288,38 +300,34 @@ export function ServiciosSupervisorList({
   columnOptions?: ServicioBandejaColumnOptions;
 }) {
   const historial = variant === "historial";
+  const activos = variant === "activos";
   const columns = serviciosBandejaColumns(role, columnOptions);
-  const columnOrder = orderedBandejaColumns(columns, columnOptions);
+  const columnOrder = orderedBandejaDisplayColumns(columns, columnOptions, historial ? "historial" : "activos");
   const trailHeader = historial ? "Cierre" : "SLA";
 
+  const sortableColumns = columnOrder.map((key) => ({
+    id: key,
+    header: bandejaThLabel(key, trailHeader),
+    sortable: true,
+    value: (row: SupervisorServicioRow) => bandejaColumnSortValue(row, key, historial),
+    cell: (row: SupervisorServicioRow) => (
+      <BandejaCell columnKey={key} row={row} columns={columns} historial={historial} />
+    ),
+  }));
+
   return (
-    <ResponsiveData
-      table={
-        <Table stickyHeader>
-          <thead>
-            <tr>
-              {columnOrder.map((key) => (
-                <Th key={key}>{bandejaThLabel(key, trailHeader)}</Th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => {
-              const { wrapClass } = servicioRowHighlight(row);
-              const extraClass = highlightRow?.(row) ? VIGENTE_ROW_CLASS : undefined;
-              const rowKey = row.kind === "cancelado" ? `att-${row.id}` : row.id;
-              return (
-                <tr key={rowKey} className={rowSurfaceClass(wrapClass, extraClass, historial)}>
-                  {columnOrder.map((key) => (
-                    <BandejaTd key={key} columnKey={key} row={row} columns={columns} historial={historial} />
-                  ))}
-                </tr>
-              );
-            })}
-          </tbody>
-        </Table>
-      }
-      cards={rows.map((row) => {
+    <SortableResponsiveList
+      rows={rows}
+      columns={sortableColumns}
+      stickyHeader
+      initialOrder={{ mode: "preserve" }}
+      rowKey={(row) => (row.kind === "cancelado" ? `att-${row.id}` : row.id)}
+      rowClassName={(row) => {
+        const { wrapClass } = servicioRowHighlight(row);
+        const extraClass = highlightRow?.(row) ? VIGENTE_ROW_CLASS : undefined;
+        return rowSurfaceClass(wrapClass, extraClass, historial);
+      }}
+      mobileCard={(row) => {
         const { wrapClass } = servicioRowHighlight(row);
         const extraClass = highlightRow?.(row) ? VIGENTE_ROW_CLASS : undefined;
         if (row.kind === "cancelado") {
@@ -339,8 +347,13 @@ export function ServiciosSupervisorList({
           );
         }
 
-        const title = row.osFolio ?? row.diagnosisFolio ?? row.equipmentLabel;
-        const href = row.osHref ?? row.diagnosisHref ?? row.equipmentHref;
+        const activeCase = activos ? activeTechnicalCaseFolio(row) : null;
+        const title = activos
+          ? activeCase?.folio ?? row.equipmentLabel
+          : row.osFolio ?? row.diagnosisFolio ?? row.equipmentLabel;
+        const href = activos
+          ? activeCase?.href ?? row.equipmentHref
+          : row.osHref ?? row.diagnosisHref ?? row.equipmentHref;
         const quoteLine = columns.cotizacion ? (
           <p>
             Cotización:{" "}
@@ -373,8 +386,14 @@ export function ServiciosSupervisorList({
               }
             >
               {quoteFirst ? quoteLine : null}
-              {columns.diagnostico && row.diagnosisFolio ? <p>DX: {row.diagnosisFolio}</p> : null}
-              {columns.ordenServicio && row.osFolio ? <p>OS: {row.osFolio}</p> : null}
+              {activos && activeCase ? (
+                <p>
+                  Servicio activo:{" "}
+                  {activeCase.href ? <RecordLink href={activeCase.href}>{activeCase.folio}</RecordLink> : activeCase.folio}
+                </p>
+              ) : null}
+              {!activos && columns.diagnostico && row.diagnosisFolio ? <p>DX: {row.diagnosisFolio}</p> : null}
+              {!activos && columns.ordenServicio && row.osFolio ? <p>OS: {row.osFolio}</p> : null}
               <p>{row.equipmentLabel}</p>
               <p><ClienteCell clientId={row.clientId} clientName={row.clientName} clientIsSystem={row.clientIsSystem} /></p>
               {columns.atencionVigente ? (
@@ -405,7 +424,7 @@ export function ServiciosSupervisorList({
             </MobileCard>
           </div>
         );
-      })}
+      }}
     />
   );
 }

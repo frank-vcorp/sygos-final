@@ -1,5 +1,8 @@
+"use client";
+
 import { ClientNameLink } from "@/components/client-entity-links";
-import { MobileCard, RecordLink, ResponsiveData, Table, Td, Th } from "@/components/ui";
+import { SortableResponsiveList } from "@/components/sortable-list";
+import { MobileCard, RecordLink } from "@/components/ui";
 import type { AlmacenBandejaRow } from "@/lib/almacen-bandeja";
 import type { StatusTone, StackedStatus } from "@/lib/servicios-bandeja";
 
@@ -29,45 +32,60 @@ function FolioCell({ folio, href }: { folio: string | null; href: string | null 
 
 export function AlmacenBandejaList({ rows }: { rows: AlmacenBandejaRow[] }) {
   return (
-    <ResponsiveData
-      table={
-        <Table stickyHeader>
-          <thead>
-            <tr>
-              <Th>Diagnóstico</Th>
-              <Th>Orden de servicio</Th>
-              <Th>Equipo</Th>
-              <Th>Cliente</Th>
-              <Th>Edo. físico</Th>
-              <Th>Vendedor</Th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr key={row.equipmentId}>
-                <Td><FolioCell folio={row.diagnosisFolio} href={row.diagnosisHref} /></Td>
-                <Td><FolioCell folio={row.osFolio} href={row.osHref} /></Td>
-                <Td>
-                  <RecordLink href={row.equipmentHref}>{row.equipmentLabel}</RecordLink>
-                  {row.legacyFolio ? (
-                    <span className="block text-[10px] font-medium text-[var(--muted)]">
-                      Ant: {row.legacyFolio}
-                    </span>
-                  ) : null}
-                </Td>
-                <Td>
-                  <ClientNameLink clientId={row.clientId} name={row.clientName} isSystem={row.clientIsSystem} />
-                </Td>
-                <Td><StatusBadge status={row.physical} /></Td>
-                <Td>{row.sellerName ?? "Sin asignar"}</Td>
-              </tr>
-            ))}
-          </tbody>
-        </Table>
-      }
-      cards={rows.map((row) => (
+    <SortableResponsiveList
+      rows={rows}
+      initialOrder={{ mode: "preserve" }}
+      rowKey={(row) => row.equipmentId}
+      stickyHeader
+      columns={[
+        {
+          id: "diagnostico",
+          header: "Diagnóstico",
+          value: (row) => row.diagnosisFolio ?? "",
+          cell: (row) => <FolioCell folio={row.diagnosisFolio} href={row.diagnosisHref} />,
+        },
+        {
+          id: "os",
+          header: "Orden de servicio",
+          value: (row) => row.osFolio ?? "",
+          cell: (row) => <FolioCell folio={row.osFolio} href={row.osHref} />,
+        },
+        {
+          id: "equipo",
+          header: "Equipo",
+          value: (row) => row.equipmentLabel,
+          cell: (row) => (
+            <>
+              <RecordLink href={row.equipmentHref}>{row.equipmentLabel}</RecordLink>
+              {row.legacyFolio ? (
+                <span className="block text-[10px] font-medium text-[var(--muted)]">Ant: {row.legacyFolio}</span>
+              ) : null}
+            </>
+          ),
+        },
+        {
+          id: "cliente",
+          header: "Cliente",
+          value: (row) => row.clientName,
+          cell: (row) => (
+            <ClientNameLink clientId={row.clientId} name={row.clientName} isSystem={row.clientIsSystem} />
+          ),
+        },
+        {
+          id: "fisico",
+          header: "Edo. físico",
+          value: (row) => row.physical.label,
+          cell: (row) => <StatusBadge status={row.physical} />,
+        },
+        {
+          id: "vendedor",
+          header: "Vendedor",
+          value: (row) => row.sellerName ?? "",
+          cell: (row) => row.sellerName ?? "Sin asignar",
+        },
+      ]}
+      mobileCard={(row) => (
         <MobileCard
-          key={row.equipmentId}
           href={row.equipmentHref}
           title={row.osFolio ?? row.diagnosisFolio ?? row.equipmentLabel}
           meta={<StatusBadge status={row.physical} />}
@@ -81,7 +99,7 @@ export function AlmacenBandejaList({ rows }: { rows: AlmacenBandejaRow[] }) {
           </p>
           <p>Vendedor: {row.sellerName ?? "Sin asignar"}</p>
         </MobileCard>
-      ))}
+      )}
     />
   );
 }

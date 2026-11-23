@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
-import { ClientNameLink } from "@/components/client-entity-links";
 import { CotizacionesListFilter } from "@/components/compact-list-filters";
-import { SlaCountdown } from "@/components/sla-countdown";
-import { ActionLink, ActiveFilters, Badge, Card, Empty, ListCap, MobileCard, PageHeader, RecordLink, ResponsiveData, Table, Td, Th, TextLink } from "@/components/ui";
+import { CotizacionesList } from "@/components/cotizaciones-list";
+import { ActionLink, ActiveFilters, Card, Empty, ListCap, PageHeader, RecordLink, TextLink } from "@/components/ui";
 import { listHref } from "@/lib/list-url";
 import { homePath } from "@/lib/home";
 import { prisma } from "@/lib/db";
@@ -63,6 +62,25 @@ export default async function CotizacionesPage({ searchParams }: { searchParams:
     include: { client: true, lines: true },
     orderBy: { createdAt: "desc" },
     take: 100,
+  });
+  const quoteListRows = quotes.map((quote) => {
+    const hidePrice = session.role === "VENTAS" && quote.status === "PENDIENTE_COTIZAR";
+    const totals = hidePrice ? null : quoteTotals(linesForTotal(quote.lines, quote.quoteType, quote.status), quote.discountPct);
+    const sla = quoteListSlaLabel(quote);
+    return {
+      id: quote.id,
+      folio: quote.folio,
+      clientId: quote.client.id,
+      clientName: quote.client.name,
+      clientIsSystem: quote.client.isSystem,
+      quoteType: quote.quoteType,
+      status: quote.status,
+      totalLabel: hidePrice ? "Sin precio" : money(totals?.total),
+      totalSort: hidePrice ? "Sin precio" : totals?.total ?? 0,
+      slaDueAt: sla.kind === "countdown" ? sla.dueAt.toISOString() : null,
+      slaText: sla.kind === "countdown" ? "" : sla.text,
+      createdAt: quote.createdAt.toISOString(),
+    };
   });
   const cases = pending && can(session.role, "quote.price", session.activeCompanyCode) && !isVentas
     ? await prisma.technicalCase.findMany({
@@ -151,55 +169,7 @@ export default async function CotizacionesPage({ searchParams }: { searchParams:
           action={query ? <TextLink href={pending ? "/cotizaciones?vista=pendientes" : "/cotizaciones"}>Quitar búsqueda</TextLink> : can(session.role, "quote.create", session.activeCompanyCode) ? <TextLink href="/cotizaciones/nuevo">Nueva cotización</TextLink> : undefined}
         />
       ) : (
-        <ResponsiveData table={<Table>
-          <thead><tr><Th>Folio</Th><Th>Cliente</Th><Th>Tipo</Th><Th>Estado</Th><Th>Total</Th><Th>SLA</Th></tr></thead>
-          <tbody>
-            {quotes.map((quote) => {
-              const hidePrice = session.role === "VENTAS" && quote.status === "PENDIENTE_COTIZAR";
-              const totals = hidePrice ? null : quoteTotals(linesForTotal(quote.lines, quote.quoteType, quote.status), quote.discountPct);
-              const sla = quoteListSlaLabel(quote);
-              return (
-                <tr key={quote.id}>
-                  <Td><RecordLink href={`/cotizaciones/${quote.id}`}>{quote.folio}</RecordLink></Td>
-                  <Td><ClientNameLink clientId={quote.client.id} name={quote.client.name} isSystem={quote.client.isSystem} canEdit={canEditClient} /></Td>
-                  <Td>{QUOTE_TYPE_LABEL[quote.quoteType as QuoteType] ?? quote.quoteType}</Td>
-                  <Td><Badge tone={quote.status === "PENDIENTE_DECISION" ? "warn" : quote.status.startsWith("AUTORIZADA") ? "ok" : quote.status === "NO_AUTORIZADA" ? "danger" : "neutral"}>{QUOTE_STATUS_LABEL[quote.status] ?? quote.status}</Badge></Td>
-                  <Td>{hidePrice ? "Sin precio" : money(totals?.total)}</Td>
-                  <Td>
-                    {sla.kind === "countdown" ? (
-                      <SlaCountdown dueAt={sla.dueAt} className="text-xs tabular-nums" />
-                    ) : (
-                      <span className="text-xs text-[var(--muted)]">{sla.text}</span>
-                    )}
-                  </Td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </Table>} cards={quotes.map((quote) => {
-          const hidePrice = session.role === "VENTAS" && quote.status === "PENDIENTE_COTIZAR";
-          const totals = hidePrice ? null : quoteTotals(linesForTotal(quote.lines, quote.quoteType, quote.status), quote.discountPct);
-          const sla = quoteListSlaLabel(quote);
-          return (
-            <MobileCard
-              key={quote.id}
-              href={`/cotizaciones/${quote.id}`}
-              title={quote.folio}
-              meta={<Badge tone={quote.status === "PENDIENTE_DECISION" ? "warn" : quote.status.startsWith("AUTORIZADA") ? "ok" : quote.status === "NO_AUTORIZADA" ? "danger" : "neutral"}>{QUOTE_STATUS_LABEL[quote.status] ?? quote.status}</Badge>}
-              footer={<ClientNameLink clientId={quote.client.id} name={quote.client.name} isSystem={quote.client.isSystem} canEdit={canEditClient} />}
-            >
-              <p>{QUOTE_TYPE_LABEL[quote.quoteType as QuoteType] ?? quote.quoteType} · {hidePrice ? "Sin precio" : money(totals?.total)}</p>
-              <p>
-                SLA:{" "}
-                {sla.kind === "countdown" ? (
-                  <SlaCountdown dueAt={sla.dueAt} className="text-xs tabular-nums" />
-                ) : (
-                  sla.text
-                )}
-              </p>
-            </MobileCard>
-          );
-        })} />
+        <CotizacionesList rows={quoteListRows} canEditClient={canEditClient} />
       )}
       <ListCap shown={quotes.length} />
     </>

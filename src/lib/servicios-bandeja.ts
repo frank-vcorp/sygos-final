@@ -18,6 +18,9 @@ export type ServicioBandejaColumns = {
 
 export type ServicioBandejaColumnKey = keyof ServicioBandejaColumns;
 
+/** Columna virtual en vista activos: sustituye Diagnóstico + Orden de servicio. */
+export type ServicioBandejaDisplayColumnKey = ServicioBandejaColumnKey | "servicioActivo";
+
 export type ServicioBandejaColumnOptions = {
   /** En Ventas, oculta la columna Monto (p. ej. panel «Cotizaciones / seguimientos»). */
   quoteMonto?: boolean;
@@ -54,6 +57,44 @@ export function orderedBandejaColumns(
     (key) => key !== "atencionVigente" && key !== "cotizacion" && key !== "cotizacionMonto",
   );
   return [...lead, ...quote, ...rest];
+}
+
+/** En activos, un solo folio del caso técnico vigente (OS si aplica; si no, DX). */
+export function activeTechnicalCaseFolio(row: {
+  osFolio: string | null;
+  osHref: string | null;
+  diagnosisFolio: string | null;
+  diagnosisHref: string | null;
+}): { folio: string; href: string | null; kind: "OS" | "DX" } | null {
+  if (row.osFolio) {
+    return { folio: row.osFolio, href: row.osHref, kind: "OS" };
+  }
+  if (row.diagnosisFolio) {
+    return { folio: row.diagnosisFolio, href: row.diagnosisHref, kind: "DX" };
+  }
+  return null;
+}
+
+export function orderedBandejaDisplayColumns(
+  columns: ServicioBandejaColumns,
+  options: ServicioBandejaColumnOptions | undefined,
+  listVariant: "activos" | "historial",
+): ServicioBandejaDisplayColumnKey[] {
+  const base = orderedBandejaColumns(columns, options);
+  if (listVariant !== "activos") return base;
+  const out: ServicioBandejaDisplayColumnKey[] = [];
+  let mergedDxOs = false;
+  for (const key of base) {
+    if (key === "diagnostico" || key === "ordenServicio") {
+      if (!mergedDxOs) {
+        out.push("servicioActivo");
+        mergedDxOs = true;
+      }
+      continue;
+    }
+    out.push(key);
+  }
+  return out;
 }
 
 export function serviciosBandejaColumns(

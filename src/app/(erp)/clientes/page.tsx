@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { ClientesFilter } from "@/components/clientes-filter";
-import { ActionLink, ActiveFilters, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, Table, Td, Th, TextLink } from "@/components/ui";
+import { ClientesList } from "@/components/clientes-list";
+import { ActionLink, ActiveFilters, Empty, PageHeader, TextLink } from "@/components/ui";
 import { listHref } from "@/lib/list-url";
 import { clientMatchesQuery, PREVIEW_LIMIT, SEARCH_LIMIT } from "@/lib/client-search";
 import { prisma } from "@/lib/db";
@@ -49,6 +50,14 @@ export default async function ClientesPage({ searchParams }: { searchParams: Pro
     select: { id: true, name: true },
   });
   const ownerName = new Map(owners.map((owner) => [owner.id, owner.name]));
+  const clientListRows = clients.map((client) => ({
+    id: client.id,
+    name: client.name,
+    isSystem: client.isSystem,
+    ownerLabel: client.ownerUserId ? ownerName.get(client.ownerUserId) ?? "—" : "—",
+    creditLabel: client.creditDays != null ? `${client.creditDays} días` : "—",
+    invoiceLabel: client.requiresInvoice == null ? "Sin definir" : client.requiresInvoice ? "Sí" : "No",
+  }));
   const sidebarNav = coordUsesSidebarNav(session.role);
   const catalogSubtitle = query
     ? `${searchTruncated ? `${SEARCH_LIMIT}+` : matchCount} coincidencias · ${session.activeCompanyName ?? ""}`
@@ -74,10 +83,7 @@ export default async function ClientesPage({ searchParams }: { searchParams: Pro
           action={query || estado === "inactivos" ? <TextLink href="/clientes">Quitar filtro</TextLink> : can(session.role, "client.create", session.activeCompanyCode) ? <TextLink href="/clientes/nuevo">Nuevo cliente</TextLink> : undefined}
         />
       ) : (
-        <ResponsiveData
-          table={<Table><thead><tr><Th>Cliente</Th><Th>Responsable</Th><Th>Crédito</Th><Th>Factura</Th></tr></thead><tbody>{clients.map((client) => <tr key={client.id}><Td><RecordLink href={`/clientes/${client.id}`}>{client.name}</RecordLink>{client.isSystem ? " · intercompañía" : ""}</Td><Td>{client.ownerUserId ? ownerName.get(client.ownerUserId) ?? "—" : "—"}</Td><Td>{client.creditDays != null ? `${client.creditDays} días` : "—"}</Td><Td>{client.requiresInvoice == null ? "Sin definir" : client.requiresInvoice ? "Sí" : "No"}</Td></tr>)}</tbody></Table>}
-          cards={clients.map((client) => <MobileCard key={client.id} href={`/clientes/${client.id}`} title={client.name} meta={client.isSystem ? "Intercompañía" : undefined}><p>Responsable: {client.ownerUserId ? ownerName.get(client.ownerUserId) ?? "—" : "—"}</p><p>Crédito: {client.creditDays != null ? `${client.creditDays} días` : "—"} · Factura: {client.requiresInvoice == null ? "Sin definir" : client.requiresInvoice ? "Sí" : "No"}</p></MobileCard>)}
-        />
+        <ClientesList rows={clientListRows} />
       )}
       {!query && totalInCatalog > PREVIEW_LIMIT ? (
         <p className="mt-2 text-xs text-[var(--muted)]">

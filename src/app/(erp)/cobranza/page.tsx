@@ -1,11 +1,9 @@
 import { redirect } from "next/navigation";
-import { ClientNameLink } from "@/components/client-entity-links";
-import { FolioCell } from "@/components/folio-cell";
 import { CobranzaVistaFilter } from "@/components/compact-list-filters";
-import { ActiveFilters, Badge, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, Table, Td, Th } from "@/components/ui";
+import { CobranzaReceivableList } from "@/components/cobranza-receivable-list";
+import { ActiveFilters, Badge, Empty, PageHeader, Table, Td, Th } from "@/components/ui";
 import { homePath } from "@/lib/home";
 import { prisma } from "@/lib/db";
-import { formatWhen } from "@/lib/form";
 import { money } from "@/lib/money";
 import { coordFilterChips, coordPageSubtitle, coordPageTitle, coordUsesSidebarNav } from "@/lib/coordination-ui";
 import { can } from "@/lib/permissions";
@@ -50,6 +48,23 @@ export default async function CobranzaPage({ searchParams }: { searchParams: Pro
     const late = (row: typeof a) => row.balance > 0 && row.dueAt.getTime() < Date.now() ? Date.now() - row.dueAt.getTime() : 0;
     return late(b) - late(a);
   });
+  const listRows = ordered.map((row) => {
+    const serviceLinks = linksForBillingDocument(row.document, serviceLinkMap);
+    return {
+      id: row.id,
+      documentFolio: row.document.folio,
+      diagnosisFolio: serviceLinks.diagnosisFolio,
+      diagnosisHref: serviceLinks.diagnosisHref,
+      osFolio: serviceLinks.osFolio,
+      osHref: serviceLinks.osHref,
+      clientId: row.client.id,
+      clientName: row.client.name,
+      clientIsSystem: row.client.isSystem,
+      balance: row.balance,
+      dueAt: row.dueAt.toISOString(),
+      status: row.status,
+    };
+  });
   const sidebarNav = coordUsesSidebarNav(session.role);
   const vistaTitle =
     selectedVista === "cxc"
@@ -82,49 +97,7 @@ export default async function CobranzaPage({ searchParams }: { searchParams: Pro
         ])}
       />
       {ordered.length === 0 ? <Empty title="Sin cuentas por cobrar" body="Aparecen cuando Coordinación emite una factura." /> : (
-        <ResponsiveData
-          table={
-            <Table>
-              <thead><tr><Th>Documento</Th><Th>DX</Th><Th>OS</Th><Th>Cliente</Th><Th>Saldo</Th><Th>Vence</Th><Th>Estado</Th></tr></thead>
-              <tbody>
-                {ordered.map((row) => {
-                  const overdue = row.balance > 0 && row.dueAt.getTime() < Date.now();
-                  const statusLabel = overdue ? "Vencida" : row.status === "SALDADA" ? "Saldada" : row.status === "PARCIAL" ? "Parcial" : "Abierta";
-                  const serviceLinks = linksForBillingDocument(row.document, serviceLinkMap);
-                  return (
-                    <tr key={row.id}>
-                      <Td><RecordLink href={`/cobranza/${row.id}`}>{row.document.folio}</RecordLink></Td>
-                      <Td><FolioCell folio={serviceLinks.diagnosisFolio} href={serviceLinks.diagnosisHref} /></Td>
-                      <Td><FolioCell folio={serviceLinks.osFolio} href={serviceLinks.osHref} /></Td>
-                      <Td><ClientNameLink clientId={row.client.id} name={row.client.name} isSystem={row.client.isSystem} canEdit={canEditClient} /></Td>
-                      <Td>{money(row.balance)}</Td>
-                      <Td>{formatWhen(row.dueAt)}</Td>
-                      <Td><Badge tone={overdue ? "warn" : "neutral"}>{statusLabel}</Badge></Td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </Table>
-          }
-          cards={ordered.map((row) => {
-            const overdue = row.balance > 0 && row.dueAt.getTime() < Date.now();
-            const statusLabel = overdue ? "Vencida" : row.status === "SALDADA" ? "Saldada" : row.status === "PARCIAL" ? "Parcial" : "Abierta";
-            const serviceLinks = linksForBillingDocument(row.document, serviceLinkMap);
-            return (
-              <MobileCard
-                key={row.id}
-                href={`/cobranza/${row.id}`}
-                title={row.document.folio}
-                meta={<Badge tone={overdue ? "warn" : "neutral"}>{statusLabel}</Badge>}
-                footer={<ClientNameLink clientId={row.client.id} name={row.client.name} isSystem={row.client.isSystem} canEdit={canEditClient} />}
-              >
-                {serviceLinks.diagnosisFolio ? <p>DX: {serviceLinks.diagnosisFolio}</p> : null}
-                {serviceLinks.osFolio ? <p>OS: {serviceLinks.osFolio}</p> : null}
-                <p>{money(row.balance)} · vence {formatWhen(row.dueAt)}</p>
-              </MobileCard>
-            );
-          })}
-        />
+        <CobranzaReceivableList rows={listRows} canEditClient={canEditClient} />
       )}
       {payables.length > 0 ? (
         <section className="mt-6">

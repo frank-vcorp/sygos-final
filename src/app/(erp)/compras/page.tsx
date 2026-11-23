@@ -1,10 +1,10 @@
 import { redirect } from "next/navigation";
-import { ActiveFilters, Badge, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, Table, Td, Th } from "@/components/ui";
+import { ComprasList } from "@/components/compras-list";
+import { ActiveFilters, Empty, PageHeader } from "@/components/ui";
 import { PurchaseFilters } from "./purchase-filters";
 import { PurchaseOrderModal } from "./oc/purchase-order-modal";
 import { PurchaseRegistrationModal } from "@/components/purchase-registration-modal";
 import { prisma } from "@/lib/db";
-import { money } from "@/lib/money";
 import { coordFilterChips, coordPageSubtitle, coordPageTitle, coordUsesSidebarNav } from "@/lib/coordination-ui";
 import { can } from "@/lib/permissions";
 import { purchaseListHref } from "@/lib/purchase-filter-links";
@@ -76,6 +76,16 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
   ]);
   const treasuryAccounts = mapTreasuryAccountOptions(accounts);
   const requesterName = new Map(requesters.map((user) => [user.id, user.name]));
+  const compraListRows = rows.map((row) => ({
+    id: row.id,
+    folio: row.folio,
+    supplierName: row.supplier?.name ?? "Sin proveedor",
+    category: [row.expenseCategory, row.expenseSubcategory].filter(Boolean).join(" · ") || "—",
+    requesterName: requesterName.get(row.requesterUserId) ?? "—",
+    amount: row.amount,
+    status: row.status,
+    createdAt: row.createdAt.toISOString(),
+  }));
   const filters = (omit?: "vista" | "q" | "estado" | "fecha" | "categoria" | "proveedor" | "solicitante") => purchaseListHref({
     vista: omit === "vista" ? undefined : view,
     q: omit === "q" ? undefined : query,
@@ -150,37 +160,7 @@ export default async function ComprasPage({ searchParams }: { searchParams: Prom
         ]}
       />
       {rows.length === 0 ? <Empty title="Sin compras en esta vista" body="La compra directa consume el presupuesto del mes desde que se registra." /> : (
-        <ResponsiveData
-          table={
-            <Table>
-              <thead><tr><Th>Folio</Th><Th>Proveedor</Th><Th>Categoría</Th><Th>Solicitante</Th><Th>{view === "oc" ? "Precio" : "Importe"}</Th><Th>Estado</Th></tr></thead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr key={row.id}>
-                    <Td><RecordLink href={`/compras/${row.id}`}>{row.folio}</RecordLink></Td>
-                    <Td>{row.supplier?.name ?? "Sin proveedor"}</Td>
-                    <Td>{[row.expenseCategory, row.expenseSubcategory].filter(Boolean).join(" · ") || "—"}</Td>
-                    <Td>{requesterName.get(row.requesterUserId) ?? "—"}</Td>
-                    <Td>{money(row.amount)}</Td>
-                    <Td><Badge>{STATUS[row.status] ?? row.status}</Badge></Td>
-                  </tr>
-                ))}
-              </tbody>
-            </Table>
-          }
-          cards={rows.map((row) => (
-            <MobileCard
-              key={row.id}
-              href={`/compras/${row.id}`}
-              title={row.folio}
-              meta={<Badge>{STATUS[row.status] ?? row.status}</Badge>}
-            >
-              <p>{row.supplier?.name ?? "Sin proveedor"}</p>
-              <p>{[row.expenseCategory, row.expenseSubcategory].filter(Boolean).join(" · ") || "Sin categoría"}</p>
-              <p className="mt-1 font-medium">{money(row.amount)}</p>
-            </MobileCard>
-          ))}
-        />
+        <ComprasList rows={compraListRows} amountHeader={view === "oc" ? "Precio" : "Importe"} />
       )}
     </>
   );

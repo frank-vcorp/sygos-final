@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
-import { SlaCountdown } from "@/components/sla-countdown";
 import { parseGerenteServicioPanelFiltro } from "@/lib/gerente-servicios-panel-filters";
-import { ActiveFilters, Badge, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, SegmentedNav, Table, Td, Th } from "@/components/ui";
+import { OperacionQueueList } from "@/components/operacion-queue-list";
+import { ActiveFilters, Empty, PageHeader, SegmentedNav } from "@/components/ui";
 import { homePath } from "@/lib/home";
 import { prisma } from "@/lib/db";
 import { displayCompanyCaseFolio, ensureOriginCompanyServiceNumbers, revealAuthorizedIntercompanyOrders } from "@/lib/folios";
@@ -10,7 +10,6 @@ import { compareBySla } from "@/lib/sla";
 import { isReparacionExpressAttentionType } from "@/lib/priorities";
 import { serviciosBandejaHref } from "@/lib/servicios-catalog";
 import { openOperationCaseWhere, hiddenReservedOsStubCaseWhere } from "@/lib/servicios-supervisor";
-import { CASE_STATUS_LABEL } from "@/lib/technical";
 import { salesPortfolioEquipmentWhere } from "@/lib/sales-assignment";
 import { requireCompany } from "@/lib/session";
 
@@ -77,6 +76,20 @@ export default async function OperacionPage({ searchParams }: { searchParams: Pr
       };
     })
     .sort((a, b) => compareBySla(a, b));
+  const listRows = ordered.map((row) => ({
+    id: row.id,
+    folio: row.folio,
+    equipmentFolio: row.equipment.folio,
+    equipmentModel: row.equipment.model ?? "",
+    status: row.status,
+    priorityName: row.attention.priorityName,
+    assigneeName: row.assignee?.name ?? null,
+    externalSupplierId: row.externalSupplierId,
+    slaDueAt: row.slaDueAt?.toISOString() ?? null,
+    express: row.express ?? false,
+    readOnly: row.serviceCompanyId !== session.activeCompanyId,
+    createdAt: row.createdAt.toISOString(),
+  }));
   const tabs = [
     ["activas", "Activas"],
     ["validacion", "Por validar"],
@@ -95,34 +108,7 @@ export default async function OperacionPage({ searchParams }: { searchParams: Pr
       {ordered.length === 0 ? (
         <Empty title="Sin operaciones en esta vista" body="El trabajo técnico aparece cuando el equipo ya tuvo entrada o ingreso físico." />
       ) : (
-        <ResponsiveData table={<Table>
-          <thead><tr><Th>Folio</Th><Th>Equipo</Th><Th>Estado</Th><Th>Prioridad</Th><Th>Responsable</Th><Th>SLA</Th></tr></thead>
-          <tbody>
-            {ordered.map((row) => {
-              const readOnly = row.serviceCompanyId !== session.activeCompanyId;
-              const overdue = !row.express && row.slaDueAt != null && row.slaDueAt.getTime() < Date.now();
-              return (
-                <tr key={row.id}>
-                  <Td><RecordLink href={`/operacion/${row.id}`}>{row.folio}</RecordLink>{readOnly ? " · lectura" : ""}</Td>
-                  <Td>{row.equipment.folio} · {row.equipment.model}</Td>
-                  <Td><Badge tone={overdue ? "warn" : "neutral"}>{CASE_STATUS_LABEL[row.status] ?? row.status}</Badge></Td>
-                  <Td>{row.attention.priorityName}</Td>
-                  <Td>{row.externalSupplierId ? "Servicio externo" : row.assignee?.name ?? "Sin asignar"}</Td>
-                  <Td>
-                    <SlaCountdown
-                      dueAt={row.slaDueAt}
-                      express={row.express}
-                    />
-                  </Td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </Table>} cards={ordered.map((row) => {
-          const readOnly = row.serviceCompanyId !== session.activeCompanyId;
-          const overdue = !row.express && row.slaDueAt != null && row.slaDueAt.getTime() < Date.now();
-          return <MobileCard key={row.id} href={`/operacion/${row.id}`} title={`${row.folio}${readOnly ? " · lectura" : ""}`} meta={<Badge tone={overdue ? "warn" : "neutral"}>{CASE_STATUS_LABEL[row.status] ?? row.status}</Badge>}><p>{row.equipment.folio} · {row.equipment.model}</p><p>{row.attention.priorityName} · {row.externalSupplierId ? "Servicio externo" : row.assignee?.name ?? "Sin asignar"}</p><p>SLA: <SlaCountdown dueAt={row.slaDueAt} express={row.express} /></p></MobileCard>;
-        })} />
+        <OperacionQueueList rows={listRows} />
       )}
     </>
   );
