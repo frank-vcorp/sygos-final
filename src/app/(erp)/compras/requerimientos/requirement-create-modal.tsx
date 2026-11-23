@@ -77,12 +77,14 @@ function RequirementCreateDialog({
 }) {
   const [state, formAction, pending] = useActionState(createRequirementAction, initialState);
   const router = useRouter();
+  const descriptionRef = useRef<HTMLInputElement>(null);
   const partNumberRef = useRef<HTMLInputElement>(null);
   const [kind, setKind] = useState<"GENERAL" | "REFACCION">(defaultKind);
 
   useEffect(() => {
-    partNumberRef.current?.focus();
-  }, []);
+    if (kind === "REFACCION") partNumberRef.current?.focus();
+    else descriptionRef.current?.focus();
+  }, [kind]);
 
   useEffect(() => {
     if (state.status !== "success") return;
@@ -125,11 +127,13 @@ function RequirementCreateDialog({
               </select>
             </Field>
           )}
-          <Field label="Número de parte" hint={kind === "GENERAL" ? "Opcional para compras generales." : undefined}>
-            <input ref={partNumberRef} name="partNumber" required={kind === "REFACCION"} className={controlClass} />
-          </Field>
+          {kind === "REFACCION" ? (
+            <Field label="Número de parte">
+              <input ref={partNumberRef} name="partNumber" required className={controlClass} />
+            </Field>
+          ) : null}
           <Field label="Descripción">
-            <input name="description" className={controlClass} />
+            <input ref={descriptionRef} name="description" required={kind === "GENERAL"} className={controlClass} />
           </Field>
           <Field label="Cantidad">
             <input name="quantity" type="number" min="1" defaultValue="1" required className={controlClass} />

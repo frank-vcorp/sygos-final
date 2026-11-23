@@ -37,7 +37,9 @@ export default async function AgregarAListaPage({ params }: { params: Promise<{ 
           allowQuickSupplier={can(session.role, "supplier.operate", session.activeCompanyCode)}
           listKind={normalizeShoppingListKind(requirement.kind)}
         />
-        <Field label="Número de parte"><input name="partNumber" defaultValue={requirement.partNumber} required={requirement.kind === "REFACCION"} className={controlClass} /></Field>
+        {requirement.kind === "REFACCION" ? (
+          <Field label="Número de parte"><input name="partNumber" defaultValue={requirement.partNumber} required className={controlClass} /></Field>
+        ) : null}
         <Field label="Descripción"><input name="description" defaultValue={requirement.description} className={controlClass} /></Field>
         <Field label="Cantidad"><input name="quantity" type="number" min="1" defaultValue={requirement.quantity} required className={controlClass} /></Field>
       </FormSection><FormActions><Button type="submit">Agregar a lista</Button></FormActions>

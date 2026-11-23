@@ -609,6 +609,9 @@ export async function createRequirement(
     throw new Error("Solo puedes crear requerimientos generales.");
   }
   if (requirementPartNumberRequired(kind) && !input.partNumber.trim()) throw new Error("Indica el número de parte.");
+  if (!requirementPartNumberRequired(kind) && !input.sourceType && !(input.description?.trim())) {
+    throw new Error("Indica la descripción.");
+  }
   if (!Number.isInteger(input.quantity) || input.quantity < 1) throw new Error("La cantidad debe ser mayor a cero.");
   if (input.sourceType && input.sourceId) {
     const existing = await prisma.requirement.findFirst({ where: { companyId: actor.activeCompanyId, sourceType: input.sourceType, sourceId: input.sourceId } });
@@ -638,10 +641,16 @@ export async function editRequirement(
   if (actor.role === "TECNICO" || (row.requesterUserId !== actor.userId && !["GERENTE_OPERATIVO_SYSTRON", "GERENTE_OPERATIVO_SERVOMOTORES", "CEO", "ADMINISTRADOR", "COORDINACION_ADMINISTRACION"].includes(actor.role))) {
     throw new Error("No tienes permiso para editar este requerimiento.");
   }
-  if (!input.partNumber.trim() || !Number.isInteger(input.quantity) || input.quantity < 1) throw new Error("La partida no es válida.");
+  if (requirementPartNumberRequired(row.kind) && !input.partNumber.trim()) throw new Error("Indica el número de parte.");
+  if (!requirementPartNumberRequired(row.kind) && !(input.description?.trim())) throw new Error("Indica la descripción.");
+  if (!Number.isInteger(input.quantity) || input.quantity < 1) throw new Error("La cantidad debe ser mayor a cero.");
   return prisma.requirement.update({
     where: { id: row.id },
-    data: { partNumber: input.partNumber.trim(), description: input.description?.trim() ?? "", quantity: input.quantity },
+    data: {
+      partNumber: requirementPartNumberRequired(row.kind) ? input.partNumber.trim() : "",
+      description: input.description?.trim() ?? "",
+      quantity: input.quantity,
+    },
   });
 }
 

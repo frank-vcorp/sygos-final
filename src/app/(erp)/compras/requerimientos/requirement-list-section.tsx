@@ -318,9 +318,11 @@ function RequirementAddToListDialog({
             allowQuickSupplier={allowQuickSupplier}
             listKind={normalizeShoppingListKind(row.kind)}
           />
-          <Field label="Número de parte">
-            <input name="partNumber" defaultValue={row.partNumber} required={partRequired} className={controlClass} />
-          </Field>
+          {partRequired ? (
+            <Field label="Número de parte">
+              <input name="partNumber" defaultValue={row.partNumber} required className={controlClass} />
+            </Field>
+          ) : null}
           <Field label="Descripción">
             <input name="description" defaultValue={row.description} className={controlClass} />
           </Field>

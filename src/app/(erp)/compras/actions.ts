@@ -230,7 +230,7 @@ export async function updateRequirementAction(formData: FormData) {
   try {
     const session = await guard("purchase.operate");
     await editRequirement(session, id, {
-      partNumber: requiredText(formData.get("partNumber"), "Número de parte"),
+      partNumber: optionalText(formData.get("partNumber")) ?? "",
       description: optionalText(formData.get("description")) ?? "",
       quantity: Number(formData.get("quantity")),
     });
