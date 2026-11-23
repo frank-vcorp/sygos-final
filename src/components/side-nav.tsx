@@ -81,10 +81,10 @@ function SectionIcon({ title }: { title: string }) {
 }
 
 const activeItemClass =
-  "relative bg-white text-[#0a477e] font-semibold shadow-[0_1px_3px_rgba(15,23,42,0.08)] ring-1 ring-slate-200/90 before:absolute before:left-0 before:top-2 before:bottom-2 before:w-[3px] before:rounded-r-full before:bg-[#0a477e]";
+  "relative bg-white text-[var(--accent)] font-semibold shadow-[0_1px_3px_rgba(15,23,42,0.08)] ring-1 ring-slate-200/90 before:absolute before:left-0 before:top-2 before:bottom-2 before:w-[3px] before:rounded-r-full before:bg-[var(--accent)]";
 const inactiveItemClass = "text-slate-600 hover:bg-slate-200/50 hover:text-slate-900";
 const quickCreatePillClass =
-  "mr-1.5 inline-flex h-7 w-7 items-center justify-center rounded-md text-base font-semibold leading-none text-slate-400 transition-colors hover:bg-slate-200/60 hover:text-[#0a477e]";
+  "mr-1.5 inline-flex h-7 w-7 items-center justify-center rounded-md text-base font-semibold leading-none text-slate-400 transition-colors hover:bg-slate-200/60 hover:text-[var(--accent)]";
 
 type SideLink = { href: string; label: string; createHref?: string };
 type SideSection = { title: string; links: SideLink[] };
@@ -122,7 +122,7 @@ export function SideNav({
       const active = link.href === globalActiveHref;
       return (
         <div key={link.href} className={`flex min-h-9 items-center rounded-lg transition-all ${active ? activeItemClass : inactiveItemClass}`}>
-          <Link href={link.href} className={`block min-w-0 flex-1 px-3 py-2 text-[13.5px] ${active ? "font-semibold text-[#0a477e]" : "font-medium"}`} aria-current={active ? "page" : undefined}>
+          <Link href={link.href} className={`block min-w-0 flex-1 px-3 py-2 text-[13.5px] ${active ? "font-semibold text-[var(--accent)]" : "font-medium"}`} aria-current={active ? "page" : undefined}>
             {link.label}
           </Link>
           {link.createHref ? (
@@ -146,7 +146,7 @@ export function SideNav({
             >
               <Link
                 href={link.href}
-                className={`flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] ${active ? "text-[#0a477e]" : "text-slate-600"}`}
+                className={`flex min-w-0 flex-1 items-center gap-2 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.08em] ${active ? "text-[var(--accent)]" : "text-slate-600"}`}
               >
                 <SectionIcon title={group.title} />
                 <span className="truncate">{group.title}</span>
@@ -182,7 +182,7 @@ export function SideNav({
           return (
             <div key={group.title} className="pt-1">
               <div
-                className={`flex min-h-8 items-center gap-2 rounded-lg px-3 text-[11px] font-semibold uppercase tracking-[0.08em] ${groupActive ? "text-[#0a477e]" : "text-slate-500"}`}
+                className={`flex min-h-8 items-center gap-2 rounded-lg px-3 text-[11px] font-semibold uppercase tracking-[0.08em] ${groupActive ? "text-[var(--accent)]" : "text-slate-500"}`}
               >
                 <SectionIcon title={group.title} />
                 <span className="truncate">{group.title}</span>
@@ -193,7 +193,7 @@ export function SideNav({
         }
         return (
           <details key={`${group.title}-${path}`} open={groupActive} className="group rounded-lg">
-            <summary className={`flex min-h-9 cursor-pointer list-none items-center justify-between rounded-lg px-3 text-[11px] font-semibold uppercase tracking-[0.08em] transition-colors ${groupActive ? "text-[#0a477e] hover:bg-slate-200/40" : "text-slate-500 hover:bg-slate-200/40 hover:text-slate-800"}`}>
+            <summary className={`flex min-h-9 cursor-pointer list-none items-center justify-between rounded-lg px-3 text-[11px] font-semibold uppercase tracking-[0.08em] transition-colors ${groupActive ? "text-[var(--accent)] hover:bg-slate-200/40" : "text-slate-500 hover:bg-slate-200/40 hover:text-slate-800"}`}>
               <span className="flex min-w-0 items-center gap-2">
                 <SectionIcon title={group.title} />
                 <span className="truncate">{group.title}</span>

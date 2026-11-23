@@ -114,12 +114,39 @@ summary {
   --accent: #a61e24;
   --accent-soft: #fceaea;
   --accent-secondary: #c9a227;
+  --brand-logo-tray: #1b252c;
+  --focus-ring: #a61e24;
+  --selection-bg: #fecdd3;
+  --table-row-hover: #fff5f5;
+  --btn-gradient-from: #c42a32;
+  --btn-gradient-to: #8a1820;
+  --btn-gradient-from-hover: #d4353f;
+  --btn-gradient-to-hover: #a61e24;
+  --company-dot: #a61e24;
+  --company-badge-border: #fecaca;
+  --company-badge-bg: #fceaea;
+  --company-badge-text: #7f1d1d;
+  --sidebar-wash: #f9f7f4;
 }
 
 [data-company="SERVOMOTORES"] {
-  --accent: #1b4965;
-  --accent-soft: #e3edf5;
-  --accent-secondary: #64748b;
+  --line: #e5e7eb;
+  --accent: #111827;
+  --accent-soft: #f3f4f6;
+  --accent-secondary: #6b7280;
+  --brand-logo-tray: #ffffff;
+  --focus-ring: #111827;
+  --selection-bg: #e5e7eb;
+  --table-row-hover: #f9fafb;
+  --btn-gradient-from: #1f2937;
+  --btn-gradient-to: #111827;
+  --btn-gradient-from-hover: #374151;
+  --btn-gradient-to-hover: #1f2937;
+  --company-dot: #111827;
+  --company-badge-border: #e5e7eb;
+  --company-badge-bg: #f9fafb;
+  --company-badge-text: #374151;
+  --sidebar-wash: #f9fafb;
 }
 
 .sygos-document .doc-print-header {
@@ -145,12 +172,12 @@ body {
 }
 
 ::selection {
-  background: #bae6fd;
+  background: var(--selection-bg, #bae6fd);
   color: var(--ink);
 }
 
 :where(a, button, input, select, textarea, summary):focus-visible {
-  outline: 2px solid #0a477e;
+  outline: 2px solid var(--focus-ring, #0a477e);
   outline-offset: 2px;
 }
 
@@ -191,7 +218,7 @@ body {
 }
 
 :where(tbody tr):hover {
-  background: #eef6fb;
+  background: var(--table-row-hover, #eef6fb);
 }
 
 :where(tbody tr:last-child td) {

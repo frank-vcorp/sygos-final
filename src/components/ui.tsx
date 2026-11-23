@@ -301,7 +301,7 @@ export function EntityMetaItem({ label, children }: { label: string; children: R
 
 /** Botón de ancla hacia el bloque de captura de la acción principal en la misma página. */
 const detailPrimaryButtonClass =
-  "inline-flex min-h-11 items-center justify-center rounded-lg bg-gradient-to-b from-[#0e5696] to-[#083d6e] hover:from-[#1162ab] hover:to-[#0a477e] px-4 py-2 text-sm font-semibold text-white shadow-[0_1px_2px_rgba(15,23,42,0.18),inset_0_1px_0_rgba(255,255,255,0.18)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2";
+  "inline-flex min-h-11 items-center justify-center rounded-lg bg-gradient-to-b from-[var(--btn-gradient-from)] to-[var(--btn-gradient-to)] hover:from-[var(--btn-gradient-from-hover)] hover:to-[var(--btn-gradient-to-hover)] px-4 py-2 text-sm font-semibold text-white shadow-[0_1px_2px_rgba(15,23,42,0.18),inset_0_1px_0_rgba(255,255,255,0.18)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-2";
 
 export function DetailAnchorButton({ href, children }: { href: string; children: React.ReactNode }) {
   return (
@@ -351,7 +351,7 @@ function KpiIcon({ label }: { label: string }) {
   }
   if (key.includes("vencid") || key.includes("sla") || key.includes("pendiente") || key.includes("por ") || key.includes("cxc")) {
     return (
-      <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-sky-50 text-[#0a477e] ring-1 ring-sky-200/70">
+      <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-[var(--accent-soft)] text-[var(--accent)] ring-1 ring-[color-mix(in_srgb,var(--accent)_25%,transparent)]">
         <svg {...baseProps}>
           <circle cx="9" cy="9" r="6.25" />
           <path d="M9 5.5v3.75l2.5 1.5" />
@@ -400,7 +400,7 @@ export function Button({
 }: React.ButtonHTMLAttributes<HTMLButtonElement> & { tone?: "primary" | "ghost" | "danger" }) {
   const tones = {
     primary:
-      "bg-gradient-to-b from-[#0e5696] to-[#083d6e] hover:from-[#1162ab] hover:to-[#0a477e] text-white shadow-[0_1px_2px_rgba(15,23,42,0.18),inset_0_1px_0_rgba(255,255,255,0.18)] font-semibold",
+      "bg-gradient-to-b from-[var(--btn-gradient-from)] to-[var(--btn-gradient-to)] hover:from-[var(--btn-gradient-from-hover)] hover:to-[var(--btn-gradient-to-hover)] text-white shadow-[0_1px_2px_rgba(15,23,42,0.18),inset_0_1px_0_rgba(255,255,255,0.18)] font-semibold",
     ghost:
       "bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90 shadow-2xs font-medium",
     danger:
@@ -429,7 +429,7 @@ export function ActionLink({
 }) {
   const styles =
     tone === "primary"
-      ? "bg-gradient-to-b from-[#0e5696] to-[#083d6e] hover:from-[#1162ab] hover:to-[#0a477e] text-white shadow-[0_1px_2px_rgba(15,23,42,0.18),inset_0_1px_0_rgba(255,255,255,0.18)] font-semibold"
+      ? "bg-gradient-to-b from-[var(--btn-gradient-from)] to-[var(--btn-gradient-to)] hover:from-[var(--btn-gradient-from-hover)] hover:to-[var(--btn-gradient-to-hover)] text-white shadow-[0_1px_2px_rgba(15,23,42,0.18),inset_0_1px_0_rgba(255,255,255,0.18)] font-semibold"
       : "bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90 shadow-2xs font-medium";
   return (
     <Link
@@ -443,11 +443,11 @@ export function ActionLink({
 
 /** Clase compartida: folio o nombre principal en listados (§3.1 guía UX). */
 export const recordLinkClass =
-  "inline-flex items-center gap-1.5 font-semibold text-slate-900 hover:text-[#0a477e] underline decoration-slate-300/80 underline-offset-4 hover:decoration-[#0a477e] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1 rounded-sm";
+  "inline-flex items-center gap-1.5 font-semibold text-slate-900 hover:text-[var(--accent)] underline decoration-slate-300/80 underline-offset-4 hover:decoration-[var(--accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1 rounded-sm";
 
 /** Relaciones navegables en detalle o texto corrido. */
 export const inlineLinkClass =
-  "font-medium text-slate-800 hover:text-[#0a477e] underline decoration-slate-300/80 underline-offset-4 hover:decoration-[#0a477e] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1 rounded-sm";
+  "font-medium text-slate-800 hover:text-[var(--accent)] underline decoration-slate-300/80 underline-offset-4 hover:decoration-[var(--accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1 rounded-sm";
 
 export function RecordLink({
   href,
@@ -481,8 +481,8 @@ export function TableActionLink({
 }) {
   const styles =
     tone === "primary"
-      ? "bg-gradient-to-b from-[#0e5696] to-[#083d6e] hover:from-[#1162ab] hover:to-[#0a477e] text-white shadow-2xs"
-      : "border border-slate-200/90 bg-white text-[#0a477e] shadow-2xs hover:border-sky-300 hover:bg-slate-50";
+      ? "bg-gradient-to-b from-[var(--btn-gradient-from)] to-[var(--btn-gradient-to)] hover:from-[var(--btn-gradient-from-hover)] hover:to-[var(--btn-gradient-to-hover)] text-white shadow-2xs"
+      : "border border-slate-200/90 bg-white text-[var(--accent)] shadow-2xs hover:border-slate-300 hover:bg-slate-50";
   return (
     <Link
       href={href}
@@ -521,7 +521,7 @@ export function ActiveFilters({
         <Link
           key={`${item.label}-${item.clearHref}`}
           href={item.clearHref}
-          className="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-slate-200/90 bg-white px-3 py-1 text-xs font-medium text-slate-700 shadow-2xs transition-colors hover:border-[#0a477e] hover:bg-sky-50/40 hover:text-[#0a477e] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1"
+          className="inline-flex min-h-8 items-center gap-1.5 rounded-full border border-slate-200/90 bg-white px-3 py-1 text-xs font-medium text-slate-700 shadow-2xs transition-colors hover:border-[var(--accent)] hover:bg-[var(--accent-soft)] hover:text-[var(--accent)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent)] focus-visible:ring-offset-1"
         >
           <span>{item.label}</span>
           <span className="text-slate-400" aria-hidden>×</span>
@@ -552,7 +552,7 @@ export function Field({
 }
 
 export const controlClass =
-  "min-h-11 w-full rounded-lg border border-slate-300/90 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-2xs outline-none focus:border-[#0a477e] focus:ring-3 focus:ring-[#0a477e]/15";
+  "min-h-11 w-full rounded-lg border border-slate-300/90 bg-white px-3.5 py-2.5 text-sm text-slate-900 shadow-2xs outline-none focus:border-[var(--accent)] focus:ring-3 focus:ring-[color-mix(in_srgb,var(--accent)_18%,transparent)]";
 
 export { MoneyInput } from "@/components/money-input";
 
@@ -731,7 +731,7 @@ export function FormSection({
   const grids = { 1: "", 2: "md:grid-cols-2", 3: "md:grid-cols-2 xl:grid-cols-3" };
   return (
     <section className="border-b border-slate-200/80 p-5 last:border-b-0 md:p-8">
-      <div className="mb-6 border-l-[3px] border-[#0e5696] pl-4">
+      <div className="mb-6 border-l-[3px] border-[var(--accent)] pl-4">
         <h2 className="text-lg font-bold tracking-tight text-slate-900">{title}</h2>
         {description ? <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">{description}</p> : null}
       </div>
@@ -761,7 +761,7 @@ export function FormBlock({
       : "border-slate-200/80 bg-white";
   return (
     <section className={`rounded-xl border ${surface} p-4 md:p-5`}>
-      <header className="mb-4 border-l-[3px] border-[#0e5696] pl-3">
+      <header className="mb-4 border-l-[3px] border-[var(--accent)] pl-3">
         <h3 className="text-sm font-bold tracking-tight text-slate-900">{title}</h3>
         {description ? <p className="mt-1 text-xs leading-5 text-slate-600">{description}</p> : null}
       </header>

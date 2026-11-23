@@ -9,7 +9,7 @@ export function CompanyLogo({
 }) {
   const systron = code === "SYSTRON";
   return (
-    <span className={`inline-flex items-center rounded-md ${systron ? "bg-[#1b252c] px-3 py-2" : "bg-white px-2 py-1"} ${className}`}>
+    <span className={`inline-flex items-center rounded-md ${systron ? "bg-[var(--brand-logo-tray)] px-3 py-2" : "bg-white px-2 py-1"} ${className}`}>
       <Image
         src={systron ? "/brand/systron.png" : "/brand/servomotores.png"}
         alt={systron ? "SYSTRON Industria" : "SYSTRON Servomotores"}

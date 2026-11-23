@@ -136,19 +136,15 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
       .map((w) => w[0]?.toUpperCase() ?? "")
       .join("") || "SY";
 
-  const isServomotores = session.activeCompanyCode === "SERVOMOTORES";
-  const companyDotClass = isServomotores
-    ? "bg-amber-500 ring-2 ring-amber-500/20"
-    : "bg-[#0284c7] ring-2 ring-sky-500/20";
-  const companyBadgeToneClass = isServomotores
-    ? "border-amber-200/90 bg-amber-50/70 text-amber-900"
-    : "border-sky-200/90 bg-sky-50/70 text-sky-950";
+  const companyDotClass = "bg-[var(--company-dot)] ring-2 ring-[color-mix(in_srgb,var(--company-dot)_22%,transparent)]";
+  const companyBadgeToneClass =
+    "border-[var(--company-badge-border)] bg-[var(--company-badge-bg)] text-[var(--company-badge-text)]";
 
   const sidebar = (
     <>
         <div className="mb-3 border-b border-slate-200/80 px-4 pb-4 pt-5">
           <div className="flex items-center gap-2.5 pr-10">
-            <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#0a477e] text-white shadow-2xs ring-1 ring-[#0a477e]/15">
+            <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--accent)] text-white shadow-2xs ring-1 ring-[color-mix(in_srgb,var(--accent)_18%,transparent)]">
               <svg viewBox="0 0 20 20" fill="none" className="h-4 w-4" aria-hidden>
                 <path d="M10 2.5 16.5 6.25v7.5L10 17.5 3.5 13.75v-7.5L10 2.5Z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round" />
                 <path d="M10 6.5 13.5 8.5v3L10 13.5 6.5 11.5v-3L10 6.5Z" fill="currentColor" fillOpacity="0.25" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
@@ -161,7 +157,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
           </div>
           <div className="mt-4 flex items-center gap-2.5 rounded-xl bg-white px-3 py-2.5 shadow-2xs ring-1 ring-slate-200/80">
             <span
-              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-sky-50 text-xs font-bold tracking-tight text-[#0a477e] ring-1 ring-sky-200/80"
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-xs font-bold tracking-tight text-[var(--accent)] ring-1 ring-[color-mix(in_srgb,var(--accent)_28%,transparent)]"
               aria-hidden
             >
               {initials}
@@ -244,7 +240,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
                     <option value="">Administrador</option>
                     {viewAsUsers.filter((user) => isRole(user.role)).map((user) => <option key={user.id} value={user.id}>{user.name}{user.company ? ` · ${user.company.name}` : ""}</option>)}
                   </select>
-                  <button className="min-h-9 rounded-lg bg-[#0d5ca1] px-3 text-xs font-semibold text-white">Aplicar</button>
+                  <button className="min-h-9 rounded-lg bg-[var(--accent)] px-3 text-xs font-semibold text-white hover:opacity-90">Aplicar</button>
                 </form>
               ) : null}
               {can(session.role, "search.global") && session.activeCompanyId ? (
@@ -276,7 +272,7 @@ export default async function ErpLayout({ children }: { children: React.ReactNod
             ) : null}
             {can(session.role, "search.global") && session.activeCompanyId ? (
               <form action="/buscar" className="flex">
-                <input name="q" placeholder="Buscar…" className="min-h-7 w-44 rounded-md border border-slate-200/90 bg-slate-50/80 px-2.5 py-1 text-xs text-slate-800 focus:border-[#0a477e] focus:bg-white focus:ring-2 focus:ring-[#0a477e]/15 md:w-56" />
+                <input name="q" placeholder="Buscar…" className="min-h-7 w-44 rounded-md border border-slate-200/90 bg-slate-50/80 px-2.5 py-1 text-xs text-slate-800 focus:border-[var(--accent)] focus:bg-white focus:ring-2 focus:ring-[color-mix(in_srgb,var(--accent)_18%,transparent)] md:w-56" />
               </form>
             ) : null}
             <form action={logoutAction}>
