@@ -88,6 +88,8 @@ type ListScope = {
   originMotors?: boolean;
   /** Systron: gerente, supervisor y técnico no ven motores. */
   hideMotors?: boolean;
+  /** Efectos de escritura intercompañía (revelar OS, alinear cotizaciones). Off en /panel. */
+  intercompanyMaintenance?: boolean;
 };
 
 /** Alcance de bandeja: taller de la empresa, o motores de origen cuando el caso lo ejecuta la otra. */
@@ -581,8 +583,10 @@ export async function listActiveServicios(
   const technicianId = options?.assigneeUserId;
   const clientOwnerUserId = options?.clientOwnerUserId;
 
-  await revealAuthorizedIntercompanyOrders();
-  await alignIntercompanyWorkshopQuoteClients(companyId);
+  if (options?.intercompanyMaintenance) {
+    await revealAuthorizedIntercompanyOrders();
+    await alignIntercompanyWorkshopQuoteClients(companyId);
+  }
   const pendingDecisionCaseIds = q
     ? []
     : await technicalCaseIdsPendingSellerDecision(companyId, clientOwnerUserId);
@@ -640,13 +644,15 @@ export async function listHistorialServicios(
   query: string,
   options?: ListScope & { status?: string | null },
 ): Promise<SupervisorServicioRow[]> {
-  await revealAuthorizedIntercompanyOrders();
+  if (options?.intercompanyMaintenance) {
+    await revealAuthorizedIntercompanyOrders();
+    await alignIntercompanyWorkshopQuoteClients(companyId);
+  }
   const tipo = options?.tipo ?? null;
   const attentionType = tipo ? (SERVICIO_TIPO_PARAM[tipo] as AttentionType) : null;
   const q = query.trim();
   const technicianId = options?.assigneeUserId;
   const clientOwnerUserId = options?.clientOwnerUserId;
-  await alignIntercompanyWorkshopQuoteClients(companyId);
   const historialStatuses = technicianId ? TECHNICIAN_HISTORIAL_CASE : HISTORIAL_CASE;
   const statusFilter =
     options?.status && options.status !== "todos" && (historialStatuses as readonly string[]).includes(options.status)

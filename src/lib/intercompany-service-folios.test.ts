@@ -97,8 +97,12 @@ describe("folios de diagnóstico por empresa", () => {
     assert.equal(os!.folio, "OS-3");
     assert.equal(displayCompanyCaseFolio(os!.folio, stored!, systron.id), "OS-4");
 
-    const systronRows = await listActiveServicios(systron.id, "", { originMotors: true, equipmentKind: "MOT" });
-    const servRows = await listActiveServicios(servomotores.id, "", { equipmentKind: "MOT" });
+    const systronRows = await listActiveServicios(systron.id, "", {
+      originMotors: true,
+      equipmentKind: "MOT",
+      intercompanyMaintenance: true,
+    });
+    const servRows = await listActiveServicios(servomotores.id, "", { equipmentKind: "MOT", intercompanyMaintenance: true });
     const folioOf = (rows: typeof systronRows, equipmentId: string) => {
       const row = rows.find((item) => item.kind === "servicio" && item.equipmentId === equipmentId);
       return row && row.kind === "servicio" ? row.diagnosisFolio : null;
@@ -122,7 +126,7 @@ describe("folios de diagnóstico por empresa", () => {
     assert.equal(mirror!.technicalCaseId, dx!.id);
     assert.equal(mirror!.equipmentId, motor.id);
     await prisma.quote.update({ where: { id: workshopQuote.id }, data: { clientId: client.id } });
-    await listActiveServicios(servomotores.id, "", { equipmentKind: "MOT" });
+    await listActiveServicios(servomotores.id, "", { equipmentKind: "MOT", intercompanyMaintenance: true });
     const correctedQuote = await prisma.quote.findUnique({ where: { id: workshopQuote.id } });
     const mirrorAfter = await prisma.quote.findUnique({ where: { id: mirror!.id } });
     assert.equal(correctedQuote!.clientId, adminClient.id);
@@ -238,7 +242,11 @@ describe("folios de diagnóstico por empresa", () => {
     assert.equal(osBefore!.folio, "OS-3");
     assert.equal(osBefore!.quotePending, true);
     assert.equal(osBefore!.serviceCompanyId, smOs.id);
-    const hidden = await listActiveServicios(syOs.id, "", { originMotors: true, equipmentKind: "MOT" });
+    const hidden = await listActiveServicios(syOs.id, "", {
+      originMotors: true,
+      equipmentKind: "MOT",
+      intercompanyMaintenance: true,
+    });
     const hiddenRow = hidden.find((item) => item.kind === "servicio" && item.equipmentId === motorOs.id);
     assert.equal(hiddenRow && hiddenRow.kind === "servicio" ? hiddenRow.osFolio : null, null);
 
@@ -261,8 +269,12 @@ describe("folios de diagnóstico por empresa", () => {
     assert.equal(osCases[0]!.serviceCompanyId, smOs.id);
     const numbered = await prisma.attention.findUnique({ where: { id: attentionOs.id } });
     assert.equal(numbered!.originServiceNumber, 23);
-    const systronOsRows = await listActiveServicios(syOs.id, "", { originMotors: true, equipmentKind: "MOT" });
-    const servOsRows = await listActiveServicios(smOs.id, "", { equipmentKind: "MOT" });
+    const systronOsRows = await listActiveServicios(syOs.id, "", {
+      originMotors: true,
+      equipmentKind: "MOT",
+      intercompanyMaintenance: true,
+    });
+    const servOsRows = await listActiveServicios(smOs.id, "", { equipmentKind: "MOT", intercompanyMaintenance: true });
     const shown = (rows: typeof systronOsRows) => {
       const row = rows.find((item) => item.kind === "servicio" && item.equipmentId === motorOs.id);
       return row && row.kind === "servicio" ? row.osFolio : null;
@@ -331,7 +343,11 @@ describe("folios de diagnóstico por empresa", () => {
         equipmentId: motorBlank.id,
       },
     });
-    const blankRows = await listActiveServicios(syOs.id, "", { originMotors: true, equipmentKind: "MOT" });
+    const blankRows = await listActiveServicios(syOs.id, "", {
+      originMotors: true,
+      equipmentKind: "MOT",
+      intercompanyMaintenance: true,
+    });
     const blank = blankRows.find((item) => item.kind === "servicio" && item.equipmentId === motorBlank.id);
     assert.ok(blank && blank.kind === "servicio");
     assert.equal(blank.diagnosisFolio, "DX-23");

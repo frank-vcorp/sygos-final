@@ -176,9 +176,17 @@ export async function ServiciosTecnicoBandeja({
           equipmentKind: equipmentKindScope,
           hideMotors,
           originMotors,
+          intercompanyMaintenance: true,
           ...dateRange,
         })
-      : await listActiveServicios(companyId, query, { ...listScope, equipmentKind: equipmentKindScope, hideMotors, originMotors, ...dateRange });
+      : await listActiveServicios(companyId, query, {
+          ...listScope,
+          equipmentKind: equipmentKindScope,
+          hideMotors,
+          originMotors,
+          intercompanyMaintenance: true,
+          ...dateRange,
+        });
 
   if (gerentePanelFiltro) {
     const servicioRows = rows.filter((row): row is ServicioBandejaRow => row.kind === "servicio");
