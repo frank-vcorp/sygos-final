@@ -337,7 +337,10 @@ export async function revealAuthorizedIntercompanyOrders(): Promise<void> {
   }
 }
 
-export async function ensureOriginCompanyServiceNumbers(attentionIds: string[]): Promise<Map<string, number>> {
+/** Solo lectura: números de origen ya persistidos (sin apartar SRV en render). */
+export async function loadOriginCompanyServiceNumbersForDisplay(
+  attentionIds: string[],
+): Promise<Map<string, number>> {
   const map = new Map<string, number>();
   const ids = [...new Set(attentionIds)];
   if (ids.length === 0) return map;
@@ -346,11 +349,23 @@ export async function ensureOriginCompanyServiceNumbers(attentionIds: string[]):
     select: { id: true, originCompanyId: true, serviceCompanyId: true, originServiceNumber: true },
   });
   for (const row of rows) {
-    if (row.originCompanyId === row.serviceCompanyId) continue;
-    if (row.originServiceNumber != null) {
+    if (row.originCompanyId !== row.serviceCompanyId && row.originServiceNumber != null) {
       map.set(row.id, row.originServiceNumber);
-      continue;
     }
+  }
+  return map;
+}
+
+export async function ensureOriginCompanyServiceNumbers(attentionIds: string[]): Promise<Map<string, number>> {
+  const map = await loadOriginCompanyServiceNumbersForDisplay(attentionIds);
+  const ids = [...new Set(attentionIds)];
+  if (ids.length === 0) return map;
+  const rows = await prisma.attention.findMany({
+    where: { id: { in: ids } },
+    select: { id: true, originCompanyId: true, serviceCompanyId: true, originServiceNumber: true },
+  });
+  for (const row of rows) {
+    if (row.originCompanyId === row.serviceCompanyId || map.has(row.id)) continue;
     const n = await ensureOriginCompanyServiceNumber(row.id);
     if (n != null) map.set(row.id, n);
   }

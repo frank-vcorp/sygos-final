@@ -1,5 +1,10 @@
 import { prisma } from "@/lib/db";
-import { displayCompanyCaseFolio, ensureOriginCompanyServiceNumbers, revealAuthorizedIntercompanyOrders, serviceCycleNumberFromFolio } from "@/lib/folios";
+import {
+  displayCompanyCaseFolio,
+  loadOriginCompanyServiceNumbersForDisplay,
+  revealAuthorizedIntercompanyOrders,
+  serviceCycleNumberFromFolio,
+} from "@/lib/folios";
 import { serviceClientForCompany } from "@/lib/intercompany-client";
 import { alignIntercompanyWorkshopQuoteClients } from "@/lib/quotes";
 import { linesForTotal, money, quoteTotals } from "@/lib/money";
@@ -477,7 +482,7 @@ async function mapCasesToBandejaRows(companyId: string, cases: CaseRecord[]): Pr
 
   const casesWithOrders = await attachMissingOrders(cases);
   const casesWithParents = await attachParentDiagnoses(companyId, casesWithOrders);
-  const originNumbers = await ensureOriginCompanyServiceNumbers(casesWithParents.map((row) => row.attentionId));
+  const originNumbers = await loadOriginCompanyServiceNumbersForDisplay(casesWithParents.map((row) => row.attentionId));
   for (const row of casesWithParents) {
     const n = originNumbers.get(row.attentionId);
     if (n != null) row.attention.originServiceNumber = n;
