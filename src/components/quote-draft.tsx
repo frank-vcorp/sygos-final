@@ -82,7 +82,7 @@ export function QuoteDraft({
           </Field>
         )}
         {requiresDiagnosisPriority ? (
-          <Field label="Prioridad del diagnóstico" hint="Obligatoria en COTDX; se hereda al abrir el DX.">
+          <Field label="Prioridad del diagnóstico" hint="Obligatoria en COTDX; define precio y plazos desde catálogo (salvo prioridad sin tarifa).">
             <select name="priorityId" className={controlClass} required defaultValue="">
               <option value="">Selecciona</option>
               {filteredDiagnosisPriorities.map((item) => (

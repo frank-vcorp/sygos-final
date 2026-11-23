@@ -30,7 +30,7 @@ describe("cotización espejo MOT Servomotores → SYSTRON", () => {
       stdio: "ignore",
     });
     const { prisma } = await import("./db");
-    const { ensureQuoteFromCase, setPrices, intercompanyReferenceAmount, intercompanyDeliveryDaysDefault } = await import("./quotes");
+    const { ensureQuoteFromCase, intercompanyReferenceAmount, intercompanyDeliveryDaysDefault } = await import("./quotes");
 
     const systron = await prisma.company.create({ data: { code: "SYSTRON", name: "Systron" } });
     const servomotores = await prisma.company.create({ data: { code: "SERVOMOTORES", name: "Servomotores" } });
@@ -109,6 +109,7 @@ describe("cotización espejo MOT Servomotores → SYSTRON", () => {
       dx.id,
     );
     assert.equal(servQuote.companyId, servomotores.id);
+    assert.equal(servQuote.status, "PENDIENTE_DECISION");
 
     const mirror = await prisma.quote.findFirst({
       where: { companyId: systron.id, technicalCaseId: dx.id },
@@ -132,21 +133,13 @@ describe("cotización espejo MOT Servomotores → SYSTRON", () => {
       1,
     );
 
-    const unpricedBase = await prisma.quote.findUnique({ where: { id: servQuote.id }, include: { lines: true } });
-    assert.equal(intercompanyReferenceAmount(unpricedBase, null), null);
-
-    const servWithLines = await prisma.quote.findUnique({ where: { id: servQuote.id }, include: { lines: true } });
-    await setPrices(
-      { userId: diego.id, role: "GERENTE_OPERATIVO_SERVOMOTORES", activeCompanyId: servomotores.id, activeCompanyCode: "SERVOMOTORES" },
-      servQuote.id,
-      1,
-      [{ lineId: servWithLines!.lines[0]!.id, amount: 10000 }],
-      10,
-    );
     const pricedBase = await prisma.quote.findUnique({ where: { id: servQuote.id }, include: { lines: true } });
-    assert.equal(intercompanyReferenceAmount(pricedBase, attention), 10000);
+    assert.equal(pricedBase!.lines[0]!.basePrice, 8000);
+    assert.equal(pricedBase!.lines[0]!.unitPrice, 8800);
+    assert.equal(pricedBase!.deliveryBusinessDays, 7);
+    assert.equal(intercompanyReferenceAmount(pricedBase, attention), 8000);
     const mirrorAfterPrice = await prisma.quote.findFirst({ where: { companyId: systron.id, linkedQuoteId: servQuote.id } });
-    assert.equal(mirrorAfterPrice!.deliveryBusinessDays, 10);
+    assert.equal(mirrorAfterPrice!.deliveryBusinessDays, 7);
 
     const os = await prisma.technicalCase.create({
       data: {

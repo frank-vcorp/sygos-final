@@ -95,13 +95,15 @@ describe("commercial quote folios", () => {
     assert.equal(quote.priorityName, "Alta");
     assert.equal(quote.warrantyMonths, 6);
     assert.equal(quote.paymentCondition, "ANTICIPADO");
+    assert.equal(quote.status, "PENDIENTE_DECISION");
     const stored = await prisma.quote.findUnique({ where: { id: quote.id }, include: { lines: true } });
     assert.equal(stored!.lines.length, 1);
     assert.match(stored!.lines[0]!.concept, /^Diagnóstico/);
+    assert.equal(stored!.lines[0]!.unitPrice, 3500);
     await prisma.$disconnect();
   });
 
-  it("vendedor ve COTDX comercial en PENDIENTE_DECISION tras precio del CEO", async () => {
+  it("vendedor ve COTDX comercial en PENDIENTE_DECISION con precio del catálogo", async () => {
     const dir = mkdtempSync(join(tmpdir(), "sygos-cotdx-decision-"));
     process.env.DATABASE_URL = `file:${join(dir, "test.db")}`;
     const { execSync } = await import("child_process");
@@ -111,7 +113,7 @@ describe("commercial quote folios", () => {
       stdio: "ignore",
     });
     const { prisma } = await import("./db");
-    const { createSellerQuote, setPrices } = await import("./quotes");
+    const { createSellerQuote } = await import("./quotes");
     const { initialPriorities } = await import("./priorities");
 
     const company = await prisma.company.create({ data: { code: "SYT3", name: "Systron" } });
@@ -120,9 +122,6 @@ describe("commercial quote folios", () => {
     }
     const seller = await prisma.user.create({
       data: { username: "vendedor2", name: "V", passwordHash: "x", role: "VENTAS", companyId: company.id },
-    });
-    const ceo = await prisma.user.create({
-      data: { username: "ceo2", name: "CEO", passwordHash: "x", role: "CEO", companyId: company.id },
     });
     const client = await prisma.client.create({
       data: {
@@ -167,17 +166,7 @@ describe("commercial quote folios", () => {
       },
     );
     assert.equal(quote.sellerUserId, seller.id);
-
-    const withLines = await prisma.quote.findUnique({ where: { id: quote.id }, include: { lines: true } });
-    await setPrices(
-      { userId: ceo.id, role: "CEO", activeCompanyId: company.id, activeCompanyCode: "SYSTRON" },
-      quote.id,
-      1,
-      [{ lineId: withLines!.lines[0]!.id, amount: 2500 }],
-    );
-
-    const priced = await prisma.quote.findUnique({ where: { id: quote.id } });
-    assert.equal(priced!.status, "PENDIENTE_DECISION");
+    assert.equal(quote.status, "PENDIENTE_DECISION");
 
     const sellerList = await prisma.quote.findMany({
       where: { companyId: company.id, sellerUserId: seller.id, status: "PENDIENTE_DECISION" },
@@ -270,7 +259,7 @@ describe("commercial quote folios", () => {
       stdio: "ignore",
     });
     const { prisma } = await import("./db");
-    const { createSellerQuote, setPrices, decideQuote, openWaitingRepairs } = await import("./quotes");
+    const { createSellerQuote, decideQuote, openWaitingRepairs } = await import("./quotes");
     const { openPendingCases, openCase } = await import("./technical");
     const { initialPriorities } = await import("./priorities");
 
@@ -280,9 +269,6 @@ describe("commercial quote folios", () => {
     }
     const seller = await prisma.user.create({
       data: { username: "v-srv", name: "V", passwordHash: "x", role: "VENTAS", companyId: company.id },
-    });
-    const ceo = await prisma.user.create({
-      data: { username: "c-srv", name: "CEO", passwordHash: "x", role: "CEO", companyId: company.id },
     });
     const client = await prisma.client.create({
       data: {
@@ -361,16 +347,11 @@ describe("commercial quote folios", () => {
     assert.equal(otherDx!.folio, "DX-2");
 
     const withLines = await prisma.quote.findUnique({ where: { id: quote.id }, include: { lines: true } });
-    await setPrices(
-      { userId: ceo.id, role: "CEO", activeCompanyId: company.id, activeCompanyCode: "SYSTRON" },
-      quote.id,
-      1,
-      [{ lineId: withLines!.lines[0]!.id, amount: 1000 }],
-    );
+    assert.equal(quote.status, "PENDIENTE_DECISION");
     await decideQuote(
       { userId: seller.id, role: "VENTAS", activeCompanyId: company.id, activeCompanyCode: "SYSTRON" },
       quote.id,
-      2,
+      1,
       true,
       [withLines!.lines[0]!.id],
     );

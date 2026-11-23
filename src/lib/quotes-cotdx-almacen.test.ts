@@ -25,13 +25,10 @@ async function setupSystronDb(suffix: string) {
 describe("COTDX comercial → almacén", () => {
   it("al autorizar con equipo SIN_CUSTODIA crea atención ABIERTA con originQuoteId", async () => {
     const { prisma, company } = await setupSystronDb("cotdx-almacen");
-    const { createSellerQuote, setPrices, decideQuote } = await import("./quotes");
+    const { createSellerQuote, decideQuote } = await import("./quotes");
 
     const seller = await prisma.user.create({
       data: { username: "vendedor", name: "V", passwordHash: "x", role: "VENTAS", companyId: company.id },
-    });
-    const ceo = await prisma.user.create({
-      data: { username: "ceo", name: "CEO", passwordHash: "x", role: "CEO", companyId: company.id },
     });
     const client = await prisma.client.create({
       data: {
@@ -75,17 +72,13 @@ describe("COTDX comercial → almacén", () => {
         paymentCondition: "CONTADO",
       },
     );
+    assert.equal(quote.status, "PENDIENTE_DECISION");
     const withLines = await prisma.quote.findUnique({ where: { id: quote.id }, include: { lines: true } });
-    await setPrices(
-      { userId: ceo.id, role: "CEO", activeCompanyId: company.id, activeCompanyCode: "SYSTRON" },
-      quote.id,
-      1,
-      [{ lineId: withLines!.lines[0]!.id, amount: 3500 }],
-    );
+    assert.equal(withLines!.lines[0]!.unitPrice, 3500);
     await decideQuote(
       { userId: seller.id, role: "VENTAS", activeCompanyId: company.id, activeCompanyCode: "SYSTRON" },
       quote.id,
-      2,
+      1,
       true,
       [withLines!.lines[0]!.id],
     );
@@ -109,14 +102,11 @@ describe("COTDX comercial → almacén", () => {
 
   it("tras entrada física abre DX y liga cotización", async () => {
     const { prisma, company } = await setupSystronDb("cotdx-ingreso");
-    const { createSellerQuote, setPrices, decideQuote, openWaitingRepairs } = await import("./quotes");
+    const { createSellerQuote, decideQuote, openWaitingRepairs } = await import("./quotes");
     const { openPendingCases } = await import("./technical");
 
     const seller = await prisma.user.create({
       data: { username: "v1", name: "V", passwordHash: "x", role: "VENTAS", companyId: company.id },
-    });
-    const ceo = await prisma.user.create({
-      data: { username: "c1", name: "CEO", passwordHash: "x", role: "CEO", companyId: company.id },
     });
     const client = await prisma.client.create({
       data: {
@@ -161,16 +151,10 @@ describe("COTDX comercial → almacén", () => {
       },
     );
     const withLines = await prisma.quote.findUnique({ where: { id: quote.id }, include: { lines: true } });
-    await setPrices(
-      { userId: ceo.id, role: "CEO", activeCompanyId: company.id, activeCompanyCode: "SYSTRON" },
-      quote.id,
-      1,
-      [{ lineId: withLines!.lines[0]!.id, amount: 2000 }],
-    );
     await decideQuote(
       { userId: seller.id, role: "VENTAS", activeCompanyId: company.id, activeCompanyCode: "SYSTRON" },
       quote.id,
-      2,
+      1,
       true,
       [withLines!.lines[0]!.id],
     );

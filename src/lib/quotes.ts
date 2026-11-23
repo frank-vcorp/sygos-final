@@ -91,6 +91,53 @@ function frozenPriorityFromQuote(quote: {
   };
 }
 
+/** Precio de catálogo/prioridad congelada definido (incluye 0; excluye null). */
+export function diagnosisCatalogPriceIsDefined(price: number | null | undefined): price is number {
+  return price != null;
+}
+
+/** Misma regla que setPrices al asignar importe desde catálogo de diagnóstico. */
+export function quoteLineFieldsFromDiagnosisCatalog(
+  catalogPrice: number,
+  incrementPct: number | null,
+): { unitPrice: number; basePrice: number | null; incrementPct: number | null } {
+  if (incrementPct != null) {
+    return {
+      basePrice: catalogPrice,
+      unitPrice: finalFromBase(catalogPrice, incrementPct),
+      incrementPct,
+    };
+  }
+  return { unitPrice: catalogPrice, basePrice: null, incrementPct: null };
+}
+
+function diagnosisDeliveryBusinessDaysFromPriority(priority: {
+  slaMaxDays?: number | null;
+  prioritySlaMaxDays?: number | null;
+  targetMaxDays?: number | null;
+  priorityTargetMax?: number | null;
+}): number | null {
+  const sla = priority.slaMaxDays ?? priority.prioritySlaMaxDays ?? null;
+  const targetMax = priority.targetMaxDays ?? priority.priorityTargetMax ?? null;
+  const deliveryDefault = sla ?? targetMax ?? null;
+  return deliveryDefault != null && deliveryDefault >= 1 ? deliveryDefault : null;
+}
+
+function diagnosisQuotePricingFromCatalog(
+  catalogPrice: number | null,
+  incrementPct: number | null,
+  deliveryDays: number | null,
+): { line: ReturnType<typeof quoteLineFieldsFromDiagnosisCatalog> | Record<string, never>; status: "PENDIENTE_DECISION" | "PENDIENTE_COTIZAR"; deliveryBusinessDays?: number } {
+  if (!diagnosisCatalogPriceIsDefined(catalogPrice)) {
+    return { line: {}, status: "PENDIENTE_COTIZAR" };
+  }
+  return {
+    line: quoteLineFieldsFromDiagnosisCatalog(catalogPrice, incrementPct),
+    status: "PENDIENTE_DECISION",
+    ...(deliveryDays != null ? { deliveryBusinessDays: deliveryDays } : {}),
+  };
+}
+
 type AttentionPriorityFreeze = {
   priorityName: string;
   priorityPrice: number | null;
@@ -247,13 +294,16 @@ export async function createSellerQuote(
     const service = await serviceCompanyForEquipment(equipment, actor.activeCompanyId);
     reservedServiceNumber = await allocateServiceNumber(service.id);
   }
+  const diagnosisPricing = input.quoteType === "DIAGNOSTICO" && frozenPriority
+    ? diagnosisQuotePricingFromCatalog(frozenPriority.price, frozenPriority.incrementPct, null)
+    : { line: {} as Record<string, never>, status: "PENDIENTE_COTIZAR" as const };
   const quote = await prisma.quote.create({
     data: {
       folio,
       companyId: actor.activeCompanyId,
       clientId: client.id,
       quoteType: input.quoteType,
-      status: "PENDIENTE_COTIZAR",
+      status: diagnosisPricing.status,
       equipmentId: input.equipmentId,
       ...(reservedServiceNumber != null ? { reservedServiceNumber } : {}),
       reference: input.reference,
@@ -270,7 +320,13 @@ export async function createSellerQuote(
             prioritySlaMaxDays: frozenPriority.slaMaxDays,
           }
         : {}),
-      lines: { create: concepts.map((line) => ({ concept: line.concept, quantity: line.quantity })) },
+      lines: {
+        create: concepts.map((line) => ({
+          concept: line.concept,
+          quantity: line.quantity,
+          ...diagnosisPricing.line,
+        })),
+      },
     },
   });
   await recordHistory({
@@ -278,7 +334,9 @@ export async function createSellerQuote(
     entityType: "COTIZACION",
     entityId: quote.id,
     action: "ALTA",
-    summary: `${folio} quedó pendiente de cotizar. Los contactos elegidos se usan al dar seguimiento.`,
+    summary: diagnosisPricing.status === "PENDIENTE_DECISION"
+      ? `${folio} quedó con precio del catálogo de diagnóstico; pendiente de decisión del cliente.`
+      : `${folio} quedó pendiente de cotizar. Los contactos elegidos se usan al dar seguimiento.`,
     authorUserId: actor.userId,
   });
   return quote;
@@ -407,6 +465,13 @@ export async function ensureQuoteFromCase(actor: { userId: string; activeCompany
   const repair = row.kind === "OS";
   const concept = automaticQuoteConcept(row);
   const folio = await serviceFolioForAttention(row.attentionId, row.serviceCompanyId, "COT");
+  const workshopDiagnosisPricing = repair
+    ? { line: {} as Record<string, never>, status: "PENDIENTE_COTIZAR" as const }
+    : diagnosisQuotePricingFromCatalog(
+      row.attention.priorityPrice,
+      row.attention.priorityIncrementPct,
+      diagnosisDeliveryBusinessDaysFromPriority(row.attention),
+    );
   let quote;
   try {
     quote = await prisma.quote.create({
@@ -415,16 +480,21 @@ export async function ensureQuoteFromCase(actor: { userId: string; activeCompany
         companyId: actor.activeCompanyId,
         clientId,
         quoteType: repair ? "REPARACION" : "DIAGNOSTICO",
-        status: "PENDIENTE_COTIZAR",
+        status: repair ? "PENDIENTE_COTIZAR" : workshopDiagnosisPricing.status,
         equipmentId: row.equipmentId,
         technicalCaseId: row.id,
         sellerUserId: resolveQuoteSellerUserId(row.attention.sellerUserId, client.ownerUserId),
         reference: row.folio,
+        ...(workshopDiagnosisPricing.deliveryBusinessDays != null
+          ? { deliveryBusinessDays: workshopDiagnosisPricing.deliveryBusinessDays }
+          : {}),
         lines: {
           create: [{
             concept,
             quantity: 1,
-            incrementPct: repair ? row.attention.priorityIncrementPct : null,
+            ...(repair
+              ? { incrementPct: row.attention.priorityIncrementPct }
+              : workshopDiagnosisPricing.line),
           }],
         },
       },
@@ -449,8 +519,12 @@ export async function ensureQuoteFromCase(actor: { userId: string; activeCompany
     entityId: quote.id,
     action: "ALTA",
     summary: contactNames
-      ? `${folio} quedó pendiente de cotizar desde ${row.folio}. Contactos: ${contactNames}.`
-      : `${folio} quedó pendiente de cotizar desde ${row.folio}. El cliente no tiene contactos activos.`,
+      ? workshopDiagnosisPricing.status === "PENDIENTE_DECISION"
+        ? `${folio} quedó con precio de prioridad desde ${row.folio}; pendiente de decisión del cliente. Contactos: ${contactNames}.`
+        : `${folio} quedó pendiente de cotizar desde ${row.folio}. Contactos: ${contactNames}.`
+      : workshopDiagnosisPricing.status === "PENDIENTE_DECISION"
+        ? `${folio} quedó con precio de prioridad desde ${row.folio}; pendiente de decisión del cliente. El cliente no tiene contactos activos.`
+        : `${folio} quedó pendiente de cotizar desde ${row.folio}. El cliente no tiene contactos activos.`,
     authorUserId: actor.userId,
   });
   if (row.equipment.kind === "MOT" && row.equipment.originCompanyId !== actor.activeCompanyId) {

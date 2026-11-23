@@ -60,11 +60,14 @@ export async function createQuoteAction(formData: FormData) {
       paymentCondition: parsePaymentCondition(formData.get("paymentCondition")),
     });
     const fromVentas = optionalText(formData.get("origin")) === "ventas";
+    const diagnosisAutoPriced = quote.quoteType === "DIAGNOSTICO" && quote.status === "PENDIENTE_DECISION";
     await setFlash({
       tone: "ok",
       message: fromVentas
         ? `${quote.folio} registrada como venta de equipo, sin precio. Sigue en cotizaciones hasta autorización.`
-        : `${quote.folio} quedó registrada, sin precio.`,
+        : diagnosisAutoPriced
+          ? `${quote.folio} quedó registrada con precio del catálogo de diagnóstico; pendiente de decisión del cliente.`
+          : `${quote.folio} quedó registrada, sin precio.`,
     });
     redirect(`/cotizaciones/${quote.id}`);
   } catch (error) {

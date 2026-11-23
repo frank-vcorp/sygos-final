@@ -35,7 +35,7 @@ export default async function NuevaCotizacionPage({ searchParams }: { searchPara
     <>
       <PageHeader
         title="Nueva cotización"
-        subtitle="Completa cliente, equipo, conceptos y destinatarios. Podrás revisar el precio en el siguiente paso."
+        subtitle="Completa cliente, equipo y destinatarios. Diagnóstico (COTDX) toma el precio de la prioridad del catálogo; los demás tipos quedan sin precio hasta coordinación."
         back={{ href: "/cotizaciones", label: "Cotizaciones" }}
       />
       <FormPanel action={createQuoteAction}>
@@ -56,8 +56,8 @@ export default async function NuevaCotizacionPage({ searchParams }: { searchPara
             diagnosisPriorities={diagnosisPriorities}
           />
         </div>
-        <FormActions note="La cotización se guarda sin precio; coordinación o gerencia la completa después.">
-          <SubmitButton pendingLabel="Guardando…">Guardar sin precio</SubmitButton>
+        <FormActions note="COTDX: precio automático según prioridad. COTOS, campo y venta de equipo: sin precio hasta que gerencia los complete.">
+          <SubmitButton pendingLabel="Guardando…">Guardar cotización</SubmitButton>
         </FormActions>
       </FormPanel>
     </>
