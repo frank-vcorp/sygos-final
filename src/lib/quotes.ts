@@ -199,6 +199,8 @@ export async function createSellerQuote(
     concepts: Array<{ concept: string; quantity: number }>;
     contactIds: string[];
     priorityId?: string | null;
+    warrantyMonths: number;
+    paymentCondition: string;
   },
 ) {
   const client = await prisma.client.findFirst({
@@ -255,6 +257,8 @@ export async function createSellerQuote(
       equipmentId: input.equipmentId,
       ...(reservedServiceNumber != null ? { reservedServiceNumber } : {}),
       reference: input.reference,
+      warrantyMonths: input.warrantyMonths,
+      paymentCondition: input.paymentCondition,
       sellerUserId,
       ...(frozenPriority
         ? {

@@ -75,6 +75,7 @@ describe("commercial quote folios", () => {
     const priority = await prisma.priority.findFirst({ where: { companyId: company.id, attentionType: "DIAGNOSTICO", name: "Alta" } });
     assert.ok(priority);
 
+    const { defaultSellerQuoteCommercialTerms } = await import("./quote-commercial-terms");
     const quote = await createSellerQuote(
       { userId: user.id, role: "VENTAS", activeCompanyId: company.id, activeCompanyCode: "SYSTRON" },
       {
@@ -85,10 +86,15 @@ describe("commercial quote folios", () => {
         concepts: [],
         contactIds: [contact.id],
         priorityId: priority!.id,
+        ...defaultSellerQuoteCommercialTerms,
+        warrantyMonths: 6,
+        paymentCondition: "ANTICIPADO",
       },
     );
     assert.match(quote.folio, /^COTDX-/);
     assert.equal(quote.priorityName, "Alta");
+    assert.equal(quote.warrantyMonths, 6);
+    assert.equal(quote.paymentCondition, "ANTICIPADO");
     const stored = await prisma.quote.findUnique({ where: { id: quote.id }, include: { lines: true } });
     assert.equal(stored!.lines.length, 1);
     assert.match(stored!.lines[0]!.concept, /^Diagnóstico/);
@@ -156,6 +162,8 @@ describe("commercial quote folios", () => {
         concepts: [{ concept: "Diagnóstico comercial", quantity: 1 }],
         contactIds: [contact.id],
         priorityId: priority!.id,
+        warrantyMonths: 12,
+        paymentCondition: "CONTADO",
       },
     );
     assert.equal(quote.sellerUserId, seller.id);
@@ -222,6 +230,8 @@ describe("commercial quote folios", () => {
         reference: null,
         concepts: [],
         contactIds: [contact.id],
+        warrantyMonths: 12,
+        paymentCondition: "CONTADO",
       },
     );
     assert.match(quote.folio, /^COTSC-/);
@@ -314,6 +324,8 @@ describe("commercial quote folios", () => {
         concepts: [{ concept: "DX comercial", quantity: 1 }],
         contactIds: [contact.id],
         priorityId: priority!.id,
+        warrantyMonths: 12,
+        paymentCondition: "CONTADO",
       },
     );
     const reserved = (await prisma.quote.findUnique({ where: { id: quote.id } }))!.reservedServiceNumber;

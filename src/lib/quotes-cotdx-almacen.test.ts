@@ -71,6 +71,8 @@ describe("COTDX comercial → almacén", () => {
         concepts: [{ concept: "Diagnóstico comercial", quantity: 1 }],
         contactIds: [contact.id],
         priorityId: priority!.id,
+        warrantyMonths: 12,
+        paymentCondition: "CONTADO",
       },
     );
     const withLines = await prisma.quote.findUnique({ where: { id: quote.id }, include: { lines: true } });
@@ -154,6 +156,8 @@ describe("COTDX comercial → almacén", () => {
         concepts: [{ concept: "DX", quantity: 1 }],
         contactIds: [contact.id],
         priorityId: priority!.id,
+        warrantyMonths: 12,
+        paymentCondition: "CONTADO",
       },
     );
     const withLines = await prisma.quote.findUnique({ where: { id: quote.id }, include: { lines: true } });
@@ -245,6 +249,8 @@ describe("COTOS comercial → almacén", () => {
         reference: null,
         concepts: [{ concept: "Reparación comercial", quantity: 1 }],
         contactIds: [contact.id],
+        warrantyMonths: 9,
+        paymentCondition: "CREDITO",
       },
     );
     assert.match(quote.folio, /^COTOS-/);

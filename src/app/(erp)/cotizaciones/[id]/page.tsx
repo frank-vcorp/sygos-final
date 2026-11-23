@@ -35,6 +35,7 @@ import { linesForTotal, money, quoteTotals } from "@/lib/money";
 import { can } from "@/lib/permissions";
 import { PRESOLICITUD_LABEL } from "@/lib/part-presolicitud";
 import { ATTENTION_LABEL, type AttentionType } from "@/lib/priorities";
+import { quotePaymentConditionDisplay, warrantyMonthsLabel } from "@/lib/quote-commercial-terms";
 import { alignIntercompanyWorkshopQuoteClients, QUOTE_STATUS_LABEL, QUOTE_TYPE_LABEL, commercialAttentionTypeForQuote, intercompanyDeliveryDaysDefault, intercompanyReferenceAmount, quoteDeliveryDaysRequired, quoteListSlaLabel, quoteRequiresDeliveryDays, quoteShowsDeliveryDaysField, seesEconomicDetail, type QuoteType } from "@/lib/quotes";
 import { FIELD_SERVICE_DEFAULT_HOURS, FIELD_SERVICE_STATUS_LABEL, fieldServiceTotal, quoteCampoDisplayTotal } from "@/lib/field-service";
 import { ClientNameLink, ContactNameLink } from "@/components/client-entity-links";
@@ -368,6 +369,14 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
               )}
             </EntityMetaItem>
             {quote.priorityName ? <EntityMetaItem label="Prioridad">{quote.priorityName}</EntityMetaItem> : null}
+            {warrantyMonthsLabel(quote.warrantyMonths) ? (
+              <EntityMetaItem label="Garantía">{warrantyMonthsLabel(quote.warrantyMonths)}</EntityMetaItem>
+            ) : null}
+            {quote.paymentCondition ? (
+              <EntityMetaItem label="Condiciones de pago">
+                {quotePaymentConditionDisplay(quote.paymentCondition, quote.creditDays)}
+              </EntityMetaItem>
+            ) : null}
             {quote.fieldServiceCase ? (
               <EntityMetaItem label="SCA">
                 <TextLink href={`/servicio-campo/${quote.fieldServiceCase.id}`}>{quote.fieldServiceCase.folio}</TextLink>
@@ -431,6 +440,12 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
             <p className="mt-1 text-[var(--muted)]">Espejo intercompañía ligado a cotización Servomotores {base.folio}. No se duplica diagnóstico en SYSTRON.</p>
           ) : null}
           {quote.reference ? <p className="mt-1">Referencia: {quote.reference}</p> : null}
+          {warrantyMonthsLabel(quote.warrantyMonths) ? (
+            <p className="mt-1">Garantía: {warrantyMonthsLabel(quote.warrantyMonths)}</p>
+          ) : null}
+          {quote.paymentCondition ? (
+            <p className="mt-1">Condiciones de pago: {quotePaymentConditionDisplay(quote.paymentCondition, quote.creditDays)}</p>
+          ) : null}
           {quote.creditDays != null ? <p className="mt-1">Crédito congelado: {quote.creditDays} días</p> : null}
           {quoteRequiresDeliveryDays(quote) && quote.deliveryBusinessDays != null ? (
             <p className="mt-1">Tiempo de entrega: {quote.deliveryBusinessDays} días hábiles</p>

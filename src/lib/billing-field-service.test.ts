@@ -48,6 +48,8 @@ describe("facturación SCA", () => {
         reference: null,
         concepts: [{ concept: "Instalación en planta", quantity: 1 }],
         contactIds: [contact.id],
+        warrantyMonths: 12,
+        paymentCondition: "CONTADO",
       },
     );
     const withLines = await prisma.quote.findUnique({ where: { id: quote.id }, include: { lines: true } });

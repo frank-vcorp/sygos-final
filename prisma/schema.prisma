@@ -604,6 +604,10 @@ model Quote {
   preliminarySerial  String?
   reference          String?
   sellerConceptComplement String?
+  /// Meses de garantía comercial (3, 6, 9, 12) capturados al alta.
+  warrantyMonths     Int?
+  /// ANTICIPADO | CONTADO | CREDITO
+  paymentCondition   String?
   creditDays         Int?
   discountPct        Float    @default(0)
   deliveryBusinessDays Int?

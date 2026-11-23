@@ -6,6 +6,7 @@ import { clientIdFromForm } from "@/lib/form-quick-entities";
 import { optionalText, parseVersion, requiredText } from "@/lib/form";
 import { moneyFromForm } from "@/lib/money";
 import { can, type Action } from "@/lib/permissions";
+import { parsePaymentCondition, parseWarrantyMonths } from "@/lib/quote-commercial-terms";
 import { QUOTE_TYPES, type QuoteType, applyDiscount, createSellerQuote, decideQuote, linkIntercompanyQuote, prepareQuoteFromCase, quoteDeliveryEmailNote, relateQuoteEquipment, setPrices, updateGeneratedQuoteConcepts, updateSellerQuoteConceptComplement } from "@/lib/quotes";
 import { sendMail } from "@/lib/sendgrid";
 import { prisma } from "@/lib/db";
@@ -55,6 +56,8 @@ export async function createQuoteAction(formData: FormData) {
       concepts,
       contactIds,
       priorityId: optionalText(formData.get("priorityId")),
+      warrantyMonths: parseWarrantyMonths(formData.get("warrantyMonths")),
+      paymentCondition: parsePaymentCondition(formData.get("paymentCondition")),
     });
     const fromVentas = optionalText(formData.get("origin")) === "ventas";
     await setFlash({
