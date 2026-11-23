@@ -46,10 +46,16 @@ describe("facturación SCA", () => {
         quoteType: "CAMPO",
         equipmentId: null,
         reference: null,
-        concepts: [{ concept: "Instalación en planta", quantity: 1 }],
+        concepts: [],
         contactIds: [contact.id],
         warrantyMonths: 12,
         paymentCondition: "CONTADO",
+        fieldServiceMachine: {
+          brand: "ABB",
+          model: "ACS880",
+          serial: "SN-42",
+          serviceDescription: "Instalación en planta",
+        },
       },
     );
     const withLines = await prisma.quote.findUnique({ where: { id: quote.id }, include: { lines: true } });

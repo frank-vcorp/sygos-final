@@ -40,7 +40,7 @@ export default async function NuevaVentaEquipoPage({ searchParams }: { searchPar
         <input type="hidden" name="origin" value="ventas" />
         <div className="grid gap-5 p-5 md:p-7">
           <div className="rounded-xl border border-[#cbe3ef] bg-[#f1f8fc] px-4 py-3 text-sm text-[var(--ink)]">
-            <strong>Venta de equipo</strong> · Coordinación asignará el precio antes de enviarla al cliente.
+            <strong>Venta de equipo (COTVT)</strong> · Captura conceptos, precios, T.E., garantía y condición (nuevo/usado). Queda lista para la decisión del cliente.
           </div>
           <QuoteDraft
             fixedQuoteType="VENTA_EQUIPO"
@@ -58,8 +58,8 @@ export default async function NuevaVentaEquipoPage({ searchParams }: { searchPar
             catalogByKind={{ EQUI: catalog.EQUI, MOT: { types: [], brands: [], models: [] } }}
           />
         </div>
-        <FormActions note="Al autorizarla, la propuesta aparece en tu bandeja de ventas de equipos.">
-          <SubmitButton pendingLabel="Guardando…">Guardar sin precio</SubmitButton>
+        <FormActions note="Con precio y T.E. completos pasará a pendiente de decisión del cliente.">
+          <SubmitButton pendingLabel="Guardando…">Guardar cotización</SubmitButton>
         </FormActions>
       </FormPanel>
     </>

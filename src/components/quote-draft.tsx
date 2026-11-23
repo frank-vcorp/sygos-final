@@ -5,6 +5,8 @@ import type { EquipmentCatalogByKind } from "@/lib/catalog";
 import { filterDiagnosisPrioritiesForEquipment, type DiagnosisPriorityOption } from "@/lib/diagnosis-priorities-shared";
 import { ContactNameLink } from "@/components/client-entity-links";
 import { ClientPicker } from "@/components/client-picker";
+import { QuoteFieldServiceBlock } from "@/components/quote-field-service-block";
+import { QuoteSaleLinesFields } from "@/components/quote-sale-lines-fields";
 import { ServiceEquipmentPicker, type ServiceEquipmentOption } from "@/components/service-equipment-picker";
 import { controlClass, Field, FormBlock } from "@/components/ui";
 import {
@@ -67,9 +69,17 @@ export function QuoteDraft({
   );
   const client = [...clients, ...createdClients].find((row) => row.id === clientId);
   const contacts = client?.contacts ?? [];
-  const requiresEquipment = quoteType === "DIAGNOSTICO" || quoteType === "REPARACION" || quoteType === "MANTENIMIENTO_PREVENTIVO";
-  const requiresDiagnosisPriority = quoteType === "DIAGNOSTICO" && !fixedQuoteType;
-  const requiresMantenimientoPriority = quoteType === "MANTENIMIENTO_PREVENTIVO" && !fixedQuoteType;
+  const activeType = fixedQuoteType ?? quoteType;
+  const isEquipmentSale = activeType === "VENTA_EQUIPO";
+  const isFieldService = activeType === "CAMPO";
+  const requiresEquipment = activeType === "DIAGNOSTICO" || activeType === "REPARACION" || activeType === "MANTENIMIENTO_PREVENTIVO";
+  const requiresDiagnosisPriority = activeType === "DIAGNOSTICO" && !fixedQuoteType;
+  const requiresMantenimientoPriority = activeType === "MANTENIMIENTO_PREVENTIVO" && !fixedQuoteType;
+  const clientEquipment = useMemo(
+    () => equipment.filter((row) => row.clientId === clientId),
+    [equipment, clientId],
+  );
+
   if (clients.length === 0 && !allowQuickClient) {
     return (
       <p className="rounded-md border border-[#efd0d0] bg-[var(--danger-soft)] px-3 py-2 text-sm text-[var(--danger)]">
@@ -82,7 +92,7 @@ export function QuoteDraft({
     <div className="grid gap-5">
       <FormBlock title="1. Tipo y cliente" description="Define el servicio y a quién irá dirigida la propuesta." columns={1}>
         {fixedQuoteType ? <input type="hidden" name="quoteType" value={fixedQuoteType} /> : (
-          <Field label="Tipo de cotización" hint="Elige el tipo antes de capturar el equipo.">
+          <Field label="Tipo de cotización" hint="Elige el tipo antes de capturar el resto.">
             <select name="quoteType" className={controlClass} value={quoteType} onChange={(event) => setQuoteType(event.target.value as QuoteType)} required>
               {QUOTE_TYPES.map((type) => <option key={type} value={type}>{QUOTE_TYPE_LABEL[type]}</option>)}
             </select>
@@ -117,24 +127,77 @@ export function QuoteDraft({
         />
       </FormBlock>
 
-      <FormBlock title="2. Equipo" description={requiresEquipment ? "El catálogo solo sugiere tipo, marca y modelo para la etiqueta. Siempre se crea un folio nuevo; para un EQUI ya registrado abre el servicio desde su ficha." : "Relaciona un equipo si aplica. Puedes continuar sin uno."} columns={1}>
-        <ServiceEquipmentPicker
-          equipment={equipment}
-          clientId={clientId}
-          companyCode={companyCode}
-          types={types}
-          brands={brands}
-          models={models}
-          catalogByKind={catalogByKind}
-          allowQuickEquipment={allowQuickEquipment}
-          quickEquipmentKinds={quickEquipmentKinds}
-          onEquipmentKindChange={setEquipmentKind}
-          emptyOptionLabel="Sin equipo físico"
-          required={requiresEquipment}
-        />
-      </FormBlock>
+      {isFieldService ? (
+        <QuoteFieldServiceBlock equipment={equipment} clientId={clientId} />
+      ) : null}
 
-      <FormBlock title="3. Condiciones comerciales" description="Garantía y forma de pago que verá el cliente en la propuesta." columns={2}>
+      {isEquipmentSale ? (
+        <>
+          <FormBlock title="2. Equipo de referencia (opcional)" description="Sin catálogo: solo un equipo ya registrado del cliente, si aplica." columns={1}>
+            {clientId ? (
+              <Field label="Equipo en cartera">
+                <select name="equipmentId" className={controlClass} defaultValue="">
+                  <option value="">Sin equipo en cartera</option>
+                  {clientEquipment.map((row) => (
+                    <option key={row.id} value={row.id}>
+                      {[row.folio, row.brandName, row.model, row.serial].filter(Boolean).join(" · ")}
+                    </option>
+                  ))}
+                </select>
+              </Field>
+            ) : (
+              <p className="text-sm text-[var(--muted)]">Elige un cliente para relacionar un equipo de referencia.</p>
+            )}
+          </FormBlock>
+          <FormBlock title="3. Conceptos y precios" description="Puedes cotizar equipo y componentes en la misma propuesta (COTVT)." columns={1}>
+            <QuoteSaleLinesFields />
+          </FormBlock>
+        </>
+      ) : null}
+
+      {requiresEquipment ? (
+        <FormBlock title="2. Equipo" description="El catálogo solo sugiere tipo, marca y modelo para la etiqueta. Siempre se crea un folio nuevo; para un EQUI ya registrado abre el servicio desde su ficha." columns={1}>
+          <ServiceEquipmentPicker
+            equipment={equipment}
+            clientId={clientId}
+            companyCode={companyCode}
+            types={types}
+            brands={brands}
+            models={models}
+            catalogByKind={catalogByKind}
+            allowQuickEquipment={allowQuickEquipment}
+            quickEquipmentKinds={quickEquipmentKinds}
+            onEquipmentKindChange={setEquipmentKind}
+            emptyOptionLabel="Sin equipo físico"
+            required={requiresEquipment}
+          />
+        </FormBlock>
+      ) : null}
+
+      {!isFieldService && !isEquipmentSale && !requiresEquipment ? (
+        <FormBlock title="2. Equipo" description="Relaciona un equipo si aplica. Puedes continuar sin uno." columns={1}>
+          <ServiceEquipmentPicker
+            equipment={equipment}
+            clientId={clientId}
+            companyCode={companyCode}
+            types={types}
+            brands={brands}
+            models={models}
+            catalogByKind={catalogByKind}
+            allowQuickEquipment={allowQuickEquipment}
+            quickEquipmentKinds={quickEquipmentKinds}
+            onEquipmentKindChange={setEquipmentKind}
+            emptyOptionLabel="Sin equipo físico"
+            required={false}
+          />
+        </FormBlock>
+      ) : null}
+
+      <FormBlock
+        title={isEquipmentSale ? "4. Condiciones comerciales" : "3. Condiciones comerciales"}
+        description="Garantía, forma de pago y plazos que verá el cliente en la propuesta."
+        columns={2}
+      >
         <Field label="Garantía" hint="Meses de garantía del servicio o equipo cotizado.">
           <select name="warrantyMonths" className={controlClass} required defaultValue={String(DEFAULT_QUOTE_WARRANTY_MONTHS)}>
             {QUOTE_WARRANTY_MONTHS.map((months) => (
@@ -149,9 +212,26 @@ export function QuoteDraft({
             ))}
           </select>
         </Field>
+        {isEquipmentSale ? (
+          <Field label="T.E. (tiempo de entrega)" hint="Días hábiles para entregar el equipo o componentes.">
+            <input
+              name="deliveryBusinessDays"
+              type="number"
+              min={1}
+              step={1}
+              required
+              className={controlClass}
+              placeholder="Ej. 10"
+            />
+          </Field>
+        ) : null}
       </FormBlock>
 
-      <FormBlock title="4. Destinatarios y referencia" description="Selecciona al menos un contacto. La referencia interna es opcional." columns={2}>
+      <FormBlock
+        title={isEquipmentSale ? "5. Destinatarios y referencia" : "4. Destinatarios y referencia"}
+        description="Selecciona al menos un contacto. La referencia interna es opcional."
+        columns={2}
+      >
         <Field label="Referencia comercial" hint="Folio del cliente, orden de compra, etc.">
           <input name="reference" className={controlClass} placeholder="Opcional" />
         </Field>

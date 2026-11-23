@@ -36,7 +36,7 @@ export default async function NuevaCotizacionPage({ searchParams }: { searchPara
     <>
       <PageHeader
         title="Nueva cotización"
-        subtitle="Completa cliente, equipo y destinatarios. COTDX y COTMP toman precio del catálogo de prioridad; COTOS, campo y venta quedan sin precio hasta coordinación."
+        subtitle="COTDX/COTMP usan catálogo de prioridad. COTVT: captura precio, T.E. y condición aquí. COTOS y COTSC siguen con precio de gerencia."
         back={{ href: "/cotizaciones", label: "Cotizaciones" }}
       />
       <FormPanel action={createQuoteAction}>
@@ -58,7 +58,7 @@ export default async function NuevaCotizacionPage({ searchParams }: { searchPara
             mantenimientoPriorities={mantenimientoPriorities}
           />
         </div>
-        <FormActions note="COTDX/COTMP: precio automático según prioridad. COTOS, campo y venta: sin precio hasta que gerencia los complete.">
+        <FormActions note="Venta de equipo: guarda con precio del vendedor. Servicio de campo: gerencia cotiza horas y tarifa después.">
           <SubmitButton pendingLabel="Guardando…">Guardar cotización</SubmitButton>
         </FormActions>
       </FormPanel>

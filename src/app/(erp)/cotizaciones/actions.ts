@@ -7,6 +7,7 @@ import { optionalText, parseVersion, requiredText } from "@/lib/form";
 import { moneyFromForm } from "@/lib/money";
 import { can, type Action } from "@/lib/permissions";
 import { parsePaymentCondition, parseWarrantyMonths } from "@/lib/quote-commercial-terms";
+import { parseDeliveryBusinessDays, parseFieldServiceMachineFromForm, parseSellerSaleLines } from "@/lib/quote-seller-input";
 import { QUOTE_TYPES, type QuoteType, applyDiscount, createSellerQuote, decideQuote, linkIntercompanyQuote, prepareQuoteFromCase, quoteDeliveryEmailNote, relateQuoteEquipment, setPrices, updateGeneratedQuoteConcepts, updateSellerQuoteConceptComplement } from "@/lib/quotes";
 import { sendMail } from "@/lib/sendgrid";
 import { prisma } from "@/lib/db";
@@ -58,16 +59,28 @@ export async function createQuoteAction(formData: FormData) {
       priorityId: optionalText(formData.get("priorityId")),
       warrantyMonths: parseWarrantyMonths(formData.get("warrantyMonths")),
       paymentCondition: parsePaymentCondition(formData.get("paymentCondition")),
+      ...(quoteType === "VENTA_EQUIPO"
+        ? {
+            sellerSaleLines: parseSellerSaleLines(formData),
+            deliveryBusinessDays: parseDeliveryBusinessDays(formData.get("deliveryBusinessDays")),
+          }
+        : {}),
+      ...(quoteType === "CAMPO" ? { fieldServiceMachine: parseFieldServiceMachineFromForm(formData) } : {}),
     });
     const fromVentas = optionalText(formData.get("origin")) === "ventas";
     const diagnosisAutoPriced = quote.quoteType === "DIAGNOSTICO" && quote.status === "PENDIENTE_DECISION";
+    const ventaReady = quote.quoteType === "VENTA_EQUIPO" && quote.status === "PENDIENTE_DECISION";
     await setFlash({
       tone: "ok",
-      message: fromVentas
-        ? `${quote.folio} registrada como venta de equipo, sin precio. Sigue en cotizaciones hasta autorización.`
-        : diagnosisAutoPriced
-          ? `${quote.folio} quedó registrada con precio del catálogo de diagnóstico; pendiente de decisión del cliente.`
-          : `${quote.folio} quedó registrada, sin precio.`,
+      message: ventaReady
+        ? `${quote.folio} quedó lista para decisión del cliente (precio y T.E. capturados).`
+        : fromVentas
+          ? `${quote.folio} registrada como venta de equipo.`
+          : diagnosisAutoPriced
+            ? `${quote.folio} quedó registrada con precio del catálogo de diagnóstico; pendiente de decisión del cliente.`
+            : quote.quoteType === "CAMPO"
+              ? `${quote.folio} quedó registrada; gerencia asignará horas y tarifa.`
+              : `${quote.folio} quedó registrada, sin precio.`,
     });
     redirect(`/cotizaciones/${quote.id}`);
   } catch (error) {

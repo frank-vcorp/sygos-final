@@ -296,11 +296,18 @@ describe("commercial quote folios", () => {
         contactIds: [contact.id],
         warrantyMonths: 12,
         paymentCondition: "CONTADO",
+        fieldServiceMachine: {
+          brand: "Siemens",
+          model: "G120",
+          serial: "SN-99",
+          serviceDescription: "Instalación y puesta en marcha",
+        },
       },
     );
     assert.match(quote.folio, /^COTSC-/);
     const withLines = await prisma.quote.findUnique({ where: { id: quote.id }, include: { lines: true } });
-    assert.equal(withLines!.lines[0]!.concept, "Servicio de campo");
+    assert.equal(withLines!.lines[0]!.concept, "Instalación y puesta en marcha");
+    assert.equal(withLines!.preliminaryBrand, "Siemens");
     await setPrices(
       { userId: user.id, role: "CEO", activeCompanyId: company.id, activeCompanyCode: "SYSTRON" },
       quote.id,
@@ -453,6 +460,65 @@ describe("commercial quote folios", () => {
     assert.ok(dx);
     assert.equal(dx!.folio, "DX-1");
 
+    await prisma.$disconnect();
+  });
+
+  it("COTVT queda PENDIENTE_DECISION con precio del vendedor", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "sygos-cotvt-"));
+    process.env.DATABASE_URL = `file:${join(dir, "test.db")}`;
+    const { execSync } = await import("child_process");
+    execSync("npx prisma db push --skip-generate", {
+      cwd: join(import.meta.dirname, "../.."),
+      env: process.env,
+      stdio: "ignore",
+    });
+    const { prisma } = await import("./db");
+    const { createSellerQuote } = await import("./quotes");
+
+    const company = await prisma.company.create({ data: { code: "SYVT", name: "Systron" } });
+    const seller = await prisma.user.create({
+      data: { username: "vta", name: "Ventas", passwordHash: "x", role: "VENTAS", companyId: company.id },
+    });
+    const client = await prisma.client.create({
+      data: {
+        companyId: company.id,
+        name: "Cliente",
+        ownerUserId: seller.id,
+        active: true,
+        isSystem: false,
+        requiresInvoice: true,
+        rfc: "XAXX010101000",
+        cfdiUse: "G03",
+        paymentMethod: "PUE",
+      },
+    });
+    const contact = await prisma.contact.create({ data: { clientId: client.id, name: "C", active: true, isPrimary: true } });
+
+    const quote = await createSellerQuote(
+      { userId: seller.id, role: "VENTAS", activeCompanyId: company.id, activeCompanyCode: "SYSTRON" },
+      {
+        clientId: client.id,
+        quoteType: "VENTA_EQUIPO",
+        equipmentId: null,
+        reference: "OC-1",
+        concepts: [],
+        contactIds: [contact.id],
+        warrantyMonths: 12,
+        paymentCondition: "CONTADO",
+        deliveryBusinessDays: 15,
+        sellerSaleLines: [
+          { concept: "Variador", quantity: 1, unitPrice: 25000, lineCondition: "NUEVO" },
+          { concept: "Gabinete", quantity: 1, unitPrice: 8000, lineCondition: "USADO" },
+        ],
+      },
+    );
+    assert.match(quote.folio, /^COTVT-/);
+    assert.equal(quote.status, "PENDIENTE_DECISION");
+    const row = await prisma.quote.findUnique({ where: { id: quote.id }, include: { lines: true } });
+    assert.equal(row!.deliveryBusinessDays, 15);
+    assert.equal(row!.lines.length, 2);
+    assert.equal(row!.lines[0]!.unitPrice, 25000);
+    assert.equal(row!.lines[1]!.lineCondition, "USADO");
     await prisma.$disconnect();
   });
 });

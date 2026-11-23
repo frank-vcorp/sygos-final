@@ -37,7 +37,8 @@ import { can } from "@/lib/permissions";
 import { PRESOLICITUD_LABEL } from "@/lib/part-presolicitud";
 import { ATTENTION_LABEL, type AttentionType } from "@/lib/priorities";
 import { quotePaymentConditionDisplay, warrantyMonthsLabel } from "@/lib/quote-commercial-terms";
-import { alignIntercompanyWorkshopQuoteClients, QUOTE_STATUS_LABEL, QUOTE_TYPE_LABEL, commercialAttentionTypeForQuote, intercompanyDeliveryDaysDefault, intercompanyReferenceAmount, quoteDeliveryDaysRequired, quoteListSlaLabel, quoteRequiresDeliveryDays, quoteShowsDeliveryDaysField, seesEconomicDetail, type QuoteType } from "@/lib/quotes";
+import { quoteLineConditionLabel } from "@/lib/quote-line-condition";
+import { alignIntercompanyWorkshopQuoteClients, QUOTE_STATUS_LABEL, QUOTE_TYPE_LABEL, commercialAttentionTypeForQuote, intercompanyDeliveryDaysDefault, intercompanyReferenceAmount, quoteDeliveryDaysRequired, quoteListSlaLabel, quoteRequiresDeliveryDays, quoteShowsDeliveryDaysField, quoteShowsSellerDeliveryDays, seesEconomicDetail, type QuoteType } from "@/lib/quotes";
 import { FIELD_SERVICE_DEFAULT_HOURS, FIELD_SERVICE_STATUS_LABEL, fieldServiceTotal, quoteCampoDisplayTotal } from "@/lib/field-service";
 import { ClientNameLink, ContactNameLink } from "@/components/client-entity-links";
 import { redirectIfSalesNotAssigned } from "@/lib/sales-assignment";
@@ -151,7 +152,11 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
   ];
   const showBase = seesEconomicDetail(session.role, session.activeCompanyCode, quote.company.code, false);
   const missing = quote.status === "PENDIENTE_COTIZAR"
-    ? "Falta el precio de CEO o Administrador."
+    ? quote.quoteType === "VENTA_EQUIPO"
+      ? "Cotización legacy sin precio: requiere CEO o Administrador."
+      : quote.quoteType === "CAMPO"
+        ? "Falta que gerencia asigne horas y tarifa."
+        : "Falta el precio de CEO o Administrador."
     : quote.status === "PENDIENTE_DECISION"
       ? "Falta la decisión del cliente."
         : quote.status === "AUTORIZADA_PENDIENTE_EQUIPO"
@@ -448,7 +453,12 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
             <p className="mt-1">Condiciones de pago: {quotePaymentConditionDisplay(quote.paymentCondition, quote.creditDays)}</p>
           ) : null}
           {quote.creditDays != null ? <p className="mt-1">Crédito congelado: {quote.creditDays} días</p> : null}
-          {quoteRequiresDeliveryDays(quote) && quote.deliveryBusinessDays != null ? (
+          {quote.quoteType === "CAMPO" && (quote.preliminaryBrand || quote.preliminaryModel) ? (
+            <p className="mt-1">
+              Máquina: {[quote.preliminaryBrand, quote.preliminaryModel, quote.preliminarySerial ? `S/N ${quote.preliminarySerial}` : null].filter(Boolean).join(" · ")}
+            </p>
+          ) : null}
+          {(quoteShowsSellerDeliveryDays(quote) || (quoteRequiresDeliveryDays(quote) && quote.deliveryBusinessDays != null)) ? (
             <p className="mt-1">Tiempo de entrega: {quote.deliveryBusinessDays} días hábiles</p>
           ) : null}
           {quoteRequiresDeliveryDays(quote) && quote.slaDueAt ? (
@@ -508,7 +518,13 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
                         </form>
                       </details>
                     ) : (
-                      <><QuoteConcept concept={line.concept} complement={index === 0 ? quote.sellerConceptComplement : null} />{quote.status === "AUTORIZADA" && quote.quoteType === "VENTA_EQUIPO" ? (line.authorized ? " · autorizada" : " · no autorizada") : line.authorized ? " · autorizada" : ""}</>
+                      <>
+                        <QuoteConcept concept={line.concept} complement={index === 0 ? quote.sellerConceptComplement : null} />
+                        {quote.quoteType === "VENTA_EQUIPO" && quoteLineConditionLabel(line.lineCondition) ? (
+                          <span className="text-[var(--muted)]"> · {quoteLineConditionLabel(line.lineCondition)}</span>
+                        ) : null}
+                        {quote.status === "AUTORIZADA" && quote.quoteType === "VENTA_EQUIPO" ? (line.authorized ? " · autorizada" : " · no autorizada") : line.authorized ? " · autorizada" : ""}
+                      </>
                     )}
                   </td>
                   <td>{line.quantity}</td>

@@ -676,6 +676,8 @@ model QuoteLine {
   unitPrice    Float?
   basePrice    Float?
   incrementPct Float?
+  /// NUEVO | USADO — venta de equipo (COTVT).
+  lineCondition String?
   authorized   Boolean @default(false)
 }
 

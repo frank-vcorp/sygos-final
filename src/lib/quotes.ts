@@ -250,6 +250,12 @@ export async function createSellerQuote(
     priorityId?: string | null;
     warrantyMonths: number;
     paymentCondition: string;
+    /** COTVT: líneas con precio del vendedor. */
+    sellerSaleLines?: Array<{ concept: string; quantity: number; unitPrice: number; lineCondition: string }>;
+    /** COTVT: días hábiles de entrega. */
+    deliveryBusinessDays?: number | null;
+    /** COTSC: máquina y alcance (si no viene de `equipmentId`). */
+    fieldServiceMachine?: { brand: string; model: string; serial: string; serviceDescription: string };
   },
 ) {
   const client = await prisma.client.findFirst({
@@ -267,13 +273,28 @@ export async function createSellerQuote(
   if (!input.equipmentId && (input.quoteType === "DIAGNOSTICO" || input.quoteType === "REPARACION" || input.quoteType === "MANTENIMIENTO_PREVENTIVO")) {
     throw new Error("Selecciona o registra un equipo para esta cotización.");
   }
+  if (input.quoteType === "CAMPO") {
+    if (!input.fieldServiceMachine) throw new Error("Indica marca, modelo, serie y descripción del servicio de campo.");
+  }
+  if (input.quoteType === "VENTA_EQUIPO") {
+    if (!input.sellerSaleLines?.length) throw new Error("Agrega al menos un concepto con precio.");
+    if (input.deliveryBusinessDays == null || input.deliveryBusinessDays < 1) {
+      throw new Error("Indica el tiempo de entrega (T.E.) en días hábiles.");
+    }
+  }
   const manualConcepts = input.concepts
     .map((line) => ({ concept: line.concept.trim(), quantity: line.quantity }))
     .filter((line) => line.concept.length > 0);
-  const concepts =
+  let concepts =
     manualConcepts.length > 0
       ? manualConcepts
       : [{ concept: commercialSellerQuoteConcept(input.quoteType, equipment), quantity: 1 }];
+  if (input.quoteType === "VENTA_EQUIPO" && input.sellerSaleLines) {
+    concepts = input.sellerSaleLines.map((line) => ({ concept: line.concept, quantity: line.quantity }));
+  }
+  if (input.quoteType === "CAMPO" && input.fieldServiceMachine) {
+    concepts = [{ concept: input.fieldServiceMachine.serviceDescription, quantity: 1 }];
+  }
   let frozenPriority: Awaited<ReturnType<typeof freezePriorityFromCatalog>> | null = null;
   if (input.quoteType === "DIAGNOSTICO") {
     if (!input.priorityId) throw new Error("Selecciona la prioridad del diagnóstico.");
@@ -304,18 +325,30 @@ export async function createSellerQuote(
   const diagnosisPricing = catalogPricingType && frozenPriority
     ? diagnosisQuotePricingFromCatalog(frozenPriority.price, frozenPriority.incrementPct, null)
     : { line: {} as Record<string, never>, status: "PENDIENTE_COTIZAR" as const };
+  const ventaSellerComplete = input.quoteType === "VENTA_EQUIPO" && input.sellerSaleLines;
+  const quoteStatus = ventaSellerComplete ? "PENDIENTE_DECISION" as const : diagnosisPricing.status;
+  const campoMachine =
+    input.quoteType === "CAMPO" && input.fieldServiceMachine
+      ? {
+          preliminaryBrand: input.fieldServiceMachine.brand || equipment?.brandName || "",
+          preliminaryModel: input.fieldServiceMachine.model || equipment?.model || "",
+          preliminarySerial: input.fieldServiceMachine.serial || equipment?.serial || "",
+        }
+      : {};
   const quote = await prisma.quote.create({
     data: {
       folio,
       companyId: actor.activeCompanyId,
       clientId: client.id,
       quoteType: input.quoteType,
-      status: diagnosisPricing.status,
+      status: quoteStatus,
       equipmentId: input.equipmentId,
       ...(reservedServiceNumber != null ? { reservedServiceNumber } : {}),
       reference: input.reference,
       warrantyMonths: input.warrantyMonths,
       paymentCondition: input.paymentCondition,
+      ...(ventaSellerComplete ? { deliveryBusinessDays: input.deliveryBusinessDays! } : {}),
+      ...campoMachine,
       sellerUserId,
       ...(frozenPriority
         ? {
@@ -328,22 +361,32 @@ export async function createSellerQuote(
           }
         : {}),
       lines: {
-        create: concepts.map((line) => ({
+        create: concepts.map((line, index) => ({
           concept: line.concept,
           quantity: line.quantity,
-          ...diagnosisPricing.line,
+          ...(ventaSellerComplete && input.sellerSaleLines
+            ? {
+                unitPrice: input.sellerSaleLines[index]!.unitPrice,
+                lineCondition: input.sellerSaleLines[index]!.lineCondition,
+              }
+            : diagnosisPricing.line),
         })),
       },
     },
   });
+  const historySummary = ventaSellerComplete
+    ? `${folio} quedó lista para enviar al cliente (precio y T.E. capturados por ventas).`
+    : quoteStatus === "PENDIENTE_DECISION"
+      ? `${folio} quedó con precio del catálogo de prioridad; pendiente de decisión del cliente.`
+      : input.quoteType === "CAMPO"
+        ? `${folio} quedó pendiente de precio de gerencia (servicio de campo).`
+        : `${folio} quedó pendiente de cotizar. Los contactos elegidos se usan al dar seguimiento.`;
   await recordHistory({
     companyId: actor.activeCompanyId,
     entityType: "COTIZACION",
     entityId: quote.id,
     action: "ALTA",
-    summary: diagnosisPricing.status === "PENDIENTE_DECISION"
-      ? `${folio} quedó con precio del catálogo de prioridad; pendiente de decisión del cliente.`
-      : `${folio} quedó pendiente de cotizar. Los contactos elegidos se usan al dar seguimiento.`,
+    summary: historySummary,
     authorUserId: actor.userId,
   });
   return quote;
@@ -679,7 +722,12 @@ export function quoteListSlaLabel(quote: {
   if (quote.slaDueAt) {
     return { kind: "countdown", dueAt: quote.slaDueAt };
   }
-  if (quote.deliveryBusinessDays != null && quote.deliveryBusinessDays >= 1 && quote.status !== "PENDIENTE_COTIZAR") {
+  if (
+    (quote.quoteType === "VENTA_EQUIPO" || quoteRequiresDeliveryDays(quote))
+    && quote.deliveryBusinessDays != null
+    && quote.deliveryBusinessDays >= 1
+    && quote.status !== "PENDIENTE_COTIZAR"
+  ) {
     return { kind: "text", text: `${quote.deliveryBusinessDays} días hábiles` };
   }
   if (quote.status === "PENDIENTE_COTIZAR") {
@@ -691,12 +739,19 @@ export function quoteListSlaLabel(quote: {
   return { kind: "text", text: "—" };
 }
 
+export function quoteShowsSellerDeliveryDays(quote: { quoteType: string; deliveryBusinessDays: number | null }) {
+  return quote.quoteType === "VENTA_EQUIPO" && quote.deliveryBusinessDays != null && quote.deliveryBusinessDays >= 1;
+}
+
 export function quoteDeliveryEmailNote(quote: {
   quoteType: string;
   technicalCaseId: string | null;
   slaDueAt: Date | null;
   deliveryBusinessDays: number | null;
 }): string {
+  if (quoteShowsSellerDeliveryDays(quote) && quote.deliveryBusinessDays) {
+    return ` Tiempo de entrega: ${quote.deliveryBusinessDays} días hábiles.`;
+  }
   if (!quoteRequiresDeliveryDays(quote)) return "";
   if (quote.slaDueAt) {
     return ` Fecha de entrega: ${quote.slaDueAt.toLocaleDateString("es-MX", { timeZone: "America/Mexico_City", dateStyle: "long" })}.`;

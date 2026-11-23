@@ -11,7 +11,8 @@ import { prisma } from "@/lib/db";
 import { companyDisplayName, primaryContact } from "@/lib/document-print";
 import { linesForTotal, money, quoteTotals } from "@/lib/money";
 import { quotePaymentConditionDisplay, warrantyMonthsLabel } from "@/lib/quote-commercial-terms";
-import { QUOTE_STATUS_LABEL, QUOTE_TYPE_LABEL, quoteRequiresDeliveryDays, type QuoteType } from "@/lib/quotes";
+import { quoteLineConditionLabel } from "@/lib/quote-line-condition";
+import { QUOTE_STATUS_LABEL, QUOTE_TYPE_LABEL, quoteRequiresDeliveryDays, quoteShowsSellerDeliveryDays, type QuoteType } from "@/lib/quotes";
 import { requireCompany } from "@/lib/session";
 
 export default async function CotizacionDocumentoPage({ params }: { params: Promise<{ id: string }> }) {
@@ -57,13 +58,19 @@ export default async function CotizacionDocumentoPage({ params }: { params: Prom
         />
 
         <DocumentLinesTableCommercial
-          lines={lines.map((line, index) => ({
-            id: line.id,
-            concept: <QuoteConcept concept={line.concept} complement={index === 0 ? quote.sellerConceptComplement : null} />,
-            quantity: line.quantity,
-            unitPrice: money(line.unitPrice),
-            amount: line.unitPrice == null ? "Pendiente" : money(line.unitPrice * line.quantity),
-          }))}
+          lines={lines.map((line, index) => {
+            const condition = quoteLineConditionLabel(line.lineCondition);
+            const conceptBody = condition && quote.quoteType === "VENTA_EQUIPO"
+              ? `${line.concept} (${condition})`
+              : line.concept;
+            return {
+              id: line.id,
+              concept: <QuoteConcept concept={conceptBody} complement={index === 0 ? quote.sellerConceptComplement : null} />,
+              quantity: line.quantity,
+              unitPrice: money(line.unitPrice),
+              amount: line.unitPrice == null ? "Pendiente" : money(line.unitPrice * line.quantity),
+            };
+          })}
         />
 
         <DocumentTotalsBox
@@ -86,8 +93,15 @@ export default async function CotizacionDocumentoPage({ params }: { params: Prom
           {warrantyMonthsLabel(quote.warrantyMonths) ? <p>Garantía: {warrantyMonthsLabel(quote.warrantyMonths)}.</p> : null}
           <p>Condición de pago: {quotePaymentConditionDisplay(quote.paymentCondition, quote.creditDays)}.</p>
           {quote.reference ? <p className="whitespace-pre-wrap">Referencia: {quote.reference}</p> : null}
-          {quoteRequiresDeliveryDays(quote) && quote.deliveryBusinessDays != null ? (
+          {quoteShowsSellerDeliveryDays(quote) || (quoteRequiresDeliveryDays(quote) && quote.deliveryBusinessDays != null) ? (
             <p>Tiempo de entrega: {quote.deliveryBusinessDays} días hábiles.</p>
+          ) : null}
+          {quote.quoteType === "CAMPO" && (quote.preliminaryBrand || quote.preliminaryModel) ? (
+            <p>
+              Equipo: {[quote.preliminaryBrand, quote.preliminaryModel, quote.preliminarySerial ? `S/N ${quote.preliminarySerial}` : null]
+                .filter(Boolean)
+                .join(" · ")}
+            </p>
           ) : null}
           {quoteRequiresDeliveryDays(quote) && quote.slaDueAt ? (
             <p>
