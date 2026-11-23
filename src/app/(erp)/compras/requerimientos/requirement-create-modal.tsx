@@ -4,7 +4,9 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createRequirementAction, type CreateRequirementState } from "../actions";
 import { FormOverlayDialog } from "@/components/overlay-dialog";
-import { Button, controlClass, Field, FormActions, FormSection, recordLinkClass } from "@/components/ui";
+import { Badge, Button, controlClass, Field, FormActions, FormSection, recordLinkClass } from "@/components/ui";
+
+const partidaRowClass = "grid gap-3 sm:grid-cols-[minmax(0,1fr)_4.5rem] sm:items-end";
 
 const initialState: CreateRequirementState = { status: "idle" };
 
@@ -103,7 +105,8 @@ function RequirementCreateDialog({
         {shoppingListId ? <input type="hidden" name="shoppingListId" value={shoppingListId} /> : null}
         {lockKind ? <input type="hidden" name="kind" value={kind} /> : null}
         <FormSection
-          title="Nuevo requerimiento"
+          columns={1}
+          title="Partida"
           description={
             shoppingListId
               ? "Se creará y quedará en esta lista de compras."
@@ -111,11 +114,12 @@ function RequirementCreateDialog({
           }
         >
           {lockKind ? (
-            <Field label="Tipo">
-              <p className="text-sm font-medium">{kind === "REFACCION" ? "Refacción" : "General"}</p>
-            </Field>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Tipo</span>
+              <Badge tone={kind === "REFACCION" ? "warn" : "neutral"}>{kind === "REFACCION" ? "Refacción" : "General"}</Badge>
+            </div>
           ) : (
-            <Field label="Tipo">
+            <Field label="Tipo" className="max-w-[12rem]">
               <select
                 name="kind"
                 value={kind}
@@ -132,12 +136,20 @@ function RequirementCreateDialog({
               <input ref={partNumberRef} name="partNumber" required className={controlClass} />
             </Field>
           ) : null}
-          <Field label="Descripción">
-            <input ref={descriptionRef} name="description" required={kind === "GENERAL"} className={controlClass} />
-          </Field>
-          <Field label="Cantidad">
-            <input name="quantity" type="number" min="1" defaultValue="1" required className={controlClass} />
-          </Field>
+          <div className={partidaRowClass}>
+            <Field label="Descripción">
+              <input
+                ref={descriptionRef}
+                name="description"
+                required={kind === "GENERAL"}
+                className={controlClass}
+                placeholder={kind === "GENERAL" ? "Qué se necesita comprar" : undefined}
+              />
+            </Field>
+            <Field label="Cantidad">
+              <input name="quantity" type="number" min="1" defaultValue="1" required className={controlClass} />
+            </Field>
+          </div>
         </FormSection>
         {state.status === "error" ? (
           <p className="px-5 pt-4 text-sm text-[var(--danger)]" role="alert">
