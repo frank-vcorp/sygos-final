@@ -4,6 +4,7 @@ import { CEO_NAV_GROUPS } from "@/lib/nav-links-ceo";
 import { COORDINATION_NAV_GROUPS } from "@/lib/nav-links-coordination";
 import { SUPERVISOR_NAV_GROUPS } from "@/lib/nav-links-supervisor";
 import { TECNICO_NAV_GROUPS } from "@/lib/nav-links-tecnico";
+import { AUXILIAR_SERVOMOTORES_NAV_GROUPS } from "@/lib/nav-links-auxiliar-servomotores";
 import { GERENTE_SERVOMOTORES_NAV_GROUPS } from "@/lib/nav-links-gerente-servomotores";
 import { GERENTE_SYSTRON_NAV_GROUPS } from "@/lib/nav-links-gerente-systron";
 import { VENTAS_NAV_GROUPS } from "@/lib/nav-links-ventas";
@@ -156,6 +157,7 @@ export function navGroupsForRole(role: Role): NavGroupDef[] {
   if (role === "TECNICO") return TECNICO_NAV_GROUPS;
   if (role === "GERENTE_OPERATIVO_SYSTRON") return GERENTE_SYSTRON_NAV_GROUPS;
   if (role === "GERENTE_OPERATIVO_SERVOMOTORES") return GERENTE_SERVOMOTORES_NAV_GROUPS;
+  if (role === "AUXILIAR_OPERATIVO_SERVOMOTORES") return AUXILIAR_SERVOMOTORES_NAV_GROUPS;
   if (role === "ADMINISTRADOR") return ADMIN_NAV_GROUPS;
   return NAV_GROUPS;
 }

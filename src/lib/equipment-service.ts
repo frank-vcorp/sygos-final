@@ -21,12 +21,14 @@ type Actor = {
 };
 
 export async function listCompanySellers(companyId: string, companyCode: string | null | undefined) {
-  const companySellerRole = companyCode === "SERVOMOTORES" ? "GERENTE_OPERATIVO_SERVOMOTORES" : "VENTAS";
+  const smSellerRoles = ["GERENTE_OPERATIVO_SERVOMOTORES", "AUXILIAR_OPERATIVO_SERVOMOTORES"] as const;
   return prisma.user.findMany({
     where: {
       active: true,
       OR: [
-        { role: companySellerRole, companyId },
+        companyCode === "SERVOMOTORES"
+          ? { role: { in: [...smSellerRoles] }, companyId }
+          : { role: "VENTAS", companyId },
         { role: "CEO" },
       ],
     },
@@ -44,13 +46,15 @@ export async function resolveAttentionSellerUserId(
   if (requestedSellerUserId === undefined) return clientOwnerUserId;
   const trimmed = requestedSellerUserId?.trim() || "";
   if (!trimmed) return null;
-  const expectedCompanyRole = actor.activeCompanyCode === "SERVOMOTORES" ? "GERENTE_OPERATIVO_SERVOMOTORES" : "VENTAS";
+  const smSellerRoles = ["GERENTE_OPERATIVO_SERVOMOTORES", "AUXILIAR_OPERATIVO_SERVOMOTORES"] as const;
   const seller = await prisma.user.findFirst({
     where: {
       id: trimmed,
       active: true,
       OR: [
-        { role: expectedCompanyRole, companyId: actor.activeCompanyId },
+        actor.activeCompanyCode === "SERVOMOTORES"
+          ? { role: { in: [...smSellerRoles] }, companyId: actor.activeCompanyId }
+          : { role: "VENTAS", companyId: actor.activeCompanyId },
         { role: "CEO" },
       ],
     },

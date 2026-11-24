@@ -6,7 +6,7 @@ import type { Role } from "./roles";
 export const REPORTS: Array<{ id: string; label: string; roles: Role[] | "all" }> = [
   { id: "cotizaciones", label: "Cotizaciones", roles: "all" },
   { id: "conversion", label: "Conversión comercial", roles: "all" },
-  { id: "cxc", label: "Cuentas por cobrar", roles: ["ADMINISTRADOR", "CEO", "COORDINACION_ADMINISTRACION", "VENTAS", "GERENTE_OPERATIVO_SERVOMOTORES"] },
+  { id: "cxc", label: "Cuentas por cobrar", roles: ["ADMINISTRADOR", "CEO", "COORDINACION_ADMINISTRACION", "VENTAS", "GERENTE_OPERATIVO_SERVOMOTORES", "AUXILIAR_OPERATIVO_SERVOMOTORES"] },
   { id: "cxp", label: "Cuentas por pagar", roles: ["ADMINISTRADOR", "CEO", "COORDINACION_ADMINISTRACION"] },
   { id: "movimientos", label: "Ingresos y egresos", roles: ["ADMINISTRADOR", "CEO", "COORDINACION_ADMINISTRACION"] },
   { id: "produccion", label: "Producción por ejecutor", roles: ["ADMINISTRADOR", "CEO", "COORDINACION_ADMINISTRACION", "GERENTE_OPERATIVO_SERVOMOTORES"] },

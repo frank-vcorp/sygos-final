@@ -8,7 +8,12 @@ type QuickClientActor = {
 };
 
 async function ownerForQuickClient(actor: QuickClientActor) {
-  if (actor.role === "VENTAS" || actor.role === "GERENTE_OPERATIVO_SERVOMOTORES" || actor.role === "CEO") {
+  if (
+    actor.role === "VENTAS"
+    || actor.role === "GERENTE_OPERATIVO_SERVOMOTORES"
+    || actor.role === "AUXILIAR_OPERATIVO_SERVOMOTORES"
+    || actor.role === "CEO"
+  ) {
     return actor.userId;
   }
   if (actor.role === "COORDINACION_ADMINISTRACION" || actor.role === "ADMINISTRADOR") {

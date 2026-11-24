@@ -186,8 +186,14 @@ export function intercompanyDeliveryDaysDefault(quote: {
 export function seesEconomicDetail(role: Role, companyCode: string, quoteCompanyCode: string, isBaseForOther: boolean): boolean {
   if (role === "VENTAS") return false;
   if (companyCode === "SERVOMOTORES" && quoteCompanyCode === "SYSTRON") return false;
-  if (role === "GERENTE_OPERATIVO_SERVOMOTORES" && isBaseForOther) return true;
-  return role === "ADMINISTRADOR" || role === "CEO" || role === "COORDINACION_ADMINISTRACION" || role === "GERENTE_OPERATIVO_SERVOMOTORES";
+  if ((role === "GERENTE_OPERATIVO_SERVOMOTORES" || role === "AUXILIAR_OPERATIVO_SERVOMOTORES") && isBaseForOther) return true;
+  return (
+    role === "ADMINISTRADOR"
+    || role === "CEO"
+    || role === "COORDINACION_ADMINISTRACION"
+    || role === "GERENTE_OPERATIVO_SERVOMOTORES"
+    || role === "AUXILIAR_OPERATIVO_SERVOMOTORES"
+  );
 }
 
 function automaticQuoteConcept(row: {
@@ -308,7 +314,9 @@ export async function createSellerQuote(
   const contacts = await prisma.contact.count({ where: { id: { in: input.contactIds }, clientId: client.id, active: true } });
   if (contacts !== input.contactIds.length) throw new Error("Algún contacto no pertenece al cliente.");
   const sellerUserId =
-    actor.role === "VENTAS" || actor.role === "GERENTE_OPERATIVO_SERVOMOTORES"
+    actor.role === "VENTAS"
+    || actor.role === "GERENTE_OPERATIVO_SERVOMOTORES"
+    || actor.role === "AUXILIAR_OPERATIVO_SERVOMOTORES"
       ? actor.userId
       : client.ownerUserId;
   if (!sellerUserId) {

@@ -97,7 +97,9 @@ export default async function ClienteDetallePage({ params }: { params: Promise<{
     ? await prisma.user.findMany({
         where: {
           active: true,
-          role: session.activeCompanyCode === "SYSTRON" ? { in: ["VENTAS", "CEO"] } : { in: ["GERENTE_OPERATIVO_SERVOMOTORES", "CEO"] },
+          role: session.activeCompanyCode === "SYSTRON"
+            ? { in: ["VENTAS", "CEO"] }
+            : { in: ["GERENTE_OPERATIVO_SERVOMOTORES", "AUXILIAR_OPERATIVO_SERVOMOTORES", "CEO"] },
         },
         orderBy: { name: "asc" },
       })

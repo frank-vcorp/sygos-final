@@ -104,6 +104,7 @@ export function serviciosBandejaColumns(
   const ventas = role === "VENTAS";
   const ventasTaller = ventas && options?.tallerColumns === true;
   const showQuoteMonto = ventas && options?.quoteMonto !== false;
+  const auxiliarSm = role === "AUXILIAR_OPERATIVO_SERVOMOTORES";
   const hideAdmin = (
     role === "TECNICO"
     || role === "GERENTE_OPERATIVO_SYSTRON"
@@ -117,13 +118,13 @@ export function serviciosBandejaColumns(
     ordenServicio: true,
     equipo: true,
     cliente: true,
-    edoTecnico: !ventas || ventasTaller,
-    edoAdministrativo: !hideAdmin,
-    cotizacion: ventas,
-    cotizacionMonto: showQuoteMonto,
-    vendedor: !ventas,
-    tecnico: !tecnicoView && (!ventas || ventasTaller),
-    sla: !ventas || ventasTaller,
+    edoTecnico: auxiliarSm ? false : !ventas || ventasTaller,
+    edoAdministrativo: auxiliarSm ? true : !hideAdmin,
+    cotizacion: ventas || auxiliarSm,
+    cotizacionMonto: auxiliarSm || showQuoteMonto,
+    vendedor: !ventas && !auxiliarSm,
+    tecnico: auxiliarSm ? false : !tecnicoView && (!ventas || ventasTaller),
+    sla: auxiliarSm ? false : !ventas || ventasTaller,
   };
 }
 

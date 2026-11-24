@@ -56,6 +56,8 @@ export function can(role: Role, action: Action, companyCode?: string | null): bo
   const sales = role === "VENTAS";
   const gerenteSy = role === "GERENTE_OPERATIVO_SYSTRON";
   const gerenteSm = role === "GERENTE_OPERATIVO_SERVOMOTORES";
+  const auxiliarSm = role === "AUXILIAR_OPERATIVO_SERVOMOTORES";
+  const smCommercial = gerenteSm || auxiliarSm;
 
   switch (action) {
     case "nav.business":
@@ -75,19 +77,19 @@ export function can(role: Role, action: Action, companyCode?: string | null): bo
     case "client.inactivate":
       return admin || ceo || coord;
     case "client.edit":
-      return admin || ceo || coord || sales || gerenteSm;
+      return admin || ceo || coord || sales || smCommercial;
     case "client.create":
       if (admin || ceo || coord) return true;
       if (companyCode === "SYSTRON") return sales;
-      if (companyCode === "SERVOMOTORES") return gerenteSm;
+      if (companyCode === "SERVOMOTORES") return smCommercial;
       return false;
     case "prospect.operate":
       if (admin || ceo || coord) return true;
       if (companyCode === "SYSTRON") return sales;
-      if (companyCode === "SERVOMOTORES") return gerenteSm;
+      if (companyCode === "SERVOMOTORES") return smCommercial;
       return false;
     case "supplier.operate":
-      return admin || ceo || coord || gerenteSy || gerenteSm;
+      return admin || ceo || coord || gerenteSy || smCommercial;
     case "equi.view":
       return (
         companyCode === "SYSTRON"
@@ -99,12 +101,12 @@ export function can(role: Role, action: Action, companyCode?: string | null): bo
       return companyCode === "SYSTRON" && (admin || ceo || coord || sales || gerenteSy);
     case "mot.view":
       if (role === "ALMACEN" || role === "AYUDANTE_GENERAL" || role === "KIOSCO_ASISTENCIA") return false;
-      if (companyCode === "SERVOMOTORES") return admin || ceo || coord || gerenteSm;
+      if (companyCode === "SERVOMOTORES") return admin || ceo || coord || smCommercial;
       // En Systron los ven Ventas, Coordinación y CEO. El gerente, el supervisor y el técnico no.
       return companyCode === "SYSTRON" && (admin || ceo || coord || sales);
     case "mot.create":
       if (companyCode === "SYSTRON") return admin || ceo || coord || sales;
-      if (companyCode === "SERVOMOTORES") return admin || ceo || coord || gerenteSm;
+      if (companyCode === "SERVOMOTORES") return admin || ceo || coord || smCommercial;
       return false;
     case "attention.create":
       // Ventas captura la Atención; el ingreso físico de Almacén inicia el SLA.
@@ -112,7 +114,7 @@ export function can(role: Role, action: Action, companyCode?: string | null): bo
     case "attention.catalog":
       if (admin || ceo) return true;
       if (companyCode === "SYSTRON") return sales || gerenteSy || role === "SUPERVISOR_TECNICO" || role === "TECNICO";
-      if (companyCode === "SERVOMOTORES") return gerenteSm;
+      if (companyCode === "SERVOMOTORES") return smCommercial;
       return false;
     case "equipment.catalog":
       if (
@@ -126,18 +128,24 @@ export function can(role: Role, action: Action, companyCode?: string | null): bo
       }
       return can(role, "equi.view", companyCode) || can(role, "mot.view", companyCode);
     case "operation.queue":
-      if (role === "ALMACEN" || role === "COORDINACION_ADMINISTRACION" || role === "AYUDANTE_GENERAL" || role === "KIOSCO_ASISTENCIA") {
+      if (
+        role === "ALMACEN"
+        || role === "COORDINACION_ADMINISTRACION"
+        || role === "AYUDANTE_GENERAL"
+        || role === "KIOSCO_ASISTENCIA"
+        || role === "AUXILIAR_OPERATIVO_SERVOMOTORES"
+      ) {
         return false;
       }
       if (admin || ceo || gerenteSy || gerenteSm || role === "SUPERVISOR_TECNICO" || role === "TECNICO" || sales) return true;
       return can(role, "equi.view", companyCode) || can(role, "mot.view", companyCode);
     case "custody.confirm":
       if (companyCode === "SYSTRON") return admin || ceo || gerenteSy || role === "ALMACEN";
-      if (companyCode === "SERVOMOTORES") return admin || ceo || gerenteSm;
+      if (companyCode === "SERVOMOTORES") return admin || ceo || smCommercial;
       return false;
     case "inventory.operate":
       if (companyCode === "SYSTRON") return admin || ceo || gerenteSy || role === "ALMACEN";
-      if (companyCode === "SERVOMOTORES") return admin || ceo || gerenteSm;
+      if (companyCode === "SERVOMOTORES") return admin || ceo || smCommercial;
       return false;
     case "inventory.search":
       if (can(role, "inventory.operate", companyCode)) return true;
@@ -154,44 +162,49 @@ export function can(role: Role, action: Action, companyCode?: string | null): bo
     case "quote.create":
       if (admin || ceo || coord) return true;
       if (companyCode === "SYSTRON") return sales;
-      if (companyCode === "SERVOMOTORES") return gerenteSm;
+      if (companyCode === "SERVOMOTORES") return smCommercial;
       return false;
     case "quote.price":
       if (admin || ceo) return true;
-      return companyCode === "SERVOMOTORES" && gerenteSm;
+      return companyCode === "SERVOMOTORES" && smCommercial;
     case "quote.follow":
       if (admin || ceo || coord) return true;
       if (companyCode === "SYSTRON") return sales;
-      if (companyCode === "SERVOMOTORES") return gerenteSm;
+      if (companyCode === "SERVOMOTORES") return smCommercial;
       return false;
     case "sale.receive":
       return companyCode === "SYSTRON" && (admin || ceo || gerenteSy || role === "ALMACEN");
     case "agenda.use":
-      return admin || ceo || sales || gerenteSm;
+      return admin || ceo || sales || smCommercial;
     case "goals.manage":
       return (admin || ceo) && companyCode === "SYSTRON";
     case "invoice.request":
       if (admin || ceo || coord) return true;
       if (companyCode === "SYSTRON") return sales;
-      return companyCode === "SERVOMOTORES" && gerenteSm;
+      return companyCode === "SERVOMOTORES" && smCommercial;
     case "invoice.issue":
       return admin || ceo || coord;
     case "payment.register":
-      return admin || ceo || coord || sales || gerenteSm;
+      return admin || ceo || coord || sales || smCommercial;
     case "payment.validate":
       return admin || ceo || coord;
     case "receivable.view":
-      return admin || ceo || coord || sales || gerenteSm;
+      return admin || ceo || coord || sales || smCommercial;
     case "purchase.operate":
       if (admin || ceo || coord) return true;
       if (companyCode === "SYSTRON") return gerenteSy;
-      return companyCode === "SERVOMOTORES" && gerenteSm;
+      return companyCode === "SERVOMOTORES" && smCommercial;
     case "purchase.requirement.create":
+      if (companyCode === "SERVOMOTORES") {
+        if (role === "TECNICO" || role === "KIOSCO_ASISTENCIA" || role === "AYUDANTE_GENERAL") return false;
+        return admin || ceo || coord || auxiliarSm;
+      }
       if (companyCode !== "SYSTRON") return false;
       if (role === "TECNICO" || role === "KIOSCO_ASISTENCIA" || role === "AYUDANTE_GENERAL") return false;
       if (admin || ceo || coord || gerenteSy || sales) return true;
       return role === "ALMACEN" || role === "SUPERVISOR_TECNICO";
     case "purchase.requirement.refaccion":
+      if (companyCode === "SERVOMOTORES") return admin || ceo || coord || auxiliarSm;
       return companyCode === "SYSTRON" && (role === "ALMACEN" || role === "SUPERVISOR_TECNICO");
     case "purchase.authorize":
       return admin || ceo;
@@ -204,15 +217,15 @@ export function can(role: Role, action: Action, companyCode?: string | null): bo
       return admin || ceo;
     case "overtime.capture":
       if (role === "AYUDANTE_GENERAL" || role === "KIOSCO_ASISTENCIA" || role === "COORDINACION_ADMINISTRACION") return false;
-      return admin || ceo || gerenteSy || gerenteSm || role === "SUPERVISOR_TECNICO" || role === "TECNICO" || role === "VENTAS" || role === "ALMACEN";
+      return admin || ceo || gerenteSy || smCommercial || role === "SUPERVISOR_TECNICO" || role === "TECNICO" || role === "VENTAS" || role === "ALMACEN";
     case "kiosk.punch":
       return role === "KIOSCO_ASISTENCIA" || admin;
     case "panel.view":
-      return admin || ceo || coord || sales || gerenteSy || gerenteSm || role === "SUPERVISOR_TECNICO" || role === "TECNICO";
+      return admin || ceo || coord || sales || gerenteSy || smCommercial || role === "SUPERVISOR_TECNICO" || role === "TECNICO";
     case "production.view":
       return admin || ceo || gerenteSm;
     case "report.view":
-      return admin || ceo || coord || gerenteSy || gerenteSm || role === "SUPERVISOR_TECNICO" || role === "ALMACEN";
+      return admin || ceo || coord || gerenteSy || smCommercial || role === "SUPERVISOR_TECNICO" || role === "ALMACEN";
     default:
       return false;
   }

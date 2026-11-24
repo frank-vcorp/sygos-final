@@ -201,12 +201,13 @@ export default async function PanelPage({ searchParams }: { searchParams: Promis
     );
   }
   if (session.role === "COORDINACION_ADMINISTRACION") return <Coordination companyId={companyId} code={session.activeCompanyCode} vista={vista} />;
-  if (session.role === "GERENTE_OPERATIVO_SERVOMOTORES") {
+  if (session.role === "GERENTE_OPERATIVO_SERVOMOTORES" || session.role === "AUXILIAR_OPERATIVO_SERVOMOTORES") {
     return (
       <GerenteServomotoresPanel
         companyId={companyId}
         companyCode={session.activeCompanyCode}
         userId={session.userId}
+        role={session.role}
         history={vista === "historial"}
       />
     );
@@ -495,14 +496,16 @@ async function GerenteServomotoresPanel({
   companyId,
   companyCode,
   userId,
+  role,
   history,
 }: {
   companyId: string;
   companyCode: string | null;
   userId: string;
+  role: Role;
   history: boolean;
 }) {
-  const role: Role = "GERENTE_OPERATIVO_SERVOMOTORES";
+  const technicalOps = role === "GERENTE_OPERATIVO_SERVOMOTORES";
   const bandejaHistorial = serviciosBandejaHref({ vista: "historial" });
 
   if (history) {
@@ -526,7 +529,8 @@ async function GerenteServomotoresPanel({
     );
   }
 
-  const canManageRequirements = can(role, "purchase.operate", companyCode);
+  const canManageRequirements =
+    can(role, "purchase.requirement.create", companyCode) || can(role, "purchase.operate", companyCode);
   const allowQuickSupplier = can(role, "supplier.operate", companyCode);
 
   const [
@@ -611,11 +615,13 @@ async function GerenteServomotoresPanel({
       take: 100,
       orderBy: { dueAt: "asc" },
     }),
-    prisma.technicalCase.findMany({
-      where: { serviceCompanyId: companyId, assigneeUserId: userId, status: { notIn: CLOSED } },
-      select: { attentionId: true },
-      distinct: ["attentionId"],
-    }),
+    technicalOps
+      ? prisma.technicalCase.findMany({
+          where: { serviceCompanyId: companyId, assigneeUserId: userId, status: { notIn: CLOSED } },
+          select: { attentionId: true },
+          distinct: ["attentionId"],
+        })
+      : Promise.resolve([]),
     canManageRequirements
       ? prisma.requirement.findMany({
           where: { companyId, kind: "REFACCION", status: "PENDIENTE" },
@@ -679,9 +685,11 @@ async function GerenteServomotoresPanel({
 
   const servicioRows = activeRows.filter((row): row is ServicioBandejaRow => row.kind === "servicio");
   const motRows = servicioRows.filter((row) => row.equipmentKind === "MOT");
-  const sections = gerentePanelSections(motRows, panelCtx);
+  const sections = gerentePanelSections(motRows, panelCtx).filter(
+    (section) => technicalOps || section.filtro === "refacciones",
+  );
   const assignedAttentionIds = new Set(assignedAttentions.map((row) => row.attentionId));
-  const asignadasAMi = motRows.filter((row) => assignedAttentionIds.has(row.id));
+  const asignadasAMi = technicalOps ? motRows.filter((row) => assignedAttentionIds.has(row.id)) : [];
 
   const osSinFacturaCaseIds = [
     ...new Set(osSinFacturaQuotes.map((row) => row.technicalCaseId).filter((id): id is string => Boolean(id))),
@@ -744,14 +752,22 @@ async function GerenteServomotoresPanel({
     <>
       <PageHeader
         title="Inicio"
-        subtitle="Pendientes comerciales y operativos de Servomotores. Los motores en resguardo se asignan automáticamente; la ejecución técnica sigue en Servicios activos."
+        subtitle={
+          technicalOps
+            ? "Pendientes comerciales y operativos de Servomotores. Los motores en resguardo se asignan automáticamente; la ejecución técnica sigue en Servicios activos."
+            : "Pendientes comerciales y de compras en Servomotores. La ejecución técnica la gestiona el gerente en taller."
+        }
         action={<TextLink href="/panel?vista=historial">Ver historial</TextLink>}
       />
       <section className="flex w-full max-w-none flex-col gap-4">
         <SalesPanelServiciosGrouped
           title="Comercial (Servomotores)"
           role={role}
-          columnOptions={{ quoteMonto: true, cotizacionFirst: true, tallerColumns: true }}
+          columnOptions={{
+            quoteMonto: true,
+            cotizacionFirst: true,
+            tallerColumns: technicalOps,
+          }}
           sections={[
             {
               subtitle: "Cotizadas / sin autorización",
@@ -828,13 +844,15 @@ async function GerenteServomotoresPanel({
             />
           ),
         )}
-        <SalesPanelServiciosSection
-          title="Asignadas a mí"
-          empty="No tienes operaciones activas asignadas."
-          bandejaHref={bandejaActivos}
-          rows={asignadasAMi.slice(0, 20)}
-          role={role}
-        />
+        {technicalOps ? (
+          <SalesPanelServiciosSection
+            title="Asignadas a mí"
+            empty="No tienes operaciones activas asignadas."
+            bandejaHref={bandejaActivos}
+            rows={asignadasAMi.slice(0, 20)}
+            role={role}
+          />
+        ) : null}
       </section>
     </>
   );

@@ -180,6 +180,7 @@ const VERIFICATION_USERS: Array<{ username: string; name: string; role: Role; co
   { username: "Coordinacion", name: "Coordinación de Administración", role: "COORDINACION_ADMINISTRACION", company: null },
   { username: "GerenteSystron", name: "Gerente Operativo SYSTRON", role: "GERENTE_OPERATIVO_SYSTRON", company: "SYSTRON" },
   { username: "GerenteServomotores", name: "Gerente Operativo Servomotores", role: "GERENTE_OPERATIVO_SERVOMOTORES", company: "SERVOMOTORES" },
+  { username: "GustamboIbarra", name: "Gustambo Ibarra", role: "AUXILIAR_OPERATIVO_SERVOMOTORES", company: "SERVOMOTORES" },
   { username: "Supervisor", name: "Supervisor Técnico", role: "SUPERVISOR_TECNICO", company: "SYSTRON" },
   { username: "Tecnico", name: "Técnico", role: "TECNICO", company: "SYSTRON" },
   { username: "Ventas", name: "Ventas", role: "VENTAS", company: "SYSTRON" },

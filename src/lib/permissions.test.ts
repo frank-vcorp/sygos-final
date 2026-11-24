@@ -95,6 +95,13 @@ describe("permisos de fase 1", () => {
     assert.equal(can("AYUDANTE_GENERAL", "purchase.requirement.create", "SYSTRON"), false);
     assert.equal(can("GERENTE_OPERATIVO_SYSTRON", "purchase.requirement.create", "SYSTRON"), true);
     assert.equal(can("CEO", "purchase.requirement.refaccion", "SYSTRON"), false);
+    assert.equal(can("GERENTE_OPERATIVO_SERVOMOTORES", "purchase.requirement.create", "SERVOMOTORES"), false);
+    assert.equal(can("AUXILIAR_OPERATIVO_SERVOMOTORES", "purchase.requirement.create", "SERVOMOTORES"), true);
+    assert.equal(can("AUXILIAR_OPERATIVO_SERVOMOTORES", "purchase.requirement.refaccion", "SERVOMOTORES"), true);
+    assert.equal(can("AUXILIAR_OPERATIVO_SERVOMOTORES", "operation.queue", "SERVOMOTORES"), false);
+    assert.equal(can("AUXILIAR_OPERATIVO_SERVOMOTORES", "client.create", "SERVOMOTORES"), true);
+    assert.equal(can("AUXILIAR_OPERATIVO_SERVOMOTORES", "purchase.operate", "SERVOMOTORES"), true);
+    assert.equal(can("GERENTE_OPERATIVO_SERVOMOTORES", "purchase.operate", "SERVOMOTORES"), true);
   });
 
   it("deja al técnico fuera del catálogo de equipos; servicios solo asignados en bandeja", () => {

@@ -4,6 +4,7 @@ export const ROLES = [
   "COORDINACION_ADMINISTRACION",
   "GERENTE_OPERATIVO_SYSTRON",
   "GERENTE_OPERATIVO_SERVOMOTORES",
+  "AUXILIAR_OPERATIVO_SERVOMOTORES",
   "SUPERVISOR_TECNICO",
   "TECNICO",
   "VENTAS",
@@ -20,6 +21,7 @@ export const ROLE_LABEL: Record<Role, string> = {
   COORDINACION_ADMINISTRACION: "Coordinación de Administración",
   GERENTE_OPERATIVO_SYSTRON: "Gerente Operativo",
   GERENTE_OPERATIVO_SERVOMOTORES: "Gerente Operativo",
+  AUXILIAR_OPERATIVO_SERVOMOTORES: "Auxiliar Operativo",
   SUPERVISOR_TECNICO: "Supervisor Técnico",
   TECNICO: "Técnico",
   VENTAS: "Ventas",
@@ -44,7 +46,11 @@ export function isMultiCompanyRole(role: Role): boolean {
 
 export function companiesForRole(role: Role): "both" | Array<"SYSTRON" | "SERVOMOTORES"> {
   if (isMultiCompanyRole(role)) return "both";
-  if (role === "GERENTE_OPERATIVO_SERVOMOTORES" || role === "AYUDANTE_GENERAL") {
+  if (
+    role === "GERENTE_OPERATIVO_SERVOMOTORES"
+    || role === "AUXILIAR_OPERATIVO_SERVOMOTORES"
+    || role === "AYUDANTE_GENERAL"
+  ) {
     return ["SERVOMOTORES"];
   }
   if (role === "KIOSCO_ASISTENCIA") return ["SYSTRON", "SERVOMOTORES"];
@@ -61,6 +67,18 @@ export function roleFitsCompany(role: Role, companyCode: string | null): boolean
 export const DEFAULT_MONTHLY_PURCHASE = 5000;
 export const DEFAULT_PURCHASE_LIMIT = 2000;
 
+export function isServomotoresCommercialStaff(role: Role): boolean {
+  return role === "GERENTE_OPERATIVO_SERVOMOTORES" || role === "AUXILIAR_OPERATIVO_SERVOMOTORES";
+}
+
+export function isServomotoresTechnicalManager(role: Role): boolean {
+  return role === "GERENTE_OPERATIVO_SERVOMOTORES";
+}
+
 export function isPurchaseManager(role: Role): boolean {
-  return role === "GERENTE_OPERATIVO_SYSTRON" || role === "GERENTE_OPERATIVO_SERVOMOTORES";
+  return (
+    role === "GERENTE_OPERATIVO_SYSTRON"
+    || role === "GERENTE_OPERATIVO_SERVOMOTORES"
+    || role === "AUXILIAR_OPERATIVO_SERVOMOTORES"
+  );
 }

@@ -30,7 +30,12 @@ async function assertOwn(session: Awaited<ReturnType<typeof guard>>, clientId: s
 }
 
 async function ownerForCreator(session: Awaited<ReturnType<typeof guard>>) {
-  if (session.role === "VENTAS" || session.role === "GERENTE_OPERATIVO_SERVOMOTORES" || session.role === "CEO") {
+  if (
+    session.role === "VENTAS"
+    || session.role === "GERENTE_OPERATIVO_SERVOMOTORES"
+    || session.role === "AUXILIAR_OPERATIVO_SERVOMOTORES"
+    || session.role === "CEO"
+  ) {
     return session.userId;
   }
   if (session.role === "COORDINACION_ADMINISTRACION" || session.role === "ADMINISTRADOR") {
@@ -165,7 +170,13 @@ export async function reassignClientAction(formData: FormData) {
     const version = parseVersion(formData.get("version"));
     const ownerUserId = requiredText(formData.get("ownerUserId"), "Responsable");
     const owner = await prisma.user.findFirst({ where: { id: ownerUserId, active: true } });
-    if (!owner || (owner.role !== "VENTAS" && owner.role !== "CEO" && owner.role !== "GERENTE_OPERATIVO_SERVOMOTORES")) {
+    if (
+      !owner
+      || (owner.role !== "VENTAS"
+        && owner.role !== "CEO"
+        && owner.role !== "GERENTE_OPERATIVO_SERVOMOTORES"
+        && owner.role !== "AUXILIAR_OPERATIVO_SERVOMOTORES")
+    ) {
       throw new Error("El responsable debe ser un usuario comercial activo.");
     }
     if (session.activeCompanyCode === "SYSTRON" && owner.role === "GERENTE_OPERATIVO_SERVOMOTORES") {

@@ -638,7 +638,7 @@ export async function editRequirement(
 ) {
   const row = await prisma.requirement.findFirst({ where: { id: requirementId, companyId: actor.activeCompanyId, status: "PENDIENTE" } });
   if (!row) throw new Error("El requerimiento ya no está pendiente.");
-  if (actor.role === "TECNICO" || (row.requesterUserId !== actor.userId && !["GERENTE_OPERATIVO_SYSTRON", "GERENTE_OPERATIVO_SERVOMOTORES", "CEO", "ADMINISTRADOR", "COORDINACION_ADMINISTRACION"].includes(actor.role))) {
+  if (actor.role === "TECNICO" || (row.requesterUserId !== actor.userId && !["GERENTE_OPERATIVO_SYSTRON", "GERENTE_OPERATIVO_SERVOMOTORES", "AUXILIAR_OPERATIVO_SERVOMOTORES", "CEO", "ADMINISTRADOR", "COORDINACION_ADMINISTRACION"].includes(actor.role))) {
     throw new Error("No tienes permiso para editar este requerimiento.");
   }
   if (requirementPartNumberRequired(row.kind) && !input.partNumber.trim()) throw new Error("Indica el número de parte.");
@@ -655,7 +655,7 @@ export async function editRequirement(
 }
 
 export async function setRequirementStatus(actor: Actor, requirementId: string, status: "ATENDIDO" | "CANCELADO") {
-  if (!["GERENTE_OPERATIVO_SYSTRON", "GERENTE_OPERATIVO_SERVOMOTORES", "CEO", "ADMINISTRADOR", "COORDINACION_ADMINISTRACION"].includes(actor.role)) {
+  if (!["GERENTE_OPERATIVO_SYSTRON", "GERENTE_OPERATIVO_SERVOMOTORES", "AUXILIAR_OPERATIVO_SERVOMOTORES", "CEO", "ADMINISTRADOR", "COORDINACION_ADMINISTRACION"].includes(actor.role)) {
     throw new Error("Solo el gerente puede cambiar el estado del requerimiento.");
   }
   const updated = await prisma.requirement.updateMany({
