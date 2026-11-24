@@ -41,6 +41,19 @@ export function parsePaymentCondition(raw: unknown): QuotePaymentCondition {
   return text;
 }
 
+/** Días de crédito congelados en la cotización cuando la condición es CREDITO. */
+export function parseQuoteCreditDays(
+  paymentCondition: QuotePaymentCondition,
+  raw: unknown,
+): number | null {
+  if (paymentCondition !== "CREDITO") return null;
+  const text = typeof raw === "string" ? raw.trim() : raw === null || raw === undefined ? "" : String(raw).trim();
+  if (!text) throw new Error("Indica los días de crédito.");
+  const n = Number.parseInt(text, 10);
+  if (!Number.isInteger(n) || n < 1) throw new Error("Los días de crédito deben ser un entero mayor o igual a 1.");
+  return n;
+}
+
 export function warrantyMonthsLabel(months: number | null | undefined): string | null {
   if (months == null) return null;
   return `${months} meses de garantía`;

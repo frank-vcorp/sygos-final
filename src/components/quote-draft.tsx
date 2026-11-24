@@ -8,14 +8,8 @@ import { ClientPicker } from "@/components/client-picker";
 import { QuoteFieldServiceBlock } from "@/components/quote-field-service-block";
 import { QuoteSaleLinesFields } from "@/components/quote-sale-lines-fields";
 import { ServiceEquipmentPicker, type ServiceEquipmentOption } from "@/components/service-equipment-picker";
-import { controlClass, Field, FormBlock } from "@/components/ui";
-import {
-  DEFAULT_QUOTE_PAYMENT_CONDITION,
-  DEFAULT_QUOTE_WARRANTY_MONTHS,
-  QUOTE_PAYMENT_CONDITION_LABEL,
-  QUOTE_PAYMENT_CONDITIONS,
-  QUOTE_WARRANTY_MONTHS,
-} from "@/lib/quote-commercial-terms";
+import { QuoteCommercialTermsFields } from "@/components/quote-commercial-terms-fields";
+import { controlClass, FormBlock } from "@/components/ui";
 import { QUOTE_TYPES, QUOTE_TYPE_LABEL, type QuoteType } from "@/lib/quote-meta";
 
 type Contact = { id: string; name: string; isPrimary: boolean };
@@ -198,20 +192,7 @@ export function QuoteDraft({
         description="Garantía, forma de pago y plazos que verá el cliente en la propuesta."
         columns={2}
       >
-        <Field label="Garantía" hint="Meses de garantía del servicio o equipo cotizado.">
-          <select name="warrantyMonths" className={controlClass} required defaultValue={String(DEFAULT_QUOTE_WARRANTY_MONTHS)}>
-            {QUOTE_WARRANTY_MONTHS.map((months) => (
-              <option key={months} value={months}>{months} meses de garantía</option>
-            ))}
-          </select>
-        </Field>
-        <Field label="Condiciones de pago" hint="Define cómo se espera el cobro al autorizar.">
-          <select name="paymentCondition" className={controlClass} required defaultValue={DEFAULT_QUOTE_PAYMENT_CONDITION}>
-            {QUOTE_PAYMENT_CONDITIONS.map((code) => (
-              <option key={code} value={code}>{QUOTE_PAYMENT_CONDITION_LABEL[code]}</option>
-            ))}
-          </select>
-        </Field>
+        <QuoteCommercialTermsFields />
         {isEquipmentSale ? (
           <Field label="T.E. (tiempo de entrega)" hint="Días hábiles para entregar el equipo o componentes.">
             <input

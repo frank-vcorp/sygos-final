@@ -4,6 +4,7 @@ import {
   DEFAULT_QUOTE_PAYMENT_CONDITION,
   DEFAULT_QUOTE_WARRANTY_MONTHS,
   parsePaymentCondition,
+  parseQuoteCreditDays,
   parseWarrantyMonths,
   quotePaymentConditionDisplay,
   warrantyMonthsLabel,
@@ -21,6 +22,14 @@ describe("quote commercial terms", () => {
     assert.equal(parsePaymentCondition("ANTICIPADO"), "ANTICIPADO");
     assert.equal(parsePaymentCondition("CREDITO"), "CREDITO");
     assert.throws(() => parsePaymentCondition("EFECTIVO"), /no son válidas/);
+  });
+
+  it("parseQuoteCreditDays solo aplica a CREDITO", () => {
+    assert.equal(parseQuoteCreditDays("CONTADO", "30"), null);
+    assert.equal(parseQuoteCreditDays("ANTICIPADO", ""), null);
+    assert.equal(parseQuoteCreditDays("CREDITO", "30"), 30);
+    assert.throws(() => parseQuoteCreditDays("CREDITO", ""), /días de crédito/);
+    assert.throws(() => parseQuoteCreditDays("CREDITO", "0"), /entero mayor/);
   });
 
   it("defaults sensatos para el formulario", () => {

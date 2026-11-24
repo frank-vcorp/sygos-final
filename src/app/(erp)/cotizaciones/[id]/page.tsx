@@ -6,6 +6,7 @@ import { HistoryTimeline } from "@/components/history-timeline";
 import { QuoteBillingRequestActions } from "@/components/quote-billing-request-actions";
 import { QuoteDecisionActions } from "@/components/quote-decision-actions";
 import { QuoteSellerDecisionDiscountPanel, QuoteSellerDecisionHeaderActions, QuoteSellerDecisionRoot } from "@/components/quote-seller-decision";
+import { QuoteCommercialTermsFields } from "@/components/quote-commercial-terms-fields";
 import { QuoteConcept } from "@/components/quote-concept";
 import { SlaCountdown } from "@/components/sla-countdown";
 import { SubmitButton } from "@/components/submit-button";
@@ -229,6 +230,12 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
             />
           </label>
         ) : null}
+        <QuoteCommercialTermsFields
+          variant="inline"
+          defaultWarrantyMonths={quote.warrantyMonths}
+          defaultPaymentCondition={quote.paymentCondition}
+          defaultCreditDays={quote.creditDays ?? quote.client.creditDays}
+        />
         <SubmitButton>Asignar precio</SubmitButton>
       </form>
     );

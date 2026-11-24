@@ -6,7 +6,7 @@ import { clientIdFromForm } from "@/lib/form-quick-entities";
 import { optionalText, parseVersion, requiredText } from "@/lib/form";
 import { moneyFromForm } from "@/lib/money";
 import { can, type Action } from "@/lib/permissions";
-import { parsePaymentCondition, parseWarrantyMonths } from "@/lib/quote-commercial-terms";
+import { parsePaymentCondition, parseQuoteCreditDays, parseWarrantyMonths } from "@/lib/quote-commercial-terms";
 import { parseDeliveryBusinessDays, parseFieldServiceMachineFromForm, parseSellerSaleLines } from "@/lib/quote-seller-input";
 import { QUOTE_TYPES, type QuoteType, applyDiscount, createSellerQuote, decideQuote, linkIntercompanyQuote, prepareQuoteFromCase, quoteDeliveryEmailNote, relateQuoteEquipment, setPrices, updateGeneratedQuoteConcepts, updateSellerQuoteConceptComplement } from "@/lib/quotes";
 import { sendMail } from "@/lib/sendgrid";
@@ -49,6 +49,7 @@ export async function createQuoteAction(formData: FormData) {
     if (resolvedClient.primaryContactId && contactIds.length === 0) {
       contactIds = [resolvedClient.primaryContactId];
     }
+    const paymentCondition = parsePaymentCondition(formData.get("paymentCondition"));
     const quote = await createSellerQuote(session, {
       clientId,
       quoteType: quoteType as QuoteType,
@@ -58,7 +59,8 @@ export async function createQuoteAction(formData: FormData) {
       contactIds,
       priorityId: optionalText(formData.get("priorityId")),
       warrantyMonths: parseWarrantyMonths(formData.get("warrantyMonths")),
-      paymentCondition: parsePaymentCondition(formData.get("paymentCondition")),
+      paymentCondition,
+      creditDays: parseQuoteCreditDays(paymentCondition, formData.get("creditDays")),
       ...(quoteType === "VENTA_EQUIPO"
         ? {
             sellerSaleLines: parseSellerSaleLines(formData),
@@ -144,6 +146,7 @@ export async function setPricesAction(formData: FormData) {
     const fieldServiceHours = hoursRaw != null && String(hoursRaw).trim() !== ""
       ? Number.parseFloat(String(hoursRaw))
       : null;
+    const paymentCondition = parsePaymentCondition(formData.get("paymentCondition"));
     await setPrices(
       session,
       requiredText(formData.get("quoteId"), "Cotización"),
@@ -151,6 +154,11 @@ export async function setPricesAction(formData: FormData) {
       prices,
       deliveryBusinessDays,
       fieldServiceHours,
+      {
+        warrantyMonths: parseWarrantyMonths(formData.get("warrantyMonths")),
+        paymentCondition,
+        creditDays: parseQuoteCreditDays(paymentCondition, formData.get("creditDays")),
+      },
     );
     await setFlash({ tone: "ok", message: "Precio asignado." });
     redirect(target);

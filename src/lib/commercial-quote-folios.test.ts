@@ -104,6 +104,86 @@ describe("commercial quote folios", () => {
     await prisma.$disconnect();
   });
 
+  it("setPrices persiste garantía y condiciones de pago del CEO", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "sygos-cot-price-terms-"));
+    process.env.DATABASE_URL = `file:${join(dir, "test.db")}`;
+    const { execSync } = await import("child_process");
+    execSync("npx prisma db push --skip-generate", {
+      cwd: join(import.meta.dirname, "../.."),
+      env: process.env,
+      stdio: "ignore",
+    });
+    const { prisma } = await import("./db");
+    const { createSellerQuote, setPrices } = await import("./quotes");
+
+    const company = await prisma.company.create({ data: { code: "SYPR", name: "Systron" } });
+    const seller = await prisma.user.create({
+      data: { username: "v-pr", name: "V", passwordHash: "x", role: "VENTAS", companyId: company.id },
+    });
+    const ceo = await prisma.user.create({
+      data: { username: "ceo-pr", name: "CEO", passwordHash: "x", role: "CEO", companyId: company.id },
+    });
+    const client = await prisma.client.create({
+      data: {
+        companyId: company.id,
+        name: "Cliente",
+        ownerUserId: seller.id,
+        active: true,
+        isSystem: false,
+        requiresInvoice: true,
+        rfc: "XAXX010101000",
+        cfdiUse: "G03",
+        paymentMethod: "PUE",
+        creditDays: 15,
+      },
+    });
+    const contact = await prisma.contact.create({ data: { clientId: client.id, name: "C", active: true, isPrimary: true } });
+    const equipment = await prisma.equipment.create({
+      data: {
+        folio: "EQUI-PR",
+        kind: "EQUI",
+        originCompanyId: company.id,
+        clientId: client.id,
+        model: "M",
+        custody: "SIN_CUSTODIA",
+        createdByUserId: seller.id,
+      },
+    });
+
+    const quote = await createSellerQuote(
+      { userId: seller.id, role: "VENTAS", activeCompanyId: company.id, activeCompanyCode: "SYSTRON" },
+      {
+        clientId: client.id,
+        quoteType: "REPARACION",
+        equipmentId: equipment.id,
+        reference: null,
+        concepts: [{ concept: "Reparación comercial", quantity: 1 }],
+        contactIds: [contact.id],
+        warrantyMonths: 3,
+        paymentCondition: "ANTICIPADO",
+      },
+    );
+    assert.equal(quote.status, "PENDIENTE_COTIZAR");
+    assert.equal(quote.warrantyMonths, 3);
+    const withLines = await prisma.quote.findUnique({ where: { id: quote.id }, include: { lines: true } });
+    await setPrices(
+      { userId: ceo.id, role: "CEO", activeCompanyId: company.id, activeCompanyCode: "SYSTRON" },
+      quote.id,
+      1,
+      [{ lineId: withLines!.lines[0]!.id, amount: 5000 }],
+      7,
+      null,
+      { warrantyMonths: 9, paymentCondition: "CREDITO", creditDays: 45 },
+    );
+    const priced = await prisma.quote.findUnique({ where: { id: quote.id } });
+    assert.equal(priced!.status, "PENDIENTE_DECISION");
+    assert.equal(priced!.warrantyMonths, 9);
+    assert.equal(priced!.paymentCondition, "CREDITO");
+    assert.equal(priced!.creditDays, 45);
+    assert.equal(priced!.deliveryBusinessDays, 7);
+    await prisma.$disconnect();
+  });
+
   it("createSellerQuote asigna COTMP y congela prioridad de mantenimiento", async () => {
     const dir = mkdtempSync(join(tmpdir(), "sygos-cotmp-"));
     process.env.DATABASE_URL = `file:${join(dir, "test.db")}`;

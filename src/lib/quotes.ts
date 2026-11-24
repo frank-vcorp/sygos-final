@@ -256,6 +256,7 @@ export async function createSellerQuote(
     priorityId?: string | null;
     warrantyMonths: number;
     paymentCondition: string;
+    creditDays?: number | null;
     /** COTVT: líneas con precio del vendedor. */
     sellerSaleLines?: Array<{ concept: string; quantity: number; unitPrice: number; lineCondition: string }>;
     /** COTVT: días hábiles de entrega. */
@@ -355,6 +356,7 @@ export async function createSellerQuote(
       reference: input.reference,
       warrantyMonths: input.warrantyMonths,
       paymentCondition: input.paymentCondition,
+      ...(input.creditDays != null ? { creditDays: input.creditDays } : {}),
       ...(ventaSellerComplete ? { deliveryBusinessDays: input.deliveryBusinessDays! } : {}),
       ...campoMachine,
       sellerUserId,
@@ -770,6 +772,12 @@ export function quoteDeliveryEmailNote(quote: {
   return "";
 }
 
+export type QuoteCommercialTermsInput = {
+  warrantyMonths: number;
+  paymentCondition: string;
+  creditDays: number | null;
+};
+
 export async function setPrices(
   actor: Actor,
   quoteId: string,
@@ -777,6 +785,7 @@ export async function setPrices(
   prices: Array<{ lineId: string; amount: number }>,
   deliveryBusinessDays?: number | null,
   fieldServiceHours?: number | null,
+  commercialTerms?: QuoteCommercialTermsInput,
 ) {
   const quote = await prisma.quote.findFirst({
     where: { id: quoteId, companyId: actor.activeCompanyId },
@@ -838,7 +847,13 @@ export async function setPrices(
       where: { id: quote.id, version },
       data: {
         status: "PENDIENTE_DECISION",
-        creditDays: quote.creditDays,
+        ...(commercialTerms
+          ? {
+              warrantyMonths: commercialTerms.warrantyMonths,
+              paymentCondition: commercialTerms.paymentCondition,
+              creditDays: commercialTerms.creditDays,
+            }
+          : { creditDays: quote.creditDays }),
         ...(quote.sellerUserId == null && quote.client.ownerUserId
           ? { sellerUserId: quote.client.ownerUserId }
           : {}),
