@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
+  DEFAULT_QUOTE_CREDIT_DAYS,
   DEFAULT_QUOTE_PAYMENT_CONDITION,
   DEFAULT_QUOTE_WARRANTY_MONTHS,
   parsePaymentCondition,
   parseQuoteCreditDays,
   parseWarrantyMonths,
+  quoteCreditDaysFieldValue,
   quotePaymentConditionDisplay,
   warrantyMonthsLabel,
 } from "./quote-commercial-terms";
@@ -28,8 +30,15 @@ describe("quote commercial terms", () => {
     assert.equal(parseQuoteCreditDays("CONTADO", "30"), null);
     assert.equal(parseQuoteCreditDays("ANTICIPADO", ""), null);
     assert.equal(parseQuoteCreditDays("CREDITO", "30"), 30);
-    assert.throws(() => parseQuoteCreditDays("CREDITO", ""), /días de crédito/);
+    assert.equal(parseQuoteCreditDays("CREDITO", ""), DEFAULT_QUOTE_CREDIT_DAYS);
     assert.throws(() => parseQuoteCreditDays("CREDITO", "0"), /entero mayor/);
+  });
+
+  it("DEFAULT_QUOTE_CREDIT_DAYS y campo inicial con CREDITO", () => {
+    assert.equal(DEFAULT_QUOTE_CREDIT_DAYS, 30);
+    assert.equal(quoteCreditDaysFieldValue("CONTADO", 45), "");
+    assert.equal(quoteCreditDaysFieldValue("CREDITO", 45), "45");
+    assert.equal(quoteCreditDaysFieldValue("CREDITO", null), "30");
   });
 
   it("defaults sensatos para el formulario", () => {

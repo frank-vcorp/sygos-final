@@ -1,10 +1,16 @@
+"use client";
+
+import { useState } from "react";
 import { controlClass, Field } from "@/components/ui";
 import {
   DEFAULT_QUOTE_PAYMENT_CONDITION,
   DEFAULT_QUOTE_WARRANTY_MONTHS,
+  isQuotePaymentCondition,
   QUOTE_PAYMENT_CONDITION_LABEL,
   QUOTE_PAYMENT_CONDITIONS,
+  type QuotePaymentCondition,
   QUOTE_WARRANTY_MONTHS,
+  quoteCreditDaysFieldValue,
 } from "@/lib/quote-commercial-terms";
 
 type QuoteCommercialTermsFieldsProps = {
@@ -14,6 +20,11 @@ type QuoteCommercialTermsFieldsProps = {
   defaultCreditDays?: number | null;
 };
 
+function initialPayment(defaultPaymentCondition: string | null | undefined): QuotePaymentCondition {
+  const value = defaultPaymentCondition ?? DEFAULT_QUOTE_PAYMENT_CONDITION;
+  return isQuotePaymentCondition(value) ? value : DEFAULT_QUOTE_PAYMENT_CONDITION;
+}
+
 export function QuoteCommercialTermsFields({
   variant = "field",
   defaultWarrantyMonths,
@@ -21,8 +32,21 @@ export function QuoteCommercialTermsFields({
   defaultCreditDays,
 }: QuoteCommercialTermsFieldsProps) {
   const warrantyValue = String(defaultWarrantyMonths ?? DEFAULT_QUOTE_WARRANTY_MONTHS);
-  const paymentValue = defaultPaymentCondition ?? DEFAULT_QUOTE_PAYMENT_CONDITION;
-  const creditValue = defaultCreditDays != null && defaultCreditDays > 0 ? String(defaultCreditDays) : "";
+  const [paymentCondition, setPaymentCondition] = useState<QuotePaymentCondition>(() =>
+    initialPayment(defaultPaymentCondition),
+  );
+  const [creditDays, setCreditDays] = useState(() =>
+    quoteCreditDaysFieldValue(initialPayment(defaultPaymentCondition), defaultCreditDays),
+  );
+
+  const onPaymentChange = (next: QuotePaymentCondition) => {
+    setPaymentCondition(next);
+    if (next === "CREDITO") {
+      setCreditDays((prev) => (prev.trim() ? prev : quoteCreditDaysFieldValue("CREDITO", null)));
+    }
+  };
+
+  const showCreditDays = paymentCondition === "CREDITO";
 
   const warrantySelect = (
     <select
@@ -45,7 +69,11 @@ export function QuoteCommercialTermsFields({
       name="paymentCondition"
       className={controlClass}
       required
-      defaultValue={paymentValue}
+      value={paymentCondition}
+      onChange={(event) => {
+        const value = event.target.value;
+        if (isQuotePaymentCondition(value)) onPaymentChange(value);
+      }}
       aria-label="Condiciones de pago"
     >
       {QUOTE_PAYMENT_CONDITIONS.map((code) => (
@@ -63,9 +91,12 @@ export function QuoteCommercialTermsFields({
       min={1}
       step={1}
       className={controlClass}
-      defaultValue={creditValue}
+      value={creditDays}
+      onChange={(event) => setCreditDays(event.target.value)}
+      required={showCreditDays}
+      disabled={!showCreditDays}
       aria-label="Días de crédito"
-      placeholder="Ej. 30"
+      placeholder="30"
     />
   );
 
@@ -80,10 +111,12 @@ export function QuoteCommercialTermsFields({
           <span className="text-xs font-semibold text-[var(--muted)]">Condiciones de pago</span>
           {paymentSelect}
         </label>
-        <label className="grid gap-1">
-          <span className="text-xs font-semibold text-[var(--muted)]">Días de crédito · si aplica</span>
-          {creditInput}
-        </label>
+        {showCreditDays ? (
+          <label className="grid gap-1">
+            <span className="text-xs font-semibold text-[var(--muted)]">Días de crédito</span>
+            {creditInput}
+          </label>
+        ) : null}
       </>
     );
   }
@@ -96,9 +129,11 @@ export function QuoteCommercialTermsFields({
       <Field label="Condiciones de pago" hint="Define cómo se espera el cobro al autorizar.">
         {paymentSelect}
       </Field>
-      <Field label="Días de crédito" hint="Obligatorio si la condición de pago es Crédito.">
-        {creditInput}
-      </Field>
+      {showCreditDays ? (
+        <Field label="Días de crédito" hint="Plazo de cobro cuando la condición es Crédito.">
+          {creditInput}
+        </Field>
+      ) : null}
     </>
   );
 }
