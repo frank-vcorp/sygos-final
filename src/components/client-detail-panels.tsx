@@ -245,19 +245,55 @@ export function ClientProfileSection({
   }
 
   return (
-    <Card className="p-4">
+    <div className="border-b border-[var(--line)] p-3">
       <div className="mb-3 flex items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold">Ficha del cliente</h2>
+        <p className="text-sm font-medium">Ficha del cliente</p>
         <Button type="button" tone="ghost" className="min-h-9 px-2 text-xs" onClick={() => setEditing(true)}>Editar</Button>
       </div>
       <dl className="grid gap-2 text-xs sm:grid-cols-2">
+        <div className="sm:col-span-2">
+          <dt className="text-[var(--muted)]">Nombre Comercial</dt>
+          <dd className="font-medium">{client.name}</dd>
+        </div>
         <div><dt className="text-[var(--muted)]">Clasificación</dt><dd>{classificationLabel(client.classification)}</dd></div>
         <div><dt className="text-[var(--muted)]">Responsable</dt><dd>{ownerName ?? "—"}</dd></div>
-        <div className="sm:col-span-2"><dt className="text-[var(--muted)]">Fiscal</dt><dd>{invoiceSummary}</dd></div>
         <div><dt className="text-[var(--muted)]">Crédito</dt><dd>{client.creditDays != null ? `${client.creditDays} días` : "—"}</dd></div>
-        <div><dt className="text-[var(--muted)]">Entrega</dt><dd>{client.deliveryAddress?.trim() || "—"}</dd></div>
+        <div className="sm:col-span-2">
+          <dt className="text-[var(--muted)]">Entrega</dt>
+          <dd>{client.deliveryAddress?.trim() || "—"}</dd>
+        </div>
+        {client.requiresInvoice ? (
+          <>
+            <div className="sm:col-span-2 border-t border-[var(--line)] pt-2">
+              <dt className="text-[var(--muted)]">Facturación (CFDI)</dt>
+              <dd className="mt-1 grid gap-1 sm:grid-cols-2">
+                <span><span className="text-[var(--muted)]">RFC: </span>{client.rfc ?? "—"}</span>
+                <span><span className="text-[var(--muted)]">Régimen: </span>{regimenLabel(client.taxRegime)}</span>
+                <span><span className="text-[var(--muted)]">Uso CFDI: </span>{cfdiUseLabel(client.cfdiUse)}</span>
+                <span><span className="text-[var(--muted)]">Método pago: </span>{paymentMethodLabel(client.paymentMethod)}</span>
+                <span className="sm:col-span-2">
+                  <span className="text-[var(--muted)]">Razón social SAT: </span>
+                  {client.satLegalName?.trim() || client.name}
+                </span>
+                {client.fiscalZip ? (
+                  <span><span className="text-[var(--muted)]">C.P. fiscal: </span>{client.fiscalZip}</span>
+                ) : null}
+                {client.fiscalEmail ? (
+                  <span><span className="text-[var(--muted)]">Correo fiscal: </span>{client.fiscalEmail}</span>
+                ) : null}
+                {client.fiscalAddress?.trim() ? (
+                  <span className="sm:col-span-2">
+                    <span className="text-[var(--muted)]">Domicilio fiscal: </span>{client.fiscalAddress}
+                  </span>
+                ) : null}
+              </dd>
+            </div>
+          </>
+        ) : (
+          <div className="sm:col-span-2"><dt className="text-[var(--muted)]">Facturación</dt><dd>{invoiceSummary}</dd></div>
+        )}
       </dl>
-    </Card>
+    </div>
   );
 }
 
@@ -524,8 +560,12 @@ export function ClientDataAccordion({
   candidates: Array<{ id: string; name: string }>;
 }) {
   return (
-    <CollapseBlock id="contactos" title="Datos del cliente y contactos" count={contacts.length}>
-      <ClientProfileSection client={client} ownerName={ownerName} updateAction={updateAction} compact />
+    <section id="contactos" className="rounded-lg border border-[var(--line)] bg-white">
+      <div className="border-b border-[var(--line)] px-3 py-2 text-sm font-medium text-[#0b1f3a]">
+        Datos del cliente y contactos{contacts.length > 0 ? ` (${contacts.length})` : ""}
+      </div>
+      <ClientProfileSection client={client} ownerName={ownerName} updateAction={updateAction} />
+      <div className="border-t border-[var(--line)] px-3 py-2 text-xs font-medium text-[#0b1f3a]">Contactos</div>
       <ClientContactsPanel
         clientId={clientId}
         contacts={contacts}
@@ -551,7 +591,7 @@ export function ClientDataAccordion({
         reassignAction={reassignAction}
         inactivateAction={inactivateAction}
       />
-    </CollapseBlock>
+    </section>
   );
 }
 

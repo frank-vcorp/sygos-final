@@ -162,61 +162,61 @@ export default async function ClienteDetallePage({ params }: { params: Promise<{
         primaryAction={primaryAction}
       />
 
-      <ClientRelationsHub
+      <ClientDataAccordion
+        client={clientData}
+        ownerName={ownerLabel}
+        contacts={client.contacts.map((contact) => ({
+          id: contact.id,
+          name: contact.name,
+          roleTitle: contact.roleTitle,
+          phone: contact.phone,
+          email: contact.email,
+          isPrimary: contact.isPrimary,
+        }))}
         clientId={client.id}
-        quotes={quotes.map((quote) => ({
-          id: quote.id,
-          folio: quote.folio,
-          status: quote.status,
-          quoteType: quote.quoteType,
-          updatedAt: quote.updatedAt.toISOString(),
-        }))}
-        attentions={attentions.map((row) => ({
-          id: row.id,
-          attentionType: row.attentionType,
-          priorityName: row.priorityName,
-          status: row.status,
-          reportedFault: row.reportedFault,
-          createdAt: row.createdAt.toISOString(),
-          equipment: row.equipment,
-          technicalCases: row.technicalCases,
-        }))}
-        equipments={client.equipments.map((equipment) => ({
-          id: equipment.id,
-          folio: equipment.folio,
-          kind: equipment.kind,
-          model: equipment.model,
-          custody: equipment.custody,
-        }))}
-        canQuote={canQuote}
-        canService={canService}
+        version={client.version}
+        ownerUserId={client.ownerUserId}
+        prospects={client.prospects.map((prospect) => ({ id: prospect.id, name: prospect.name }))}
+        updateAction={updateClientAction}
+        addContactAction={addContactAction}
+        updateContactAction={updateContactAction}
+        inactivateContactAction={inactivateContactAction}
+        reassignAction={reassignClientAction}
+        inactivateAction={inactivateClientAction}
+        canReassign={can(session.role, "client.reassign")}
+        canInactivate={can(session.role, "client.inactivate") && client.active}
+        candidates={candidates.map((user) => ({ id: user.id, name: user.name }))}
       />
 
-      <div className="mt-3">
-        <ClientDataAccordion
-          client={clientData}
-          ownerName={ownerLabel}
-          contacts={client.contacts.map((contact) => ({
-            id: contact.id,
-            name: contact.name,
-            roleTitle: contact.roleTitle,
-            phone: contact.phone,
-            email: contact.email,
-            isPrimary: contact.isPrimary,
-          }))}
+      <div className="mt-4">
+        <ClientRelationsHub
           clientId={client.id}
-          version={client.version}
-          ownerUserId={client.ownerUserId}
-          prospects={client.prospects.map((prospect) => ({ id: prospect.id, name: prospect.name }))}
-          updateAction={updateClientAction}
-          addContactAction={addContactAction}
-          updateContactAction={updateContactAction}
-          inactivateContactAction={inactivateContactAction}
-          reassignAction={reassignClientAction}
-          inactivateAction={inactivateClientAction}
-          canReassign={can(session.role, "client.reassign")}
-          canInactivate={can(session.role, "client.inactivate") && client.active}
-          candidates={candidates.map((user) => ({ id: user.id, name: user.name }))}
+          quotes={quotes.map((quote) => ({
+            id: quote.id,
+            folio: quote.folio,
+            status: quote.status,
+            quoteType: quote.quoteType,
+            updatedAt: quote.updatedAt.toISOString(),
+          }))}
+          attentions={attentions.map((row) => ({
+            id: row.id,
+            attentionType: row.attentionType,
+            priorityName: row.priorityName,
+            status: row.status,
+            reportedFault: row.reportedFault,
+            createdAt: row.createdAt.toISOString(),
+            equipment: row.equipment,
+            technicalCases: row.technicalCases,
+          }))}
+          equipments={client.equipments.map((equipment) => ({
+            id: equipment.id,
+            folio: equipment.folio,
+            kind: equipment.kind,
+            model: equipment.model,
+            custody: equipment.custody,
+          }))}
+          canQuote={canQuote}
+          canService={canService}
         />
       </div>
 
