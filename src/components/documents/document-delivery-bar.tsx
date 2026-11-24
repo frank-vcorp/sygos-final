@@ -3,8 +3,8 @@
 import { useMemo, useState } from "react";
 import { FormOverlayDialog } from "@/components/overlay-dialog";
 import { Button, controlClass, inlineLinkClass, TextLink } from "@/components/ui";
-import type { DeliveryIntegrationHint, DocumentDeliveryContact } from "@/lib/document-delivery";
-import { contactOptionsForDelivery } from "@/lib/document-delivery";
+import type { DeliveryIntegrationHint, DocumentDeliveryContact } from "@/lib/document-delivery-shared";
+import { contactOptionsForDelivery } from "@/lib/document-delivery-shared";
 
 type DeliveryAction = (formData: FormData) => void | Promise<void>;
 

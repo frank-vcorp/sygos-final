@@ -1,19 +1,10 @@
 import type { SendGridSmtpConfig } from "./sendgrid";
-import { quoteDeliveryEmailNote } from "./quotes";
+import { quoteDeliveryEmailNote } from "./quote-delivery-note";
 import type { WhatsAppState } from "./whatsapp";
 
-export type DocumentDeliveryContact = {
-  id: string;
-  name: string;
-  email?: string | null;
-  phone?: string | null;
-  isPrimary?: boolean;
-};
+import type { DeliveryIntegrationHint } from "./document-delivery-shared";
 
-export type DeliveryIntegrationHint = {
-  ready: boolean;
-  message: string;
-};
+export type { DocumentDeliveryContact, DeliveryIntegrationHint } from "./document-delivery-shared";
 
 export type MultiSendResult = {
   ok: boolean;
@@ -59,15 +50,7 @@ export function parsePhoneRecipients(formData: FormData, fieldPrefix = "contactP
   return [...set];
 }
 
-export function contactOptionsForDelivery(contacts: DocumentDeliveryContact[]) {
-  return contacts.map((contact) => ({
-    id: contact.id,
-    name: contact.name,
-    email: contact.email?.trim() || null,
-    phone: contact.phone?.trim() || null,
-    isPrimary: Boolean(contact.isPrimary),
-  }));
-}
+export { contactOptionsForDelivery } from "./document-delivery-shared";
 
 export function deliveryIntegrationFromConfig(
   sendGrid: SendGridSmtpConfig,
