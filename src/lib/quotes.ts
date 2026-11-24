@@ -16,7 +16,14 @@ import { ATTENTION_LABEL, isReparacionExpressAttentionType, type AttentionType }
 import { ensureMantenimientoPreventivoPriorities, ensureMotDiagnosisPriorities, ensureReparacionTallerPriorities } from "./priority-catalog";
 import { commercialSellerQuoteConcept, technicalServiceConcept } from "./quote-concept";
 import { commercialQuoteSeriesForType, isCotmpQuote, isCotosQuote, isSellerCommercialQuote } from "./quote-folio-series";
-import { createFieldServiceCaseFromQuote, FIELD_SERVICE_DEFAULT_HOURS, parseFieldServicePricing } from "./field-service";
+import {
+  createFieldServiceCaseFromQuote,
+  FIELD_SERVICE_DEFAULT_HOURS,
+  fieldServiceTotal,
+  parseFieldServicePricing,
+  syncCampoLineTotalFromPricing,
+} from "./field-service";
+import { can } from "./permissions";
 import type { Role } from "./roles";
 import { QUOTE_STATUS_LABEL, QUOTE_TYPE_LABEL, QUOTE_TYPES, type QuoteType } from "./quote-meta";
 import { SALES_NOT_ASSIGNED_MESSAGE } from "./sales-assignment";
@@ -778,6 +785,148 @@ export type QuoteCommercialTermsInput = {
   creditDays: number | null;
 };
 
+/** Estados donde CEO/Administrador pueden corregir precios sin reabrir el flujo de cotización. */
+export const QUOTE_STATUSES_ALLOWING_LINE_PRICE_CORRECTION = [
+  "PENDIENTE_DECISION",
+  "AUTORIZADA",
+  "NO_AUTORIZADA",
+  "AUTORIZADA_PENDIENTE_EQUIPO",
+] as const;
+
+const FISCAL_STATUSES_BLOCKING_QUOTE_LINE_PRICE_EDIT = ["TIMBRADA", "PROCESANDO"] as const;
+
+export function quoteStatusAllowsLinePriceCorrection(status: string): boolean {
+  return (QUOTE_STATUSES_ALLOWING_LINE_PRICE_CORRECTION as readonly string[]).includes(status);
+}
+
+export function quoteLinePriceEditBlockedMessage(
+  documents: Array<{ folio: string; fiscalStatus: string }>,
+): string {
+  if (documents.length === 0) return "";
+  const folios = documents.map((item) => item.folio).join(", ");
+  if (documents.some((item) => item.fiscalStatus === "TIMBRADA")) {
+    return `No se pueden corregir precios: la cotización ya tiene comprobante timbrado (${folios}).`;
+  }
+  return `No se pueden corregir precios: hay comprobante fiscal en proceso de timbrado (${folios}).`;
+}
+
+export async function findBillingDocumentsBlockingQuotePriceEdit(
+  quoteId: string,
+  fieldServiceCaseId: string | null,
+) {
+  const or: Array<{ quoteId: string } | { fieldServiceCaseId: string }> = [{ quoteId }];
+  if (fieldServiceCaseId) or.push({ fieldServiceCaseId });
+  return prisma.billingDocument.findMany({
+    where: {
+      OR: or,
+      fiscalStatus: { in: [...FISCAL_STATUSES_BLOCKING_QUOTE_LINE_PRICE_EDIT] },
+    },
+    select: { folio: true, fiscalStatus: true },
+  });
+}
+
+function applyLinePriceAmount(
+  line: { incrementPct: number | null },
+  amount: number,
+  quoteType: string,
+  campoPricing: { hours: number; unitPrice: number } | null,
+) {
+  let unitAmount = amount;
+  if (campoPricing && quoteType === "CAMPO") {
+    unitAmount = fieldServiceTotal(campoPricing.hours, campoPricing.unitPrice);
+  }
+  const increment = line.incrementPct;
+  return increment != null
+    ? { basePrice: unitAmount, unitPrice: finalFromBase(unitAmount, increment) }
+    : { unitPrice: unitAmount, basePrice: null };
+}
+
+/** CEO/Administrador (quote.price): corrige unitPrice/basePrice sin cambiar el estado de la cotización. */
+export async function updateQuoteLinePrices(
+  actor: Actor,
+  quoteId: string,
+  version: number,
+  prices: Array<{ lineId: string; amount: number }>,
+) {
+  if (!can(actor.role, "quote.price", actor.activeCompanyCode)) {
+    throw new Error("No tienes permiso para corregir precios de cotización.");
+  }
+  const quote = await prisma.quote.findFirst({
+    where: { id: quoteId, companyId: actor.activeCompanyId },
+    include: { lines: true, fieldServiceCase: { select: { id: true } } },
+  });
+  if (!quote) throw new Error("Cotización no encontrada.");
+  if (quote.status === "PENDIENTE_COTIZAR") {
+    throw new Error("Usa asignar precio mientras la cotización está pendiente de cotizar.");
+  }
+  if (!quoteStatusAllowsLinePriceCorrection(quote.status)) {
+    throw new Error("Este estado de cotización no admite corregir precios de partida.");
+  }
+  const blocking = await findBillingDocumentsBlockingQuotePriceEdit(quote.id, quote.fieldServiceCase?.id ?? null);
+  if (blocking.length > 0) throw new Error(quoteLinePriceEditBlockedMessage(blocking));
+  if (prices.length !== quote.lines.length || new Set(prices.map((item) => item.lineId)).size !== prices.length) {
+    throw new Error("Indica el precio de cada partida.");
+  }
+
+  const campoPricing =
+    quote.quoteType === "CAMPO"
+      ? parseFieldServicePricing(
+          quote.quoteType,
+          quote.fieldServiceHours ?? FIELD_SERVICE_DEFAULT_HOURS,
+          prices.map((price) => ({ unitPrice: price.amount })),
+        )
+      : null;
+
+  await prisma.$transaction(async (tx) => {
+    const quoteData: {
+      version: { increment: number };
+      fieldServiceHours?: number;
+      fieldServiceUnitPrice?: number;
+    } = { version: { increment: 1 } };
+    if (campoPricing) {
+      quoteData.fieldServiceHours = campoPricing.hours;
+      quoteData.fieldServiceUnitPrice = campoPricing.unitPrice;
+      const synced = syncCampoLineTotalFromPricing(quote.lines, campoPricing.hours, campoPricing.unitPrice);
+      for (let index = 0; index < quote.lines.length; index++) {
+        const line = quote.lines[index]!;
+        const next = synced[index]!;
+        await tx.quoteLine.update({
+          where: { id: line.id },
+          data: {
+            unitPrice: next.unitPrice,
+            quantity: next.quantity,
+            basePrice: next.basePrice,
+            incrementPct: next.incrementPct,
+          },
+        });
+      }
+    } else {
+      for (const price of prices) {
+        const line = quote.lines.find((item) => item.id === price.lineId);
+        if (!line) throw new Error("Hay un concepto que no pertenece a la cotización.");
+        if (!Number.isFinite(price.amount) || price.amount < 0) throw new Error("El precio no es válido.");
+        await tx.quoteLine.update({
+          where: { id: line.id },
+          data: applyLinePriceAmount(line, price.amount, quote.quoteType, null),
+        });
+      }
+    }
+    const updated = await tx.quote.updateMany({
+      where: { id: quote.id, version },
+      data: quoteData,
+    });
+    if (updated.count === 0) throw new ConcurrencyError();
+  });
+  await recordHistory({
+    companyId: actor.activeCompanyId,
+    entityType: "COTIZACION",
+    entityId: quote.id,
+    action: "PRECIO",
+    summary: "Precio de partidas corregido (sin cambiar estado de la cotización).",
+    authorUserId: actor.userId,
+  });
+}
+
 export async function setPrices(
   actor: Actor,
   quoteId: string,
@@ -831,16 +980,9 @@ export async function setPrices(
       const line = quote.lines.find((item) => item.id === price.lineId);
       if (!line) throw new Error("Hay un concepto que no pertenece a la cotización.");
       if (!Number.isFinite(price.amount) || price.amount < 0) throw new Error("El precio no es válido.");
-      const increment = line.incrementPct;
-      let unitAmount = price.amount;
-      if (campoPricing && quote.quoteType === "CAMPO") {
-        unitAmount = campoPricing.hours * campoPricing.unitPrice;
-      }
       await tx.quoteLine.update({
         where: { id: line.id },
-        data: increment != null
-          ? { basePrice: unitAmount, unitPrice: finalFromBase(unitAmount, increment) }
-          : { unitPrice: unitAmount, basePrice: null },
+        data: applyLinePriceAmount(line, price.amount, quote.quoteType, campoPricing),
       });
     }
     const updated = await tx.quote.updateMany({

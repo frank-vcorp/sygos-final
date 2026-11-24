@@ -5,7 +5,7 @@ import { DocumentDeliveryBar } from "@/components/documents/document-delivery-ba
 import { deliveryIntegrationFromConfig, quoteDeliveryDefaultMessages } from "@/lib/document-delivery";
 import { getSendGridSmtpConfig } from "@/lib/sendgrid";
 import { getWhatsAppFullStatus } from "@/lib/whatsapp";
-import { decideAction, discountAction, linkBaseAction, relateEquipmentAction, setPricesAction, updateGeneratedConceptAction, updateSellerConceptComplementAction } from "../actions";
+import { decideAction, discountAction, linkBaseAction, relateEquipmentAction, setPricesAction, updateGeneratedConceptAction, updateQuoteLinePricesAction, updateSellerConceptComplementAction } from "../actions";
 import { RelateEquipmentForm } from "@/components/relate-equipment-form";
 import { HistoryTimeline } from "@/components/history-timeline";
 import { QuoteBillingRequestActions } from "@/components/quote-billing-request-actions";
@@ -43,7 +43,7 @@ import { PRESOLICITUD_LABEL } from "@/lib/part-presolicitud";
 import { ATTENTION_LABEL, type AttentionType } from "@/lib/priorities";
 import { quotePaymentConditionDisplay, warrantyMonthsLabel } from "@/lib/quote-commercial-terms";
 import { quoteLineConditionLabel } from "@/lib/quote-line-condition";
-import { alignIntercompanyWorkshopQuoteClients, QUOTE_STATUS_LABEL, QUOTE_TYPE_LABEL, commercialAttentionTypeForQuote, intercompanyDeliveryDaysDefault, intercompanyReferenceAmount, quoteDeliveryDaysRequired, quoteListSlaLabel, quoteRequiresDeliveryDays, quoteShowsDeliveryDaysField, quoteShowsSellerDeliveryDays, seesEconomicDetail, type QuoteType } from "@/lib/quotes";
+import { alignIntercompanyWorkshopQuoteClients, QUOTE_STATUS_LABEL, QUOTE_TYPE_LABEL, commercialAttentionTypeForQuote, findBillingDocumentsBlockingQuotePriceEdit, intercompanyDeliveryDaysDefault, intercompanyReferenceAmount, quoteDeliveryDaysRequired, quoteLinePriceEditBlockedMessage, quoteListSlaLabel, quoteRequiresDeliveryDays, quoteShowsDeliveryDaysField, quoteShowsSellerDeliveryDays, quoteStatusAllowsLinePriceCorrection, seesEconomicDetail, type QuoteType } from "@/lib/quotes";
 import { FIELD_SERVICE_DEFAULT_HOURS, FIELD_SERVICE_STATUS_LABEL, fieldServiceTotal, quoteCampoDisplayTotal } from "@/lib/field-service";
 import { ClientNameLink, ContactNameLink } from "@/components/client-entity-links";
 import { redirectIfSalesNotAssigned } from "@/lib/sales-assignment";
@@ -178,6 +178,16 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
     && session.role === "VENTAS"
     && quote.sellerUserId === session.userId
     && can(session.role, "quote.follow", session.activeCompanyCode);
+
+  const showCeoLinePriceCorrection = can(session.role, "quote.price", session.activeCompanyCode)
+    && quote.status !== "PENDIENTE_COTIZAR"
+    && quoteStatusAllowsLinePriceCorrection(quote.status);
+  const blockingBillingForLinePriceEdit = showCeoLinePriceCorrection
+    ? await findBillingDocumentsBlockingQuotePriceEdit(quote.id, quote.fieldServiceCase?.id ?? null)
+    : [];
+  const linePriceEditBlockedMessage = blockingBillingForLinePriceEdit.length > 0
+    ? quoteLinePriceEditBlockedMessage(blockingBillingForLinePriceEdit)
+    : null;
 
   let primaryAction: React.ReactNode = null;
   if (quote.status === "PENDIENTE_COTIZAR" && can(session.role, "quote.price", session.activeCompanyCode)) {
@@ -566,6 +576,47 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
           </table>
           {totals ? (
             <p className="mt-3">Subtotal {money(totals.subtotal)} · descuento {quote.discountPct}% · IVA {money(totals.iva)} · total {money(totals.total)}</p>
+          ) : null}
+          {showCeoLinePriceCorrection ? (
+            <div className="mt-4 rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] p-3">
+              <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--muted)]">Editar precios de partidas</p>
+              <p className="mt-1 text-xs text-[var(--muted)]">
+                CEO o Administrador pueden corregir precios sin cambiar el estado de la cotización.
+              </p>
+              {linePriceEditBlockedMessage ? (
+                <p className="mt-2 rounded-md bg-[var(--warn-soft)] px-3 py-2 text-sm">{linePriceEditBlockedMessage}</p>
+              ) : (
+                <form action={updateQuoteLinePricesAction} className="mt-3 flex flex-wrap items-end gap-2">
+                  <input type="hidden" name="quoteId" value={quote.id} />
+                  <input type="hidden" name="version" value={quote.version} />
+                  {quote.lines.map((line) => {
+                    const defaultAmount = quote.quoteType === "CAMPO"
+                      ? (quote.fieldServiceUnitPrice ?? line.unitPrice ?? "")
+                      : (showBase && line.basePrice != null ? line.basePrice : line.unitPrice ?? "");
+                    const priceLabel = quote.quoteType === "CAMPO"
+                      ? "Tarifa por hora"
+                      : quote.lines.length === 1
+                        ? "Precio"
+                        : line.concept;
+                    return (
+                      <label key={line.id} className="grid gap-1">
+                        <span className="max-w-xs truncate text-xs font-semibold text-[var(--muted)]">{priceLabel}</span>
+                        <input type="hidden" name="lineId" value={line.id} />
+                        <MoneyInput
+                          name="amount"
+                          required
+                          aria-label={`Precio de ${line.concept}`}
+                          defaultValue={defaultAmount ?? ""}
+                          wrapperClassName="w-32"
+                          className="text-right"
+                        />
+                      </label>
+                    );
+                  })}
+                  <SubmitButton tone="ghost">Guardar precios</SubmitButton>
+                </form>
+              )}
+            </div>
           ) : null}
           {quote.sales.map((sale) => <p key={sale.id} className="mt-2">Venta <TextLink href={`/ventas/${sale.id}`}>{sale.folio}</TextLink></p>)}
           {quote.status === "AUTORIZADA" && can(session.role, "invoice.request", session.activeCompanyCode) ? (

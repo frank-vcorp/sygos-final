@@ -8,7 +8,7 @@ import { moneyFromForm } from "@/lib/money";
 import { can, type Action } from "@/lib/permissions";
 import { parsePaymentCondition, parseQuoteCreditDays, parseWarrantyMonths } from "@/lib/quote-commercial-terms";
 import { parseDeliveryBusinessDays, parseFieldServiceMachineFromForm, parseSellerSaleLines } from "@/lib/quote-seller-input";
-import { QUOTE_TYPES, type QuoteType, applyDiscount, createSellerQuote, decideQuote, linkIntercompanyQuote, prepareQuoteFromCase, relateQuoteEquipment, setPrices, updateGeneratedQuoteConcepts, updateSellerQuoteConceptComplement } from "@/lib/quotes";
+import { QUOTE_TYPES, type QuoteType, applyDiscount, createSellerQuote, decideQuote, linkIntercompanyQuote, prepareQuoteFromCase, relateQuoteEquipment, setPrices, updateGeneratedQuoteConcepts, updateQuoteLinePrices, updateSellerQuoteConceptComplement } from "@/lib/quotes";
 import { prisma } from "@/lib/db";
 import { requireCompany } from "@/lib/session";
 
@@ -125,6 +125,30 @@ export async function prepareFromCaseAction(formData: FormData) {
     if (isRedirect(error)) throw error;
     await setFlash({ tone: "error", message: messageOf(error) });
     redirect(`/operacion/${caseId}`);
+  }
+}
+
+export async function updateQuoteLinePricesAction(formData: FormData) {
+  "use server";
+  const target = back(formData);
+  try {
+    const session = await guard("quote.price");
+    const prices = formData.getAll("lineId").map((lineId, index) => ({
+      lineId: String(lineId),
+      amount: moneyFromForm(formData.getAll("amount")[index], "Precio"),
+    }));
+    await updateQuoteLinePrices(
+      session,
+      requiredText(formData.get("quoteId"), "Cotización"),
+      parseVersion(formData.get("version")),
+      prices,
+    );
+    await setFlash({ tone: "ok", message: "Precios de partidas actualizados." });
+    redirect(target);
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    await setFlash({ tone: "error", message: messageOf(error) });
+    redirect(target);
   }
 }
 
