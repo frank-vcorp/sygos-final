@@ -215,6 +215,8 @@ describe("Facturapi Fase 1: flujo BD, líneas, 202/409 e intercompañía resilie
       consolidatedConcept: "Diagnóstico; Bobinado",
     });
     assert.equal(builtLines.length, 2);
+    assert.equal(builtLines[0]!.satProductKey, null);
+    assert.equal(builtLines[0]!.satUnitKey, null);
     assert.equal(builtLines[0]!.taxIncluded, false);
     assert.equal(builtLines[0]!.unitPrice, 1000);
     assert.equal(builtLines[0]!.discountAmount, 150);
@@ -444,7 +446,17 @@ describe("Facturapi Fase 1: flujo BD, líneas, 202/409 e intercompañía resilie
       },
     });
     const plainDoc = await requestFromQuote(sellerActor, plainQuote.id, "FACTURA", null);
-    assert.equal((await prisma.billingLine.findFirst({ where: { documentId: plainDoc.id } }))?.satUnitKey, "H87");
+    const plainLine = await prisma.billingLine.findFirst({ where: { documentId: plainDoc.id } });
+    assert.equal(plainLine?.satProductKey, null);
+    assert.equal(plainLine?.satUnitKey, null);
+
+    const { patchBillingLineSatKeys } = await import("./billing");
+    await patchBillingLineSatKeys(coordActor, {
+      documentId: plainDoc.id,
+      lineId: plainLine!.id,
+      satProductKey: "32151700",
+      satUnitKey: "H87",
+    });
 
     // Emitimos preparando snapshot (usando facturapiMode OFF temporalmente para probar stampBillingDocument con mock fetch)
     await prisma.company.update({ where: { id: systron.id }, data: { facturapiMode: "OFF" } });

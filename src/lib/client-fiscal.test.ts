@@ -111,6 +111,6 @@ describe("clientFiscalReady", () => {
     });
     assert.equal(remWithLines!.lines[0]!.unitPrice, 1000);
     assert.equal(remWithLines!.lines[0]!.amount, 1000);
-    assert.ok(remWithLines!.lines[0]!.satProductKey);
+    assert.equal(remWithLines!.lines[0]!.satProductKey, null);
   });
 });
