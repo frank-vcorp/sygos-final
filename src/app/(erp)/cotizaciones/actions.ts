@@ -8,7 +8,7 @@ import { moneyFromForm } from "@/lib/money";
 import { can, type Action } from "@/lib/permissions";
 import { parsePaymentCondition, parseQuoteCreditDays, parseWarrantyMonths } from "@/lib/quote-commercial-terms";
 import { parseDeliveryBusinessDays, parseFieldServiceMachineFromForm, parseSellerSaleLines } from "@/lib/quote-seller-input";
-import { QUOTE_TYPES, type QuoteType, applyDiscount, createSellerQuote, decideQuote, linkIntercompanyQuote, prepareQuoteFromCase, relateQuoteEquipment, setPrices, updateGeneratedQuoteConcepts, updateQuoteLinePrices, updateSellerQuoteConceptComplement } from "@/lib/quotes";
+import { QUOTE_TYPES, type QuoteType, applyDiscount, createSellerQuote, decideQuote, linkIntercompanyQuote, prepareQuoteFromCase, relateQuoteEquipment, setPrices, updateGeneratedQuoteConcepts, updateQuoteLineDescriptions, updateQuoteLinePrices, updateSellerQuoteConceptComplement } from "@/lib/quotes";
 import { prisma } from "@/lib/db";
 import { requireCompany } from "@/lib/session";
 
@@ -144,6 +144,32 @@ export async function updateQuoteLinePricesAction(formData: FormData) {
       prices,
     );
     await setFlash({ tone: "ok", message: "Precios de partidas actualizados." });
+    redirect(target);
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    await setFlash({ tone: "error", message: messageOf(error) });
+    redirect(target);
+  }
+}
+
+export async function updateQuoteLineDescriptionsAction(formData: FormData) {
+  "use server";
+  const target = back(formData);
+  try {
+    const session = await guard("quote.price");
+    const lineIds = formData.getAll("lineId");
+    const concepts = formData.getAll("concept");
+    const descriptions = lineIds.map((lineId, index) => ({
+      lineId: String(lineId),
+      concept: requiredText(concepts[index], "Descripción"),
+    }));
+    await updateQuoteLineDescriptions(
+      session,
+      requiredText(formData.get("quoteId"), "Cotización"),
+      parseVersion(formData.get("version")),
+      descriptions,
+    );
+    await setFlash({ tone: "ok", message: "Descripciones de partidas actualizadas." });
     redirect(target);
   } catch (error) {
     if (isRedirect(error)) throw error;

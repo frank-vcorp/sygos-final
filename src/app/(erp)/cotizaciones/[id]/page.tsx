@@ -5,7 +5,7 @@ import { DocumentDeliveryBar } from "@/components/documents/document-delivery-ba
 import { deliveryIntegrationFromConfig, quoteDeliveryDefaultMessages } from "@/lib/document-delivery";
 import { getSendGridSmtpConfig } from "@/lib/sendgrid";
 import { getWhatsAppFullStatus } from "@/lib/whatsapp";
-import { decideAction, discountAction, linkBaseAction, relateEquipmentAction, setPricesAction, updateGeneratedConceptAction, updateQuoteLinePricesAction, updateSellerConceptComplementAction } from "../actions";
+import { decideAction, discountAction, linkBaseAction, relateEquipmentAction, setPricesAction, updateGeneratedConceptAction, updateQuoteLineDescriptionsAction, updateQuoteLinePricesAction, updateSellerConceptComplementAction } from "../actions";
 import { RelateEquipmentForm } from "@/components/relate-equipment-form";
 import { HistoryTimeline } from "@/components/history-timeline";
 import { QuoteBillingRequestActions } from "@/components/quote-billing-request-actions";
@@ -43,7 +43,7 @@ import { PRESOLICITUD_LABEL } from "@/lib/part-presolicitud";
 import { ATTENTION_LABEL, type AttentionType } from "@/lib/priorities";
 import { quotePaymentConditionDisplay, warrantyMonthsLabel } from "@/lib/quote-commercial-terms";
 import { quoteLineConditionLabel } from "@/lib/quote-line-condition";
-import { alignIntercompanyWorkshopQuoteClients, QUOTE_STATUS_LABEL, QUOTE_TYPE_LABEL, commercialAttentionTypeForQuote, findBillingDocumentsBlockingQuotePriceEdit, intercompanyDeliveryDaysDefault, intercompanyReferenceAmount, quoteDeliveryDaysRequired, quoteLinePriceEditBlockedMessage, quoteListSlaLabel, quoteRequiresDeliveryDays, quoteShowsDeliveryDaysField, quoteShowsSellerDeliveryDays, quoteStatusAllowsLinePriceCorrection, seesEconomicDetail, type QuoteType } from "@/lib/quotes";
+import { alignIntercompanyWorkshopQuoteClients, QUOTE_STATUS_LABEL, QUOTE_TYPE_LABEL, commercialAttentionTypeForQuote, findBillingDocumentsBlockingQuotePriceEdit, intercompanyDeliveryDaysDefault, intercompanyReferenceAmount, quoteDeliveryDaysRequired, quoteLineDescriptionEditBlockedMessage, quoteLinePriceEditBlockedMessage, quoteListSlaLabel, quoteRequiresDeliveryDays, quoteShowsDeliveryDaysField, quoteShowsSellerDeliveryDays, quoteStatusAllowsLineDescriptionCorrection, quoteStatusAllowsLinePriceCorrection, seesEconomicDetail, type QuoteType } from "@/lib/quotes";
 import { FIELD_SERVICE_DEFAULT_HOURS, FIELD_SERVICE_STATUS_LABEL, fieldServiceTotal, quoteCampoDisplayTotal } from "@/lib/field-service";
 import { ClientNameLink, ContactNameLink } from "@/components/client-entity-links";
 import { redirectIfSalesNotAssigned } from "@/lib/sales-assignment";
@@ -182,11 +182,20 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
   const showCeoLinePriceCorrection = can(session.role, "quote.price", session.activeCompanyCode)
     && quote.status !== "PENDIENTE_COTIZAR"
     && quoteStatusAllowsLinePriceCorrection(quote.status);
+  const showCeoLineDescriptionCorrection = can(session.role, "quote.price", session.activeCompanyCode)
+    && quote.status !== "PENDIENTE_COTIZAR"
+    && quoteStatusAllowsLineDescriptionCorrection(quote.status);
   const blockingBillingForLinePriceEdit = showCeoLinePriceCorrection
+    ? await findBillingDocumentsBlockingQuotePriceEdit(quote.id, quote.fieldServiceCase?.id ?? null)
+    : [];
+  const blockingBillingForLineDescriptionEdit = showCeoLineDescriptionCorrection
     ? await findBillingDocumentsBlockingQuotePriceEdit(quote.id, quote.fieldServiceCase?.id ?? null)
     : [];
   const linePriceEditBlockedMessage = blockingBillingForLinePriceEdit.length > 0
     ? quoteLinePriceEditBlockedMessage(blockingBillingForLinePriceEdit)
+    : null;
+  const lineDescriptionEditBlockedMessage = blockingBillingForLineDescriptionEdit.length > 0
+    ? quoteLineDescriptionEditBlockedMessage(blockingBillingForLineDescriptionEdit)
     : null;
 
   let primaryAction: React.ReactNode = null;
@@ -614,6 +623,40 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
                     );
                   })}
                   <SubmitButton tone="ghost">Guardar precios</SubmitButton>
+                </form>
+              )}
+            </div>
+          ) : null}
+          {showCeoLineDescriptionCorrection ? (
+            <div className="mt-4 rounded-lg border border-[var(--line)] bg-[var(--surface-muted)] p-3">
+              <p className="text-xs font-bold uppercase tracking-[0.12em] text-[var(--muted)]">Editar descripciones de partidas</p>
+              <p className="mt-1 text-xs text-[var(--muted)]">
+                CEO o Administrador pueden corregir la descripción de cada partida sin cambiar el estado de la cotización.
+              </p>
+              {lineDescriptionEditBlockedMessage ? (
+                <p className="mt-2 rounded-md bg-[var(--warn-soft)] px-3 py-2 text-sm">{lineDescriptionEditBlockedMessage}</p>
+              ) : (
+                <form action={updateQuoteLineDescriptionsAction} className="mt-3 flex flex-col gap-3">
+                  <input type="hidden" name="quoteId" value={quote.id} />
+                  <input type="hidden" name="version" value={quote.version} />
+                  {quote.lines.map((line, lineIndex) => (
+                    <label key={line.id} className="grid gap-1">
+                      <span className="text-xs font-semibold text-[var(--muted)]">
+                        {quote.lines.length > 1 ? `Partida ${lineIndex + 1}` : "Descripción"}
+                      </span>
+                      <input type="hidden" name="lineId" value={line.id} />
+                      <input
+                        type="text"
+                        name="concept"
+                        required
+                        maxLength={500}
+                        aria-label={`Descripción de partida: ${line.concept}`}
+                        defaultValue={line.concept}
+                        className="rounded-lg border border-[#cbd8e6] bg-white px-3 py-2 text-sm outline-none focus:border-[#087d99] focus-visible:ring-2 focus-visible:ring-[#c7e9f2]"
+                      />
+                    </label>
+                  ))}
+                  <SubmitButton tone="ghost" className="self-start">Guardar descripciones</SubmitButton>
                 </form>
               )}
             </div>

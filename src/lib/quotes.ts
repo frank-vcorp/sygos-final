@@ -789,6 +789,24 @@ export function quoteLinePriceEditBlockedMessage(
   return `No se pueden corregir precios: hay comprobante fiscal en proceso de timbrado (${folios}).`;
 }
 
+/** Mismos estados que corrección de precios de partida. */
+export const QUOTE_STATUSES_ALLOWING_LINE_DESCRIPTION_CORRECTION = QUOTE_STATUSES_ALLOWING_LINE_PRICE_CORRECTION;
+
+export function quoteStatusAllowsLineDescriptionCorrection(status: string): boolean {
+  return quoteStatusAllowsLinePriceCorrection(status);
+}
+
+export function quoteLineDescriptionEditBlockedMessage(
+  documents: Array<{ folio: string; fiscalStatus: string }>,
+): string {
+  if (documents.length === 0) return "";
+  const folios = documents.map((item) => item.folio).join(", ");
+  if (documents.some((item) => item.fiscalStatus === "TIMBRADA")) {
+    return `No se pueden corregir descripciones: la cotización ya tiene comprobante timbrado (${folios}).`;
+  }
+  return `No se pueden corregir descripciones: hay comprobante fiscal en proceso de timbrado (${folios}).`;
+}
+
 export async function findBillingDocumentsBlockingQuotePriceEdit(
   quoteId: string,
   fieldServiceCaseId: string | null,
@@ -902,6 +920,66 @@ export async function updateQuoteLinePrices(
     entityId: quote.id,
     action: "PRECIO",
     summary: "Precio de partidas corregido (sin cambiar estado de la cotización).",
+    authorUserId: actor.userId,
+  });
+}
+
+/** CEO/Administrador (quote.price): corrige la descripción (concept) de partidas sin cambiar el estado ni totales. */
+export async function updateQuoteLineDescriptions(
+  actor: Actor,
+  quoteId: string,
+  version: number,
+  descriptions: Array<{ lineId: string; concept: string }>,
+) {
+  if (!can(actor.role, "quote.price", actor.activeCompanyCode)) {
+    throw new Error("No tienes permiso para corregir descripciones de cotización.");
+  }
+  const quote = await prisma.quote.findFirst({
+    where: { id: quoteId, companyId: actor.activeCompanyId },
+    include: { lines: true, fieldServiceCase: { select: { id: true } } },
+  });
+  if (!quote) throw new Error("Cotización no encontrada.");
+  if (quote.status === "PENDIENTE_COTIZAR") {
+    throw new Error("Usa ajustar concepto mientras la cotización está pendiente de cotizar.");
+  }
+  if (!quoteStatusAllowsLineDescriptionCorrection(quote.status)) {
+    throw new Error("Este estado de cotización no admite corregir descripciones de partida.");
+  }
+  const blocking = await findBillingDocumentsBlockingQuotePriceEdit(quote.id, quote.fieldServiceCase?.id ?? null);
+  if (blocking.length > 0) throw new Error(quoteLineDescriptionEditBlockedMessage(blocking));
+  if (
+    descriptions.length !== quote.lines.length
+    || new Set(descriptions.map((item) => item.lineId)).size !== descriptions.length
+  ) {
+    throw new Error("Indica la descripción de cada partida.");
+  }
+
+  const changes = descriptions.map((item) => {
+    const line = quote.lines.find((candidate) => candidate.id === item.lineId);
+    const concept = item.concept.trim();
+    if (!line) throw new Error("Hay un concepto que no pertenece a la cotización.");
+    if (!concept) throw new Error("Cada partida debe tener una descripción.");
+    return { line, concept };
+  });
+  const changed = changes.filter(({ line, concept }) => line.concept !== concept);
+  if (changed.length === 0) return;
+
+  await prisma.$transaction(async (tx) => {
+    for (const { line, concept } of changed) {
+      await tx.quoteLine.update({ where: { id: line.id }, data: { concept } });
+    }
+    const updated = await tx.quote.updateMany({
+      where: { id: quote.id, version },
+      data: { version: { increment: 1 } },
+    });
+    if (updated.count === 0) throw new ConcurrencyError();
+  });
+  await recordHistory({
+    companyId: actor.activeCompanyId,
+    entityType: "COTIZACION",
+    entityId: quote.id,
+    action: "CONCEPTO",
+    summary: `Descripción de partidas corregida (sin cambiar estado de la cotización): ${changed.map(({ line, concept }) => `${line.concept} → ${concept}`).join(" | ")}.`,
     authorUserId: actor.userId,
   });
 }
