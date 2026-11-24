@@ -1,6 +1,11 @@
 import { notFound, redirect } from "next/navigation";
 import { requestDocumentAction, requestIntercompanyAction } from "@/app/(erp)/facturacion/actions";
-import { decideAction, discountAction, linkBaseAction, relateEquipmentAction, sendQuoteMailAction, setPricesAction, updateGeneratedConceptAction, updateSellerConceptComplementAction } from "../actions";
+import { sendQuoteDeliveryEmailAction, sendQuoteDeliveryWhatsAppAction } from "@/app/(erp)/documentos/delivery-actions";
+import { DocumentDeliveryBar } from "@/components/documents/document-delivery-bar";
+import { deliveryIntegrationFromConfig, quoteDeliveryDefaultMessages } from "@/lib/document-delivery";
+import { getSendGridSmtpConfig } from "@/lib/sendgrid";
+import { getWhatsAppFullStatus } from "@/lib/whatsapp";
+import { decideAction, discountAction, linkBaseAction, relateEquipmentAction, setPricesAction, updateGeneratedConceptAction, updateSellerConceptComplementAction } from "../actions";
 import { RelateEquipmentForm } from "@/components/relate-equipment-form";
 import { HistoryTimeline } from "@/components/history-timeline";
 import { QuoteBillingRequestActions } from "@/components/quote-billing-request-actions";
@@ -23,7 +28,6 @@ import {
   FormActions,
   FormPanel,
   FormSection,
-  inlineLinkClass,
   MoneyInput,
   TextLink,
 } from "@/components/ui";
@@ -272,6 +276,20 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
     : null;
   const executiveAuthorNames = new Map(executiveAuthors.map((item) => [item.id, item.name]));
   const executiveCaseById = new Map(executiveTimingAttention?.technicalCases.map((item) => [item.id, item]) ?? []);
+  const [sendGridConfig, whatsAppStatus] = await Promise.all([
+    getSendGridSmtpConfig(session.activeCompanyId, quote.company.name),
+    getWhatsAppFullStatus(session.activeCompanyId),
+  ]);
+  const deliveryIntegration = deliveryIntegrationFromConfig(sendGridConfig, whatsAppStatus);
+  const deliveryDefaults = quoteDeliveryDefaultMessages(quote);
+  const deliveryContacts = quote.client.contacts.map((contact) => ({
+    id: contact.id,
+    name: contact.name,
+    email: contact.email,
+    phone: contact.phone,
+    isPrimary: contact.isPrimary,
+  }));
+
   const executiveCasesWithOpenHistory = new Set(executiveOperationHistory.filter((item) => item.action === "ALTA").map((item) => item.entityId));
   const executiveAttentionHasOpenHistory = executiveAttentionHistory.some((item) => item.action === "ALTA");
   const executivePartItems = executiveTimingAttention?.technicalCases.flatMap((technicalCase) => [
@@ -404,13 +422,19 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
         }
         primaryAction={primaryAction}
         secondaryActions={
-          <>
-            <TextLink href={`/documentos/cotizacion/${quote.id}`}>Imprimir</TextLink>
-            <form action={sendQuoteMailAction} className="inline">
-              <input type="hidden" name="quoteId" value={quote.id} />
-              <button type="submit" className={inlineLinkClass}>Enviar por correo</button>
-            </form>
-          </>
+          <DocumentDeliveryBar
+            printHref={`/documentos/cotizacion/${quote.id}`}
+            returnTo={`/cotizaciones/${quote.id}`}
+            quoteId={quote.id}
+            contacts={deliveryContacts}
+            defaultSubject={deliveryDefaults.subject}
+            defaultEmailBody={deliveryDefaults.emailBody}
+            defaultWhatsAppBody={deliveryDefaults.waBody}
+            emailIntegration={deliveryIntegration.email}
+            whatsappIntegration={deliveryIntegration.whatsapp}
+            sendEmailAction={sendQuoteDeliveryEmailAction}
+            sendWhatsAppAction={sendQuoteDeliveryWhatsAppAction}
+          />
         }
       />
       {executiveMetrics ? (

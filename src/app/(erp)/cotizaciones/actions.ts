@@ -8,8 +8,7 @@ import { moneyFromForm } from "@/lib/money";
 import { can, type Action } from "@/lib/permissions";
 import { parsePaymentCondition, parseQuoteCreditDays, parseWarrantyMonths } from "@/lib/quote-commercial-terms";
 import { parseDeliveryBusinessDays, parseFieldServiceMachineFromForm, parseSellerSaleLines } from "@/lib/quote-seller-input";
-import { QUOTE_TYPES, type QuoteType, applyDiscount, createSellerQuote, decideQuote, linkIntercompanyQuote, prepareQuoteFromCase, quoteDeliveryEmailNote, relateQuoteEquipment, setPrices, updateGeneratedQuoteConcepts, updateSellerQuoteConceptComplement } from "@/lib/quotes";
-import { sendMail } from "@/lib/sendgrid";
+import { QUOTE_TYPES, type QuoteType, applyDiscount, createSellerQuote, decideQuote, linkIntercompanyQuote, prepareQuoteFromCase, relateQuoteEquipment, setPrices, updateGeneratedQuoteConcepts, updateSellerQuoteConceptComplement } from "@/lib/quotes";
 import { prisma } from "@/lib/db";
 import { requireCompany } from "@/lib/session";
 
@@ -261,31 +260,6 @@ export async function linkBaseAction(formData: FormData) {
     await setFlash({ tone: "error", message: messageOf(error) });
     redirect(target);
   }
-}
-
-export async function sendQuoteMailAction(formData: FormData) {
-  "use server";
-  const target = back(formData);
-  try {
-    const session = await guard("quote.follow");
-    const quote = await prisma.quote.findFirst({ where: { id: requiredText(formData.get("quoteId"), "Cotización"), companyId: session.activeCompanyId }, include: { client: { include: { contacts: { where: { active: true } } } }, company: true } });
-    if (!quote) throw new Error("Esa cotización no es de esta empresa.");
-    const email = quote.client.contacts.find((contact) => contact.email)?.email;
-    if (!email) throw new Error("El cliente no tiene un contacto con correo. SendGrid no envió nada.");
-    const deliveryNote = quoteDeliveryEmailNote(quote);
-    const result = await sendMail({
-      companyId: session.activeCompanyId,
-      to: email,
-      subject: `${quote.folio} · ${quote.company.name}`,
-      text: `Cotización ${quote.folio} de ${quote.company.name}.${deliveryNote}`,
-    });
-    if (!result.ok) throw new Error(result.message);
-    await setFlash({ tone: "ok", message: result.message });
-  } catch (error) {
-    if (isRedirect(error)) throw error;
-    await setFlash({ tone: "error", message: messageOf(error) });
-  }
-  redirect(target);
 }
 
 function messageOf(error: unknown) {

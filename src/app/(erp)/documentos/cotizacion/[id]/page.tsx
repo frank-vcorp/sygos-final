@@ -1,5 +1,10 @@
 import { notFound } from "next/navigation";
+import { sendQuoteDeliveryEmailAction, sendQuoteDeliveryWhatsAppAction } from "@/app/(erp)/documentos/delivery-actions";
+import { DocumentDeliveryBar } from "@/components/documents/document-delivery-bar";
 import { DocumentFooter } from "@/components/documents/document-footer";
+import { deliveryIntegrationFromConfig, quoteDeliveryDefaultMessages } from "@/lib/document-delivery";
+import { getSendGridSmtpConfig } from "@/lib/sendgrid";
+import { getWhatsAppFullStatus } from "@/lib/whatsapp";
 import { DocumentHeader } from "@/components/documents/document-header";
 import { DocumentLegalNotes } from "@/components/documents/document-legal-notes";
 import { DocumentLinesTableCommercial } from "@/components/documents/document-lines-table";
@@ -33,9 +38,43 @@ export default async function CotizacionDocumentoPage({ params }: { params: Prom
   const issued = quote.createdAt.toLocaleDateString("es-MX", { timeZone: "America/Mexico_City", dateStyle: "long" });
   const contact = primaryContact(quote.client.contacts);
   const clientParty = buildCommercialClientParty(quote.client, contact);
+  const [sendGridConfig, whatsAppStatus] = await Promise.all([
+    getSendGridSmtpConfig(session.activeCompanyId, quote.company.name),
+    getWhatsAppFullStatus(session.activeCompanyId),
+  ]);
+  const deliveryIntegration = deliveryIntegrationFromConfig(sendGridConfig, whatsAppStatus);
+  const deliveryDefaults = quoteDeliveryDefaultMessages(quote);
+  const deliveryContacts = quote.client.contacts.map((c) => ({
+    id: c.id,
+    name: c.name,
+    email: c.email,
+    phone: c.phone,
+    isPrimary: c.isPrimary,
+  }));
+  const returnTo = `/documentos/cotizacion/${quote.id}`;
 
   return (
-    <DocumentPrintShell companyCode={quote.company.code} backHref={`/cotizaciones/${quote.id}`} backLabel="Volver a la cotización">
+    <DocumentPrintShell
+      companyCode={quote.company.code}
+      backHref={`/cotizaciones/${quote.id}`}
+      backLabel="Volver a la cotización"
+      deliveryBar={(
+        <DocumentDeliveryBar
+          showPrintLink={false}
+          returnTo={returnTo}
+          quoteId={quote.id}
+          contacts={deliveryContacts}
+          defaultSubject={deliveryDefaults.subject}
+          defaultEmailBody={deliveryDefaults.emailBody}
+          defaultWhatsAppBody={deliveryDefaults.waBody}
+          emailIntegration={deliveryIntegration.email}
+          whatsappIntegration={deliveryIntegration.whatsapp}
+          sendEmailAction={sendQuoteDeliveryEmailAction}
+          sendWhatsAppAction={sendQuoteDeliveryWhatsAppAction}
+          layout="toolbar"
+        />
+      )}
+    >
       <DocumentHeader
         company={quote.company}
         docTitle="Cotización"

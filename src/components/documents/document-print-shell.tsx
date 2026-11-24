@@ -8,12 +8,15 @@ export function DocumentPrintShell({
   backHref,
   backLabel = "Volver",
   embedded,
+  deliveryBar,
   children,
 }: {
   companyCode: string;
   backHref?: string;
   backLabel?: string;
   embedded?: boolean;
+  /** Barra Imprimir | Correo | WhatsApp (cliente) junto al botón de impresión del navegador. */
+  deliveryBar?: ReactNode;
   children: ReactNode;
 }) {
   return (
@@ -21,7 +24,10 @@ export function DocumentPrintShell({
       {embedded ? null : (
         <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
           {backHref ? <TextLink href={backHref}>{backLabel}</TextLink> : <span />}
-          <PrintButton />
+          <div className="flex flex-wrap items-center gap-3">
+            {deliveryBar}
+            <PrintButton />
+          </div>
         </div>
       )}
       <article
