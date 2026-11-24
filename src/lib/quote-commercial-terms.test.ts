@@ -43,7 +43,8 @@ describe("quote commercial terms", () => {
 
   it("defaults sensatos para el formulario", () => {
     assert.equal(DEFAULT_QUOTE_WARRANTY_MONTHS, 12);
-    assert.equal(DEFAULT_QUOTE_PAYMENT_CONDITION, "CONTADO");
+    assert.equal(DEFAULT_QUOTE_PAYMENT_CONDITION, "CREDITO");
+    assert.equal(quoteCreditDaysFieldValue(DEFAULT_QUOTE_PAYMENT_CONDITION, null), "30");
   });
 
   it("etiquetas para detalle y documento", () => {

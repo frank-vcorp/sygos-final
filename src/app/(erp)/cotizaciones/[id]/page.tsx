@@ -234,7 +234,7 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
           variant="inline"
           defaultWarrantyMonths={quote.warrantyMonths}
           defaultPaymentCondition={quote.paymentCondition}
-          defaultCreditDays={quote.creditDays ?? quote.client.creditDays}
+          defaultCreditDays={quote.creditDays}
         />
         <SubmitButton>Asignar precio</SubmitButton>
       </form>

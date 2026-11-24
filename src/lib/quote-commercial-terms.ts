@@ -6,7 +6,7 @@ export const DEFAULT_QUOTE_WARRANTY_MONTHS: QuoteWarrantyMonths = 12;
 export const QUOTE_PAYMENT_CONDITIONS = ["ANTICIPADO", "CONTADO", "CREDITO"] as const;
 export type QuotePaymentCondition = (typeof QUOTE_PAYMENT_CONDITIONS)[number];
 
-export const DEFAULT_QUOTE_PAYMENT_CONDITION: QuotePaymentCondition = "CONTADO";
+export const DEFAULT_QUOTE_PAYMENT_CONDITION: QuotePaymentCondition = "CREDITO";
 
 /** Plazo sugerido al elegir condición de pago Crédito (30 días). */
 export const DEFAULT_QUOTE_CREDIT_DAYS = 30;
