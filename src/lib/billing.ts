@@ -1255,8 +1255,9 @@ export async function requestDocumentCancellation(
     include: { client: true },
   });
   if (!doc) throw new Error("No se encontró el documento en esta empresa.");
-  if (actor.role === "VENTAS" && doc.client.ownerUserId !== actor.userId) {
-    throw new Error(SALES_NOT_ASSIGNED_MESSAGE);
+  if (actor.role === "VENTAS") {
+    if (doc.client.ownerUserId !== actor.userId) throw new Error(SALES_NOT_ASSIGNED_MESSAGE);
+    throw new Error("Los vendedores no pueden solicitar cancelación fiscal.");
   }
   if (doc.status === "CANCELADA") throw new Error("Este documento ya está cancelado.");
   if (doc.cancellationStatus === "pending" || doc.cancellationStatus === "verifying") {
@@ -1556,8 +1557,8 @@ export async function patchBillingLineSatKeys(
     },
   });
   if (!document) throw new Error("Documento no encontrado en esta empresa.");
-  if (actor.role === "VENTAS" && document.client.ownerUserId !== actor.userId) {
-    throw new Error(SALES_NOT_ASSIGNED_MESSAGE);
+  if (actor.role === "VENTAS") {
+    throw new Error("Los vendedores no pueden editar claves SAT en facturación.");
   }
   if (!billingLineSatKeysEditable(document)) {
     throw new Error("Las claves SAT de esta línea ya no se pueden editar.");

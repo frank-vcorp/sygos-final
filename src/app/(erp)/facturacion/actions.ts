@@ -24,6 +24,7 @@ import { prisma } from "@/lib/db";
 import { pollBillingDocumentCancellation } from "@/lib/facturapi";
 import { parseCfdiUse } from "@/lib/sat-cfdi-use";
 import { parsePaymentForm, parsePaymentMethod } from "@/lib/sat-payment-method";
+import { billingSalesCannotMutateMessage, billingSalesDetailReadOnly } from "@/lib/billing-sales";
 import { requireCompany } from "@/lib/session";
 
 function fiscalFromForm(formData: FormData) {
@@ -58,7 +59,7 @@ export async function requestDocumentAction(formData: FormData) {
     const kind = formData.get("kind") === "REMISION" ? "REMISION" : "FACTURA";
     const document = await requestFromQuote(session, requiredText(quoteId, "Cotización"), kind, null);
     await setFlash({ tone: "ok", message: `${document.folio} quedó solicitado.` });
-    redirect(`/facturacion/${document.id}`);
+    redirect(quoteId ? `/cotizaciones/${quoteId}` : "/facturacion?vista=solicitudes");
   } catch (error) {
     if (isRedirect(error)) throw error;
     await setFlash({ tone: "error", message: messageOf(error) });
@@ -73,7 +74,7 @@ export async function requestIntercompanyAction(formData: FormData) {
     const session = await guard("invoice.request");
     const document = await requestIntercompany(session, requiredText(quoteId, "Cotización"));
     await setFlash({ tone: "ok", message: `${document.folio} solicita la factura a SYSTRON.` });
-    redirect(`/facturacion/${document.id}`);
+    redirect(quoteId ? `/cotizaciones/${quoteId}` : "/facturacion?vista=solicitudes");
   } catch (error) {
     if (isRedirect(error)) throw error;
     await setFlash({ tone: "error", message: messageOf(error) });
@@ -197,6 +198,9 @@ export async function requestCancelDocumentAction(formData: FormData) {
   const id = requiredText(formData.get("documentId"), "Documento");
   try {
     const session = await requireCompany();
+    if (billingSalesDetailReadOnly(session.role)) {
+      throw new Error(billingSalesCannotMutateMessage());
+    }
     if (
       !can(session.role, "invoice.request", session.activeCompanyCode)
       && !can(session.role, "invoice.issue", session.activeCompanyCode)
@@ -286,6 +290,9 @@ export async function updateBillingLineSatAction(formData: FormData) {
     const mayRequest = can(session.role, "invoice.request", session.activeCompanyCode);
     if (!mayIssue && !mayRequest) {
       throw new Error("No tienes permiso para editar claves SAT.");
+    }
+    if (billingSalesDetailReadOnly(session.role)) {
+      throw new Error(billingSalesCannotMutateMessage());
     }
     await patchBillingLineSatKeys(session, {
       documentId: id,

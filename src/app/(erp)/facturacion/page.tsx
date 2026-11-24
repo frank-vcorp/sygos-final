@@ -12,6 +12,7 @@ import {
   pickBillingDocumentTechnicalCaseId,
 } from "@/lib/billing-document-service-links";
 import { fiscalBadgeInfo } from "@/lib/billing-badges";
+import { billingSalesListDetailHref } from "@/lib/billing-sales";
 import { requireCompany } from "@/lib/session";
 
 type Vista = "solicitudes" | "facturas" | "canceladas" | "remisiones" | "todas";
@@ -70,6 +71,7 @@ export default async function FacturacionPage({ searchParams }: { searchParams: 
       createdAt: row.createdAt.toISOString(),
       fiscalTone: fiscal?.tone ?? null,
       fiscalLabel: fiscal?.label ?? null,
+      detailHref: billingSalesListDetailHref(session.role, row),
     };
   });
   const tabs: Array<{ href: string; label: string; active: boolean; key: Vista }> = [

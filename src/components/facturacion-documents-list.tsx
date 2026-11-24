@@ -30,6 +30,7 @@ export type FacturacionListRow = {
   createdAt: string | Date;
   fiscalTone: "neutral" | "ok" | "warn" | "danger" | null;
   fiscalLabel: string | null;
+  detailHref: string | null;
 };
 
 export function FacturacionDocumentsList({
@@ -49,7 +50,12 @@ export function FacturacionDocumentsList({
           id: "folio",
           header: "Folio",
           value: (row) => row.folio,
-          cell: (row) => <RecordLink href={`/facturacion/${row.id}`}>{row.folio}</RecordLink>,
+          cell: (row) =>
+            row.detailHref ? (
+              <RecordLink href={row.detailHref}>{row.folio}</RecordLink>
+            ) : (
+              <span className="font-semibold text-slate-900">{row.folio}</span>
+            ),
         },
         {
           id: "dx",
@@ -83,7 +89,7 @@ export function FacturacionDocumentsList({
           value: (row) => row.status,
           cell: (row) => {
             const statusLabel = row.status === "SOLICITADA" ? "Solicitada" : row.status === "EMITIDA" ? "Emitida" : row.status;
-            return <Badge>{statusLabel}</Badge>;
+            return <Badge tone={row.status === "SOLICITADA" ? "warn" : "neutral"}>{statusLabel}</Badge>;
           },
         },
         {
@@ -114,9 +120,9 @@ export function FacturacionDocumentsList({
         const statusLabel = row.status === "SOLICITADA" ? "Solicitada" : row.status === "EMITIDA" ? "Emitida" : row.status;
         return (
           <MobileCard
-            href={`/facturacion/${row.id}`}
+            href={row.detailHref ?? undefined}
             title={row.folio}
-            meta={<Badge>{statusLabel}</Badge>}
+            meta={<Badge tone={row.status === "SOLICITADA" ? "warn" : "neutral"}>{statusLabel}</Badge>}
             footer={
               <ClientNameLink clientId={row.clientId} name={row.clientName} isSystem={row.clientIsSystem} canEdit={canEditClient} />
             }

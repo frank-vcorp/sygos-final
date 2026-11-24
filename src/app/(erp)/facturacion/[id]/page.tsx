@@ -34,6 +34,12 @@ import { formatWhen } from "@/lib/form";
 import { historyFor } from "@/lib/history";
 import { money } from "@/lib/money";
 import { billingLineSatKeysEditable } from "@/lib/billing-line-sat";
+import {
+  billingSalesCanViewBillingDetail,
+  billingSalesDetailReadOnly,
+  billingSalesRequestedDocumentMessage,
+} from "@/lib/billing-sales";
+import { setFlash } from "@/lib/flash";
 import { can } from "@/lib/permissions";
 import { redirectIfSalesNotAssigned } from "@/lib/sales-assignment";
 import { requireCompany } from "@/lib/session";
@@ -104,12 +110,18 @@ export default async function DocumentoPage({ params }: { params: Promise<{ id: 
   });
   if (!row) notFound();
   await redirectIfSalesNotAssigned(session, row.client.ownerUserId, "/facturacion");
+  if (!billingSalesCanViewBillingDetail(session.role, row)) {
+    await setFlash({ tone: "ok", message: billingSalesRequestedDocumentMessage() });
+    redirect("/facturacion");
+  }
+  const salesReadOnly = billingSalesDetailReadOnly(session.role);
   const serviceLinks = await loadBillingDocumentServiceLinksForDocument(row, session.activeCompanyId);
   const canEditClient = can(session.role, "client.edit", session.activeCompanyCode);
   const canIssue = can(session.role, "invoice.issue", session.activeCompanyCode);
   const canAuthorizeCancel = session.role === "CEO" || session.role === "ADMINISTRADOR";
   const canRequestCancel =
-    can(session.role, "invoice.request", session.activeCompanyCode) || canIssue;
+    !salesReadOnly
+    && (can(session.role, "invoice.request", session.activeCompanyCode) || canIssue);
   const history = await historyFor("DOCUMENTO", row.id);
   const statusLabel = row.status === "SOLICITADA" ? "Solicitada" : row.status === "EMITIDA" ? "Emitida" : row.status === "CANCELADA" ? "Cancelada" : row.status;
   const fiscalBadge = fiscalBadgeInfo(row);
@@ -152,7 +164,8 @@ export default async function DocumentoPage({ params }: { params: Promise<{ id: 
     && showFiscalFields
     && (row.fiscalStatus === "ERROR" || row.fiscalStatus === "PENDIENTE" || row.fiscalStatus === "PROCESANDO");
   const canEditSatLines =
-    showFiscalFields
+    !salesReadOnly
+    && showFiscalFields
     && billingLineSatKeysEditable(row)
     && (canIssue || can(session.role, "invoice.request", session.activeCompanyCode));
 
