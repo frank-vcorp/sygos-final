@@ -20,6 +20,7 @@ describe("clientFiscalReady", () => {
     cfdiUse: "G03",
     paymentMethod: "PUE",
     fiscalZip: "64000",
+    fiscalEmail: "facturas@cliente.mx",
   };
 
   it("marca listo cuando están RFC, régimen, CP, uso CFDI y método de pago", () => {
@@ -38,6 +39,7 @@ describe("clientFiscalReady", () => {
     });
     assert.ok(missing.includes("RFC"));
     assert.ok(missing.includes("régimen fiscal"));
+    assert.ok(missing.includes("correo fiscal"));
   });
 
   it("assertClientFiscalReadyForInvoice lanza mensaje para el vendedor", () => {

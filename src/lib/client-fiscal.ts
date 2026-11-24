@@ -8,6 +8,7 @@ export type ClientFiscalInput = {
   cfdiUse?: string | null;
   paymentMethod?: string | null;
   fiscalZip?: string | null;
+  fiscalEmail?: string | null;
 };
 
 /** Campos mínimos para solicitar factura (alineado con timbrado Facturapi Fase 1). */
@@ -20,6 +21,7 @@ export function clientFiscalMissingLabels(client: ClientFiscalInput): string[] {
   if (!client.fiscalZip?.trim()) missing.push("código postal fiscal");
   if (!client.cfdiUse?.trim()) missing.push("uso de CFDI");
   if (!client.paymentMethod?.trim()) missing.push("método de pago");
+  if (!client.fiscalEmail?.trim()) missing.push("correo fiscal");
   return missing;
 }
 

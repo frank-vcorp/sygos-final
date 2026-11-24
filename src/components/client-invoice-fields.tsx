@@ -51,7 +51,7 @@ export function ClientInvoiceFields({
       </Field>
       {show ? (
         <>
-          <Field label="RFC"><input name="rfc" defaultValue={rfc} className={controlClass} /></Field>
+          <Field label="RFC"><input name="rfc" defaultValue={rfc} className={controlClass} required /></Field>
           <div className="md:col-span-2">
             <Field
               label="Razón social SAT (sin régimen societario)"
@@ -76,12 +76,12 @@ export function ClientInvoiceFields({
               </div>
             </Field>
           </div>
-          <Field label="Régimen fiscal" hint="Catálogo c_RegimenFiscal del SAT."><RegimenSelect name="taxRegime" defaultValue={taxRegime} /></Field>
-          <Field label="Uso de CFDI" hint="Catálogo c_UsoCFDI del SAT."><CfdiUseSelect name="cfdiUse" defaultValue={cfdiUse} /></Field>
-          <Field label="Método de pago" hint="PUE o PPD (c_MetodoPago)."><PaymentMethodSelect name="paymentMethod" defaultValue={paymentMethod} /></Field>
-          <Field label="Código postal fiscal"><input name="fiscalZip" defaultValue={fiscalZip} className={controlClass} /></Field>
-          <Field label="Correo fiscal para XML/PDF (opcional)" hint="Si queda vacío se usa el correo del contacto principal.">
-            <input name="fiscalEmail" type="email" defaultValue={fiscalEmail} placeholder="facturacion@cliente.com" className={controlClass} />
+          <Field label="Régimen fiscal" hint="Catálogo c_RegimenFiscal del SAT."><RegimenSelect name="taxRegime" defaultValue={taxRegime} required /></Field>
+          <Field label="Uso de CFDI" hint="Catálogo c_UsoCFDI del SAT."><CfdiUseSelect name="cfdiUse" defaultValue={cfdiUse} required /></Field>
+          <Field label="Método de pago" hint="PUE o PPD (c_MetodoPago)."><PaymentMethodSelect name="paymentMethod" defaultValue={paymentMethod} required /></Field>
+          <Field label="Código postal fiscal"><input name="fiscalZip" defaultValue={fiscalZip} className={controlClass} required /></Field>
+          <Field label="Correo fiscal para XML/PDF" hint="Correo donde se entregarán el XML y el PDF del CFDI.">
+            <input name="fiscalEmail" type="email" defaultValue={fiscalEmail} placeholder="facturacion@cliente.com" className={controlClass} required />
           </Field>
           <Field label="Domicilio fiscal (opcional)"><textarea name="fiscalAddress" defaultValue={fiscalAddress} className={controlClass} rows={2} /></Field>
         </>

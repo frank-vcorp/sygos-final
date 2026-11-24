@@ -8,6 +8,7 @@ import { parseCfdiUse } from "@/lib/sat-cfdi-use";
 import { normalizeSatLegalName } from "@/lib/sat-legal-name";
 import { parsePaymentMethod } from "@/lib/sat-payment-method";
 import { parseRegimen } from "@/lib/sat-regimen";
+import { clientFiscalMissingLabels } from "@/lib/client-fiscal";
 import { SALES_NOT_ASSIGNED_MESSAGE } from "@/lib/sales-assignment";
 import { requireCompany } from "@/lib/session";
 
@@ -56,17 +57,18 @@ function clientData(formData: FormData, applyCreateDefaults = false) {
   }
   const requiresInvoice = optionalBool(formData.get("requiresInvoice"));
   const creditDays = optionalInt(formData.get("creditDays"));
+  const name = requiredText(formData.get("name"), "Nombre Comercial");
   return {
-    name: requiredText(formData.get("name"), "Nombre Comercial"),
+    name,
     classification,
     requiresInvoice,
     creditDays: creditDays ?? (applyCreateDefaults ? 0 : null),
-    ...fiscalIdentity(formData, requiresInvoice),
+    ...fiscalIdentity(formData, requiresInvoice, name),
     deliveryAddress: optionalText(formData.get("deliveryAddress")),
   };
 }
 
-function fiscalIdentity(formData: FormData, requiresInvoice: boolean | null) {
+function fiscalIdentity(formData: FormData, requiresInvoice: boolean | null, commercialName: string) {
   const rfc = optionalText(formData.get("rfc"));
   const satLegalName = normalizeSatLegalName(optionalText(formData.get("satLegalName")));
   const taxRegime = parseRegimen(formData.get("taxRegime"));
@@ -75,8 +77,20 @@ function fiscalIdentity(formData: FormData, requiresInvoice: boolean | null) {
   const fiscalZip = optionalText(formData.get("fiscalZip"));
   const fiscalAddress = optionalText(formData.get("fiscalAddress"));
   const fiscalEmail = optionalText(formData.get("fiscalEmail"));
-  if (requiresInvoice && !rfc) {
-    throw new Error("El RFC es obligatorio cuando el cliente requiere factura.");
+  if (requiresInvoice) {
+    const missing = clientFiscalMissingLabels({
+      name: commercialName,
+      satLegalName,
+      rfc,
+      taxRegime,
+      cfdiUse,
+      paymentMethod,
+      fiscalZip,
+      fiscalEmail,
+    });
+    if (missing.length > 0) {
+      throw new Error(`Cuando el cliente requiere factura, complete: ${missing.join(", ")}.`);
+    }
   }
   return { rfc, satLegalName, taxRegime, cfdiUse, paymentMethod, fiscalZip, fiscalAddress, fiscalEmail };
 }

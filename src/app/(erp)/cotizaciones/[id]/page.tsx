@@ -684,6 +684,7 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
                     cfdiUse: quote.client.cfdiUse,
                     paymentMethod: quote.client.paymentMethod,
                     fiscalZip: quote.client.fiscalZip,
+                    fiscalEmail: quote.client.fiscalEmail,
                   }}
                   canEditClient={canEditClient}
                   requestDocumentAction={requestDocumentAction}
