@@ -195,7 +195,7 @@ export function ClientProfileSection({
           <p className="text-sm font-medium">Editar datos</p>
           <Button type="button" tone="ghost" className="min-h-9 px-2 text-xs" onClick={() => setEditing(false)}>Cancelar</Button>
         </div>
-        <Field label="Nombre"><input name="name" defaultValue={client.name} className={controlClass} required /></Field>
+        <Field label="Nombre Comercial"><input name="name" defaultValue={client.name} className={controlClass} required /></Field>
         <Field label="Clasificación">
           <select name="classification" defaultValue={client.classification ?? ""} className={controlClass}>
             <option value="">Sin clasificación</option>

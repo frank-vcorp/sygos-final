@@ -13,7 +13,7 @@ export function QuickClientFields({
 }) {
   return (
     <>
-      <Field label="Nombre o razón social">
+      <Field label="Nombre Comercial">
         <input name="newClientName" className={controlClass} required={required} defaultValue={defaultName} />
       </Field>
       <Field label="Nombre del contacto" hint="Obligatorio en alta rápida.">

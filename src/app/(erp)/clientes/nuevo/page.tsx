@@ -23,7 +23,7 @@ export default async function NuevoClientePage() {
               description="Define quién es el cliente y las condiciones básicas de operación."
               columns={2}
             >
-              <Field label="Nombre o razón social" hint="Obligatorio.">
+              <Field label="Nombre Comercial" hint="Obligatorio.">
                 <input name="name" className={controlClass} required />
               </Field>
               <Field label="Clasificación">

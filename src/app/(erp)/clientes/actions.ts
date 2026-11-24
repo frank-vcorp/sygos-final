@@ -57,7 +57,7 @@ function clientData(formData: FormData, applyCreateDefaults = false) {
   const requiresInvoice = optionalBool(formData.get("requiresInvoice"));
   const creditDays = optionalInt(formData.get("creditDays"));
   return {
-    name: requiredText(formData.get("name"), "Nombre o razón social"),
+    name: requiredText(formData.get("name"), "Nombre Comercial"),
     classification,
     requiresInvoice,
     creditDays: creditDays ?? (applyCreateDefaults ? 0 : null),
