@@ -595,34 +595,37 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
               {linePriceEditBlockedMessage ? (
                 <p className="mt-2 rounded-md bg-[var(--warn-soft)] px-3 py-2 text-sm">{linePriceEditBlockedMessage}</p>
               ) : (
-                <form action={updateQuoteLinePricesAction} className="mt-3 flex flex-wrap items-end gap-2">
+                <form action={updateQuoteLinePricesAction} className="mt-3 flex flex-col gap-3">
                   <input type="hidden" name="quoteId" value={quote.id} />
                   <input type="hidden" name="version" value={quote.version} />
-                  {quote.lines.map((line) => {
+                  {quote.lines.map((line, lineIndex) => {
                     const defaultAmount = quote.quoteType === "CAMPO"
                       ? (quote.fieldServiceUnitPrice ?? line.unitPrice ?? "")
                       : (showBase && line.basePrice != null ? line.basePrice : line.unitPrice ?? "");
                     const priceLabel = quote.quoteType === "CAMPO"
                       ? "Tarifa por hora"
-                      : quote.lines.length === 1
-                        ? "Precio"
-                        : line.concept;
+                      : quote.lines.length > 1
+                        ? `Partida ${lineIndex + 1}`
+                        : "Precio";
                     return (
                       <label key={line.id} className="grid gap-1">
-                        <span className="max-w-xs truncate text-xs font-semibold text-[var(--muted)]">{priceLabel}</span>
+                        <span className="text-xs font-semibold text-[var(--muted)]">{priceLabel}</span>
+                        {quote.lines.length > 1 && quote.quoteType !== "CAMPO" ? (
+                          <span className="text-xs text-[var(--muted)]">{line.concept}</span>
+                        ) : null}
                         <input type="hidden" name="lineId" value={line.id} />
                         <MoneyInput
                           name="amount"
                           required
                           aria-label={`Precio de ${line.concept}`}
                           defaultValue={defaultAmount ?? ""}
-                          wrapperClassName="w-32"
+                          wrapperClassName="max-w-md w-full"
                           className="text-right"
                         />
                       </label>
                     );
                   })}
-                  <SubmitButton tone="ghost">Guardar precios</SubmitButton>
+                  <SubmitButton tone="ghost" className="self-start">Guardar precios</SubmitButton>
                 </form>
               )}
             </div>
