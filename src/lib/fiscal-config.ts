@@ -95,12 +95,7 @@ export const SAT_TAXABILITY_OPTIONS = [
   { id: "04", label: "04 — Sí objeto y no causa impuesto" },
 ] as const;
 
-export const SAT_UNIT_OPTIONS = [
-  { id: "E48", name: "Servicio", label: "E48 — Unidad de servicio" },
-  { id: "H87", name: "Pieza", label: "H87 — Pieza" },
-  { id: "ACT", name: "Actividad", label: "ACT — Actividad" },
-  { id: "HUR", name: "Hora", label: "HUR — Hora" },
-] as const;
+export { SAT_UNIT_OPTIONS } from "@/lib/sat-unit-options";
 
 export function defaultSatDefaultsForCompany(companyCode?: string | null): Record<FiscalOperationKind, SatLineDefaults> {
   const isSm = companyCode === "SERVOMOTORES";

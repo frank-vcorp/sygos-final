@@ -10,7 +10,9 @@ import {
   retryFiscalAction,
   sendBillingEmailAction,
   sendBillingWhatsAppAction,
+  updateBillingLineSatAction,
 } from "../actions";
+import { BillingLineSatEditor } from "@/components/billing-line-sat-editor";
 import { CfdiUseSelect } from "@/components/cfdi-use-select";
 import { HistoryTimeline } from "@/components/history-timeline";
 import { ClientNameLink } from "@/components/client-entity-links";
@@ -31,6 +33,7 @@ import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
 import { historyFor } from "@/lib/history";
 import { money } from "@/lib/money";
+import { billingLineSatKeysEditable } from "@/lib/billing-line-sat";
 import { can } from "@/lib/permissions";
 import { redirectIfSalesNotAssigned } from "@/lib/sales-assignment";
 import { requireCompany } from "@/lib/session";
@@ -148,6 +151,10 @@ export default async function DocumentoPage({ params }: { params: Promise<{ id: 
     && canIssue
     && showFiscalFields
     && (row.fiscalStatus === "ERROR" || row.fiscalStatus === "PENDIENTE" || row.fiscalStatus === "PROCESANDO");
+  const canEditSatLines =
+    showFiscalFields
+    && billingLineSatKeysEditable(row)
+    && (canIssue || can(session.role, "invoice.request", session.activeCompanyCode));
 
   const canDownloadAndDeliver =
     showFiscalFields
@@ -294,23 +301,17 @@ export default async function DocumentoPage({ params }: { params: Promise<{ id: 
                 <Th>Cant.</Th>
                 <Th>P. Unit. neto</Th>
                 <Th>Descuento</Th>
-                <Th>Clave SAT</Th>
+                <Th>{canEditSatLines ? "Claves SAT (editable)" : "Clave SAT"}</Th>
                 <Th>Importe</Th>
               </tr>
             </thead>
             <tbody>
-              {row.lines.map((line) => (
-                <tr key={line.id}>
-                  <Td>{line.concept}</Td>
-                  <Td>{line.quantity}</Td>
-                  <Td>{money(line.unitPrice)}</Td>
-                  <Td>{line.discountAmount > 0 ? money(line.discountAmount) : "—"}</Td>
-                  <Td className="text-xs text-[var(--muted)]">
-                    {line.satProductKey || "—"} · {line.satUnitKey || "E48"} · Obj {line.taxability || "02"}
-                  </Td>
-                  <Td>{money(line.amount)}</Td>
-                </tr>
-              ))}
+              <BillingLineSatEditor
+                documentId={row.id}
+                lines={row.lines}
+                canEdit={canEditSatLines}
+                saveAction={updateBillingLineSatAction}
+              />
             </tbody>
           </Table>
         </div>

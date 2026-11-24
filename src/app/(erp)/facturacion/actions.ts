@@ -16,6 +16,7 @@ import {
   requestDocumentCancellation,
   requestFromQuote,
   requestIntercompany,
+  patchBillingLineSatKeys,
   retryFiscal,
 } from "@/lib/billing";
 import { sendBillingDocumentByEmail, sendBillingDocumentByWhatsApp } from "@/lib/billing-delivery";
@@ -268,6 +269,31 @@ export async function pollCancelStatusAction(formData: FormData) {
     if (!doc) throw new Error("Documento no encontrado en esta empresa.");
     const result = await pollBillingDocumentCancellation(doc.id, { actorUserId: session.userId });
     await setFlash({ tone: result.ok ? "ok" : "error", message: result.message });
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    await setFlash({ tone: "error", message: messageOf(error) });
+  }
+  redirect(`/facturacion/${id}`);
+}
+
+export async function updateBillingLineSatAction(formData: FormData) {
+  "use server";
+  const id = requiredText(formData.get("documentId"), "Documento");
+  const lineId = requiredText(formData.get("lineId"), "Línea");
+  try {
+    const session = await requireCompany();
+    const mayIssue = can(session.role, "invoice.issue", session.activeCompanyCode);
+    const mayRequest = can(session.role, "invoice.request", session.activeCompanyCode);
+    if (!mayIssue && !mayRequest) {
+      throw new Error("No tienes permiso para editar claves SAT.");
+    }
+    await patchBillingLineSatKeys(session, {
+      documentId: id,
+      lineId,
+      satProductKey: requiredText(formData.get("satProductKey"), "Clave producto/servicio"),
+      satUnitKey: requiredText(formData.get("satUnitKey"), "Clave unidad"),
+    });
+    await setFlash({ tone: "ok", message: "Claves SAT de la línea guardadas." });
   } catch (error) {
     if (isRedirect(error)) throw error;
     await setFlash({ tone: "error", message: messageOf(error) });

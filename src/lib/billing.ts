@@ -20,6 +20,12 @@ import { linesForTotal, quoteTotals, roundMoney } from "./money";
 import type { Role } from "./roles";
 import { SALES_NOT_ASSIGNED_MESSAGE } from "./sales-assignment";
 import { assertClientFiscalReadyForInvoice } from "./client-fiscal";
+import {
+  billingLineSatKeysEditable,
+  parseSatProductKey,
+  parseSatUnitKey,
+  resolveSatUnitName,
+} from "./billing-line-sat";
 import { resolvePaymentFormForDocument } from "./sat-payment-method";
 
 type Actor = { userId: string; role: Role; activeCompanyId: string; activeCompanyCode: string };
@@ -1536,4 +1542,44 @@ export async function issueCreditNote(
   });
 
   return creditNote;
+}
+
+export async function patchBillingLineSatKeys(
+  actor: Actor,
+  input: { documentId: string; lineId: string; satProductKey: string; satUnitKey: string },
+) {
+  const document = await prisma.billingDocument.findFirst({
+    where: { id: input.documentId, companyId: actor.activeCompanyId },
+    include: {
+      client: { select: { ownerUserId: true } },
+      lines: { where: { id: input.lineId } },
+    },
+  });
+  if (!document) throw new Error("Documento no encontrado en esta empresa.");
+  if (actor.role === "VENTAS" && document.client.ownerUserId !== actor.userId) {
+    throw new Error(SALES_NOT_ASSIGNED_MESSAGE);
+  }
+  if (!billingLineSatKeysEditable(document)) {
+    throw new Error("Las claves SAT de esta línea ya no se pueden editar.");
+  }
+  const line = document.lines[0];
+  if (!line) throw new Error("Línea de facturación no encontrada.");
+
+  const satProductKey = parseSatProductKey(input.satProductKey);
+  const satUnitKey = parseSatUnitKey(input.satUnitKey);
+  const satUnitName = resolveSatUnitName(satUnitKey);
+
+  await prisma.billingLine.update({
+    where: { id: line.id },
+    data: { satProductKey, satUnitKey, satUnitName },
+  });
+
+  await recordHistory({
+    companyId: actor.activeCompanyId,
+    entityType: "DOCUMENTO",
+    entityId: document.id,
+    action: "ACTUALIZACION",
+    summary: `Claves SAT actualizadas en línea «${line.concept}»: prod. ${satProductKey}, unidad ${satUnitKey}.`,
+    authorUserId: actor.userId,
+  });
 }
