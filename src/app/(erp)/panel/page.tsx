@@ -1234,7 +1234,7 @@ async function Coordination({ companyId, code, vista }: { companyId: string; cod
       )}
       <div className="grid gap-3">
         <Block title="Facturas solicitadas" empty="Sin solicitudes." bandejaHref="/facturacion?vista=solicitudes" rows={invoices.map((row) => ({ href: `/facturacion/${row.id}`, label: row.folio, detail: billingDocumentPanelDetail(row, row.kind, billingServiceLinkMap) }))} />
-        <Block title="Remisiones solicitadas" empty="Sin remisiones por generar." bandejaHref="/facturacion?vista=remisiones" rows={remissions.map((row) => ({ href: `/facturacion/${row.id}`, label: row.folio, detail: billingDocumentPanelDetail(row, "Remisión", billingServiceLinkMap) }))} />
+        <Block title="Remisiones solicitadas" empty="Sin remisiones por generar." bandejaHref="/remisiones" rows={remissions.map((row) => ({ href: `/facturacion/${row.id}`, label: row.folio, detail: billingDocumentPanelDetail(row, "Remisión", billingServiceLinkMap) }))} />
         <Block title="Pagos por validar" empty="Sin pagos pendientes." bandejaHref="/pagos?vista=pendientes" rows={payments.map((row) => ({ href: `/pagos/${row.id}`, label: row.folio, detail: money(row.amount) }))} />
         <Block title="Compras por validar" empty="Nada pendiente de validación." bandejaHref={comprasPendientesHref} rows={purchases.map((row) => ({ href: `/compras/${row.id}`, label: row.folio, detail: money(row.amount) }))} />
         <Block

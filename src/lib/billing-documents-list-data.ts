@@ -16,7 +16,21 @@ import { prisma } from "@/lib/db";
 import type { Role } from "@/lib/roles";
 import type { Prisma } from "@prisma/client";
 
-type VistaWhere = Prisma.BillingDocumentWhereInput;
+export type FacturacionVista = "solicitudes" | "facturas" | "canceladas" | "remisiones" | "todas";
+
+export function parseFacturacionVista(raw: string | undefined, invoicesOnlyNav: boolean): FacturacionVista {
+  if (raw === "solicitudes" || raw === "facturas" || raw === "canceladas" || raw === "remisiones") return raw;
+  return invoicesOnlyNav ? "facturas" : "todas";
+}
+
+export function whereForFacturacionVista(vista: FacturacionVista, invoicesOnlyNav: boolean): Prisma.BillingDocumentWhereInput {
+  if (vista === "solicitudes") return { status: "SOLICITADA", ...(invoicesOnlyNav ? { kind: { not: "REMISION" } } : {}) };
+  if (vista === "remisiones") return { kind: "REMISION" };
+  if (vista === "canceladas") return { status: "CANCELADA", ...(invoicesOnlyNav ? { kind: { not: "REMISION" } } : {}) };
+  if (vista === "facturas") return { kind: { not: "REMISION" }, status: { not: "CANCELADA" } };
+  if (invoicesOnlyNav) return { kind: { not: "REMISION" } };
+  return {};
+}
 
 const LIST_INCLUDE = {
   client: true,
@@ -90,25 +104,28 @@ function mapDocumentToListRow(
     createdAt: row.createdAt.toISOString(),
     fiscalTone: fiscal?.tone ?? null,
     fiscalLabel: fiscal?.label ?? null,
-    detailHref: billingSalesListDetailHref(role, row),
+    detailHref: billingSalesListDetailHref(role, row) ?? `/facturacion/${row.id}`,
     paymentMethodCode: showPaymentMethodColumn ? paymentCode : null,
     ppdCobranza: ppdCobranza ?? undefined,
   };
 }
 
-export async function loadFacturacionDocumentListRows(input: {
-  companyId: string;
+type SessionSlice = {
   role: Role;
   userId: string;
-  where: VistaWhere;
-  ventasScope: boolean;
-}): Promise<FacturacionListRow[]> {
-  const showPaymentMethodColumn = facturacionListUsesPaymentMethodColumn(input.role);
+  activeCompanyId: string;
+};
+
+export async function loadBillingDocumentListRows(
+  session: SessionSlice,
+  where: Prisma.BillingDocumentWhereInput,
+): Promise<FacturacionListRow[]> {
+  const showPaymentMethodColumn = facturacionListUsesPaymentMethodColumn(session.role);
   const rows = await prisma.billingDocument.findMany({
     where: {
-      companyId: input.companyId,
-      ...input.where,
-      ...(input.ventasScope ? { client: { ownerUserId: input.userId } } : {}),
+      companyId: session.activeCompanyId,
+      ...where,
+      ...(session.role === "VENTAS" ? { client: { ownerUserId: session.userId } } : {}),
     },
     include: LIST_INCLUDE,
     orderBy: { createdAt: "desc" },
@@ -116,9 +133,7 @@ export async function loadFacturacionDocumentListRows(input: {
   });
   const serviceLinkMap = await batchLoadBillingDocumentServiceLinks(
     rows.map((row) => pickBillingDocumentTechnicalCaseId(row)),
-    input.companyId,
+    session.activeCompanyId,
   );
-  return rows.map((row) =>
-    mapDocumentToListRow(row, input.role, serviceLinkMap, showPaymentMethodColumn),
-  );
+  return rows.map((row) => mapDocumentToListRow(row, session.role, serviceLinkMap, showPaymentMethodColumn));
 }
