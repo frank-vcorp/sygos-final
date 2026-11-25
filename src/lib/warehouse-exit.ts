@@ -317,7 +317,7 @@ export async function loadWarehouseExitContext(input: {
 }
 
 export async function listExitWithoutDocumentPending(serviceCompanyId: string, take = 12) {
-  return prisma.technicalCase.findMany({
+  const rows = await prisma.technicalCase.findMany({
     where: {
       serviceCompanyId,
       kind: "OS",
@@ -326,13 +326,40 @@ export async function listExitWithoutDocumentPending(serviceCompanyId: string, t
       exitWithoutDocumentAuthorizedAt: null,
       equipment: { custody: "EN_RESGUARDO" },
     },
-    include: {
-      equipment: { include: { client: true } },
-      attention: { include: { adminClient: true } },
+    select: {
+      id: true,
+      version: true,
+      folio: true,
+      equipment: { select: { folio: true, clientId: true } },
+      attention: {
+        select: { originCompanyId: true, serviceCompanyId: true, adminClientId: true },
+      },
     },
     orderBy: { exitWithoutDocumentRequestedAt: "desc" },
     take,
   });
+  const ids = [...new Set(rows.flatMap((row) => [row.equipment.clientId, row.attention.adminClientId]))];
+  const clients = ids.length === 0
+    ? []
+    : await prisma.client.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, name: true, isSystem: true },
+      });
+  const byId = new Map(clients.map((row) => [row.id, row]));
+  return rows.map((row) => ({
+    id: row.id,
+    version: row.version,
+    folio: row.folio,
+    equipment: {
+      folio: row.equipment.folio,
+      client: byId.get(row.equipment.clientId) ?? null,
+    },
+    attention: {
+      originCompanyId: row.attention.originCompanyId,
+      serviceCompanyId: row.attention.serviceCompanyId,
+      adminClient: byId.get(row.attention.adminClientId) ?? null,
+    },
+  }));
 }
 
 /** Equipo en salida definitiva por OS terminada (motivo reparación). */

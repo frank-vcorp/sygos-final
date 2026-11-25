@@ -75,7 +75,7 @@ export async function listServicesPendingCeoPrice(companyId: string, take = 20) 
       equipment: { originCompanyId: companyId },
       serviceCeoPrices: { none: { companyId } },
     },
-    include: { equipment: { include: { client: true } } },
+    select: { id: true, folio: true },
     orderBy: { updatedAt: "desc" },
     take,
   });

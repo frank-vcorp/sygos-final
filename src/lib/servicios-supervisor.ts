@@ -195,7 +195,8 @@ type CaseRecord = {
     brandName: string | null;
     model: string;
     custody: string;
-    client: { id: string; name: string; isSystem: boolean };
+    clientId: string;
+    client: { id: string; name: string; isSystem: boolean } | null;
   };
   attention: {
     attentionType: string;
@@ -208,6 +209,7 @@ type CaseRecord = {
     serviceCompanyId: string;
     serviceNumber: number | null;
     originServiceNumber: number | null;
+    adminClientId: string;
     adminClient: { id: string; name: string; isSystem: boolean } | null;
   };
   assignee: { name: string } | null;
@@ -432,7 +434,18 @@ function groupCasesByEquipment(cases: CaseRecord[]) {
 }
 
 const caseInclude = {
-  equipment: { include: { client: true } },
+  equipment: {
+    select: {
+      id: true,
+      kind: true,
+      folio: true,
+      typeName: true,
+      brandName: true,
+      model: true,
+      custody: true,
+      clientId: true,
+    },
+  },
   attention: {
     select: {
       priorityName: true,
@@ -445,11 +458,31 @@ const caseInclude = {
       serviceCompanyId: true,
       serviceNumber: true,
       originServiceNumber: true,
-      adminClient: { select: { id: true, name: true, isSystem: true } },
+      adminClientId: true,
     },
   },
   assignee: { select: { name: true } },
 } as const;
+
+/** El include anidado de Prisma revienta el SSR si el cliente ya no existe. Se resuelve aparte. */
+async function attachBandejaClients<T extends {
+  equipment: { clientId: string };
+  attention: { adminClientId: string };
+}>(rows: T[]): Promise<CaseRecord[]> {
+  const ids = [...new Set(rows.flatMap((row) => [row.equipment.clientId, row.attention.adminClientId]))];
+  const found = ids.length === 0
+    ? []
+    : await prisma.client.findMany({
+        where: { id: { in: ids } },
+        select: { id: true, name: true, isSystem: true },
+      });
+  const byId = new Map(found.map((row) => [row.id, row]));
+  return rows.map((row) => ({
+    ...row,
+    equipment: { ...row.equipment, client: byId.get(row.equipment.clientId) ?? null },
+    attention: { ...row.attention, adminClient: byId.get(row.attention.adminClientId) ?? null },
+  })) as unknown as CaseRecord[];
+}
 
 async function attachParentDiagnoses(companyId: string, cases: CaseRecord[]): Promise<CaseRecord[]> {
   const existing = new Set(cases.map((c) => c.id));
@@ -465,7 +498,7 @@ async function attachParentDiagnoses(companyId: string, cases: CaseRecord[]): Pr
     where: { id: { in: parentIds }, serviceCompanyId: companyId },
     include: caseInclude,
   });
-  return [...cases, ...(parents as CaseRecord[])];
+  return [...cases, ...(await attachBandejaClients(parents))];
 }
 
 async function attachMissingOrders(cases: CaseRecord[]): Promise<CaseRecord[]> {
@@ -476,7 +509,7 @@ async function attachMissingOrders(cases: CaseRecord[]): Promise<CaseRecord[]> {
     where: { kind: "OS", spawnedFromId: { in: diagnosisIds }, id: { notIn: [...existing] } },
     include: caseInclude,
   });
-  return [...cases, ...(children as CaseRecord[])];
+  return [...cases, ...(await attachBandejaClients(children))];
 }
 
 async function mapCasesToBandejaRows(companyId: string, cases: CaseRecord[]): Promise<ServicioBandejaRow[]> {
@@ -563,7 +596,7 @@ export async function listServiciosForBillingLinks(
     include: caseInclude,
     take: 200,
   });
-  const rows = await mapCasesToBandejaRows(companyId, cases as CaseRecord[]);
+  const rows = await mapCasesToBandejaRows(companyId, await attachBandejaClients(cases));
   const seen = new Set<string>();
   return rows.filter((row) => {
     if (seen.has(row.id)) return false;
@@ -616,7 +649,7 @@ export async function listActiveServicios(
     take: 200,
   });
 
-  let rows = await mapCasesToBandejaRows(companyId, cases as CaseRecord[]);
+  let rows = await mapCasesToBandejaRows(companyId, await attachBandejaClients(cases));
   const equipmentKind = options?.equipmentKind ?? null;
   if (equipmentKind) {
     rows = rows.filter((row) => row.kind !== "servicio" || row.equipmentKind === equipmentKind);
@@ -675,6 +708,7 @@ export async function listHistorialServicios(
     orderBy: { updatedAt: "desc" },
     take: 200,
   });
+  const hydratedCases = await attachBandejaClients(cases);
 
   const cancelledAttentions =
     technicianId || (statusFilter && statusFilter !== "CANCELADA")
@@ -701,21 +735,52 @@ export async function listHistorialServicios(
                 }
               : {}),
           },
-          include: {
-            adminClient: { select: { id: true, name: true, isSystem: true } },
-            equipment: { include: { client: true } },
+          select: {
+            id: true,
+            updatedAt: true,
+            createdAt: true,
+            priorityName: true,
+            legacyFolio: true,
+            originCompanyId: true,
+            serviceCompanyId: true,
+            adminClientId: true,
+            equipment: {
+              select: {
+                id: true,
+                kind: true,
+                folio: true,
+                typeName: true,
+                brandName: true,
+                model: true,
+                clientId: true,
+              },
+            },
           },
           orderBy: { updatedAt: "desc" },
           take: 80,
         });
+  const cancelledClientIds = [
+    ...new Set(cancelledAttentions.flatMap((row) => [row.adminClientId, row.equipment.clientId])),
+  ];
+  const cancelledClients = cancelledClientIds.length === 0
+    ? []
+    : await prisma.client.findMany({
+        where: { id: { in: cancelledClientIds } },
+        select: { id: true, name: true, isSystem: true },
+      });
+  const cancelledClientById = new Map(cancelledClients.map((row) => [row.id, row]));
 
-  let serviceRows = await mapCasesToBandejaRows(companyId, cases as CaseRecord[]);
+  let serviceRows = await mapCasesToBandejaRows(companyId, hydratedCases);
   const equipmentKind = options?.equipmentKind ?? null;
   if (equipmentKind) {
     serviceRows = serviceRows.filter((row) => row.equipmentKind === equipmentKind);
   }
   const cancelledRows: CancelledServicioBandejaRow[] = cancelledAttentions.map((row) => {
-    const shownClient = serviceClientForCompany(companyId, row, row.equipment.client);
+    const shownClient = serviceClientForCompany(
+      companyId,
+      { ...row, adminClient: cancelledClientById.get(row.adminClientId) ?? null },
+      cancelledClientById.get(row.equipment.clientId) ?? null,
+    );
     return {
     kind: "cancelado",
     id: row.id,

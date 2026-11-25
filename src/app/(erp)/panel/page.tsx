@@ -56,6 +56,7 @@ import { requireCompany } from "@/lib/session";
 import { ADMIN_ESTADO, PHYSICAL_ESTADO } from "@/lib/servicios-bandeja";
 import { serviceClientForCompany } from "@/lib/intercompany-client";
 import { listExitWithoutDocumentPending } from "@/lib/warehouse-exit";
+import { loadPanelDecisionQuotes } from "@/lib/panel-decision-quotes";
 import { CeoExitWithoutDocumentPanel } from "@/components/ceo-exit-without-document-panel";
 
 const CLOSED = ["VALIDADO", "TERMINADA", "SIN_REPARACION"];
@@ -175,6 +176,55 @@ function panelClientRef(client: { id: string; name: string; isSystem: boolean } 
   return panelClientLink(client);
 }
 
+async function loadSolicitedDocuments(companyId: string, kind: { not: "REMISION" } | "REMISION", take: number) {
+  const rows = await prisma.billingDocument.findMany({
+    where: { companyId, status: "SOLICITADA", kind },
+    select: { id: true, folio: true, kind: true, technicalCaseId: true, quoteId: true },
+    take,
+  });
+  const quoteIds = [...new Set(rows.map((row) => row.quoteId).filter((id): id is string => Boolean(id)))];
+  const quotes = quoteIds.length
+    ? await prisma.quote.findMany({
+        where: { id: { in: quoteIds } },
+        select: { id: true, technicalCaseId: true },
+      })
+    : [];
+  const quoteById = new Map(quotes.map((row) => [row.id, row]));
+  return rows.map((row) => ({
+    id: row.id,
+    folio: row.folio,
+    kind: row.kind,
+    technicalCaseId: row.technicalCaseId,
+    quote: row.quoteId ? quoteById.get(row.quoteId) ?? null : null,
+  }));
+}
+
+async function loadOpenPayableRows(companyId: string, take: number) {
+  const rows = await prisma.payable.findMany({
+    where: { companyId, balance: { gt: 0 } },
+    select: { balance: true, supplierId: true, documentId: true },
+    orderBy: { dueAt: "asc" },
+    take,
+  });
+  const supplierIds = [...new Set(rows.map((row) => row.supplierId))];
+  const documentIds = [...new Set(rows.map((row) => row.documentId).filter((id): id is string => Boolean(id)))];
+  const [suppliers, documents] = await Promise.all([
+    supplierIds.length
+      ? prisma.supplier.findMany({ where: { id: { in: supplierIds } }, select: { id: true, name: true } })
+      : Promise.resolve([]),
+    documentIds.length
+      ? prisma.billingDocument.findMany({ where: { id: { in: documentIds } }, select: { id: true, folio: true } })
+      : Promise.resolve([]),
+  ]);
+  const supplierName = new Map(suppliers.map((row) => [row.id, row.name]));
+  const documentFolio = new Map(documents.map((row) => [row.id, row.folio]));
+  return rows.map((row) => ({
+    balance: row.balance,
+    supplier: { name: supplierName.get(row.supplierId) ?? "Proveedor" },
+    document: row.documentId && documentFolio.has(row.documentId) ? { folio: documentFolio.get(row.documentId) ?? "" } : null,
+  }));
+}
+
 function SalesMetric({ label, value, href }: { label: string; value: ReactNode; href: string }) {
   return (
     <Link
@@ -252,10 +302,30 @@ async function Technician({ companyId, userId, history }: { companyId: string; u
           }
         : { status: { notIn: CLOSED }, assigneeUserId: userId }),
     },
-    include: { equipment: { include: { client: true } }, attention: true },
+    select: {
+      id: true,
+      folio: true,
+      status: true,
+      equipment: { select: { folio: true, clientId: true } },
+      attention: { select: { priorityName: true } },
+    },
     orderBy: { slaDueAt: "asc" },
     take: 80,
   });
+  const technicianClients = rows.length
+    ? await prisma.client.findMany({
+        where: { id: { in: [...new Set(rows.map((row) => row.equipment.clientId))] } },
+        select: { id: true, name: true, isSystem: true },
+      })
+    : [];
+  const technicianClientById = new Map(technicianClients.map((row) => [row.id, row]));
+  const assigned = rows.map((row) => ({
+    ...row,
+    equipment: {
+      folio: row.equipment.folio,
+      client: technicianClientById.get(row.equipment.clientId) ?? null,
+    },
+  }));
   return (
     <>
       <PageHeader
@@ -266,7 +336,7 @@ async function Technician({ companyId, userId, history }: { companyId: string; u
       <Block
         title={history ? "Historial" : "Asignados a ti"}
         empty={history ? "No hay trabajos cerrados en tu historial." : "No tienes operaciones activas asignadas."}
-        rows={rows.map((row) => ({
+        rows={assigned.map((row) => ({
           href: `/operacion/${row.id}`,
           label: row.folio,
           detail: (
@@ -551,26 +621,7 @@ async function GerenteServomotoresPanel({
   ] = await Promise.all([
     listActiveServicios(companyId, ""),
     loadGerenteServicioPanelContext(companyId),
-    prisma.quote.findMany({
-      where: { companyId, status: "PENDIENTE_DECISION" },
-      include: {
-        client: { select: { id: true, name: true, isSystem: true, ownerUserId: true } },
-        equipment: {
-          select: {
-            id: true,
-            kind: true,
-            folio: true,
-            custody: true,
-            typeName: true,
-            brandName: true,
-            model: true,
-            client: { select: { id: true, name: true, isSystem: true } },
-          },
-        },
-        lines: { select: { quantity: true, unitPrice: true, authorized: true } },
-      },
-      take: 100,
-    }),
+    loadPanelDecisionQuotes({ companyId, status: "PENDIENTE_DECISION" }),
     prisma.quote.findMany({
       where: {
         companyId,
@@ -610,9 +661,10 @@ async function GerenteServomotoresPanel({
     })(),
     prisma.receivable.findMany({
       where: { companyId, balance: { gt: 0 } },
-      include: {
+      select: {
+        dueAt: true,
+        balance: true,
         document: { select: { folio: true, technicalCaseId: true, equipmentId: true } },
-        client: true,
       },
       take: 100,
       orderBy: { dueAt: "asc" },
@@ -888,9 +940,10 @@ async function Sales({
   ] = await Promise.all([
     prisma.receivable.findMany({
       where: { companyId, sellerUserId: userId, balance: { gt: 0 } },
-      include: {
+      select: {
+        dueAt: true,
+        balance: true,
         document: { select: { folio: true, technicalCaseId: true, equipmentId: true } },
-        client: true,
       },
       take: 100,
       orderBy: { dueAt: "asc" },
@@ -924,32 +977,13 @@ async function Sales({
       clientOwnerUserId: userId,
       ...(companyCode === "SYSTRON" ? { originMotors: true } : {}),
     }),
-    prisma.quote.findMany({
-      where: {
-        companyId,
-        status: "PENDIENTE_DECISION",
-        OR: [
-          { sellerUserId: userId },
-          { client: { ownerUserId: userId, isSystem: false } },
-        ],
-      },
-      include: {
-        client: { select: { id: true, name: true, isSystem: true, ownerUserId: true } },
-        equipment: {
-          select: {
-            id: true,
-            kind: true,
-            folio: true,
-            custody: true,
-            typeName: true,
-            brandName: true,
-            model: true,
-            client: { select: { id: true, name: true, isSystem: true } },
-          },
-        },
-        lines: { select: { quantity: true, unitPrice: true, authorized: true } },
-      },
-      take: 100,
+    loadPanelDecisionQuotes({
+      companyId,
+      status: "PENDIENTE_DECISION",
+      OR: [
+        { sellerUserId: userId },
+        { client: { ownerUserId: userId, isSystem: false } },
+      ],
     }),
     prisma.quote.findMany({
       where: {
@@ -1160,28 +1194,15 @@ async function Coordination({ companyId, code, vista }: { companyId: string; cod
     solicitante: "",
   });
   const [invoices, remissions, payments, purchases, openPayables, payableSum, suppliers, categories, accounts] = await Promise.all([
-    prisma.billingDocument.findMany({
-      where: { companyId, status: "SOLICITADA", kind: { not: "REMISION" } },
-      select: { id: true, folio: true, kind: true, technicalCaseId: true, quote: { select: { technicalCaseId: true } } },
-      take: 20,
-    }),
-    prisma.billingDocument.findMany({
-      where: { companyId, status: "SOLICITADA", kind: "REMISION" },
-      select: { id: true, folio: true, kind: true, technicalCaseId: true, quote: { select: { technicalCaseId: true } } },
-      take: 20,
-    }),
+    loadSolicitedDocuments(companyId, { not: "REMISION" }, 20),
+    loadSolicitedDocuments(companyId, "REMISION", 20),
     prisma.payment.findMany({ where: { companyId, status: "PENDIENTE" }, orderBy: { createdAt: "asc" }, take: 20 }),
     prisma.purchase.findMany({
       where: { companyId, kind: { in: ["DIRECTA", "COMPRA"] }, status: "PENDIENTE_VALIDAR" },
       orderBy: { createdAt: "desc" },
       take: 20,
     }),
-    prisma.payable.findMany({
-      where: { companyId, balance: { gt: 0 } },
-      include: { supplier: true, document: true },
-      orderBy: { dueAt: "asc" },
-      take: 20,
-    }),
+    loadOpenPayableRows(companyId, 20),
     prisma.payable.aggregate({ where: { companyId, balance: { gt: 0 } }, _sum: { balance: true } }),
     systron
       ? prisma.supplier.findMany({ where: { companyId, active: true }, orderBy: { name: "asc" } })
@@ -1281,24 +1302,11 @@ async function loadCoordinationFinanceSnapshot(companyId: string) {
     solicitante: "",
   });
   const [invoices, remissions, payments, purchases, openPayables, payableSum] = await Promise.all([
-    prisma.billingDocument.findMany({
-      where: { companyId, status: "SOLICITADA", kind: { not: "REMISION" } },
-      select: { id: true, folio: true, kind: true, technicalCaseId: true, quote: { select: { technicalCaseId: true } } },
-      take: 12,
-    }),
-    prisma.billingDocument.findMany({
-      where: { companyId, status: "SOLICITADA", kind: "REMISION" },
-      select: { id: true, folio: true, kind: true, technicalCaseId: true, quote: { select: { technicalCaseId: true } } },
-      take: 12,
-    }),
+    loadSolicitedDocuments(companyId, { not: "REMISION" }, 12),
+    loadSolicitedDocuments(companyId, "REMISION", 12),
     prisma.payment.findMany({ where: { companyId, status: "PENDIENTE" }, orderBy: { createdAt: "asc" }, take: 12 }),
     prisma.purchase.findMany({ where: { companyId, kind: { in: ["DIRECTA", "COMPRA"] }, status: "PENDIENTE_VALIDAR" }, take: 12 }),
-    prisma.payable.findMany({
-      where: { companyId, balance: { gt: 0 } },
-      include: { supplier: true, document: true },
-      orderBy: { dueAt: "asc" },
-      take: 12,
-    }),
+    loadOpenPayableRows(companyId, 12),
     prisma.payable.aggregate({ where: { companyId, balance: { gt: 0 } }, _sum: { balance: true } }),
   ]);
   const billingServiceLinkMap = await batchLoadBillingDocumentServiceLinks([

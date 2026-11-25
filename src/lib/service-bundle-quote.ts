@@ -44,46 +44,71 @@ export async function listPricedServices(companyId: string, sellerUserId?: strin
       companyId,
       ...(sellerUserId ? { client: { ownerUserId: sellerUserId, isSystem: false } } : {}),
     },
-    include: {
-      client: { select: { id: true, name: true } },
-      technicalCase: {
-        select: {
-          id: true,
-          folio: true,
-          equipment: { select: { folio: true, model: true, brandName: true, serial: true } },
-        },
-      },
+    select: {
+      technicalCaseId: true,
+      clientId: true,
+      concept: true,
+      amount: true,
     },
     orderBy: { pricedAt: "desc" },
   });
   if (prices.length === 0) return [];
-  const links = await prisma.quoteLine.findMany({
+  const [clients, cases] = await Promise.all([
+    prisma.client.findMany({
+      where: { id: { in: [...new Set(prices.map((row) => row.clientId))] } },
+      select: { id: true, name: true },
+    }),
+    prisma.technicalCase.findMany({
+      where: { id: { in: [...new Set(prices.map((row) => row.technicalCaseId))] } },
+      select: { id: true, folio: true, equipmentId: true },
+    }),
+  ]);
+  const equipment = await prisma.equipment.findMany({
+    where: { id: { in: [...new Set(cases.map((row) => row.equipmentId))] } },
+    select: { id: true, folio: true, model: true, brandName: true, serial: true },
+  });
+  const clientById = new Map(clients.map((row) => [row.id, row]));
+  const caseById = new Map(cases.map((row) => [row.id, row]));
+  const equipmentById = new Map(equipment.map((row) => [row.id, row]));
+  const linkRows = await prisma.quoteLine.findMany({
     where: {
       sourceTechnicalCaseId: { in: prices.map((row) => row.technicalCaseId) },
       quote: { companyId, quoteType: SERVICES_QUOTE_TYPE, status: { in: [...SERVICE_QUOTE_BLOCKING_STATUSES] } },
     },
-    select: {
-      sourceTechnicalCaseId: true,
-      quote: { select: { id: true, folio: true, status: true } },
-    },
+    select: { sourceTechnicalCaseId: true, quoteId: true },
   });
-  return prices.map((price) => {
+  const linkedQuotes = linkRows.length === 0
+    ? []
+    : await prisma.quote.findMany({
+        where: { id: { in: [...new Set(linkRows.map((row) => row.quoteId))] } },
+        select: { id: true, folio: true, status: true },
+      });
+  const quoteById = new Map(linkedQuotes.map((row) => [row.id, row]));
+  const links = linkRows.flatMap((row) => {
+    const quote = quoteById.get(row.quoteId);
+    if (!quote || !row.sourceTechnicalCaseId) return [];
+    return [{ sourceTechnicalCaseId: row.sourceTechnicalCaseId, quote }];
+  });
+  return prices.flatMap((price) => {
+    const technicalCase = caseById.get(price.technicalCaseId);
+    if (!technicalCase) return [];
     const related = links.filter((link) => link.sourceTechnicalCaseId === price.technicalCaseId);
     const open = related.find((link) => link.quote.status === OPEN_QUOTE_STATUS);
     const authorized = related.find((link) => link.quote.status !== OPEN_QUOTE_STATUS);
-    const equipment = price.technicalCase.equipment;
-    return {
+    const gear = equipmentById.get(technicalCase.equipmentId);
+    const client = clientById.get(price.clientId);
+    return [{
       technicalCaseId: price.technicalCaseId,
-      folio: price.technicalCase.folio,
+      folio: technicalCase.folio,
       clientId: price.clientId,
-      clientName: price.client.name,
+      clientName: client?.name ?? "Cliente",
       concept: price.concept,
       amount: price.amount,
       amountLabel: money(price.amount),
-      equipmentLabel: [equipment.folio, equipment.brandName, equipment.model, equipment.serial].filter(Boolean).join(" · "),
+      equipmentLabel: [gear?.folio, gear?.brandName, gear?.model, gear?.serial].filter(Boolean).join(" · "),
       openQuote: open ? { id: open.quote.id, folio: open.quote.folio } : null,
       onAuthorizedQuote: Boolean(authorized),
-    };
+    }];
   });
 }
 
