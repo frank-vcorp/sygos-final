@@ -98,7 +98,7 @@ export default async function FacturaDocumentoPage({ params }: { params: Promise
             quantity: line.quantity,
             unitPrice: money(line.unitPrice),
             discount: line.discountAmount > 0 ? money(line.discountAmount) : "—",
-            satDetail: `${line.satProductKey || "—"} · ${line.satUnitKey || "E48"} · Obj ${line.taxability || "02"}`,
+            satDetail: `${line.satProductKey || "—"} · ${line.satUnitKey || "—"} · Obj ${line.taxability || "02"}`,
             amount: money(line.amount),
           }))}
         />

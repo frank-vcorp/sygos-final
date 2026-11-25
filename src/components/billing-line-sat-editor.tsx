@@ -137,7 +137,7 @@ function SatProdServCombobox({
 
 function SatUnitCombobox({
   name,
-  defaultValue = "E48",
+  defaultValue = "",
   required,
 }: {
   name: string;
@@ -268,7 +268,7 @@ export function BillingLineSatEditor({
             <Td>{money(line.unitPrice)}</Td>
             <Td>{line.discountAmount > 0 ? money(line.discountAmount) : "—"}</Td>
             <Td className="text-xs text-[var(--muted)]">
-              {line.satProductKey || "—"} · {line.satUnitKey || "E48"} · Obj {line.taxability || "02"}
+              {line.satProductKey || "—"} · {line.satUnitKey || "—"} · Obj {line.taxability || "02"}
             </Td>
             <Td>{money(line.amount)}</Td>
           </tr>
@@ -290,7 +290,7 @@ export function BillingLineSatEditor({
               <input type="hidden" name="documentId" value={documentId} />
               <input type="hidden" name="lineId" value={line.id} />
               <SatProdServCombobox name="satProductKey" defaultValue={line.satProductKey ?? ""} required />
-              <SatUnitCombobox name="satUnitKey" defaultValue={line.satUnitKey ?? "E48"} required />
+              <SatUnitCombobox name="satUnitKey" defaultValue={line.satUnitKey ?? ""} required />
               <span className="text-[10px] text-[var(--muted)] whitespace-nowrap">Obj {line.taxability || "02"}</span>
               <button
                 type="submit"

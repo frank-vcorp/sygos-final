@@ -25,6 +25,7 @@ export function IssueBillingDocumentForm({
   paymentMethod,
   paymentForm = "03",
   buttonTone,
+  issueBlockedMessage,
 }: {
   documentId: string;
   submitLabel: string;
@@ -33,7 +34,9 @@ export function IssueBillingDocumentForm({
   paymentMethod: string;
   paymentForm?: string;
   buttonTone?: "ghost";
+  issueBlockedMessage?: string | null;
 }) {
+  const issueBlocked = Boolean(issueBlockedMessage);
   const [method, setMethod] = useState(paymentMethod);
   const [form, setForm] = useState(paymentForm && paymentForm !== "99" ? paymentForm : "03");
 
@@ -61,9 +64,19 @@ export function IssueBillingDocumentForm({
             required
           />
         </FiscalField>
-        <Button type="submit" tone={buttonTone} className="w-full shrink-0 lg:w-auto lg:justify-self-end">
-          {submitLabel}
-        </Button>
+        <div className="flex w-full flex-col gap-1.5 lg:w-auto lg:justify-self-end">
+          {issueBlockedMessage ? (
+            <p className="text-xs font-medium text-[var(--warn)] lg:max-w-xs lg:text-right">{issueBlockedMessage}</p>
+          ) : null}
+          <Button
+            type="submit"
+            tone={buttonTone}
+            disabled={issueBlocked}
+            className="w-full shrink-0 lg:w-auto"
+          >
+            {submitLabel}
+          </Button>
+        </div>
       </div>
     </form>
   );

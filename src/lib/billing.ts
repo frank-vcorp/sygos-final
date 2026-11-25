@@ -21,6 +21,7 @@ import type { Role } from "./roles";
 import { SALES_NOT_ASSIGNED_MESSAGE } from "./sales-assignment";
 import { assertClientFiscalReadyForInvoice } from "./client-fiscal";
 import {
+  assertBillingDocumentSatKeysForFiscal,
   billingLineSatKeysEditable,
   parseSatProductKey,
   parseSatUnitKey,
@@ -116,9 +117,9 @@ export function buildQuoteBillingLines(input: {
         discountAmount: 0,
         amount: input.targetSubtotal,
         taxIncluded: false,
-        satProductKey: input.satDefaults.productKey,
-        satUnitKey: input.satDefaults.unitKey,
-        satUnitName: input.satDefaults.unitName,
+        satProductKey: null as string | null,
+        satUnitKey: null as string | null,
+        satUnitName: null as string | null,
         taxability: input.satDefaults.taxability,
         quoteLineId: null as string | null,
       },
@@ -137,9 +138,9 @@ export function buildQuoteBillingLines(input: {
       discountAmount,
       amount,
       taxIncluded: false,
-      satProductKey: input.satDefaults.productKey,
-      satUnitKey: input.satDefaults.unitKey,
-      satUnitName: input.satDefaults.unitName,
+      satProductKey: null as string | null,
+      satUnitKey: null as string | null,
+      satUnitName: null as string | null,
       taxability: input.satDefaults.taxability,
       quoteLineId: line.id ?? null,
     };
@@ -351,9 +352,9 @@ export async function requestFromFieldServiceCase(
             discountAmount: 0,
             amount: subtotal,
             taxIncluded: false,
-            satProductKey: satDefaults.productKey,
-            satUnitKey: satDefaults.unitKey,
-            satUnitName: satDefaults.unitName,
+            satProductKey: null,
+            satUnitKey: null,
+            satUnitName: null,
             taxability: satDefaults.taxability,
           },
         ],
@@ -438,9 +439,9 @@ export async function requestFromDiagnosisNoRepair(actor: Actor, diagnosisCaseId
             discountAmount: 0,
             amount: subtotal,
             taxIncluded: false,
-            satProductKey: satDefaults.productKey,
-            satUnitKey: satDefaults.unitKey,
-            satUnitName: satDefaults.unitName,
+            satProductKey: null,
+            satUnitKey: null,
+            satUnitName: null,
             taxability: satDefaults.taxability,
           },
         ],
@@ -480,10 +481,11 @@ function fiscalForDocument(
 export async function issueDocument(actor: Actor, documentId: string, overrides?: DocumentFiscalOverrides) {
   const document = await prisma.billingDocument.findFirst({
     where: { id: documentId, companyId: actor.activeCompanyId },
-    include: { client: true, receivable: true },
+    include: { client: true, receivable: true, lines: true },
   });
   if (!document || document.status !== "SOLICITADA") throw new Error("Ese documento no está pendiente de emisión.");
   if (document.receivable) throw new Error("Ese documento ya generó una cuenta por cobrar.");
+  assertBillingDocumentSatKeysForFiscal(document);
   const client = document.kind === INTERCOMPANY_KIND
     ? await ensureIntercompanyClientFiscal(document.clientId)
     : document.client;
@@ -556,7 +558,7 @@ export async function issueDocument(actor: Actor, documentId: string, overrides?
 export async function retryFiscal(actor: Actor, documentId: string, overrides?: DocumentFiscalOverrides) {
   const document = await prisma.billingDocument.findFirst({
     where: { id: documentId, companyId: actor.activeCompanyId },
-    include: { client: true },
+    include: { client: true, lines: true },
   });
   if (
     !document
@@ -567,6 +569,7 @@ export async function retryFiscal(actor: Actor, documentId: string, overrides?: 
   ) {
     throw new Error("Ese documento no tiene un timbrado por reintentar.");
   }
+  assertBillingDocumentSatKeysForFiscal(document);
   const client = document.kind === INTERCOMPANY_KIND
     ? await ensureIntercompanyClientFiscal(document.clientId)
     : document.client;
@@ -660,9 +663,9 @@ export async function issueFreeInvoice(
             discountAmount: 0,
             amount: subtotal,
             taxIncluded: false,
-            satProductKey: satDefaults.productKey,
-            satUnitKey: satDefaults.unitKey,
-            satUnitName: satDefaults.unitName,
+            satProductKey: null,
+            satUnitKey: null,
+            satUnitName: null,
             taxability: satDefaults.taxability,
           },
         ],

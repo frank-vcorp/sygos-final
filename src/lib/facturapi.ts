@@ -13,16 +13,15 @@ import {
   parseCompanyFiscalConfig,
   resolveFacturapiRuntimeCredential,
   resolveFacturapiSecretForEnv,
-  resolveSatDefaultsForDocument,
   syncIntercompanyPartiesFromCompany,
 } from "./fiscal-config";
 import { recordHistory } from "./history";
 import { roundMoney } from "./money";
+import { assertBillingDocumentSatKeysForFiscal, BILLING_SAT_KEYS_ISSUE_ERROR } from "./billing-line-sat";
 import { resolveClientSatLegalName } from "./sat-legal-name";
 import { resolvePaymentFormForDocument, satFormaPagoForOperationalPayment } from "./sat-payment-method";
 
 const API = "https://www.facturapi.io/v2";
-const DEFAULT_SERVICE_KEY = "72154000";
 
 export function facturapiMode(secret: string): "test" | "live" | null {
   if (secret.startsWith("sk_test_")) return "test";
@@ -131,8 +130,8 @@ export function invoicePayload(input: {
           ...(discount !== undefined ? { discount } : {}),
           product: {
             description: line.concept,
-            product_key: line.productKey?.trim() || DEFAULT_SERVICE_KEY,
-            unit_key: line.unitKey?.trim() || "E48",
+            product_key: line.productKey?.trim() || "",
+            unit_key: line.unitKey?.trim() || "",
             ...(line.unitName?.trim() ? { unit_name: line.unitName.trim().slice(0, 20) } : {}),
             price: line.unitPrice,
             tax_included: line.taxIncluded ?? false,
@@ -333,6 +332,17 @@ export async function stampBillingDocument(
   });
   if (!document || document.kind === "REMISION") return;
 
+  try {
+    assertBillingDocumentSatKeysForFiscal(document);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : BILLING_SAT_KEYS_ISSUE_ERROR;
+    await prisma.billingDocument.update({
+      where: { id: document.id },
+      data: { fiscalStatus: "ERROR", fiscalError: message },
+    });
+    throw error;
+  }
+
   const cred = await resolveFacturapiRuntimeCredential(document.companyId);
   if (cred.status === "SIMULATED") {
     await prisma.billingDocument.update({
@@ -466,23 +476,7 @@ export async function stampBillingDocument(
       return;
     }
 
-    let equipmentKind: string | null = null;
-    if (document.equipmentId) {
-      const equip = await prisma.equipment.findUnique({
-        where: { id: document.equipmentId },
-        select: { kind: true },
-      });
-      equipmentKind = equip?.kind ?? null;
-    }
-
     const companyConfig = parseCompanyFiscalConfig(document.company);
-    const satFallback = resolveSatDefaultsForDocument(companyConfig, {
-      companyCode: document.company.code,
-      documentKind: document.kind,
-      quoteType: document.quote?.quoteType ?? null,
-      equipmentKind,
-      hasFieldServiceCase: Boolean(document.fieldServiceCaseId),
-    });
 
     const parsedFolio =
       companyConfig.fiscalSeriesPolicy === "SYGOS_FAC"
@@ -549,10 +543,10 @@ export async function stampBillingDocument(
         unitPrice: line.unitPrice,
         discountAmount: line.discountAmount,
         taxIncluded: line.taxIncluded,
-        productKey: line.satProductKey || satFallback.productKey,
-        unitKey: line.satUnitKey || satFallback.unitKey,
-        unitName: line.satUnitName || satFallback.unitName,
-        taxability: line.taxability || satFallback.taxability,
+        productKey: line.satProductKey,
+        unitKey: line.satUnitKey,
+        unitName: line.satUnitName,
+        taxability: line.taxability,
       })),
       iva: document.iva,
     });

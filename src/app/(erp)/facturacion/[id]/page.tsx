@@ -33,7 +33,11 @@ import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
 import { historyFor } from "@/lib/history";
 import { money } from "@/lib/money";
-import { billingLineSatKeysEditable } from "@/lib/billing-line-sat";
+import {
+  billingDocumentSatKeysComplete,
+  billingLineSatKeysEditable,
+  BILLING_SAT_KEYS_ISSUE_ERROR,
+} from "@/lib/billing-line-sat";
 import {
   billingSalesCanViewBillingDetail,
   billingSalesDetailReadOnly,
@@ -168,6 +172,8 @@ export default async function DocumentoPage({ params }: { params: Promise<{ id: 
     && showFiscalFields
     && billingLineSatKeysEditable(row)
     && (canIssue || can(session.role, "invoice.request", session.activeCompanyCode));
+  const satKeysComplete = billingDocumentSatKeysComplete(row);
+  const issueBlockedMessage = showFiscalFields && !satKeysComplete ? BILLING_SAT_KEYS_ISSUE_ERROR : null;
 
   const canDownloadAndDeliver =
     showFiscalFields
@@ -189,6 +195,7 @@ export default async function DocumentoPage({ params }: { params: Promise<{ id: 
           cfdiUse={defaultCfdiUse}
           paymentMethod={defaultPaymentMethod}
           paymentForm={defaultPaymentForm}
+          issueBlockedMessage={issueBlockedMessage}
         />
       );
     } else {
@@ -209,6 +216,7 @@ export default async function DocumentoPage({ params }: { params: Promise<{ id: 
         paymentMethod={defaultPaymentMethod}
         paymentForm={defaultPaymentForm}
         buttonTone="ghost"
+        issueBlockedMessage={issueBlockedMessage}
       />
     );
   }

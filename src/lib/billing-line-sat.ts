@@ -33,3 +33,33 @@ export function resolveSatUnitName(unitKey: string): string {
   const match = SAT_UNIT_OPTIONS.find((row) => row.id === normalized);
   return match?.name ?? normalized;
 }
+
+export const BILLING_SAT_KEYS_ISSUE_ERROR =
+  "Completa la clave producto/servicio (8 dígitos) y la clave de unidad en cada línea antes de emitir o timbrar.";
+
+export function billingLineHasCompleteSatKeys(line: {
+  satProductKey: string | null;
+  satUnitKey: string | null;
+}): boolean {
+  const productDigits = String(line.satProductKey ?? "").replace(/\D/g, "");
+  const unitKey = String(line.satUnitKey ?? "").trim();
+  return productDigits.length === 8 && unitKey.length > 0;
+}
+
+export function billingDocumentSatKeysComplete(
+  document: { kind: string; lines: Array<{ satProductKey: string | null; satUnitKey: string | null }> },
+): boolean {
+  if (document.kind === "REMISION") return true;
+  if (document.lines.length === 0) return false;
+  return document.lines.every((line) => billingLineHasCompleteSatKeys(line));
+}
+
+export function assertBillingDocumentSatKeysForFiscal(document: {
+  kind: string;
+  lines: Array<{ satProductKey: string | null; satUnitKey: string | null }>;
+}): void {
+  if (document.kind === "REMISION") return;
+  if (!billingDocumentSatKeysComplete(document)) {
+    throw new Error(BILLING_SAT_KEYS_ISSUE_ERROR);
+  }
+}
