@@ -4,8 +4,10 @@ import { allocateFolio, serviceFolioForAttention } from "./folios";
 import { recordCompanyCash } from "./purchases";
 import {
   cancelBillingDocumentInFacturapi,
+  isBillingDocumentEligibleForRep,
   isValidSatCancelMotive,
   stampBillingDocument,
+  stampPaymentComplement,
   triggerRepAfterPaymentValidation,
 } from "./facturapi";
 import { inSandbox } from "./db";
@@ -1136,6 +1138,104 @@ async function applyReceivable(receivableId: string, amount: number) {
   });
 }
 
+/**
+ * Un solo pago y un solo complemento (REP) que cubre varias facturas PPD del mismo cliente.
+ * El saldo baja por el importe aplicado; el método PPD no las marca como pagadas.
+ */
+export async function registerMultiInvoicePaymentComplement(
+  actor: Actor,
+  input: {
+    clientId: string;
+    allocations: Array<{ documentId: string; amount: number }>;
+    method: "EFECTIVO" | "TRANSFERENCIA";
+    receipt: string;
+    destination: string;
+  },
+  options?: { fetchFn?: typeof fetch },
+) {
+  if (!canIssueMultiInvoiceComplement(actor)) {
+    throw new Error("Solo Coordinación, CEO o Administrador timbran un complemento de varias facturas.");
+  }
+  if (!input.receipt.trim()) throw new Error("El pago exige comprobante.");
+  if (!input.destination.trim()) throw new Error("Indica el destino del pago.");
+  if (input.allocations.length < 2) {
+    throw new Error("Elige al menos dos facturas del mismo cliente.");
+  }
+  const seen = new Set<string>();
+  for (const row of input.allocations) {
+    if (seen.has(row.documentId)) throw new Error("No repitas la misma factura.");
+    seen.add(row.documentId);
+    if (!Number.isFinite(row.amount) || row.amount <= 0) throw new Error("Cada importe debe ser mayor a cero.");
+  }
+
+  const documents = await prisma.billingDocument.findMany({
+    where: { id: { in: [...seen] }, companyId: actor.activeCompanyId, clientId: input.clientId },
+    include: { receivable: true, client: true },
+  });
+  if (documents.length !== input.allocations.length) {
+    throw new Error("Alguna factura no es de este cliente en esta empresa.");
+  }
+  const byId = new Map(documents.map((doc) => [doc.id, doc]));
+  const client = documents[0]!.client;
+  let total = 0;
+  const applications: Array<{ receivableId: string; amount: number }> = [];
+  for (const allocation of input.allocations) {
+    const doc = byId.get(allocation.documentId);
+    if (!doc) throw new Error("Alguna factura no es de este cliente en esta empresa.");
+    if (doc.clientId !== input.clientId) throw new Error("Todas las facturas deben ser del mismo cliente.");
+    if (!isBillingDocumentEligibleForRep(doc)) {
+      throw new Error(`${doc.folio} no está timbrada en PPD. El complemento solo cubre esas facturas.`);
+    }
+    const balance = doc.receivable?.balance ?? 0;
+    if (!doc.receivable || balance <= 0) throw new Error(`${doc.folio} no tiene saldo pendiente.`);
+    const amount = roundMoney(allocation.amount);
+    if (amount > balance) throw new Error(`El pago de ${doc.folio} no puede exceder el saldo.`);
+    if (input.method === "EFECTIVO" && !cashAllowedOnInvoice(amount, client.requiresInvoice)) {
+      throw new Error("Una factura de $2,000 o más no acepta efectivo.");
+    }
+    total = roundMoney(total + amount);
+    applications.push({ receivableId: doc.receivable.id, amount });
+  }
+
+  const folio = await allocateFolio(actor.activeCompanyId, "PAG");
+  const confirmedAt = new Date();
+  const payment = await prisma.payment.create({
+    data: {
+      folio,
+      companyId: actor.activeCompanyId,
+      clientId: input.clientId,
+      amount: total,
+      method: input.method,
+      receipt: input.receipt.trim(),
+      destination: input.destination.trim(),
+      status: "VALIDADO",
+      kind: "CLIENTE",
+      authorUserId: actor.userId,
+      applications: {
+        create: applications.map((row) => ({ ...row, confirmedAt })),
+      },
+    },
+  });
+  for (const row of applications) {
+    await applyReceivable(row.receivableId, row.amount);
+  }
+  await recordCompanyCash(actor.activeCompanyId, "INGRESO", total, input.method, folio, payment.id);
+  const stamp = await stampPaymentComplement(payment.id, { isPaymentId: true, fetchFn: options?.fetchFn });
+  await recordHistory({
+    companyId: actor.activeCompanyId,
+    entityType: "PAGO",
+    entityId: payment.id,
+    action: "COMPLEMENTO_VARIAS",
+    summary: `${folio} cubre ${applications.length} facturas del mismo cliente por ${total}.`,
+    authorUserId: actor.userId,
+  });
+  return { payment, stamp };
+}
+
+function canIssueMultiInvoiceComplement(actor: Actor) {
+  return actor.role === "ADMINISTRADOR" || actor.role === "CEO" || actor.role === "COORDINACION_ADMINISTRACION";
+}
+
 export async function validatePayment(actor: Actor, paymentId: string) {
   const payment = await prisma.payment.findFirst({
     where: { id: paymentId, companyId: actor.activeCompanyId, status: "PENDIENTE", kind: "CLIENTE" },
@@ -1376,6 +1476,16 @@ export async function authorizeAndExecuteDocumentCancellation(
 ) {
   await authorizeDocumentCancellation(actor, documentId);
   return executeDocumentCancellation(actor, documentId, options);
+}
+
+/** Importe con IVA sugerido para acreditar una partida, sin pasar del saldo acreditable. */
+export function creditNoteAmountForLine(
+  line: { amount: number; taxability: string | null; taxIncluded: boolean },
+  remaining: number,
+) {
+  const exempt = line.taxIncluded || line.taxability === "01" || line.taxability === "03";
+  const gross = exempt ? line.amount : roundMoney(line.amount * 1.16);
+  return roundMoney(Math.min(Math.max(gross, 0), Math.max(remaining, 0)));
 }
 
 export async function issueCreditNote(

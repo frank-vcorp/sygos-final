@@ -9,6 +9,8 @@ import { can, type Action } from "@/lib/permissions";
 import { parsePaymentCondition, parseQuoteCreditDays, parseWarrantyMonths } from "@/lib/quote-commercial-terms";
 import { parseDeliveryBusinessDays, parseFieldServiceMachineFromForm, parseSellerSaleLines } from "@/lib/quote-seller-input";
 import { QUOTE_TYPES, type QuoteType, applyDiscount, createSellerQuote, decideQuote, linkIntercompanyQuote, prepareQuoteFromCase, relateQuoteEquipment, setPrices, updateGeneratedQuoteConcepts, updateQuoteLineDescriptions, updateQuoteLinePrices, updateSellerQuoteConceptComplement } from "@/lib/quotes";
+import { assignServiceCeoPrice } from "@/lib/service-ceo-price";
+import { createServicesExistingQuote, syncServicesExistingQuoteLines } from "@/lib/service-bundle-quote";
 import { prisma } from "@/lib/db";
 import { requireCompany } from "@/lib/session";
 
@@ -49,6 +51,22 @@ export async function createQuoteAction(formData: FormData) {
       contactIds = [resolvedClient.primaryContactId];
     }
     const paymentCondition = parsePaymentCondition(formData.get("paymentCondition"));
+    if (quoteType === "SERVICIOS_EXISTENTES") {
+      const quote = await createServicesExistingQuote(session, {
+        clientId,
+        technicalCaseIds: formData.getAll("serviceCaseId").map(String).filter(Boolean),
+        reference: optionalText(formData.get("reference")),
+        contactIds,
+        warrantyMonths: parseWarrantyMonths(formData.get("warrantyMonths")),
+        paymentCondition,
+        creditDays: parseQuoteCreditDays(paymentCondition, formData.get("creditDays")),
+      });
+      await setFlash({
+        tone: "ok",
+        message: `${quote.folio} quedó armada con servicios que ya tienen precio. El cliente todavía no la autoriza.`,
+      });
+      redirect(`/cotizaciones/${quote.id}`);
+    }
     const quote = await createSellerQuote(session, {
       clientId,
       quoteType: quoteType as QuoteType,
@@ -91,6 +109,46 @@ export async function createQuoteAction(formData: FormData) {
   }
 }
 
+export async function assignServiceCeoPriceAction(formData: FormData) {
+  "use server";
+  const caseId = requiredText(formData.get("caseId"), "Operación");
+  try {
+    const session = await guard("quote.price");
+    const rawDays = optionalText(formData.get("deliveryBusinessDays"));
+    await assignServiceCeoPrice(session, caseId, {
+      amount: moneyFromForm(formData.get("amount"), "Precio"),
+      concept: optionalText(formData.get("concept")),
+      deliveryBusinessDays: rawDays == null ? null : Number(rawDays),
+    });
+    await setFlash({ tone: "ok", message: "Precio asignado al servicio. No se creó cotización." });
+    redirect(`/operacion/${caseId}`);
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    await setFlash({ tone: "error", message: messageOf(error) });
+    redirect(`/operacion/${caseId}`);
+  }
+}
+
+export async function syncServicesQuoteLinesAction(formData: FormData) {
+  "use server";
+  const target = back(formData);
+  try {
+    const session = await guard("quote.follow");
+    await syncServicesExistingQuoteLines(
+      session,
+      requiredText(formData.get("quoteId"), "Cotización"),
+      parseVersion(formData.get("version")),
+      formData.getAll("serviceCaseId").map(String).filter(Boolean),
+    );
+    await setFlash({ tone: "ok", message: "Partidas de la cotización actualizadas." });
+    redirect(target);
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    await setFlash({ tone: "error", message: messageOf(error) });
+    redirect(target);
+  }
+}
+
 export async function relateEquipmentAction(formData: FormData) {
   "use server";
   const target = back(formData);
@@ -119,8 +177,9 @@ export async function prepareFromCaseAction(formData: FormData) {
   const caseId = requiredText(formData.get("caseId"), "Operación");
   try {
     const session = await guard("quote.price");
-    const quote = await prepareQuoteFromCase(session, caseId);
-    redirect(`/cotizaciones/${quote.id}`);
+    await prepareQuoteFromCase(session, caseId);
+    await setFlash({ tone: "ok", message: "Asigna el precio en el servicio. Eso no crea una cotización." });
+    redirect(`/operacion/${caseId}#asignar-precio`);
   } catch (error) {
     if (isRedirect(error)) throw error;
     await setFlash({ tone: "error", message: messageOf(error) });

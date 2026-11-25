@@ -11,6 +11,7 @@ import {
   authorizeDocumentCancellation,
   executeDocumentCancellation,
   issueCreditNote,
+  registerMultiInvoicePaymentComplement,
   issueDocument,
   issueFreeInvoice,
   requestDocumentCancellation,
@@ -325,5 +326,35 @@ export async function issueCreditNoteAction(formData: FormData) {
     if (isRedirect(error)) throw error;
     await setFlash({ tone: "error", message: messageOf(error) });
     redirect(`/facturacion/${targetDocumentId}`);
+  }
+}
+
+export async function stampMultiInvoiceComplementAction(formData: FormData) {
+  "use server";
+  const clientId = requiredText(formData.get("clientId"), "Cliente");
+  try {
+    const session = await guard("invoice.issue");
+    const documentIds = formData.getAll("documentId").map(String).filter(Boolean);
+    const methodRaw = requiredText(formData.get("method"), "Forma de pago");
+    if (methodRaw !== "EFECTIVO" && methodRaw !== "TRANSFERENCIA") {
+      throw new Error("La forma de pago debe ser efectivo o transferencia.");
+    }
+    const result = await registerMultiInvoicePaymentComplement(session, {
+      clientId,
+      allocations: documentIds.map((documentId) => ({
+        documentId,
+        amount: moneyFromForm(formData.get(`amount_${documentId}`), "Importe"),
+      })),
+      method: methodRaw,
+      receipt: requiredText(formData.get("receipt"), "Comprobante"),
+      destination: requiredText(formData.get("destination"), "Destino"),
+    });
+    const stamped = result.stamp.ok ? "Complemento timbrado." : result.stamp.message;
+    await setFlash({ tone: result.stamp.ok ? "ok" : "error", message: `${result.payment.folio} registrado. ${stamped}` });
+    redirect(`/pagos/${result.payment.id}`);
+  } catch (error) {
+    if (isRedirect(error)) throw error;
+    await setFlash({ tone: "error", message: messageOf(error) });
+    redirect(`/facturacion/complemento?cliente=${clientId}`);
   }
 }

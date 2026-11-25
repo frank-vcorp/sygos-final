@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { RegisterPaymentDialog } from "./register-payment-dialog";
 import { getPaymentFormOptions } from "./payment-form-data";
-import { ActiveFilters, Badge, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, SegmentedNav, Table, Td, Th } from "@/components/ui";
+import { ActionLink, ActiveFilters, Badge, Empty, MobileCard, PageHeader, RecordLink, ResponsiveData, SegmentedNav, Table, Td, Th } from "@/components/ui";
 import { ClientNameLink } from "@/components/client-entity-links";
 import { repBadgeInfo } from "@/lib/billing-badges";
 import { homePath } from "@/lib/home";
@@ -45,14 +45,19 @@ export default async function PagosPage({ searchParams }: { searchParams: Promis
         title={coordPageTitle(sidebarNav, vistaTitle, "Pagos")}
         subtitle={coordPageSubtitle(sidebarNav, session.activeCompanyCode, "Un pago pendiente no reduce saldos. Validarlo sí.", "Comprobante, importe y destino")}
         action={
-          canRegister ? (
-            <RegisterPaymentDialog
-              receivables={paymentFormOptions.receivables}
-              payables={paymentFormOptions.payables}
-              initiallyOpen={nuevo === "1"}
-              returnHref={nuevo === "1" ? listHref : undefined}
-            />
-          ) : null
+          <span className="flex flex-wrap items-center gap-2">
+            {can(session.role, "invoice.issue", session.activeCompanyCode) ? (
+              <ActionLink href="/facturacion/complemento" tone="ghost">Complemento de varias facturas</ActionLink>
+            ) : null}
+            {canRegister ? (
+              <RegisterPaymentDialog
+                receivables={paymentFormOptions.receivables}
+                payables={paymentFormOptions.payables}
+                initiallyOpen={nuevo === "1"}
+                returnHref={nuevo === "1" ? listHref : undefined}
+              />
+            ) : null}
+          </span>
         }
       />
       {sidebarNav ? null : <SegmentedNav items={tabs} />}

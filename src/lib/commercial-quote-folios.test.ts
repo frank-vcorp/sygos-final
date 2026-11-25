@@ -22,6 +22,7 @@ describe("commercial quote folios", () => {
     assert.equal(await allocateFolio(company.id, "COTMP"), "COTMP-1");
     assert.equal(await allocateFolio(company.id, "COTSC"), "COTSC-1");
     assert.equal(await allocateFolio(company.id, "COTVT"), "COTVT-1");
+    assert.equal(await allocateFolio(company.id, "COTSV"), "COTSV-1");
     assert.equal(await allocateFolio(company.id, "SCA"), "SCA-1");
     assert.equal(await allocateFolio(company.id, "COTDX"), "COTDX-2");
     assert.equal(await allocateFolio(company.id, "SRV"), "SRV-1");

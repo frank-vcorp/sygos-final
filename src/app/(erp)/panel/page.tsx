@@ -37,6 +37,8 @@ import {
   loadGerenteServicioPanelContext,
 } from "@/lib/gerente-servicios-panel-filters";
 import { serviciosBandejaHref } from "@/lib/servicios-catalog";
+import { listServicesPendingCeoPrice } from "@/lib/service-ceo-price";
+import { listPricedServices } from "@/lib/service-bundle-quote";
 import {
   listActiveServicios,
   listHistorialServicios,
@@ -1055,6 +1057,7 @@ async function Sales({
       .filter((row) => receivableEsVigente(row.dueAt, row.balance) && row.document.equipmentId)
       .map((row) => row.document.equipmentId as string),
   );
+  const serviciosConPrecio = (await listPricedServices(companyId, userId)).filter((row) => !row.onAuthorizedQuote);
 
   return (
     <>
@@ -1084,6 +1087,21 @@ async function Sales({
         ) : null}
       </Card>
       <section className="flex w-full max-w-none flex-col gap-4">
+        <Block
+          title="Servicios con precio"
+          empty="No hay servicios con precio de CEO pendientes de una cotización autorizada."
+          bandejaHref="/cotizaciones/nuevo?tipo=SERVICIOS_EXISTENTES"
+          rows={serviciosConPrecio.map((row) => ({
+            key: row.technicalCaseId,
+            href: row.openQuote
+              ? `/cotizaciones/${row.openQuote.id}`
+              : `/cotizaciones/nuevo?tipo=SERVICIOS_EXISTENTES&clientId=${row.clientId}&servicio=${row.technicalCaseId}`,
+            label: row.folio,
+            detail: row.openQuote
+              ? `${row.clientName} · ${row.amountLabel} · En ${row.openQuote.folio}, sin autorizar`
+              : `${row.clientName} · ${row.amountLabel} · Crear cotización`,
+          }))}
+        />
         <SalesPanelServiciosGrouped
           title="Cotizaciones / seguimientos"
           role={role}
@@ -1312,8 +1330,9 @@ async function CeoExecutive({
   name: string;
 }) {
   const showFinance = can(role, "finance.view", companyCode);
-  const [quotes, payrolls, overtime, vacations, leavePermissions, pendingJustifications, compensationRequests, commissions, activeServicios, exitWithoutDocPending, finance] = await Promise.all([
+  const [quotes, pendingServices, payrolls, overtime, vacations, leavePermissions, pendingJustifications, compensationRequests, commissions, activeServicios, exitWithoutDocPending, finance] = await Promise.all([
     prisma.quote.findMany({ where: { companyId, status: "PENDIENTE_COTIZAR" }, take: 20 }),
+    listServicesPendingCeoPrice(companyId),
     prisma.payrollPeriod.findMany({
       where: { companyId, status: { in: ["PENDIENTE_VALIDACION", "PRELIMINAR"] } },
       take: 10,
@@ -1435,10 +1454,13 @@ async function CeoExecutive({
           <CeoExitWithoutDocumentPanel rows={exitPendingRows} />
         </Card>
         <Block
-          title="Cotizaciones pendientes de precio"
+          title="Pendientes de cotizar"
           empty="Nada por cotizar."
           bandejaHref="/cotizaciones?vista=pendientes"
-          rows={quotes.map((row) => ({ href: `/cotizaciones/${row.id}`, label: row.folio, detail: "Asignar precio" }))}
+          rows={[
+            ...pendingServices.map((row) => ({ href: `/operacion/${row.id}#asignar-precio`, label: row.folio, detail: "Asignar precio" })),
+            ...quotes.map((row) => ({ href: `/cotizaciones/${row.id}`, label: row.folio, detail: "Asignar precio" })),
+          ]}
         />
         <Block
           title="Nóminas"
@@ -1491,8 +1513,9 @@ async function CeoExecutive({
 }
 
 async function Executive({ companyId, name }: { companyId: string; name: string }) {
-  const [quotes, orders, warranties, payrolls, commissions, overtime, overdue, invoiced] = await Promise.all([
+  const [quotes, pendingServices, orders, warranties, payrolls, commissions, overtime, overdue, invoiced] = await Promise.all([
     prisma.quote.findMany({ where: { companyId, status: "PENDIENTE_COTIZAR" }, take: 20 }),
+    listServicesPendingCeoPrice(companyId),
     prisma.purchase.findMany({ where: { companyId, kind: "OC", status: "PENDIENTE_AUTORIZACION" }, take: 20 }),
     prisma.technicalCase.findMany({ where: { serviceCompanyId: companyId, warrantyDecision: "NO_PROCEDENTE", commercialDecision: null }, take: 20 }),
     prisma.payrollPeriod.findMany({
@@ -1508,13 +1531,16 @@ async function Executive({ companyId, name }: { companyId: string; name: string 
     <>
       <PageHeader title={`Panel ${name}`} subtitle="Solo esta empresa. No hay suma con la otra." />
       <section className="mb-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        <KpiCard label="Por cotizar" value={String(quotes.length)} href="/cotizaciones?vista=pendientes" />
+        <KpiCard label="Por cotizar" value={String(quotes.length + pendingServices.length)} href="/cotizaciones?vista=pendientes" />
         <KpiCard label="O.C. por autorizar" value={String(orders.length)} href="/compras?vista=autorizar" />
         <KpiCard label="SLA vencidos" value={String(overdue)} href="/operacion" />
         <KpiCard label="Facturado" value={money(invoiced._sum.total ?? 0)} href="/finanzas" />
       </section>
       <div className="grid gap-3">
-        <Block title="Pendientes de cotizar" empty="Nada por cotizar." bandejaHref="/cotizaciones?vista=pendientes" rows={quotes.map((row) => ({ href: `/cotizaciones/${row.id}`, label: row.folio, detail: "Asignar precio" }))} />
+        <Block title="Pendientes de cotizar" empty="Nada por cotizar." bandejaHref="/cotizaciones?vista=pendientes" rows={[
+          ...pendingServices.map((row) => ({ href: `/operacion/${row.id}#asignar-precio`, label: row.folio, detail: "Asignar precio" })),
+          ...quotes.map((row) => ({ href: `/cotizaciones/${row.id}`, label: row.folio, detail: "Asignar precio" })),
+        ]} />
         <Block title="Órdenes por autorizar" empty="Sin órdenes pendientes." bandejaHref="/compras?vista=autorizar" rows={orders.map((row) => ({ href: `/compras/${row.id}`, label: row.folio, detail: money(row.amount) }))} />
         <Block title="Garantías no procedentes" empty="Sin decisión comercial pendiente." bandejaHref="/operacion" rows={warranties.map((row) => ({ href: `/operacion/${row.id}`, label: row.folio, detail: "Decidir comercialmente" }))} />
         <Block title="Nómina" empty="Sin preliminar." bandejaHref="/nomina" rows={payrolls.map((row) => ({ href: `/nomina/${row.id}`, label: row.folio, detail: "Autorizar" }))} />

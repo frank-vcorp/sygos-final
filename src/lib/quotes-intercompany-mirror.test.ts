@@ -104,42 +104,24 @@ describe("cotización espejo MOT Servomotores → SYSTRON", () => {
       },
     });
 
-    const servQuote = await ensureQuoteFromCase(
-      { userId: diego.id, activeCompanyId: servomotores.id },
-      dx.id,
-    );
-    assert.equal(servQuote.companyId, servomotores.id);
-    assert.equal(servQuote.status, "PENDIENTE_DECISION");
-
-    const mirror = await prisma.quote.findFirst({
-      where: { companyId: systron.id, technicalCaseId: dx.id },
-      include: { lines: true },
-    });
-    assert.ok(mirror);
-    assert.equal(mirror!.linkedQuoteId, servQuote.id);
-    assert.equal(mirror!.priorityName, "Alta");
-    assert.equal(mirror!.prioritySlaMaxDays, 7);
-    assert.equal(mirror!.deliveryBusinessDays, 7);
-    assert.equal(mirror!.quoteType, "DIAGNOSTICO");
-    assert.equal(intercompanyDeliveryDaysDefault(mirror!), 7);
-
-    const again = await ensureQuoteFromCase(
-      { userId: diego.id, activeCompanyId: servomotores.id },
-      dx.id,
-    );
-    assert.equal(again.id, servQuote.id);
     assert.equal(
-      await prisma.quote.count({ where: { companyId: systron.id, technicalCaseId: dx.id } }),
-      1,
+      await ensureQuoteFromCase({ userId: diego.id, activeCompanyId: servomotores.id }, dx.id),
+      null,
     );
+    assert.equal(await prisma.quote.count(), 0);
+    assert.equal((await prisma.technicalCase.findUnique({ where: { id: dx.id } }))!.ceoPricePending, true);
+    assert.equal(intercompanyReferenceAmount(null, attention), 8000);
+    assert.equal(intercompanyDeliveryDaysDefault({
+      deliveryBusinessDays: null,
+      prioritySlaMaxDays: attention.prioritySlaMaxDays,
+      priorityTargetMaxDays: attention.priorityTargetMax,
+    }), 7);
 
-    const pricedBase = await prisma.quote.findUnique({ where: { id: servQuote.id }, include: { lines: true } });
-    assert.equal(pricedBase!.lines[0]!.basePrice, 8000);
-    assert.equal(pricedBase!.lines[0]!.unitPrice, 8800);
-    assert.equal(pricedBase!.deliveryBusinessDays, 7);
-    assert.equal(intercompanyReferenceAmount(pricedBase, attention), 8000);
-    const mirrorAfterPrice = await prisma.quote.findFirst({ where: { companyId: systron.id, linkedQuoteId: servQuote.id } });
-    assert.equal(mirrorAfterPrice!.deliveryBusinessDays, 7);
+    assert.equal(
+      await ensureQuoteFromCase({ userId: diego.id, activeCompanyId: servomotores.id }, dx.id),
+      null,
+    );
+    assert.equal(await prisma.quote.count(), 0);
 
     const os = await prisma.technicalCase.create({
       data: {
@@ -153,10 +135,10 @@ describe("cotización espejo MOT Servomotores → SYSTRON", () => {
         quotePending: true,
       },
     });
-    await ensureQuoteFromCase({ userId: diego.id, activeCompanyId: servomotores.id }, os.id);
-    const mirrorAfterOs = await prisma.quote.findFirst({ where: { companyId: systron.id, technicalCaseId: dx.id } });
-    assert.ok(mirrorAfterOs);
-    assert.equal(mirrorAfterOs!.quoteType, "DIAGNOSTICO");
+    assert.equal(await ensureQuoteFromCase({ userId: diego.id, activeCompanyId: servomotores.id }, os.id), null);
+    assert.equal(await prisma.quote.count(), 0);
+    assert.equal((await prisma.technicalCase.findUnique({ where: { id: dx.id } }))!.ceoPricePending, true);
+    assert.equal((await prisma.technicalCase.findUnique({ where: { id: os.id } }))!.ceoPricePending, false);
   });
 
   it("cotizar un DX-3 abierto no aparta el 4; el siguiente caso es DX-4", async () => {
@@ -234,13 +216,10 @@ describe("cotización espejo MOT Servomotores → SYSTRON", () => {
     assert.equal(dx!.folio, "DX-3");
     await prisma.technicalCase.update({ where: { id: dx!.id }, data: { status: "VALIDADO", quotePending: true } });
 
-    const quote = await ensureQuoteFromCase({ userId: diego.id, activeCompanyId: servomotores.id }, dx!.id);
-    assert.equal(quote.folio, "COT-3");
-    assert.equal((await prisma.quote.findUnique({ where: { id: quote.id } }))!.reservedServiceNumber, null);
-
-    const again = await ensureQuoteFromCase({ userId: diego.id, activeCompanyId: servomotores.id }, dx!.id);
-    assert.equal(again.id, quote.id);
-    assert.equal((await prisma.quote.findUnique({ where: { id: again.id } }))!.reservedServiceNumber, null);
+    assert.equal(await ensureQuoteFromCase({ userId: diego.id, activeCompanyId: servomotores.id }, dx!.id), null);
+    assert.equal(await prisma.quote.count(), 0);
+    assert.equal(await ensureQuoteFromCase({ userId: diego.id, activeCompanyId: servomotores.id }, dx!.id), null);
+    assert.equal(await prisma.quote.count(), 0);
 
     const other = await prisma.equipment.create({
       data: {

@@ -5,7 +5,7 @@ import { DocumentDeliveryBar } from "@/components/documents/document-delivery-ba
 import { deliveryIntegrationFromConfig, quoteDeliveryDefaultMessages } from "@/lib/document-delivery";
 import { getSendGridSmtpConfig } from "@/lib/sendgrid";
 import { getWhatsAppFullStatus } from "@/lib/whatsapp";
-import { decideAction, discountAction, linkBaseAction, relateEquipmentAction, setPricesAction, updateGeneratedConceptAction, updateQuoteLineDescriptionsAction, updateQuoteLinePricesAction, updateSellerConceptComplementAction } from "../actions";
+import { decideAction, discountAction, linkBaseAction, relateEquipmentAction, setPricesAction, syncServicesQuoteLinesAction, updateGeneratedConceptAction, updateQuoteLineDescriptionsAction, updateQuoteLinePricesAction, updateSellerConceptComplementAction } from "../actions";
 import { RelateEquipmentForm } from "@/components/relate-equipment-form";
 import { HistoryTimeline } from "@/components/history-timeline";
 import { QuoteBillingRequestActions } from "@/components/quote-billing-request-actions";
@@ -50,6 +50,7 @@ import { redirectIfSalesNotAssigned } from "@/lib/sales-assignment";
 import { requireCompany } from "@/lib/session";
 import { PART_REQUEST_STATUS_LABEL } from "@/lib/case-labels";
 import { CASE_STATUS_LABEL } from "@/lib/technical";
+import { listPricedServices } from "@/lib/service-bundle-quote";
 
 export default async function CotizacionDetallePage({ params }: { params: Promise<{ id: string }> }) {
   const session = await requireCompany();
@@ -308,6 +309,11 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
     phone: contact.phone,
     isPrimary: contact.isPrimary,
   }));
+  const bundleServices = quote.quoteType === "SERVICIOS_EXISTENTES" && quote.status === "PENDIENTE_DECISION"
+    && can(session.role, "quote.follow", session.activeCompanyCode)
+    ? (await listPricedServices(session.activeCompanyId, session.role === "VENTAS" ? session.userId : null))
+        .filter((row) => row.clientId === quote.clientId && !row.onAuthorizedQuote && (!row.openQuote || row.openQuote.id === quote.id))
+    : [];
 
   const executiveCasesWithOpenHistory = new Set(executiveOperationHistory.filter((item) => item.action === "ALTA").map((item) => item.entityId));
   const executiveAttentionHasOpenHistory = executiveAttentionHistory.some((item) => item.action === "ALTA");
@@ -779,6 +785,14 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
               </FormPanel>
             </details>
           ) : null}
+          {bundleServices.length > 0 || (quote.quoteType === "SERVICIOS_EXISTENTES" && quote.status === "PENDIENTE_DECISION" && can(session.role, "quote.follow", session.activeCompanyCode)) ? (
+            <ServiceQuoteLinesForm
+              quoteId={quote.id}
+              version={quote.version}
+              selectedIds={quote.lines.map((line) => line.sourceTechnicalCaseId).filter((id): id is string => Boolean(id))}
+              services={bundleServices}
+            />
+          ) : null}
           <HistoryTimeline
             items={session.role === "CEO" && executiveAttentionHistoryItems.length > 0
               ? executiveAttentionHistoryItems
@@ -809,4 +823,53 @@ export default async function CotizacionDetallePage({ params }: { params: Promis
   }
 
   return pageBody;
+}
+
+function ServiceQuoteLinesForm({
+  quoteId,
+  version,
+  selectedIds,
+  services,
+}: {
+  quoteId: string;
+  version: number;
+  selectedIds: string[];
+  services: Array<{ technicalCaseId: string; folio: string; equipmentLabel: string; amountLabel: string }>;
+}) {
+  return (
+    <Card className="p-4 text-sm">
+      <h2 className="font-medium">Servicios de esta cotización</h2>
+      <p className="mt-1 text-[var(--muted)]">Puedes agregar o quitar servicios de este cliente mientras la cotización no está autorizada. Un servicio no puede estar en dos cotizaciones abiertas.</p>
+      <form action={syncServicesQuoteLinesAction} className="mt-3 grid gap-3">
+        <input type="hidden" name="quoteId" value={quoteId} />
+        <input type="hidden" name="version" value={version} />
+        {services.length === 0 ? (
+          <p className="text-[var(--muted)]">No hay otros servicios con precio de este cliente.</p>
+        ) : (
+          <ul className="grid gap-2">
+            {services.map((service) => (
+              <li key={service.technicalCaseId}>
+                <label className="flex items-start gap-3">
+                  <input
+                    type="checkbox"
+                    name="serviceCaseId"
+                    value={service.technicalCaseId}
+                    defaultChecked={selectedIds.includes(service.technicalCaseId)}
+                    className="mt-1"
+                  />
+                  <span>
+                    <span className="font-medium">{service.folio}</span>
+                    <span className="block text-[var(--muted)]">{service.equipmentLabel} · {service.amountLabel}</span>
+                  </span>
+                </label>
+              </li>
+            ))}
+          </ul>
+        )}
+        <FormActions>
+          <SubmitButton tone="ghost">Guardar partidas</SubmitButton>
+        </FormActions>
+      </form>
+    </Card>
+  );
 }

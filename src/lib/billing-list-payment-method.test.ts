@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import {
   billingListPpdCobranza,
+  documentHasUnpaidBalance,
   facturacionListUsesPaymentMethodColumn,
   paymentMethodShortListLabel,
 } from "./billing-list-payment-method";
@@ -20,6 +21,14 @@ describe("paymentMethodShortListLabel", () => {
     assert.equal(paymentMethodShortListLabel("PUE"), "PUE");
     assert.equal(paymentMethodShortListLabel("PPD"), "PPD");
     assert.equal(paymentMethodShortListLabel(null), "—");
+  });
+});
+
+describe("documentHasUnpaidBalance", () => {
+  it("el pendiente es el saldo, no el método PPD", () => {
+    assert.equal(documentHasUnpaidBalance(1500), true);
+    assert.equal(documentHasUnpaidBalance(0), false);
+    assert.equal(documentHasUnpaidBalance(null), false);
   });
 });
 
@@ -48,6 +57,8 @@ describe("billingListPpdCobranza", () => {
     });
     assert.equal(row?.complementLabel, "Sin REP");
     assert.equal(row?.complementWarn, false);
+    assert.match(row?.balanceLine ?? "", /1000/);
+    assert.equal(documentHasUnpaidBalance(1000), true);
   });
 
   it("REP timbrado con saldo cero", () => {

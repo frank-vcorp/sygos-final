@@ -48,7 +48,12 @@ export default async function FacturacionPage({ searchParams }: { searchParams: 
           invoicesOnlyNav ? invoiceOnlySubtitle : "Solicitud, emisión y remisión de esta empresa. El timbrado no se duplica.",
           vista === "solicitudes" ? "Pendientes de emitir" : vista === "facturas" ? "Emitidas" : vista === "canceladas" ? "Canceladas" : "Solicitudes y emisión",
         )}
-        action={can(session.role, "invoice.issue", session.activeCompanyCode) ? <ActionLink href="/facturacion/nuevo">Factura libre</ActionLink> : null}
+        action={can(session.role, "invoice.issue", session.activeCompanyCode) ? (
+          <span className="flex flex-wrap gap-2">
+            <ActionLink href="/facturacion/complemento" tone="ghost">Complemento de varias facturas</ActionLink>
+            <ActionLink href="/facturacion/nuevo">Factura libre</ActionLink>
+          </span>
+        ) : null}
       />
       {sidebarNav ? null : <BillingVistaFilter vista={vista} options={tabs.map((tab) => ({ value: tab.key, label: tab.label }))} />}
       <ActiveFilters

@@ -1,6 +1,11 @@
 import { isBillingDocumentEligibleForRep } from "@/lib/facturapi";
 import { paymentMethodLabel } from "@/lib/sat-payment-method";
 
+/** Pendiente de pago es saldo por cobrar. PPD no cuenta como pagado. */
+export function documentHasUnpaidBalance(balance: number | null | undefined): boolean {
+  return typeof balance === "number" && Number.isFinite(balance) && balance > 0;
+}
+
 export function facturacionListUsesPaymentMethodColumn(role: string): boolean {
   return role === "COORDINACION_ADMINISTRACION" || role === "CEO";
 }

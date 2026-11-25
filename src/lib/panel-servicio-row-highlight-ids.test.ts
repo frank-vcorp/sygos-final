@@ -10,8 +10,6 @@ import type { SupervisorServicioRow } from "@/lib/servicios-supervisor-rows";
 function servicioRow(overrides: Partial<SupervisorServicioRow> & { id: string; equipmentId: string }): SupervisorServicioRow {
   return {
     kind: "servicio",
-    id: overrides.id,
-    equipmentId: overrides.equipmentId,
     equipmentKind: "MOT",
     equipmentHref: "/eq/1",
     equipmentLabel: "EQ",
@@ -32,14 +30,14 @@ function servicioRow(overrides: Partial<SupervisorServicioRow> & { id: string; e
     quoteStatus: null,
     quoteSellerUserId: null,
     quoteMonto: "$0",
-    slaDueAt: overrides.slaDueAt ?? null,
+    slaDueAt: null,
     slaStartedAt: null,
     attentionCreatedAt: new Date("2024-01-01"),
     priorityName: "Normal",
     attentionType: "REPARACION_TALLER",
     createdAt: new Date("2024-01-01"),
     closedAt: null,
-    primaryStatus: overrides.primaryStatus ?? "EN_PROCESO",
+    primaryStatus: "EN_PROCESO",
     ...overrides,
   } as SupervisorServicioRow;
 }

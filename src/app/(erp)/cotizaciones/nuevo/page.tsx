@@ -8,12 +8,15 @@ import { prisma } from "@/lib/db";
 import { can } from "@/lib/permissions";
 import { requireCompany } from "@/lib/session";
 import { loadDiagnosisPriorityOptions, loadMantenimientoPreventivoPriorityOptions } from "@/lib/diagnosis-priorities";
+import { QUOTE_TYPES, type QuoteType } from "@/lib/quote-meta";
+import { listPricedServices } from "@/lib/service-bundle-quote";
 
-export default async function NuevaCotizacionPage({ searchParams }: { searchParams: Promise<{ clientId?: string }> }) {
+export default async function NuevaCotizacionPage({ searchParams }: { searchParams: Promise<{ clientId?: string; tipo?: string; servicio?: string }> }) {
   const session = await requireCompany();
   if (!can(session.role, "quote.create", session.activeCompanyCode)) redirect("/cotizaciones");
-  const { clientId } = await searchParams;
-  const [clients, equipment, catalog, diagnosisPriorities, mantenimientoPriorities] = await Promise.all([
+  const { clientId, tipo, servicio } = await searchParams;
+  const initialQuoteType = (QUOTE_TYPES as readonly string[]).includes(tipo ?? "") ? tipo as QuoteType : undefined;
+  const [clients, equipment, catalog, diagnosisPriorities, mantenimientoPriorities, pricedServices] = await Promise.all([
     prisma.client.findMany({
       where: { companyId: session.activeCompanyId, active: true, isSystem: false, ...(session.role === "VENTAS" ? { ownerUserId: session.userId } : {}) },
       include: { contacts: { where: { active: true }, orderBy: [{ isPrimary: "desc" }, { name: "asc" }] } },
@@ -27,6 +30,7 @@ export default async function NuevaCotizacionPage({ searchParams }: { searchPara
     loadEquipmentCatalogByKind(),
     loadDiagnosisPriorityOptions(session.activeCompanyId, session.activeCompanyCode),
     loadMantenimientoPreventivoPriorityOptions(session.activeCompanyId, session.activeCompanyCode),
+    listPricedServices(session.activeCompanyId, session.role === "VENTAS" ? session.userId : null),
   ]);
   const quickEquipmentKinds: Array<"EQUI" | "MOT"> = [
     ...(can(session.role, "equi.create", session.activeCompanyCode) ? ["EQUI" as const] : []),
@@ -36,7 +40,7 @@ export default async function NuevaCotizacionPage({ searchParams }: { searchPara
     <>
       <PageHeader
         title="Nueva cotización"
-        subtitle="COTDX/COTMP usan catálogo de prioridad. COTVT: captura precio, T.E. y condición aquí. COTOS y COTSC siguen con precio de gerencia."
+        subtitle="COTDX/COTMP usan catálogo de prioridad. Servicios existentes: elige un cliente y los DX/OS que ya tienen precio. COTVT captura precio aquí. COTOS y COTSC siguen con precio de gerencia."
         back={{ href: "/cotizaciones", label: "Cotizaciones" }}
       />
       <FormPanel action={createQuoteAction}>
@@ -56,6 +60,18 @@ export default async function NuevaCotizacionPage({ searchParams }: { searchPara
             catalogByKind={catalog}
             diagnosisPriorities={diagnosisPriorities}
             mantenimientoPriorities={mantenimientoPriorities}
+            initialQuoteType={initialQuoteType}
+            defaultServiceIds={servicio ? [servicio] : []}
+            pricedServices={pricedServices
+              .filter((row) => !row.onAuthorizedQuote && !row.openQuote)
+              .map((row) => ({
+                technicalCaseId: row.technicalCaseId,
+                folio: row.folio,
+                clientId: row.clientId,
+                concept: row.concept,
+                amountLabel: row.amountLabel,
+                equipmentLabel: row.equipmentLabel,
+              }))}
           />
         </div>
         <FormActions note="Venta de equipo: guarda con precio del vendedor. Servicio de campo: gerencia cotiza horas y tarifa después.">

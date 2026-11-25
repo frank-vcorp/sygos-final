@@ -89,33 +89,35 @@ describe("cotización taller COT-* en panel ventas", () => {
       },
     });
 
-    const quote = await ensureQuoteFromCase(
-      { userId: ceo.id, activeCompanyId: company.id },
-      dx.id,
-    );
-    assert.match(quote.folio, /^COT-/);
-    assert.equal(quote.sellerUserId, seller.id);
+    assert.equal(await ensureQuoteFromCase({ userId: ceo.id, activeCompanyId: company.id }, dx.id), null);
+    assert.equal(await prisma.quote.count({ where: { companyId: company.id } }), 0);
 
-    const withLines = await prisma.quote.findUnique({ where: { id: quote.id }, include: { lines: true } });
-    await setPrices(
+    const { assignServiceCeoPrice } = await import("./service-ceo-price");
+    const { createServicesExistingQuote } = await import("./service-bundle-quote");
+    const { defaultSellerQuoteCommercialTerms } = await import("./quote-commercial-terms");
+    await assignServiceCeoPrice(
       { userId: ceo.id, role: "CEO", activeCompanyId: company.id, activeCompanyCode: "SYSTRON" },
-      quote.id,
-      1,
-      [{ lineId: withLines!.lines[0]!.id, amount: 1800 }],
-      5,
+      dx.id,
+      { amount: 1800, deliveryBusinessDays: 5 },
     );
-
-    const priced = await prisma.quote.findUnique({ where: { id: quote.id } });
-    assert.equal(priced!.status, "PENDIENTE_DECISION");
-
-    const rows = await listActiveServicios(company.id, "", { clientOwnerUserId: seller.id });
-    const servicioRows = rows.filter((row) => row.kind === "servicio");
-    assert.ok(servicioRows.length >= 1);
-    const match = servicioRows.find((row) => row.quoteFolio === quote.folio);
-    assert.ok(match);
-    assert.equal(match!.quoteStatus, "PENDIENTE_DECISION");
-    assert.equal(servicioPendienteAutorizacionForSeller(match!, seller.id), true);
-    assert.equal(servicioCotizadaSinAutorizacion(match!), false);
+    assert.equal(await prisma.quote.count({ where: { companyId: company.id } }), 0);
+    const contact = await prisma.contact.create({
+      data: { clientId: client.id, name: "Contacto", active: true, isPrimary: true },
+    });
+    const quote = await createServicesExistingQuote(
+      { userId: seller.id, role: "VENTAS", activeCompanyId: company.id, activeCompanyCode: "SYSTRON" },
+      {
+        clientId: client.id,
+        technicalCaseIds: [dx.id],
+        reference: null,
+        contactIds: [contact.id],
+        ...defaultSellerQuoteCommercialTerms,
+        creditDays: 30,
+      },
+    );
+    assert.match(quote.folio, /^COTSV-/);
+    assert.equal(quote.sellerUserId, seller.id);
+    assert.equal(quote.status, "PENDIENTE_DECISION");
 
     const pendiente = administrativeStatus({
       attentionType: "DIAGNOSTICO",
@@ -124,7 +126,19 @@ describe("cotización taller COT-* en panel ventas", () => {
       warrantyDecision: null,
     });
     assert.equal(pendiente.label, "Cotizado");
-    assert.equal(servicioPendienteAutorizacion({ ...match!, administrative: pendiente }), true);
+    assert.equal(servicioPendienteAutorizacion({
+      quoteStatus: "PENDIENTE_DECISION",
+      administrative: pendiente,
+    } as never), true);
+    assert.equal(servicioPendienteAutorizacionForSeller({
+      quoteStatus: "PENDIENTE_DECISION",
+      administrative: pendiente,
+      quoteSellerUserId: seller.id,
+    } as never, seller.id), true);
+    assert.equal(servicioCotizadaSinAutorizacion({
+      quoteStatus: "PENDIENTE_DECISION",
+      administrative: pendiente,
+    } as never), false);
 
     await prisma.$disconnect();
   });

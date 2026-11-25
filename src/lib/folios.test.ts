@@ -181,6 +181,10 @@ describe("folios", () => {
         isSystem: false,
         requiresInvoice: true,
         rfc: "XAXX010101000",
+        satLegalName: "Cliente SA",
+        taxRegime: "601",
+        fiscalZip: "64000",
+        fiscalEmail: "cliente@example.com",
         cfdiUse: "G03",
         paymentMethod: "PUE",
       },
@@ -285,20 +289,13 @@ describe("folios", () => {
     await prisma.attention.update({ where: { id: attention.id }, data: { serviceNumber: 7 } });
 
     const actor = { userId: user.id, activeCompanyId: company.id };
-    const cot = await ensureQuoteFromCase(actor, dx.id);
-    assert.equal((await ensureQuoteFromCase(actor, osSpawn.id)).id, cot.id);
-    assert.equal(cot.folio, "COT-7");
-    assert.equal(
-      await prisma.quote.count({
-        where: { companyId: company.id, technicalCaseId: { in: [dx.id, osSpawn.id] } },
-      }),
-      1,
-    );
-
-    await prisma.quote.update({ where: { id: cot.id }, data: { technicalCaseId: null } });
-    const recovered = await ensureQuoteFromCase(actor, dx.id);
-    assert.equal(recovered.id, cot.id);
-    assert.equal(await prisma.quote.count({ where: { companyId: company.id, folio: "COT-7" } }), 1);
+    assert.equal(await ensureQuoteFromCase(actor, dx.id), null);
+    assert.equal(await ensureQuoteFromCase(actor, osSpawn.id), null);
+    const dxAfter = await prisma.technicalCase.findUnique({ where: { id: dx.id } });
+    const osAfter = await prisma.technicalCase.findUnique({ where: { id: osSpawn.id } });
+    assert.equal(dxAfter!.ceoPricePending, true);
+    assert.equal(osAfter!.ceoPricePending, false);
+    assert.equal(await prisma.quote.count({ where: { companyId: company.id } }), 0);
 
     const quote = await prisma.quote.create({
       data: {

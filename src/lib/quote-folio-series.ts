@@ -1,6 +1,6 @@
 import type { QuoteType } from "./quote-meta";
 
-export const COMMERCIAL_QUOTE_SERIES = ["COTDX", "COTOS", "COTMP", "COTSC", "COTVT", "SCA"] as const;
+export const COMMERCIAL_QUOTE_SERIES = ["COTDX", "COTOS", "COTMP", "COTSC", "COTVT", "COTSV", "SCA"] as const;
 export type CommercialQuoteSeries = (typeof COMMERCIAL_QUOTE_SERIES)[number];
 
 export function commercialQuoteSeriesForType(quoteType: QuoteType): CommercialQuoteSeries {
@@ -15,6 +15,8 @@ export function commercialQuoteSeriesForType(quoteType: QuoteType): CommercialQu
       return "COTSC";
     case "VENTA_EQUIPO":
       return "COTVT";
+    case "SERVICIOS_EXISTENTES":
+      return "COTSV";
   }
 }
 
@@ -32,6 +34,6 @@ export function isCotmpQuote(quote: { quoteType: string; folio: string; technica
 }
 
 export function commercialSeriesFromFolio(folio: string): CommercialQuoteSeries | null {
-  const match = /^(COTDX|COTOS|COTMP|COTSC|COTVT|SCA)-/.exec(folio);
+  const match = /^(COTDX|COTOS|COTMP|COTSC|COTVT|COTSV|SCA)-/.exec(folio);
   return match ? (match[1] as CommercialQuoteSeries) : null;
 }

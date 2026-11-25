@@ -173,10 +173,13 @@ describe("órdenes desde Gerente Operativo SYSTRON: vendedor, folio anterior y m
     assert.ok(attHistory.some((h) => h.action === "ALTA" && h.createdAt.toISOString() === customDate.toISOString()));
     assert.ok(attHistory.some((h) => h.action === "ENTRADA_FISICA" && h.createdAt.toISOString() === customDate.toISOString()));
 
-    // La cotización derivada toma el sellerUserId elegido en la atención
+    // El precio del CEO no crea cotización. El vendedor de la atención se conserva para la cotización comercial posterior.
     await prisma.technicalCase.update({ where: { id: dx1.id }, data: { status: "VALIDADO", quotePending: true } });
     const quote = await ensureQuoteFromCase({ userId: samuel.id, activeCompanyId: systron.id }, dx1.id);
-    assert.equal(quote.sellerUserId, sellerB.id);
+    assert.equal(quote, null);
+    assert.equal((await prisma.technicalCase.findUnique({ where: { id: dx1.id } }))!.ceoPricePending, true);
+    assert.equal(await prisma.quote.count({ where: { technicalCaseId: dx1.id } }), 0);
+    assert.equal((await prisma.attention.findUnique({ where: { id: att1.id } }))!.sellerUserId, sellerB.id);
 
     // La bandeja muestra sellerName y legacyFolio, y busca por legacyFolio
     const bandeja = await listActiveServicios(systron.id, "SYS-ANT-450", { hideMotors: true });

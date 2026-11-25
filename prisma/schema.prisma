@@ -74,6 +74,7 @@ model Company {
   payrollPeriods   PayrollPeriod[]
   commissionRuns   CommissionRun[]
   fieldServiceCases FieldServiceCase[]
+  serviceCeoPrices ServiceCeoPrice[]
 }
 
 model User {
@@ -157,6 +158,7 @@ model Client {
   payments         Payment[]
   paymentComplements PaymentComplement[]
   fieldServiceCases FieldServiceCase[]
+  serviceCeoPrices ServiceCeoPrice[]
 
   @@index([companyId, name])
 }
@@ -441,6 +443,8 @@ model TechnicalCase {
   noRepairAt          DateTime?
   noRepairReason      String?
   noRepairByUserId    String?
+  /// El CEO debe asignar precio a este DX/OS. No es una cotización comercial.
+  ceoPricePending     Boolean   @default(false)
   version             Int       @default(1)
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
@@ -448,6 +452,8 @@ model TechnicalCase {
   logs            TechnicalLog[]
   requests        PartRequest[]
   presolicitudes  PartPresolicitud[] @relation("DiagnosisPresolicitudes")
+  serviceCeoPrices ServiceCeoPrice[]
+  sourcedQuoteLines QuoteLine[] @relation("QuoteLineSourceCase")
 
   @@unique([serviceCompanyId, folio])
   @@index([serviceCompanyId, status])
@@ -679,6 +685,31 @@ model QuoteLine {
   /// NUEVO | USADO — venta de equipo (COTVT).
   lineCondition String?
   authorized   Boolean @default(false)
+  /// DX/OS ya cotizado por el CEO, cuando la partida viene de servicios existentes.
+  sourceTechnicalCaseId String?
+  sourceTechnicalCase   TechnicalCase? @relation("QuoteLineSourceCase", fields: [sourceTechnicalCaseId], references: [id])
+
+  @@index([sourceTechnicalCaseId])
+}
+
+/// Precio que el CEO asigna al DX/OS. No es una cotización comercial.
+model ServiceCeoPrice {
+  id                   String        @id @default(cuid())
+  companyId            String
+  company              Company       @relation(fields: [companyId], references: [id])
+  technicalCaseId      String
+  technicalCase        TechnicalCase @relation(fields: [technicalCaseId], references: [id])
+  clientId             String
+  client               Client        @relation(fields: [clientId], references: [id])
+  amount               Float
+  concept              String
+  deliveryBusinessDays Int?
+  pricedByUserId       String
+  pricedAt             DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  @@unique([companyId, technicalCaseId])
+  @@index([companyId, clientId])
 }
 
 model Sale {

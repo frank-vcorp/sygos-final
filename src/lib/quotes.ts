@@ -15,6 +15,7 @@ import { finalFromBase } from "./money";
 import { ATTENTION_LABEL, isReparacionExpressAttentionType, type AttentionType } from "./priorities";
 import { ensureMantenimientoPreventivoPriorities, ensureMotDiagnosisPriorities, ensureReparacionTallerPriorities } from "./priority-catalog";
 import { commercialSellerQuoteConcept, technicalServiceConcept } from "./quote-concept";
+import { markServiceAwaitingCeoPrice } from "./service-ceo-price";
 import { commercialQuoteSeriesForType, isCotmpQuote, isCotosQuote, isSellerCommercialQuote } from "./quote-folio-series";
 import {
   createFieldServiceCaseFromQuote,
@@ -275,6 +276,9 @@ export async function createSellerQuote(
   const client = await prisma.client.findFirst({
     where: { id: input.clientId, companyId: actor.activeCompanyId, active: true, isSystem: false },
   });
+  if (input.quoteType === "SERVICIOS_EXISTENTES") {
+    throw new Error("Elige los servicios con precio del cliente. Esa cotización no se arma como las demás.");
+  }
   if (!client) throw new Error("Selecciona un cliente activo de esta empresa.");
   if (actor.role === "VENTAS" && client.ownerUserId !== actor.userId) throw new Error(SALES_NOT_ASSIGNED_MESSAGE);
   const equipment = input.equipmentId
@@ -434,7 +438,8 @@ async function findWorkshopQuoteForAttention(
 }
 
 export async function prepareQuoteFromCase(actor: Actor, caseId: string) {
-  return ensureQuoteFromCase(actor, caseId);
+  await ensureQuoteFromCase(actor, caseId);
+  return null;
 }
 
 /** La cotización del taller intercompañía queda a nombre de Systron, no del cliente final. */
@@ -485,119 +490,11 @@ export async function alignIntercompanyWorkshopQuoteClients(companyId: string): 
   return updated;
 }
 
+/** Marca el DX/OS como pendiente de precio. No crea la cotización comercial. */
 export async function ensureQuoteFromCase(actor: { userId: string; activeCompanyId: string }, caseId: string) {
-  const row = await prisma.technicalCase.findUnique({
-    where: { id: caseId },
-    include: { attention: true, equipment: true },
-  });
-  if (!row) throw new Error("No se encontró la operación técnica.");
-  const siblingCaseIds = (
-    await prisma.technicalCase.findMany({
-      where: { attentionId: row.attentionId },
-      select: { id: true },
-    })
-  ).map((item) => item.id);
-  const existing = await findWorkshopQuoteForAttention(
-    actor.activeCompanyId,
-    row.attentionId,
-    siblingCaseIds,
-  );
-  if (existing) {
-    if (
-      row.equipment.originCompanyId !== row.serviceCompanyId
-      && actor.activeCompanyId === row.attention.serviceCompanyId
-      && existing.clientId !== row.attention.adminClientId
-    ) {
-      await prisma.quote.update({ where: { id: existing.id }, data: { clientId: row.attention.adminClientId } });
-      existing.clientId = row.attention.adminClientId;
-    }
-    if (row.equipment.kind === "MOT" && row.equipment.originCompanyId !== actor.activeCompanyId) {
-      await ensureOriginQuote(row, existing.id, actor.userId);
-    }
-    return existing;
-  }
-  const recoverValidatedDiagnosis =
-    row.status === "VALIDADO" && row.kind === "DIAGNOSTICO" && row.attention.attentionType === "DIAGNOSTICO";
-  if (!row.quotePending && !recoverValidatedDiagnosis) throw new Error("Esta operación no está pendiente de cotizar.");
-  // Recupera diagnósticos validados antes de esta regla, que quedaron sin pendiente comercial.
-  if (!row.quotePending) {
-    await prisma.technicalCase.update({ where: { id: row.id }, data: { quotePending: true } });
-  }
-  const clientId = row.equipment.originCompanyId === actor.activeCompanyId ? row.equipment.clientId : row.attention.adminClientId;
-  const client = await prisma.client.findUnique({
-    where: { id: clientId },
-    include: { contacts: { where: { active: true }, orderBy: [{ isPrimary: "desc" }, { name: "asc" }] } },
-  });
-  if (!client) throw new Error("Falta el cliente de la cotización.");
-  const repair = row.kind === "OS";
-  const concept = automaticQuoteConcept(row);
-  const folio = await serviceFolioForAttention(row.attentionId, row.serviceCompanyId, "COT");
-  const workshopDiagnosisPricing = repair
-    ? { line: {} as Record<string, never>, status: "PENDIENTE_COTIZAR" as const }
-    : diagnosisQuotePricingFromCatalog(
-      row.attention.priorityPrice,
-      row.attention.priorityIncrementPct,
-      diagnosisDeliveryBusinessDaysFromPriority(row.attention),
-    );
-  let quote;
-  try {
-    quote = await prisma.quote.create({
-      data: {
-        folio,
-        companyId: actor.activeCompanyId,
-        clientId,
-        quoteType: repair ? "REPARACION" : "DIAGNOSTICO",
-        status: repair ? "PENDIENTE_COTIZAR" : workshopDiagnosisPricing.status,
-        equipmentId: row.equipmentId,
-        technicalCaseId: row.id,
-        sellerUserId: resolveQuoteSellerUserId(row.attention.sellerUserId, client.ownerUserId),
-        reference: row.folio,
-        ...(workshopDiagnosisPricing.deliveryBusinessDays != null
-          ? { deliveryBusinessDays: workshopDiagnosisPricing.deliveryBusinessDays }
-          : {}),
-        lines: {
-          create: [{
-            concept,
-            quantity: 1,
-            ...(repair
-              ? { incrementPct: row.attention.priorityIncrementPct }
-              : workshopDiagnosisPricing.line),
-          }],
-        },
-      },
-    });
-  } catch (error) {
-    if (!isQuoteFolioUniqueConflict(error)) throw error;
-    const raced = await findWorkshopQuoteForAttention(
-      actor.activeCompanyId,
-      row.attentionId,
-      siblingCaseIds,
-    );
-    if (!raced) throw error;
-    if (row.equipment.kind === "MOT" && row.equipment.originCompanyId !== actor.activeCompanyId) {
-      await ensureOriginQuote(row, raced.id, actor.userId);
-    }
-    return raced;
-  }
-  const contactNames = client.contacts.map((contact) => contact.name).join(", ");
-  await recordHistory({
-    companyId: actor.activeCompanyId,
-    entityType: "COTIZACION",
-    entityId: quote.id,
-    action: "ALTA",
-    summary: contactNames
-      ? workshopDiagnosisPricing.status === "PENDIENTE_DECISION"
-        ? `${folio} quedó con precio de prioridad desde ${row.folio}; pendiente de decisión del cliente. Contactos: ${contactNames}.`
-        : `${folio} quedó pendiente de cotizar desde ${row.folio}. Contactos: ${contactNames}.`
-      : workshopDiagnosisPricing.status === "PENDIENTE_DECISION"
-        ? `${folio} quedó con precio de prioridad desde ${row.folio}; pendiente de decisión del cliente. El cliente no tiene contactos activos.`
-        : `${folio} quedó pendiente de cotizar desde ${row.folio}. El cliente no tiene contactos activos.`,
-    authorUserId: actor.userId,
-  });
-  if (row.equipment.kind === "MOT" && row.equipment.originCompanyId !== actor.activeCompanyId) {
-    await ensureOriginQuote(row, quote.id, actor.userId);
-  }
-  return quote;
+  void actor;
+  await markServiceAwaitingCeoPrice(caseId);
+  return null;
 }
 
 async function ensureOriginQuote(
@@ -1263,6 +1160,7 @@ export async function decideQuote(
         creditDays,
         discountPct: nextDiscountPct,
         ...(repairSlaOnAuthorize ?? {}),
+        ...(authorized && quote.quoteType === "SERVICIOS_EXISTENTES" ? { clientAuthorizedAt: new Date() } : {}),
         version: { increment: 1 },
       },
     });
@@ -1364,6 +1262,10 @@ export async function decideQuote(
   }
   if (authorized && cotdxInShop && equipment && activeQuote) {
     await openCotdxFromQuote(actor, activeQuote, equipment.id);
+  }
+  if (authorized && quote.quoteType === "SERVICIOS_EXISTENTES") {
+    const { releasePricedServicesAfterAuthorization } = await import("./service-bundle-quote");
+    await releasePricedServicesAfterAuthorization(quote.id, actor.userId);
   }
 }
 
@@ -1916,7 +1818,7 @@ export async function openWaitingRepairs(equipmentId: string, authorUserId: stri
   }
 }
 
-async function openRepairOrder(diagnosisCaseId: string, authorUserId: string) {
+export async function openRepairOrder(diagnosisCaseId: string, authorUserId: string) {
   const diagnosis = await prisma.technicalCase.findUnique({
     where: { id: diagnosisCaseId },
     include: { attention: true },

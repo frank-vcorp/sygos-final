@@ -1,4 +1,4 @@
-export const QUOTE_TYPES = ["DIAGNOSTICO", "REPARACION", "MANTENIMIENTO_PREVENTIVO", "CAMPO", "VENTA_EQUIPO"] as const;
+export const QUOTE_TYPES = ["DIAGNOSTICO", "REPARACION", "MANTENIMIENTO_PREVENTIVO", "CAMPO", "VENTA_EQUIPO", "SERVICIOS_EXISTENTES"] as const;
 export type QuoteType = (typeof QUOTE_TYPES)[number];
 
 export const QUOTE_TYPE_LABEL: Record<QuoteType, string> = {
@@ -7,6 +7,7 @@ export const QUOTE_TYPE_LABEL: Record<QuoteType, string> = {
   MANTENIMIENTO_PREVENTIVO: "Mantenimiento preventivo",
   CAMPO: "Servicio en campo",
   VENTA_EQUIPO: "Venta de equipo",
+  SERVICIOS_EXISTENTES: "Servicios existentes",
 };
 
 export const QUOTE_STATUS_LABEL: Record<string, string> = {

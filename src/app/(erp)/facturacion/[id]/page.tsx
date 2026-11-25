@@ -29,6 +29,8 @@ import { SAT_CANCEL_MOTIVES } from "@/lib/facturapi";
 import { cfdiUseLabel } from "@/lib/sat-cfdi-use";
 import { resolveClientSatLegalName } from "@/lib/sat-legal-name";
 import { paymentFormLabel, paymentMethodLabel } from "@/lib/sat-payment-method";
+import { creditNoteAmountForLine } from "@/lib/billing";
+import { CreditNoteLineFields } from "@/components/credit-note-line-fields";
 import { prisma } from "@/lib/db";
 import { formatWhen } from "@/lib/form";
 import { historyFor } from "@/lib/history";
@@ -523,19 +525,15 @@ export default async function DocumentoPage({ params }: { params: Promise<{ id: 
           {canIssue && maxCreditable > 0 ? (
             <form action={issueCreditNoteAction} className="grid gap-3 border-t border-slate-200/80 pt-3 md:grid-cols-4 md:items-end">
               <input type="hidden" name="targetDocumentId" value={row.id} />
-              <label className="md:col-span-2">
-                <span className="mb-1 block text-xs font-semibold text-[var(--ink)]">Concepto de la nota de crédito</span>
-                <input
-                  name="concept"
-                  required
-                  defaultValue={`Devolución / bonificación sobre ${row.folio}`}
-                  className={controlClass}
-                />
-              </label>
-              <label>
-                <span className="mb-1 block text-xs font-semibold text-[var(--ink)]">Importe con IVA</span>
-                <MoneyInput name="amount" required min="0.01" defaultValue={maxCreditable} />
-              </label>
+              <CreditNoteLineFields
+                remaining={maxCreditable}
+                defaultConcept={`Devolución / bonificación sobre ${row.folio}`}
+                lines={row.lines.map((line) => ({
+                  id: line.id,
+                  concept: line.concept,
+                  amount: creditNoteAmountForLine(line, maxCreditable),
+                }))}
+              />
               <label>
                 <span className="mb-1 block text-xs font-semibold text-[var(--ink)]">Uso CFDI</span>
                 <CfdiUseSelect name="cfdiUse" defaultValue="G02" required />

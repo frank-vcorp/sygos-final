@@ -1,6 +1,6 @@
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
-import { prepareFromCaseAction } from "@/app/(erp)/cotizaciones/actions";
+import { assignServiceCeoPriceAction } from "@/app/(erp)/cotizaciones/actions";
 import {
   assignCaseAction,
   createPresolicitudAction,
@@ -41,8 +41,10 @@ import {
   FormActions,
   FormPanel,
   FormSection,
+  MoneyInput,
   TextLink,
 } from "@/components/ui";
+import { SubmitButton } from "@/components/submit-button";
 import { prisma } from "@/lib/db";
 import { displayCompanyCaseFolio, ensureOriginCompanyServiceNumber, revealAuthorizedIntercompanyOrders } from "@/lib/folios";
 import { serviceClientForCompany } from "@/lib/intercompany-client";
@@ -52,6 +54,8 @@ import { isNormalDiagnosisPriority, isPaidDiagnosisPriority } from "@/lib/diagno
 import { historyFor } from "@/lib/history";
 import { can } from "@/lib/permissions";
 import { ATTENTION_LABEL, type AttentionType } from "@/lib/priorities";
+import { technicalServiceConcept } from "@/lib/quote-concept";
+import { serviceDeliveryDaysRequired } from "@/lib/service-ceo-price";
 import { diagnosisPresolicitudEditable, fieldPresolicitudOnly, PRESOLICITUD_LABEL } from "@/lib/part-presolicitud";
 import { canCloseRepair, CASE_STATUS_LABEL, lastTechnicianWhoClosedEquipmentCase } from "@/lib/technical";
 import { homePath } from "@/lib/home";
@@ -95,6 +99,23 @@ export default async function OperacionDetallePage({ params }: { params: Promise
   }
   const row = loadedRow!;
   const displayFolio = displayCompanyCaseFolio(row.folio, row.attention, session.activeCompanyId);
+  const servicePrice = row.equipment.originCompanyId === session.activeCompanyId
+    ? await prisma.serviceCeoPrice.findUnique({
+        where: { companyId_technicalCaseId: { companyId: session.activeCompanyId, technicalCaseId: row.id } },
+      })
+    : null;
+  const serviceQuoteLink = await prisma.quoteLine.findFirst({
+    where: {
+      sourceTechnicalCaseId: row.id,
+      quote: { quoteType: "SERVICIOS_EXISTENTES", status: { in: ["PENDIENTE_DECISION", "AUTORIZADA", "AUTORIZADA_PENDIENTE_EQUIPO"] } },
+    },
+    select: { quote: { select: { id: true, folio: true, status: true } } },
+  });
+  const servicePriceLocked = serviceQuoteLink?.quote.status === "AUTORIZADA" || serviceQuoteLink?.quote.status === "AUTORIZADA_PENDIENTE_EQUIPO";
+  const showServicePriceForm = can(session.role, "quote.price", session.activeCompanyCode)
+    && row.equipment.originCompanyId === session.activeCompanyId
+    && !servicePriceLocked
+    && (row.ceoPricePending || servicePrice != null);
   const siblingCases = await prisma.technicalCase.findMany({
     where: { attentionId: row.attentionId, id: { not: row.id } },
     select: { id: true, folio: true, kind: true, quotePending: true, spawnedFromId: true },
@@ -423,13 +444,8 @@ export default async function OperacionDetallePage({ params }: { params: Promise
           finishRepairAction={finishRepairAction}
         />
       );
-    } else if (row.quotePending && can(session.role, "quote.price", session.activeCompanyCode)) {
-      primaryAction = (
-        <form action={prepareFromCaseAction} className="inline">
-          <input type="hidden" name="caseId" value={row.id} />
-          <Button type="submit">Preparar cotización</Button>
-        </form>
-      );
+    } else if (showServicePriceForm && row.ceoPricePending) {
+      primaryAction = <DetailAnchorButton href="#asignar-precio">Asignar precio</DetailAnchorButton>;
     } else if (row.warrantyDecision === "NO_PROCEDENTE" && !row.commercialDecision && (session.role === "CEO" || session.role === "ADMINISTRADOR")) {
       primaryAction = <DetailAnchorButton href="#decision-comercial">Decidir comercialmente</DetailAnchorButton>;
     }
@@ -701,6 +717,56 @@ export default async function OperacionDetallePage({ params }: { params: Promise
         }
       />
       {dxSinReparacionVentasCard}
+      {showServicePriceForm ? (
+        <Card id="asignar-precio" className="mb-4 p-4 text-sm">
+          <h2 className="font-medium">{servicePrice ? "Corregir precio del servicio" : "Asignar precio"}</h2>
+          <p className="mt-1 text-[var(--muted)]">
+            El precio queda en {row.folio}. No crea una cotización comercial.
+            {serviceQuoteLink && serviceQuoteLink.quote.status === "PENDIENTE_DECISION"
+              ? ` También actualiza la partida de ${serviceQuoteLink.quote.folio}.`
+              : ""}
+          </p>
+          <form action={assignServiceCeoPriceAction} className="mt-3 grid gap-3 md:grid-cols-2">
+            <input type="hidden" name="caseId" value={row.id} />
+            <Field label="Concepto" className="md:col-span-2">
+              <textarea name="concept" required rows={3} defaultValue={servicePrice?.concept ?? technicalServiceConcept(row.equipment)} className={controlClass} />
+            </Field>
+            <Field label="Precio">
+              <MoneyInput name="amount" required defaultValue={servicePrice?.amount ?? row.attention.priorityPrice ?? ""} />
+            </Field>
+            <Field label="Tiempo de entrega (días hábiles)" hint={serviceDeliveryDaysRequired(row.kind, row.attention.attentionType) ? "Obligatorio." : "Opcional en reparación Express."}>
+              <input
+                name="deliveryBusinessDays"
+                type="number"
+                min={1}
+                step={1}
+                required={serviceDeliveryDaysRequired(row.kind, row.attention.attentionType)}
+                defaultValue={servicePrice?.deliveryBusinessDays ?? (row.attention.prioritySlaMaxDays >= 1 ? row.attention.prioritySlaMaxDays : "")}
+                className={controlClass}
+              />
+            </Field>
+            <div className="md:col-span-2">
+              <FormActions>
+                <SubmitButton>{servicePrice ? "Guardar precio" : "Asignar precio"}</SubmitButton>
+              </FormActions>
+            </div>
+          </form>
+        </Card>
+      ) : servicePrice && row.equipment.originCompanyId === session.activeCompanyId ? (
+        <Card className="mb-4 p-4 text-sm">
+          <h2 className="font-medium">Servicio con precio</h2>
+          <p className="mt-1 text-[var(--muted)]">
+            {row.folio} ya tiene precio
+            {serviceQuoteLink ? (
+              <>
+                {" "}y está en{" "}
+                <TextLink href={`/cotizaciones/${serviceQuoteLink.quote.id}`}>{serviceQuoteLink.quote.folio}</TextLink>
+                {servicePriceLocked ? " (autorizada)." : " (sin autorizar)."}
+              </>
+            ) : ". Todavía no está en una cotización."}
+          </p>
+        </Card>
+      ) : null}
       {readOnly ? <p className="mb-4 text-sm text-[var(--muted)]">Consulta de solo lectura. SYSTRON no modifica el estado ni la bitácora de Servomotores.</p> : null}
       <DetailGrid>
         <div className="space-y-4">

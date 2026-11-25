@@ -32,6 +32,9 @@ export function QuoteDraft({
   fixedQuoteType,
   diagnosisPriorities = [],
   mantenimientoPriorities = [],
+  pricedServices = [],
+  initialQuoteType,
+  defaultServiceIds = [],
 }: {
   clients: Client[];
   equipment: ServiceEquipmentOption[];
@@ -48,10 +51,20 @@ export function QuoteDraft({
   fixedQuoteType?: QuoteType;
   diagnosisPriorities?: PriorityOption[];
   mantenimientoPriorities?: PriorityOption[];
+  pricedServices?: Array<{
+    technicalCaseId: string;
+    folio: string;
+    clientId: string;
+    concept: string;
+    amountLabel: string;
+    equipmentLabel: string;
+  }>;
+  initialQuoteType?: QuoteType;
+  defaultServiceIds?: string[];
 }) {
   const [clientId, setClientId] = useState(defaultClientId);
   const [createdClients, setCreatedClients] = useState<Client[]>([]);
-  const [quoteType, setQuoteType] = useState<QuoteType>(fixedQuoteType ?? "DIAGNOSTICO");
+  const [quoteType, setQuoteType] = useState<QuoteType>(fixedQuoteType ?? initialQuoteType ?? "DIAGNOSTICO");
   const [equipmentKind, setEquipmentKind] = useState<"EQUI" | "MOT">(quickEquipmentKinds?.[0] ?? "EQUI");
   const filteredDiagnosisPriorities = useMemo(
     () => filterDiagnosisPrioritiesForEquipment(diagnosisPriorities, companyCode, equipmentKind),
@@ -66,6 +79,11 @@ export function QuoteDraft({
   const activeType = fixedQuoteType ?? quoteType;
   const isEquipmentSale = activeType === "VENTA_EQUIPO";
   const isFieldService = activeType === "CAMPO";
+  const isExistingServices = activeType === "SERVICIOS_EXISTENTES";
+  const clientServices = useMemo(
+    () => pricedServices.filter((row) => row.clientId === clientId),
+    [pricedServices, clientId],
+  );
   const requiresEquipment = activeType === "DIAGNOSTICO" || activeType === "REPARACION" || activeType === "MANTENIMIENTO_PREVENTIVO";
   const requiresDiagnosisPriority = activeType === "DIAGNOSTICO" && !fixedQuoteType;
   const requiresMantenimientoPriority = activeType === "MANTENIMIENTO_PREVENTIVO" && !fixedQuoteType;
@@ -149,6 +167,43 @@ export function QuoteDraft({
         </>
       ) : null}
 
+      {isExistingServices ? (
+        <FormBlock
+          title="2. Servicios con precio"
+          description="Solo servicios de este cliente que el CEO ya cotizó y que no están en otra cotización abierta."
+          columns={1}
+        >
+          {!clientId ? (
+            <p className="text-sm text-[var(--muted)]">Elige un cliente para ver sus servicios con precio.</p>
+          ) : clientServices.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-[var(--line)] px-3 py-4 text-sm text-[var(--muted)]">
+              Este cliente no tiene servicios con precio disponibles.
+            </p>
+          ) : (
+            <ul className="grid gap-2">
+              {clientServices.map((service) => (
+                <li key={service.technicalCaseId}>
+                  <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-[var(--line)] bg-white px-3 py-3 has-[:checked]:border-[var(--accent)] has-[:checked]:bg-[var(--accent-soft)]">
+                    <input
+                      type="checkbox"
+                      name="serviceCaseId"
+                      value={service.technicalCaseId}
+                      defaultChecked={defaultServiceIds.includes(service.technicalCaseId)}
+                      className="mt-1"
+                    />
+                    <span className="text-sm leading-snug">
+                      <span className="font-medium">{service.folio}</span>
+                      <span className="mt-0.5 block text-[var(--muted)]">{service.equipmentLabel}</span>
+                      <span className="mt-0.5 block">{service.amountLabel}</span>
+                    </span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+          )}
+        </FormBlock>
+      ) : null}
+
       {requiresEquipment ? (
         <FormBlock title="2. Equipo" description="El catálogo solo sugiere tipo, marca y modelo para la etiqueta. Siempre se crea un folio nuevo; para un EQUI ya registrado abre el servicio desde su ficha." columns={1}>
           <ServiceEquipmentPicker
@@ -168,7 +223,7 @@ export function QuoteDraft({
         </FormBlock>
       ) : null}
 
-      {!isFieldService && !isEquipmentSale && !requiresEquipment ? (
+      {!isFieldService && !isEquipmentSale && !requiresEquipment && !isExistingServices ? (
         <FormBlock title="2. Equipo" description="Relaciona un equipo si aplica. Puedes continuar sin uno." columns={1}>
           <ServiceEquipmentPicker
             equipment={equipment}
