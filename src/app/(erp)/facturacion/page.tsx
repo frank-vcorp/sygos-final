@@ -3,16 +3,10 @@ import { BillingVistaFilter } from "@/components/compact-list-filters";
 import { FacturacionDocumentsList } from "@/components/facturacion-documents-list";
 import { ActionLink, ActiveFilters, Empty, PageHeader } from "@/components/ui";
 import { homePath } from "@/lib/home";
-import { prisma } from "@/lib/db";
+import { loadFacturacionDocumentListRows } from "@/lib/billing-documents-list-data";
+import { facturacionListUsesPaymentMethodColumn } from "@/lib/billing-list-payment-method";
 import { coordFilterChips, coordPageSubtitle, coordPageTitle, coordUsesSidebarNav } from "@/lib/coordination-ui";
 import { can } from "@/lib/permissions";
-import {
-  batchLoadBillingDocumentServiceLinks,
-  linksForBillingDocument,
-  pickBillingDocumentTechnicalCaseId,
-} from "@/lib/billing-document-service-links";
-import { fiscalBadgeInfo } from "@/lib/billing-badges";
-import { billingSalesListDetailHref } from "@/lib/billing-sales";
 import { requireCompany } from "@/lib/session";
 
 type Vista = "solicitudes" | "facturas" | "canceladas" | "remisiones" | "todas";
@@ -38,42 +32,14 @@ export default async function FacturacionPage({ searchParams }: { searchParams: 
           : vista === "facturas"
             ? { kind: { not: "REMISION" }, status: { not: "CANCELADA" } }
             : {};
-  const rows = await prisma.billingDocument.findMany({
-    where: {
-      companyId: session.activeCompanyId,
-      ...where,
-      ...(session.role === "VENTAS" ? { client: { ownerUserId: session.userId } } : {}),
-    },
-    include: { client: true, quote: { select: { technicalCaseId: true } } },
-    orderBy: { createdAt: "desc" },
-    take: 100,
+  const documentListRows = await loadFacturacionDocumentListRows({
+    companyId: session.activeCompanyId,
+    role: session.role,
+    userId: session.userId,
+    where,
+    ventasScope: session.role === "VENTAS",
   });
-  const serviceLinkMap = await batchLoadBillingDocumentServiceLinks(
-    rows.map((row) => pickBillingDocumentTechnicalCaseId(row)),
-    session.activeCompanyId,
-  );
-  const documentListRows = rows.map((row) => {
-    const serviceLinks = linksForBillingDocument(row, serviceLinkMap);
-    const fiscal = fiscalBadgeInfo(row);
-    return {
-      id: row.id,
-      folio: row.folio,
-      diagnosisFolio: serviceLinks.diagnosisFolio,
-      diagnosisHref: serviceLinks.diagnosisHref,
-      osFolio: serviceLinks.osFolio,
-      osHref: serviceLinks.osHref,
-      kind: row.kind,
-      clientId: row.client.id,
-      clientName: row.client.name,
-      clientIsSystem: row.client.isSystem,
-      status: row.status,
-      total: row.total,
-      createdAt: row.createdAt.toISOString(),
-      fiscalTone: fiscal?.tone ?? null,
-      fiscalLabel: fiscal?.label ?? null,
-      detailHref: billingSalesListDetailHref(session.role, row),
-    };
-  });
+  const showPaymentMethodColumn = facturacionListUsesPaymentMethodColumn(session.role);
   const tabs: Array<{ href: string; label: string; active: boolean; key: Vista }> = [
     { href: "/facturacion", label: "Todas", active: vista === "todas", key: "todas" },
     { href: "/facturacion?vista=solicitudes", label: "Solicitudes", active: vista === "solicitudes", key: "solicitudes" },
@@ -99,8 +65,12 @@ export default async function FacturacionPage({ searchParams }: { searchParams: 
       <ActiveFilters
         items={coordFilterChips(sidebarNav, vista !== "todas" && vistaLabel ? [{ label: vistaLabel, clearHref: "/facturacion" }] : [])}
       />
-      {rows.length === 0 ? <Empty title="Sin documentos" body="Una factura nace de una operación autorizada o de una factura libre." /> : (
-        <FacturacionDocumentsList rows={documentListRows} canEditClient={canEditClient} />
+      {documentListRows.length === 0 ? <Empty title="Sin documentos" body="Una factura nace de una operación autorizada o de una factura libre." /> : (
+        <FacturacionDocumentsList
+          rows={documentListRows}
+          canEditClient={canEditClient}
+          showPaymentMethodColumn={showPaymentMethodColumn}
+        />
       )}
     </>
   );
