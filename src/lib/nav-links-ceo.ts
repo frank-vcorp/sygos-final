@@ -28,7 +28,8 @@ export const CEO_NAV_GROUPS: NavGroupDef[] = [
   {
     title: "Administración",
     links: [
-      { href: "/facturacion", label: "Facturación", show: showCeo },
+      { href: "/facturacion?vista=facturas", label: "Facturación", show: showCeo },
+      { href: "/remisiones", label: "Remisiones", show: showCeo },
       { href: "/compras", label: "Compras", show: showCeo },
       { href: "/compras?vista=oc", label: "Órdenes de compra", show: showCeo },
       { href: "/proveedores", label: "Proveedores", show: showCeo },

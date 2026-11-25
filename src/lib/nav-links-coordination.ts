@@ -34,7 +34,8 @@ export const COORDINATION_NAV_GROUPS: NavGroupDef[] = [
   {
     title: "Administración",
     links: [
-      { href: "/facturacion", label: "Facturación", show: showCoord },
+      { href: "/facturacion?vista=facturas", label: "Facturación", show: showCoord },
+      { href: "/remisiones", label: "Remisiones", show: showCoord },
       { href: "/compras", label: "Compras", show: showCoord },
       { href: "/compras?vista=oc", label: "Órdenes de compra", show: showCoord },
       { href: "/compras/listas", label: "Listas de compras", show: (role, code) => showCoord(role) && code === "SYSTRON" },

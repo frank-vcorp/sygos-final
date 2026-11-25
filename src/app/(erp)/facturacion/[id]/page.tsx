@@ -42,6 +42,7 @@ import {
 import { setFlash } from "@/lib/flash";
 import { can } from "@/lib/permissions";
 import { redirectIfSalesNotAssigned } from "@/lib/sales-assignment";
+import { billingListBackHref } from "@/lib/billing-nav-split";
 import { requireCompany } from "@/lib/session";
 
 const KIND_LABEL: Record<string, string> = {
@@ -213,10 +214,11 @@ export default async function DocumentoPage({ params }: { params: Promise<{ id: 
     );
   }
 
+  const listBack = billingListBackHref(session.role, row.kind);
   return (
     <>
       <EntityDetailHeader
-        back={{ href: "/facturacion", label: "Facturación" }}
+        back={listBack}
         title={row.folio}
         subtitle={KIND_LABEL[row.kind] ?? row.kind}
         status={
